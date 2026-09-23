@@ -1,0 +1,2 @@
+{"id": "cf5dcb76ddf9", "ts": "2026-09-23T13:27:04+00:00", "agent": "humano", "type": "decision", "title": "ADR-000: Java 21 + Spring Boot, 4 serviços + orquestrador", "detail": "Escolhido pelo humano no kickoff; prazo de 3-4h", "refs": ["CLAUDE.md"]}
+{"id": "1da45e1d6c51", "ts": "2026-09-23T13:27:04+00:00", "agent": "orquestrador", "type": "task", "title": "F1: desenhar arquitetura, Saga e contratos", "to": "arquiteto", "refs": [".claude/agents/arquiteto.md"]}
