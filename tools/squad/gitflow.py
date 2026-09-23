@@ -31,7 +31,7 @@ def sh(*cmd: str, check=True, capture=True) -> str:
     out = subprocess.run(cmd, cwd=ROOT, capture_output=capture, text=True)
     if check and out.returncode != 0:
         sys.exit(f"falhou: {' '.join(cmd)}\n{(out.stderr or out.stdout).strip()}")
-    return (out.stdout or "").strip()
+    return (out.stdout or "").rstrip()  # rstrip: o porcelain do git começa com espaço significativo
 
 
 def log(title: str, detail: str = "", demand: str | None = None, ref: str | None = None, branch: str | None = None):
