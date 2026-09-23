@@ -74,7 +74,8 @@ Ao terminar sua tarefa, todo agente:
 3. O próximo agente só começa após o **Auditor** avaliar o gate correspondente (`docs/squad/gates.md`).
 
 ## Limites de autonomia
-- Subagentes não fazem `git push` nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.
+- Subagentes não fazem `git push` nem merge. O Orquestrador abre os PRs via `tools/squad/gitflow.py`;
+  **quem integra (merge) é sempre o revisor humano** (ADR-011).
 - Nenhum agente altera credenciais ou remove dados fora do seu diretório.
 - Mudança de contrato de evento/API → exige ADR do Arquiteto.
 - Gate com confiança < 70% ou risco "alto" → intervenção humana **obrigatória**; caso contrário é opcional.

@@ -132,12 +132,16 @@ def pr_number(url: str) -> int:
 
 
 def open_review(base: str, head: str, title: str, body: str, demand: str | None = None, release: str | None = None) -> str:
-    """Abre (ou reutiliza) o PR e registra UM evento `review`. Ninguém da squad faz merge (ADR-011)."""
+    """Abre (ou reutiliza) o PR, VOLTA para a develop e só então registra UM `review` — no log que o plantão lê
+    (devolução do G2-D8: gravado na feature branch, o evento sumia ao voltar para a develop). Ninguém da squad faz merge."""
     url = pr(base, head, title, body)
+    switch("develop")
+    sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop", check=False)
     already = [e for e in events() if e.get("type") == "review" and e.get("url") == url]
     if not already:
         event("review", f"PR #{pr_number(url)} aberto para revisão humana: {title}", demand=demand, release=release,
               pr=pr_number(url), url=url, branch=head)
+    snapshot_state()
     return url
 
 
@@ -157,18 +161,32 @@ def feature_finish(a):
     evid = [f"- {v['name']}: {v['status']}" for e in evs if e.get("demand") == a.demand and e.get("type") in ("evidence", "handoff")
             for v in e.get("evidences", [])]
     sh("git", "push", "-q", "-u", "origin", branch)
+    val = [e for e in evs if e.get("type") == "validation" and e.get("demand") == a.demand]
+    ans = [e for e in evs if e.get("type") == "clarification" and e.get("demand") == a.demand]
+    amap = {x["id"]: x["text"] for x in (ans[-1].get("answers", []) if ans else [])}
+    qa = [f"- **{q['text']}**\n  → {amap.get(q['id'], '(sem resposta)')}" for q in (val[-1].get("questions", []) if val else [])]
+    try:
+        issue = json.loads((ROOT / "docs/squad/memory/github-sync.json").read_text())["issues"].get(a.demand, {}).get("number")
+    except (OSError, json.JSONDecodeError, KeyError):
+        issue = None
+    stat = sh("git", "diff", "--stat", "origin/develop...HEAD", check=False).splitlines()[-12:]
     body = "\n".join([
+        *([f"Refs #{issue}", ""] if issue else []),
         f"## Demanda `{a.demand}` — {demand.get('title', '').replace('Demanda: ', '')}",
         "", (demand.get("detail") or "").strip(), "",
         "## Pareceres do Auditor",
         *[f"- {g['gate']} · {g.get('recommendation')} · {round((g.get('confidence') or 0) * 100)}% · risco {g.get('risk')}" for g in gates],
         "", f"**G3:** {gate.get('detail', '')}", "",
         "## Evidências", *(evid or ["- (ver log da squad)"]), "",
+        *(["## Perguntas da validação e respostas do humano", *qa, ""] if qa else []),
+        "## Artefatos alterados", "```", *stat, "```", "",
+        "## Checklist do revisor",
+        "- [ ] O diff corresponde aos critérios de aceite da demanda",
+        "- [ ] Nenhum contrato de evento/API mudou sem ADR",
+        "- [ ] Evidências (testes, capturas) conferidas", "",
         "> Pronta para **revisão humana**. O merge é do revisor; ao integrar, a demanda vira *Entregue* no Squad Control.",
         "", "🤖 Generated with [Claude Code](https://claude.com/claude-code)"])
     url = open_review("develop", branch, a.title or demand.get("title", branch).replace("Demanda: ", ""), body, demand=a.demand)
-    switch("develop")
-    snapshot_state()
     print(url)
 
 
@@ -255,7 +273,6 @@ def release_finish(a, kind="release"):
                       f"{kind.capitalize()} {a.version} — pronta para **revisão humana**. Após o merge, "
                       f"`gitflow.py {kind}-publish {a.version}` cria a tag e abre o PR de back-merge.\n\n## [{a.version}]{notes}"
                       f"\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)", release=a.version)
-    switch("develop")
     print(url)
 
 
@@ -288,7 +305,6 @@ def release_publish(a, kind="release"):
     url = open_review("develop", back, f"Back-merge {tag} em develop e {nxt}",
                       f"Back-merge da {kind} {a.version} e próxima versão {nxt}. Revisão humana.\n\n"
                       "🤖 Generated with [Claude Code](https://claude.com/claude-code)", release=f"{a.version}-back-merge")
-    switch("develop")
     print(url)
 
 

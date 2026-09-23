@@ -1,0 +1,33 @@
+{
+  "gate": "G2",
+  "demand": "349e5b1bf818",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.71,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Nenhum merge pela squad", "status": "pass", "weight": 2, "blocking": true,
+     "source": "grep '\"pr\", \"merge\"' e 'pr merge' em tools/squad/*.py e squad-control/index.html → vazio. No teste com gh falso, nenhuma chamada 'gh pr merge' foi registrada. O único 'git merge' (gitflow.py:281) é o back-merge main → develop feito numa branch chore/back-merge-<v> e aberto como PR (open_review), o que trata a ressalva 1 do G1-D8. AGENTS.md:48/53: 'merge é do humano'"},
+    {"name": "feature-finish: --demand, G3 e um único review", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Repo git temporário + remote bare local + gh falso no PATH (sem GitHub real): sem --demand → erro do argparse; sem G3 → 'G3 da demanda ainda não aprovado… o PR não é aberto'; --force → 'unrecognized arguments'; com G3 APPROVE → push + 1 'gh pr create' e PR #42; 2ª execução reutiliza o PR (só 'gh pr list') e não duplica o review"},
+    {"name": "review-sync/pending no fluxo real", "status": "fail", "weight": 3, "blocking": true,
+     "source": "DEFEITO DE INTEGRAÇÃO: feature_finish grava o evento review (open_review → log.py, cwd=ROOT) ENQUANTO está na feature branch e depois chama switch('develop'), cujo snapshot_state() commita a memória NA FEATURE. Na develop o decisions.jsonl não tem o review (nem o G3/handoffs da demanda): 'git show develop:…decisions.jsonl' só tem a task. Resultado reproduzido: pending.py → 'nada pendente' com o PR MERGED, e review-sync → 'nenhum PR em revisão para esse item'. Como o PR não é integrado pela squad, a develop só receberia esse log DEPOIS do merge humano, que nunca é detectado. Em worktree, o event() escreve no log do worktree, também fora do log principal lido pelo painel/vigia. A lógica em si funciona quando o review está no log lido: com o review copiado para a develop, OPEN → nada, MERGED → 'revisão integrada', review-sync → delivered (mergeCommit abcdef123456, mergedBy, branch da feature apagada) e idempotente; CLOSED → 'revisão recusada' e review-rejected com os comentários no detail"},
+    {"name": "release-publish", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Com PR da release OPEN → 'o PR da release ainda não foi integrado pelo humano (estado: OPEN)'. Com MERGED (revisão de código): gh release create --target <merge commit>, delivered com mergeCommit e back-merge por PR (chore/back-merge-<v> → develop, review release '<v>-back-merge'); o pending não o trata como 'release pronta'"},
+    {"name": "Campos consumidos por sync e painel", "status": "pass", "weight": 1, "blocking": false,
+     "source": "log.py grava pr, url, release, mergeCommit (+ branch). github_sync (on_review/on_delivered/on_review_rejected) lê e.get('pr'/'url'/'mergeCommit'); o G3 APPROVE da demanda não fecha mais a issue (github_sync.py:351-352, Status 'Em andamento'). O painel lê e.pr, e.url, e.mergeCommit e e.release e trata os tipos review, delivered e review-rejected"},
+    {"name": "Cache de 30 s do pending.py", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Só o estado OPEN fica em cache por 30 s; MERGED/CLOSED nunca são servidos do cache. Teste: OPEN em cache → MERGED não aparece antes de 30 s; com o cache 31 s mais velho → 'revisão integrada'. Sem gh/saída vazia → mantém o último estado ou OPEN (sem falso positivo)"},
+    {"name": "Corpo do PR (CA3)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Corpo gerado: título/descrição da demanda, pareceres do Auditor (todos os gates com recomendação/confiança/risco), detalhe do G3, evidências e rodapé. Faltam, frente ao §2.1: perguntas/respostas de clarification, 'Refs #<issue>', Artefatos e 'Checklist do revisor humano'"}
+  ],
+  "open_risks": [
+    "CORRIGIR (Orquestrador, gitflow.py feature_finish/open_review e release_finish/release_publish): o review (e os eventos que o precedem) precisam estar no log que o vigia/painel leem. Opções: registrar o review DEPOIS de switch('develop') e snapshot na develop; ou fazer event()/log() gravar sempre no log do diretório principal (ex.: variável de ambiente com o caminho do log) em vez do log da branch/worktree. Reteste: após feature-finish, 'git show develop:docs/squad/memory/decisions.jsonl' contém o review, e pending.py detecta MERGED sem cópia manual.",
+    "Completar o corpo do PR (CA3): clarifications (pergunta ↔ resposta), 'Refs #<issue>', artefatos e checklist do revisor.",
+    "AGENTS.md:77 ainda diz 'quem integra é o Orquestrador, via gitflow.py'; alinhar com 'o merge é do humano'."
+  ],
+  "human_required": false,
+  "rationale": "Sem nenhum efeito no GitHub real (repo e remote temporários, gh falso), confirmei: nenhum merge pela squad, --force removido, --demand e G3 obrigatórios, PR único e idempotente, delivered/review-rejected corretos quando o review está no log, release-publish recusando sem MERGED com back-merge por PR, campos coerentes entre log, sync e painel, e cache sem esconder MERGED/CLOSED além de 30 s. Porém, no fluxo real, o evento review fica commitado só na feature branch (feature_finish grava antes de voltar para a develop), então pending.py e review-sync na develop nunca veem o PR e a entrega nunca é detectada. É um bloqueante de integração com correção pequena; devolvo ao Orquestrador (ciclo 1). Confiança = (2+3+0+1+1+1+0.5)/12 = 0.71."
+}
