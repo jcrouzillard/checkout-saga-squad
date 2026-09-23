@@ -1,0 +1,14 @@
+{
+  "demand": "c6f83b5bb5c7",
+  "title": "testes de integração e timeout em todas as etapas",
+  "detail": "desafio pede testes de integração e \"timeout em qualquer etapa\". Hoje os testes Java são só unitários, com mocks, e o e2e de timeout cobre apenas o pagamento. O tests/TRACEABILITY.md também está desatualizado em relação ao último relatório e2e.\n\nCritérios de aceite:\n1. Testes de integração com Testcontainers (Postgres e Kafka), cobrindo:\n   - POST /orders com Idempotency-Key: replay e 409;\n   - GET /orders/{orderId};\n   - outbox e relay publicando no Kafka;\n   - consumidor idempotente descartando duplicata;\n   - mensagem venenosa indo para o DLT.\n     Mudanças no pom.xml passam por solicitação de mudança ao Backend.\n2. Novos cenários e2e timeout_inventory e timeout_shipping (este deve mostrar o cancelamento do envio, o estorno e a liberação do estoque), mais um timeout_once terminando em CONFIRMED.\n3. Cenário e2e que verifica automaticamente, pela API do Jaeger, que o pedido gera um trace único passando pelos 5 serviços.\n4. last-report.json com data de execução e todos os cenários PASS.\n5. tests/TRACEABILITY.md refeito a partir do relatório novo, com número de cenários, orderIds e estoque coerentes.\n6. README §4 e §9 atualizados; a limitação de \"cobertura e2e de timeout\" sai da lista.\n7. Nenhum contrato de evento ou API muda.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T17:44:03+00:00",
+  "kind": "produto",
+  "clarifications": [],
+  "override": false,
+  "fromBacklog": true
+}
