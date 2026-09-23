@@ -1,0 +1,35 @@
+{
+  "demand": "349e5b1bf818",
+  "title": "Entrega de alterações no produto",
+  "detail": "Preciso que gere PRs para entregar o produto, seguindo Git Flow, né? A gente não pode esquecer disso, então tudo que é entregue invalidado tem que aparecer no merge.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T18:11:31+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Quais entregas entram? Existem várias feature branches sem integração (D3-emojis-nos-agentes, D4-formulario-e-validacao-de-demanda, D5-backlog-de-demandas, P1-portabilidade-entre-fornecedores, gitflow, gitflow-trocas-seguras e a D6 atual, que ainda está em andamento). São todas ou só algumas? E o alvo é apenas o PR feature → develop, ou também uma release/x.y.z → main com tag? Nesse caso, qual versão?",
+      "dimension": "escopo",
+      "answer": "A verdade é sobre as próximas, né? Conforme eu quero que tenham Git Flow na forma de entregar cada demanda que a gente gera"
+    },
+    {
+      "question": "O que significa 'tudo que é entregue invalidado tem que aparecer no merge'? (a) Integrar também o que não tem G3 APPROVE, deixando essa pendência explícita no PR. (b) Era 'validado': cada PR deve mostrar o parecer G3 do Auditor, como o gitflow.py já faz no feature-finish. (c) Outra coisa.",
+      "dimension": "objetivo",
+      "answer": "É a opção B."
+    },
+    {
+      "question": "Se for a opção (a): você autoriza o uso de `--force` para integrar em develop demandas sem G3 aprovado? Pelo AGENTS.md, isso exige decisão humana registrada, por demanda ou em bloco.",
+      "dimension": "restricoes",
+      "answer": "Aplica"
+    },
+    {
+      "question": "Quando a demanda está pronta: com os PRs abertos no GitHub para revisão humana, ou com os PRs já mergeados? E onde a informação exigida deve aparecer: na descrição do PR, na mensagem do merge commit ou no CHANGELOG da release?",
+      "dimension": "aceite",
+      "answer": "Ela está pronta quando está para revisão humana, e ela está entregue quando tiver emergido."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
