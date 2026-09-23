@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "c6f83b5bb5c7",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "7 critérios mapeados", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Task c6f83b5bb5c7 × docs/architecture/testes.md: (1) ITs Testcontainers Postgres+Kafka no order-service (§2): OrderApiIT (replay 200 + Idempotent-Replayed, 409, 400, GET 200/404), OutboxRelayIT, IdempotentConsumerIT (mesmo messageId 2×), DeadLetterIT (não-JSON → order.commands.DLT e consumidor segue); pom via change-request ao Backend (§7). (2) timeout_inventory, timeout_shipping (shipment CANCELED, payment REFUNDED, reserva RELEASED, estoque restaurado) e timeout_once → CONFIRMED (§3, §4). (3) trace_end_to_end com traceparent conhecido + GET /api/traces/{id} exigindo os 5 serviços, FAIL se Jaeger fora (§5). (4) last-report com executedAt/gitCommit/total/passed/failed (§6). (5) TRACEABILITY regenerado do relatório (§6). (6) README §4/§9, removendo a limitação da linha 216 (§7). (7) nenhuma mudança de contrato (§7)"},
+    {"name": "Nenhum contrato muda", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop -- docs/contracts → vazio. saga.md §5.2.1 só confirma comportamento já contratado: shipment.cancel/shipment.canceled em events.md (linhas 29-30, 100, 190-191), já implementados (SagaStatus.CANCELING_SHIPMENT); DLT em events.md:18-19 e KafkaCommonConfiguration (DeadLetterPublishingRecoverer). O formato novo de last-report.json é artefato de teste, não contrato de produto"},
+    {"name": "Critérios verificáveis para G2/G3", "status": "pass", "weight": 3, "blocking": true,
+     "source": "testes.md §8: G2 = mvn verify com ≥ 4 classes IT e 0 skipped (failsafe-reports), mvn test sem Docker, diff vazio em contracts/src/main exceto poms aprovados, sem Thread.sleep; G3 = total=12, failed=0, skipped=0 com os 4 cenários novos, detail do timeout_shipping e do trace (traceId + 5 serviços), TRACEABILITY coerente, README §4/§9. Regra explícita: histórico sem COMPENSATED = defect do Backend, não ajuste do teste"},
+    {"name": "Ownership e ADR", "status": "pass", "weight": 2, "blocking": false,
+     "source": "§7: pom.xml raiz e do order-service → Backend via change-request do QA; ITs em services/order-service/src/test/** e tests/** → QA (AGENTS.md); README → Orquestrador; docs/architecture e ADR → Arquiteto; código de produção intocado. ADR-010 com decisão (*IT + failsafe, @ServiceConnection, traceparent determinístico), consequências e 3 alternativas"}
+  ],
+  "open_risks": [
+    "CI: .github/workflows/ci.yml já roda 'mvn -B verify' em ubuntu-latest (com Docker), então os ITs passam a rodar no job 'Build & testes unitários' e aumentam seu tempo (pull de postgres:16-alpine e apache/kafka-native). Sem Docker (local), verify falha de propósito; documentar -DskipITs no README. Renomear o job ou separar ITs é mudança do DevOps (change-request), não obrigatória.",
+    "DeadLetterIT depende de order.commands.DLT existir: o KafkaAdmin cria Topics.ALL (a conferir se inclui .DLT); se não incluir, conta com auto-criação de tópicos do contêiner Kafka. Confirmar no G2.",
+    "Tempo e estabilidade da suíte e2e: +3 cenários de timeout (~20–60 s cada) e o trace depende do Jaeger indexar em ≤ 30 s; o timeout_shipping pode revelar defeito real na cadeia de compensação (tratar como defect do Backend, conforme §4)."
+  ],
+  "human_required": false,
+  "rationale": "A estratégia de testes (testes.md), o ADR-010 e o acréscimo em saga.md §5.2.1 mapeiam os 7 critérios da demanda para classes, cenários, arquivos e donos, sem mudar nenhum contrato (diff vazio em docs/contracts; shipment.cancel e DLT já contratados e implementados). Os critérios de G2/G3 são objetivos e numéricos. O ownership está correto: pom por change-request ao Backend, testes com o QA, README com o Orquestrador. Riscos operacionais registrados: tempo do verify no CI (que tem Docker), tópico DLT e estabilidade dos novos e2e. Confiança = 10/10 = 1.00."
+}
