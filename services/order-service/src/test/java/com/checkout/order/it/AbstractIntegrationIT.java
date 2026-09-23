@@ -9,8 +9,6 @@ import org.awaitility.Awaitility;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -27,22 +25,33 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Base dos testes de integração do order-service (D6, ADR-010): Spring Boot completo (contexto real,
  * Flyway, JDBC, Kafka) contra Postgres e Kafka REAIS via Testcontainers — não mocks. Sem Docker
  * disponível, {@code mvn verify} falha nesta classe (evidência honesta; {@code -DskipITs} é a saída
- * explícita). Contêineres {@code static}: sobem uma vez por JVM e são compartilhados por todas as
- * classes {@code *IT}; cada teste usa dados próprios (UUID novo), sem limpeza de banco entre testes.
+ * explícita).
+ *
+ * <p><b>Padrão "singleton container"</b> (correção do G2-D6, 2º ciclo): os contêineres são
+ * {@code static}, iniciados uma única vez num bloco {@code static} e NUNCA parados explicitamente —
+ * de propósito, sem {@code @Testcontainers}/{@code @Container}. Essas anotações fazem a extensão do
+ * JUnit encerrar os contêineres ao fim de CADA classe de teste, mas o contexto Spring (cacheado pelo
+ * {@code SpringBootTest} entre classes com a mesma configuração) continua com o {@code DataSource}/
+ * {@code KafkaTemplate} apontando para as portas antigas — daí as conexões recusadas a partir da 2ª
+ * classe. {@code @ServiceConnection} continua funcionando sem {@code @Container}: é o Spring Boot,
+ * não a extensão do JUnit, quem lê essa anotação para configurar `spring.datasource.*`/
+ * `spring.kafka.*`. O JVM encerra os contêineres no shutdown (Ryuk).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers(disabledWithoutDocker = false)
 abstract class AbstractIntegrationIT {
 
     static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
 
-    @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
-    @Container
     @ServiceConnection
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.0"));
+
+    static {
+        POSTGRES.start();
+        KAFKA.start();
+    }
 
     /** Consumidor de teste puro (fora do contexto Spring), group aleatório, lê desde o início. */
     static KafkaConsumer<String, String> newConsumer(String... topics) {
