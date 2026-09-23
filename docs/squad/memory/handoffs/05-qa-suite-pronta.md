@@ -1,4 +1,4 @@
-# Handoff 05 — QA → Backend/DevOps (aguardando G2) → Jev (G3)
+# Handoff 05 — QA → Backend/DevOps (aguardando G2) → Auditor (G3)
 
 ## O que foi feito (test-first, a partir dos contratos)
 - `tests/e2e/run.sh`: bash+curl, fallback `jq`→`python3 -c`; espera `/actuator/health` dos 5
@@ -30,6 +30,6 @@
 - Rastreabilidade no Jaeger é só um link impresso (verificação visual no G3).
 
 ## Próximo agente
-Backend/DevOps concluem G2 → Jev libera execução real de `bash tests/e2e/run.sh` (ou
+Backend/DevOps concluem G2 → Auditor libera execução real de `bash tests/e2e/run.sh` (ou
 `make e2e`) → QA atualiza `tests/TRACEABILITY.md` (coluna Status) com o resultado de
 `tests/e2e/last-report.json`.

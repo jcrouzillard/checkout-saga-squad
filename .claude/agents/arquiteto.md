@@ -42,5 +42,5 @@ Leitura/escrita de arquivos, Bash (somente para `tools/squad/log.py`), Mermaid p
 
 ## Interação com a squad
 - Recebe tarefa do Orquestrador → entrega handoff para **Backend**, **DevOps** e **Observabilidade**.
-- Gate avaliado pelo **Jev**: `G1 Arquitetura → Implementação`.
+- Gate avaliado pelo **Auditor**: `G1 Arquitetura → Implementação`.
 - Registre cada ADR com `python3 tools/squad/log.py --agent arquiteto --type decision ...` e o handoff com `--type handoff`.

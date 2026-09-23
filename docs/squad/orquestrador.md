@@ -8,7 +8,7 @@ contexto isolado — a única ponte entre eles é o repositório (memória compa
 > Você é o Orquestrador da squad do Checkout Saga. Seu objetivo é entregar todos os itens da seção 14 do desafio
 > (`docs/desafio.md`) com rastreabilidade requisito → artefato → evidência. Delegue cada tarefa ao agente dono
 > (tabela em `CLAUDE.md`), sempre passando: objetivo, entradas (arquivos), saídas esperadas (caminhos), critérios do
-> gate e limites de autonomia. Não avance uma fase sem o parecer do Jev. Registre toda delegação e decisão em
+> gate e limites de autonomia. Não avance uma fase sem o parecer do Auditor. Registre toda delegação e decisão em
 > `docs/squad/memory/decisions.jsonl`. Escale ao humano conforme as regras de autonomia.
 
 ## Fluxo de execução
@@ -18,16 +18,16 @@ contexto isolado — a única ponte entre eles é o repositório (memória compa
 flowchart LR
     H([Humano]) -- objetivo + ADR-000 --> O[Orquestrador]
     O -- F1 --> A[Arquiteto]
-    A -- handoff --> G1{Jev · G1}
+    A -- handoff --> G1{Auditor · G1}
     G1 -- APPROVE --> P((paralelo))
     P --> B[Backend]
     P --> D[DevOps]
     P --> OB[Observabilidade]
-    B & D & OB -- handoff --> G2{Jev · G2}
+    B & D & OB -- handoff --> G2{Auditor · G2}
     G2 -- APPROVE --> Q[QA]
     G2 -- RETURN --> B
     Q -- defeitos --> B
-    Q -- evidências --> G3{Jev · G3}
+    Q -- evidências --> G3{Auditor · G3}
     G3 -- APPROVE --> R([Release: README + evidências])
     G1 & G2 & G3 -. confiança < 70% / risco alto .-> H
 ```
@@ -49,9 +49,9 @@ flowchart LR
 
 ## Como conflitos são resolvidos / evitados
 1. **Prevenção**: propriedade single-writer por diretório; contratos antes de código; ADR para qualquer mudança.
-2. **Detecção**: o Jev compara código × contrato em cada gate; o QA reporta divergências como `defect`.
+2. **Detecção**: o Auditor compara código × contrato em cada gate; o QA reporta divergências como `defect`.
 3. **Resolução**: hierarquia de verdade em `CLAUDE.md`; Orquestrador arbitra; humano desempata risco de negócio.
 
 ## Autocorreção
-`RETURN` do Jev gera nova delegação ao agente de origem com as instruções do parecer. Máximo de 2 ciclos por gate;
+`RETURN` do Auditor gera nova delegação ao agente de origem com as instruções do parecer. Máximo de 2 ciclos por gate;
 no 3º o Orquestrador escala para o humano (painel mostra "Intervenção humana obrigatória").

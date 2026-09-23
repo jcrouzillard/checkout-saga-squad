@@ -1,4 +1,4 @@
-# Handoff 07 — QA → Release (Jev)
+# Handoff 07 — QA → Release (Auditor)
 
 ## Resultado
 Suíte e2e 7/7 verde (`tests/e2e/last-report.json`), 60 testes unitários verdes em
@@ -25,4 +25,4 @@ seção "Correção pós-e2e"). 2ª execução: 7/7.
 
 ## Verificação feita nesta rodada
 Checagem pontual `bash tests/e2e/run.sh happy_path_physical` — PASS. Não rodei a suíte completa de
-novo (ambiente em avaliação paralela pelo Jev).
+novo (ambiente em avaliação paralela pelo Auditor).

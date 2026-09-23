@@ -1,6 +1,6 @@
 -- Migração COMPARTILHADA (lib common) — aplicada em todos os serviços.
 -- Versão 0.1 para nunca colidir com as migrações do serviço (classpath:db/migration, V1__, V2__, ...).
--- Colunas conforme docs/architecture/saga.md §3.1 (coluna do traceparent = trace_parent, parecer G1 do Jev).
+-- Colunas conforme docs/architecture/saga.md §3.1 (coluna do traceparent = trace_parent, parecer G1 do Auditor).
 
 CREATE TABLE IF NOT EXISTS outbox (
     id               BIGSERIAL PRIMARY KEY,

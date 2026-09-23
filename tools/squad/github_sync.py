@@ -5,9 +5,9 @@ O log continua sendo a fonte da verdade; o GitHub é uma projeção. O sync é i
 eventos já processados ficam em docs/squad/memory/github-sync.json.
 
   task            -> nova issue (Em andamento)
-  handoff         -> comentário com o brief; card vai para "Gate (Jev)"
+  handoff         -> comentário com o brief; card vai para "Gate (Auditor)"
   evidence        -> comentário na issue em andamento do agente
-  gate            -> parecer do Jev comentado; APPROVE fecha (Concluído), RETURN volta para Em andamento,
+  gate            -> parecer do Auditor comentado; APPROVE fecha (Concluído), RETURN volta para Em andamento,
                      confiança < 70% / risco alto -> "Intervenção humana"
   human           -> decisão humana comentada na issue do gate
   defect / change-request -> nova issue no Backlog
@@ -34,7 +34,7 @@ OWNER = os.environ.get("SQUAD_GH_OWNER", REPO.split("/")[0])
 PROJECT = os.environ.get("SQUAD_GH_PROJECT", "1")
 
 LABEL = {"orquestrador": "Orquestrador", "arquiteto": "Arquiteto", "backend": "Backend", "devops": "DevOps",
-         "observabilidade": "Observabilidade", "qa": "QA", "jev": "Jev", "humano": "Humano"}
+         "observabilidade": "Observabilidade", "qa": "QA", "auditor": "Auditor", "humano": "Humano"}
 GATE_COVERS = {"G1": ["arquiteto"], "G2": ["backend", "devops", "observabilidade"], "G3": ["qa"]}
 STATUS_ICON = {"pass": "✅", "fail": "❌", "validate": "🟡"}
 
@@ -162,7 +162,7 @@ class Sync:
             "Em andamento", {"arquiteto": "F1", "devops": "F2", "observabilidade": "F2", "backend": "F2", "qa": "F3"}.get(agent))
         self.comment(issue, self.body(e, f"Handoff → {LABEL.get(e.get('to'), e.get('to', ''))}") + self.handoff_brief(agent))
         issue["handed"] = True
-        self.set_field(issue, "Status", "Gate (Jev)")
+        self.set_field(issue, "Status", "Gate (Auditor)")
 
     def on_evidence(self, e):
         open_ = self.issues_of(e["agent"], closed=False)
@@ -173,7 +173,7 @@ class Sync:
         g, rec = e.get("gate"), e.get("recommendation")
         conf = e.get("confidence")
         human = (conf is not None and conf < 0.7) or e.get("risk") == "alto"
-        verdict = f"Parecer do Jev · {g} · {rec} · {round((conf or 0) * 100)}% · risco {e.get('risk', '—')}"
+        verdict = f"Parecer do Auditor · {g} · {rec} · {round((conf or 0) * 100)}% · risco {e.get('risk', '—')}"
         for agent in GATE_COVERS.get(g, []):
             for issue in self.issues_of(agent, handed=True, closed=False):
                 self.comment(issue, self.body(e, verdict))
@@ -185,7 +185,7 @@ class Sync:
                 else:
                     issue["handed"] = False
                     self.set_field(issue, "Status", "Em andamento")
-        for issue in self.issues_of("jev", closed=False):
+        for issue in self.issues_of("auditor", closed=False):
             self.comment(issue, self.body(e, verdict))
             self.set_field(issue, "Status", "Concluído")
             self.close(issue)

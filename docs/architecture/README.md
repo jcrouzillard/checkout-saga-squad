@@ -105,20 +105,20 @@ flowchart TB
     end
     ARQ & BE & DO & OBS & QA -->|artefatos + handoff| MEM
     MEM -->|contexto de entrada| ARQ & BE & DO & OBS & QA
-    JEV{Jev · Gatekeeper<br/>G1, G2, G3} -->|lê artefatos e evidências| MEM
-    JEV -->|APPROVE / RETURN + confiança| ORQ
-    JEV -. confiança menor que 70% ou risco alto .-> H
+    AUDITOR{Auditor · Gatekeeper<br/>G1, G2, G3} -->|lê artefatos e evidências| MEM
+    AUDITOR -->|APPROVE / RETURN + confiança| ORQ
+    AUDITOR -. confiança menor que 70% ou risco alto .-> H
     QA -->|defect| BE
 ```
 
 | Elemento | Como funciona |
 |----------|---------------|
-| **Agentes** | Arquiteto, Backend, DevOps, Observabilidade, QA (exigidos) + **Jev** (gatekeeper de qualidade, agente extra justificado por governança). Cada um tem prompt, responsabilidades, entradas/saídas e regras de decisão em `.claude/agents/<nome>.md`. |
+| **Agentes** | Arquiteto, Backend, DevOps, Observabilidade, QA (exigidos) + **Auditor** (gatekeeper de qualidade, agente extra justificado por governança). Cada um tem prompt, responsabilidades, entradas/saídas e regras de decisão em `.claude/agents/<nome>.md`. |
 | **Delegação** | Orquestrador → agente via ferramenta `Agent` com tarefa estruturada (objetivo, entradas, saídas, critérios do gate, limites). Fases F1 → F2 (paralela) → F3 → F4. |
 | **Comunicação / contexto** | Nunca direta: padrão *blackboard* — artefatos + handoff (≤ 40 linhas) + evento no log (`tools/squad/log.py`). Independe de fornecedor (Copilot Coding Agent / Devin leem os mesmos arquivos). |
 | **Memória** | Episódica: `decisions.jsonl`; de passagem: `handoffs/`; de longo prazo: ADRs e contratos. |
 | **Ferramentas** | Claude Code (Read/Write/Edit/Bash/Agent), Maven, Docker Compose, Kafka/Postgres, OpenTelemetry, `tools/squad/log.py`. |
-| **Conflitos** | Prevenção por *single-writer* por diretório e contrato-antes-de-código; detecção pelo Jev (código × contrato) e QA (`defect`); resolução pela hierarquia de verdade (desafio > ADR/contrato > código), Orquestrador arbitra, humano desempata risco de negócio. |
+| **Conflitos** | Prevenção por *single-writer* por diretório e contrato-antes-de-código; detecção pelo Auditor (código × contrato) e QA (`defect`); resolução pela hierarquia de verdade (desafio > ADR/contrato > código), Orquestrador arbitra, humano desempata risco de negócio. |
 | **Limites de autonomia** | Sem `git push`, sem credenciais, sem escrita fora do próprio diretório; mudança de contrato só via ADR; gate com confiança < 70 % ou risco alto → humano obrigatório; máx. 2 ciclos de autocorreção por gate. |
 
 ## 4. Requisitos não funcionais → mecanismo

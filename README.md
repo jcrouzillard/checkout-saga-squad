@@ -122,7 +122,7 @@ com definição versionada em [`.claude/agents/`](.claude/agents/).
 | DevOps | Dockerfile, compose, CI | [`.claude/agents/devops.md`](.claude/agents/devops.md) |
 | Observabilidade | logs, traces, métricas, dashboards | [`.claude/agents/observabilidade.md`](.claude/agents/observabilidade.md) |
 | QA | testes unitários, e2e e de falha | [`.claude/agents/qa.md`](.claude/agents/qa.md) |
-| **Jev** (agente extra) | gatekeeper independente: avalia cada passagem com evidências e confiança | [`.claude/agents/jev.md`](.claude/agents/jev.md) |
+| **Auditor** (agente extra) | gatekeeper independente: avalia cada passagem com evidências e confiança | [`.claude/agents/auditor.md`](.claude/agents/auditor.md) |
 
 **Estrutura dos agentes.** Cada definição traz prompt, objetivo, responsabilidades, entradas, saídas, ferramentas,
 regras de decisão e interação com os demais. As regras comuns ficam em [`CLAUDE.md`](CLAUDE.md), a constituição
@@ -143,18 +143,18 @@ entradas, saídas, critérios de gate e limites.
 
 **Conflitos.**
 - *Prevenção*: propriedade single-writer por diretório e contrato antes do código.
-- *Detecção*: o Jev compara código × contrato.
+- *Detecção*: o Auditor compara código × contrato.
 - *Resolução*: hierarquia de verdade (desafio > ADR/contrato > código); o Orquestrador arbitra e o humano desempata
   quando há risco de negócio.
 
 **Gates e autonomia.**
 - G1, G2 e G3 são definidos em [`docs/squad/gates.md`](docs/squad/gates.md).
-- O Jev emite um parecer com **confiança** e **evidências**.
+- O Auditor emite um parecer com **confiança** e **evidências**.
 - A intervenção humana passa a ser **obrigatória** quando a confiança fica abaixo de 70%, o risco é alto ou é o 3º
   ciclo de devolução.
 - Autocorreção: um `RETURN` gera nova delegação com as instruções do parecer.
 
-**Squad Control** (`make squad` → http://localhost:7070): linha do tempo das fases, recomendação do Jev com
+**Squad Control** (`make squad` → http://localhost:7070): linha do tempo das fases, recomendação do Auditor com
 confiança, evidências, botões de intervenção humana (gravados no log) e o **feed ao vivo de cada agente**, lido das
 transcrições das sessões do Claude Code.
 
@@ -165,11 +165,11 @@ sessão do Claude Code em que roda o Orquestrador; o painel registra, acompanha 
 
 **Exemplo real (D1).** A demanda *"Listar os pedidos de um cliente"* foi registrada pelo painel e entregue pela
 squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` no order-service, cenário e2e
-`customer_orders` e pareceres do Jev em `docs/squad/gates/*-D1.json`. O Console de Checkout consome esse endpoint.
+`customer_orders` e pareceres do Auditor em `docs/squad/gates/*-D1.json`. O Console de Checkout consome esse endpoint.
 
 ## 7. Evidências
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
-- Pareceres do Jev: [`docs/squad/gates/`](docs/squad/gates/)
+- Pareceres do Auditor: [`docs/squad/gates/`](docs/squad/gates/)
 - Handoffs entre agentes: [`docs/squad/memory/handoffs/`](docs/squad/memory/handoffs/)
 - Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **8/8** (7 cenários originais + `customer_orders` da demanda D1) (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
 - Board da squad no GitHub: issues por agente + Project (kanban) espelhando o log (`make github-sync`)
@@ -188,7 +188,7 @@ squad-control/         painel web da squad (index.html) e Console de Checkout (c
 ```
 
 ## 9. Limitações conhecidas e evolução
-Todas vêm dos riscos em aberto dos pareceres do Jev (`docs/squad/gates/`):
+Todas vêm dos riscos em aberto dos pareceres do Auditor (`docs/squad/gates/`):
 - **Uma réplica do orquestrador**: o `group.instance.id` é fixo (`saga-orchestrator-1`, sobrescrevível via
   `KAFKA_GROUP_INSTANCE_ID`). Com N réplicas, cada uma precisa de um id próprio (ex.: nome do pod de um StatefulSet).
 - **Cobertura e2e de timeout**: há cenário próprio só para o pagamento. Timeout de estoque/envio e `TIMEOUT_ONCE`

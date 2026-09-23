@@ -91,14 +91,14 @@ para múltiplas réplicas (ver `change-request` do Backend ao DevOps, id `b164b0
 1. **Timeout em INVENTORY e SHIPPING**: `timeout_step` cobre apenas `simulate.payment=TIMEOUT` (etapa
    intermediária, exercita compensação de 2 passos). O mecanismo é idêntico para `inventory`/`shipping`
    (`events.md` §3); não há função e2e dedicada para essas variantes — pode ser adicionada com o mesmo
-   padrão (`order_payload ... '{"inventory":"TIMEOUT"}'` / `'{"shipping":"TIMEOUT"}'`) se o Jev exigir
+   padrão (`order_payload ... '{"inventory":"TIMEOUT"}'` / `'{"shipping":"TIMEOUT"}'`) se o Auditor exigir
    cobertura mais ampla no G3.
 2. **`TIMEOUT_ONCE`** (retry bem-sucedido, sem compensação): documentado como variante manual em
    `tests/e2e/scenarios.md` §5, não automatizado como cenário próprio (os 7 cenários da suíte seguem
    exatamente a lista de `.claude/agents/qa.md`).
 3. **Rastreabilidade no Jaeger**: verificação é visual/manual (o script apenas imprime o link); não há
    dependência do cliente HTTP do Jaeger no `run.sh` para manter a suíte simples e sem dependências
-   extras. Evidência para o G3 deve ser um screenshot/link anexado pelo Jev.
+   extras. Evidência para o G3 deve ser um screenshot/link anexado pelo Auditor.
 4. **Testes unitários**: existem 60 testes em `services/*/src/test/**`, todos verdes (ver
    `services/*/target/surefire-reports/*.txt`) — `SagaStateMachineTest` (20, saga-orchestrator),
    `PaymentCommandHandlerTest`+`ReplyPolicyTest` (12, payment), `InventoryCommandHandlerTest`+

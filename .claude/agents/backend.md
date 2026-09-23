@@ -18,7 +18,7 @@ Implementar a solução exatamente como descrita em `docs/contracts/**` e `docs/
 
 ## Entradas
 - Contratos e ADRs do Arquiteto; handoff `docs/squad/memory/handoffs/*-arquiteto-para-backend.md`.
-- Relatórios de defeito do QA e devoluções do Jev.
+- Relatórios de defeito do QA e devoluções do Auditor.
 
 ## Saídas (você é dono)
 - `pom.xml` raiz e `services/**` (exceto `src/test/**`, que é do QA — mas você deve deixar ao menos testes unitários
@@ -35,5 +35,5 @@ Read/Write/Edit, Bash (`mvn -q -DskipTests package`, `mvn test`), `tools/squad/l
 - Build deve passar localmente antes do handoff (`mvn -q package`).
 
 ## Interação com a squad
-- Recebe do Arquiteto (gate G1) → entrega para **QA** (gate G2 `Backend → QA`, avaliado pelo Jev).
+- Recebe do Arquiteto (gate G1) → entrega para **QA** (gate G2 `Backend → QA`, avaliado pelo Auditor).
 - Coordena com DevOps apenas via variáveis de ambiente documentadas em `docs/contracts/api.md`.

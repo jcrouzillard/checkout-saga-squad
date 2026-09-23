@@ -111,7 +111,7 @@
 <body>
 <div class="app"><div class="frame">
   <header>
-    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span>Checkout Saga · Orquestrador + Jev</span></div>
+    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span>Checkout Saga · Orquestrador + Auditor</span></div>
     <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
   </header>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
@@ -141,17 +141,17 @@ const AGENTS = {
   observabilidade: { label: "Observabilidade", ini: "Ob", color: "#1F3A5F", role: "Logs, traces, métricas e dashboards" },
   backend:         { label: "Backend",         ini: "B", color: "#1F3A5F", role: "Serviços, APIs, mensageria e persistência" },
   qa:              { label: "QA",              ini: "Q", color: "#1F3A5F", role: "Testes e cenários de falha" },
-  jev:             { label: "Jev",             ini: "J", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
+  auditor:             { label: "Auditor",             ini: "Au", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
   humano:          { label: "Humano",          ini: "H", color: "#1F3A5F", role: "Intervém quando necessário" },
 };
 // Pipeline da squad (docs/squad/orquestrador.md)
 const PIPELINE = [
   { id: "F1", title: "Arquiteto definiu a Saga e os contratos", agent: "arquiteto", doneWhen: e => e.agent === "arquiteto" && e.type === "handoff" },
-  { id: "G1", title: "Jev avaliou o gate Arquitetura → Implementação", agent: "jev", gate: "G1" },
+  { id: "G1", title: "Auditor avaliou o gate Arquitetura → Implementação", agent: "auditor", gate: "G1" },
   { id: "F2", title: "Backend, DevOps e Observabilidade implementaram", agent: ["backend", "devops", "observabilidade"], doneWhen: e => e.agent === "backend" && e.type === "handoff" },
-  { id: "G2", title: "Jev avaliou o gate Backend → QA", agent: "jev", gate: "G2" },
+  { id: "G2", title: "Auditor avaliou o gate Backend → QA", agent: "auditor", gate: "G2" },
   { id: "F3", title: "QA injeta falhas e valida a Saga", agent: "qa", doneWhen: e => e.agent === "qa" && e.type === "handoff" },
-  { id: "G3", title: "Jev avaliou o gate QA → Release", agent: "jev", gate: "G3" },
+  { id: "G3", title: "Auditor avaliou o gate QA → Release", agent: "auditor", gate: "G3" },
 ];
 
 let state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
@@ -212,7 +212,7 @@ function pipelineStatus() {
 
 function renderSquadStrip() {
   const byAgent = runsByAgent();
-  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "qa", "jev"].map(a => {
+  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "qa", "auditor"].map(a => {
     const runs = byAgent[a], st = agentStatus(runs);
     return `<div class="agent" data-agent="${a}" title="Ver o que ${AGENTS[a].label} está fazendo">
       <div class="top">${av(a)}<span class="name">${AGENTS[a].label}</span><span class="dot ${st}" title="${st}"></span></div>
@@ -244,18 +244,18 @@ function renderExecucoes() {
           <div><b>${esc(p.title)}</b><p>${esc(p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
           <span class="when">${p.st === "done" ? "concluído" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}
       </ol>
-      ${g ? `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO JEV · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
+      ${g ? `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
         <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
         <div class="bar"><div style="width:${conf ?? 0}%"></div></div>
         <p>Risco ${esc(g.risk || "—")}. ${esc((g.open_risks || []).join(" ") || g.rationale || "")}</p></div>`
-      : `<div class="reco"><small>RECOMENDAÇÃO DO JEV</small><h2>Aguardando o primeiro gate</h2><p class="muted" style="margin:0">O Jev avalia cada passagem entre agentes com base em requisitos, testes e riscos abertos.</p></div>`}
+      : `<div class="reco"><small>RECOMENDAÇÃO DO AUDITOR</small><h2>Aguardando o primeiro gate</h2><p class="muted" style="margin:0">O Auditor avalia cada passagem entre agentes com base em requisitos, testes e riscos abertos.</p></div>`}
     </section>
     <section class="card">
       <h3>Evidências usadas</h3>
       ${evs.length ? evs.map(e => `<div class="ev"><span>${esc(e.name)}</span><span class="s ${e.status}">${statusLabel[e.status] || esc(e.status)}</span></div>`).join("") : `<p class="muted">Nenhuma evidência avaliada ainda.</p>`}
       <hr>
       <h3>Intervenção humana</h3>
-      ${!g ? `<p class="muted">Disponível quando o Jev emitir um parecer.</p>` : `
+      ${!g ? `<p class="muted">Disponível quando o Auditor emitir um parecer.</p>` : `
         <p class="${humanRequired ? "warn-msg" : "muted"}">${humanRequired ? "<b>Obrigatória</b> neste gate (confiança &lt; 70%, risco alto ou 3º ciclo)." : "Não obrigatória. Você pode aceitar a recomendação ou alterar o próximo passo."}</p>
         <textarea id="note" rows="2" placeholder="Observação para o Orquestrador (opcional)"></textarea>
         <div class="actions">
@@ -324,7 +324,7 @@ function renderDecisoes() {
 
 function renderEvidencias() {
   const gates = state.gates;
-  return `<h1>Evidências</h1><div class="sub">Pareceres do Jev (<code>docs/squad/gates/</code>) e briefs de passagem de contexto.</div>
+  return `<h1>Evidências</h1><div class="sub">Pareceres do Auditor (<code>docs/squad/gates/</code>) e briefs de passagem de contexto.</div>
   ${gates.length ? gates.slice().reverse().map(g => `<section class="card" style="margin-top:18px"><h3>${esc(g.gate)} · ${esc(g.recommendation)} · ${Math.round((g.confidence || 0) * 100)}% · risco ${esc(g.risk)}</h3>
     ${(g.evidences || []).map(e => `<div class="ev"><span>${esc(e.name)} <span class="muted" style="font-size:12px">${esc(e.source || "")}</span></span><span class="s ${e.status}">${statusLabel[e.status] || esc(e.status)}</span></div>`).join("")}
     <p class="muted">${esc(g.rationale || "")}</p></section>`).join("") : `<p class="muted" style="margin-top:18px">Nenhum gate avaliado ainda.</p>`}

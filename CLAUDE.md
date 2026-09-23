@@ -36,7 +36,7 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 | DevOps            | `.claude/agents/devops.md`              | `Dockerfile`, `docker-compose.yml`, `infra/**` (exceto observability), `.github/**`, `Makefile` |
 | Observabilidade   | `.claude/agents/observabilidade.md`     | `infra/observability/**`, `docs/observability.md`               |
 | QA                | `.claude/agents/qa.md`                  | `services/*/src/test/**`, `tests/**`                            |
-| Jev (Gatekeeper)  | `.claude/agents/jev.md`                 | `docs/squad/gates/**` (somente leitura no resto)               |
+| Auditor (Gatekeeper)  | `.claude/agents/auditor.md`                 | `docs/squad/gates/**` (somente leitura no resto)               |
 
 ## Hierarquia de verdade (resolução de conflitos)
 1. Requisitos do desafio (`docs/desafio.md`).
@@ -54,7 +54,7 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 Ao terminar sua tarefa, todo agente:
 1. Escreve o brief em `docs/squad/memory/handoffs/` (≤ 40 linhas; links para arquivos, não cópias).
 2. Registra `--type handoff` no log com as evidências produzidas.
-3. O próximo agente só começa após o **Jev** avaliar o gate correspondente (`docs/squad/gates.md`).
+3. O próximo agente só começa após o **Auditor** avaliar o gate correspondente (`docs/squad/gates.md`).
 
 ## Limites de autonomia
 - Nenhum agente faz `git push`, altera credenciais ou remove dados fora do seu diretório.

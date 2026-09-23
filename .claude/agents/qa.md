@@ -31,4 +31,4 @@ Provar — com testes executáveis — que cada requisito funcional, não funcio
 - Testes e2e devem ser determinísticos (poll com timeout, nunca sleep fixo longo).
 
 ## Interação com a squad
-- Recebe de Backend+DevOps (gate G2) → entrega evidências ao Jev (gate G3 `QA → Release`).
+- Recebe de Backend+DevOps (gate G2) → entrega evidências ao Auditor (gate G3 `QA → Release`).

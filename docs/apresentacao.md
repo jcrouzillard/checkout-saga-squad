@@ -14,18 +14,18 @@ Abas abertas: Squad Control · GitHub (Issues/Project) · Jaeger :16686 · Grafa
 
 ## 2. A squad agêntica (5 min): o diferencial
 1. `CLAUDE.md`: constituição com ownership single-writer, hierarquia de verdade e limites de autonomia.
-2. `.claude/agents/*.md`: cada agente tem prompt, entradas, saídas, ferramentas e regras de decisão. **Jev** é o
+2. `.claude/agents/*.md`: cada agente tem prompt, entradas, saídas, ferramentas e regras de decisão. **Auditor** é o
    agente extra: avaliador independente, somente leitura.
 3. **Squad Control** (http://localhost:7070):
    - Linha do tempo F1 → G1 → F2 → G2 → F3 → G3.
    - Clicar num agente mostra o feed real das ações, lido das transcrições do Claude Code.
-   - Recomendação do Jev com confiança e evidências; botões de intervenção humana gravam no log.
+   - Recomendação do Auditor com confiança e evidências; botões de intervenção humana gravam no log.
 4. **GitHub**: issues por agente, handoffs e pareceres como comentários, kanban por Status. Tudo é projeção do
    `decisions.jsonl`, o memory layer.
 5. **Pontos para falar:**
    - Comunicação no padrão *blackboard*: os agentes nunca falam direto entre si. Por isso o modelo independe de
      fornecedor (Copilot Coding Agent ou Devin pegam uma issue e seguem o mesmo protocolo).
-   - Conflitos são evitados pelo ownership e pelo contrato antes do código, e detectados pelo Jev.
+   - Conflitos são evitados pelo ownership e pelo contrato antes do código, e detectados pelo Auditor.
    - Paralelismo real: Arquiteto ∥ DevOps ∥ Observabilidade; Backend dividido em core ∥ participantes; QA test-first.
 
 ## 3. Demo da Saga (6 min)
@@ -49,11 +49,11 @@ bash tests/e2e/run.sh coordinator_restart     # kill -9 no orquestrador no meio 
   os deadlines da Saga (5 s) venceram e ela compensou; as respostas chegaram depois como `IGNORED_LATE_REPLY`.
   **A compensação estava correta; o problema era o timeout cobrado pela indisponibilidade do próprio coordenador.**
 - A squad seguiu o protocolo: QA registrou o `defect`, o Backend corrigiu (static membership + carência de deadlines
-  no startup) e a revalidação deu **7/7**. Depois o Jev aprovou o G2. Tudo está no log e nas issues.
+  no startup) e a revalidação deu **7/7**. Depois o Auditor aprovou o G2. Tudo está no log e nas issues.
 
 ## 4b. Uma demanda nova passando pela squad (2 min)
 Aba **Demandas** do Squad Control: mostre a D1 registrada ("Listar os pedidos de um cliente") e a trilha completa:
-Arquiteto (contrato + ADR-006) → Jev G1 (89%) → Backend + QA em paralelo → e2e 8/8 → Jev G2/G3. No GitHub, a
+Arquiteto (contrato + ADR-006) → Auditor G1 (89%) → Backend + QA em paralelo → e2e 8/8 → Auditor G2/G3. No GitHub, a
 mesma trilha aparece como issues e comentários. Ponto a frisar: **quem executa é a sessão do Orquestrador no Claude
 Code**; o painel é o cockpit humano.
 
@@ -72,4 +72,4 @@ Code**; o painel é o cockpit humano.
 | E se a compensação falhar? | Retry infinito com backoff + alerta `COMPENSATION_STUCK`; nunca desiste | saga.md §5.3 |
 | Timeout ambíguo (pagou tarde)? | Refund idempotente; refund sem autorização = no-op registrado (tombstone) | saga.md §5.1 |
 | Exactly-once? | At-least-once + idempotência (outbox + `processed_messages` + mesmo `messageId`) | ADR-002, ADR-005 |
-| Como o humano controla a squad? | Gates do Jev; obrigatório quando confiança < 70%, risco alto ou 3º ciclo | docs/squad/gates.md |
+| Como o humano controla a squad? | Gates do Auditor; obrigatório quando confiança < 70%, risco alto ou 3º ciclo | docs/squad/gates.md |

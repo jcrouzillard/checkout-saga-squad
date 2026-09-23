@@ -1,4 +1,4 @@
-# Gates de qualidade (avaliados pelo Jev)
+# Gates de qualidade (avaliados pelo Auditor)
 
 Peso entre parênteses. **B** = bloqueante (falhou → `RETURN`).
 

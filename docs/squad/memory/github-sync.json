@@ -102,7 +102,7 @@
    "number": 5,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/5",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8VuWU",
-   "agent": "jev",
+   "agent": "auditor",
    "status": "Concluído",
    "phase": "G1",
    "handed": false,
@@ -201,7 +201,7 @@
    "number": 14,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/14",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8V7Dk",
-   "agent": "jev",
+   "agent": "auditor",
    "status": "Concluído",
    "phase": "G2",
    "handed": false,
@@ -212,7 +212,7 @@
    "number": 15,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/15",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WBDw",
-   "agent": "jev",
+   "agent": "auditor",
    "status": "Concluído",
    "phase": "G3",
    "handed": false,
@@ -267,7 +267,7 @@
    "number": 20,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/20",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WncM",
-   "agent": "jev",
+   "agent": "auditor",
    "status": "Concluído",
    "phase": null,
    "handed": false,
@@ -284,7 +284,7 @@
     "options": {
      "Backlog": "1de1967c",
      "Em andamento": "e2a68c22",
-     "Gate (Jev)": "57851a80",
+     "Gate (Auditor)": "57851a80",
      "Intervenção humana": "19de1d97",
      "Concluído": "2060fcc3"
     }
@@ -298,7 +298,7 @@
      "DevOps": "7a7b7866",
      "Observabilidade": "69ae83c7",
      "QA": "a64a20a3",
-     "Jev": "df5044a3",
+     "Auditor": "df5044a3",
      "Humano": "c2557466"
     }
    },

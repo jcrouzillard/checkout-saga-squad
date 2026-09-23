@@ -2,7 +2,7 @@
 """Servidor do painel Squad Control (somente stdlib).
 
 - Serve `squad-control/index.html`.
-- GET  /api/state  -> log de decisões + pareceres do Jev + atividade ao vivo de cada agente
+- GET  /api/state  -> log de decisões + pareceres do Auditor + atividade ao vivo de cada agente
                       (lida das transcrições dos subagentes do Claude Code).
 - POST /api/human  -> registra a decisão humana (aceitar/devolver) no log compartilhado;
                       o Orquestrador lê esse evento antes de avançar o gate.
@@ -39,7 +39,7 @@ UI_DIR = ROOT / "squad-control"
 
 AGENT_ALIASES = {
     "arquiteto": "arquiteto", "backend": "backend", "devops": "devops",
-    "observabilidade": "observabilidade", "qa": "qa", "jev": "jev",
+    "observabilidade": "observabilidade", "qa": "qa", "auditor": "auditor",
 }
 RUNNING_WINDOW_S = 45
 
