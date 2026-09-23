@@ -269,7 +269,13 @@
   "4b873fca3e05",
   "eb598cbf0f0d",
   "b55594e2b496",
-  "981e38794dc8"
+  "981e38794dc8",
+  "390877110538",
+  "91bda6405a13",
+  "15541b78bfb8",
+  "4aed122febc3",
+  "3efe6d660a1e",
+  "f7a8091d0652"
  ],
  "issues": {
   "_diario": {
@@ -1096,6 +1102,17 @@
    "handed": false,
    "closed": false,
    "kind": "task"
+  },
+  "91bda6405a13": {
+   "number": 87,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/87",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8a43g",
+   "agent": "arquiteto",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
   }
  },
  "project": {
@@ -1140,7 +1157,7 @@
   }
  },
  "gates": {
-  "G1": "7479c8ca6baf",
+  "G1": "3efe6d660a1e",
   "G2": "c7acbbab2c4e",
   "G3": "dc0f2c219d79"
  }
