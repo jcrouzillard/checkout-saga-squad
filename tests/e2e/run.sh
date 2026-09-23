@@ -7,7 +7,7 @@
 # docs/architecture/saga.md), não do código do Backend (test-first, ver F2).
 #
 # Uso:
-#   bash tests/e2e/run.sh                 # roda os 8 cenários
+#   bash tests/e2e/run.sh                 # roda os 12 cenários
 #   bash tests/e2e/run.sh payment_failure  # roda só um cenário
 #   SKIP_RESTART=1 bash tests/e2e/run.sh   # pula o cenário 6 (reinício do coordenador)
 #
@@ -102,6 +102,33 @@ else:
   fi
 }
 
+# json_bool JSON PATH → "true"/"false" para um campo booleano (""  se ausente/não-booleano).
+# Existe porque `json_get` usa `// empty` no jq, que também descarta `false` (é "falsy" no jq) —
+# não dá pra reusar json_get para campos como "noop" sem esse cuidado (D6: noop=false é asserção real).
+json_bool() {
+  local json="$1" path="$2"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq -r ".${path} | if . == true then \"true\" elif . == false then \"false\" else \"\" end" 2>/dev/null
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+parts = [p for p in sys.argv[1].split(".") if p]
+cur = data
+for p in parts:
+    if isinstance(cur, dict) and p in cur:
+        cur = cur[p]
+    else:
+        cur = None
+        break
+print("true" if cur is True else "false" if cur is False else "")
+' "$path" 2>/dev/null
+  fi
+}
+
 # history_has JSON STEP STATUS [DETAIL_SUBSTR] → 0 se existe entrada em .history
 # com esse step+status (e, opcionalmente, contendo DETAIL_SUBSTR em .detail).
 history_has() {
@@ -180,6 +207,135 @@ step, status = sys.argv[1], sys.argv[2]
 print(sum(1 for h in (data.get("history") or []) if h.get("step") == step and h.get("status") == status))
 ' "$step" "$status"
   fi
+}
+
+# history_index JSON STEP STATUS → índice (0-based) da PRIMEIRA entrada de .history
+# que casa step+status, ou -1 se não houver (usado para checar ordem relativa, D6 §4.2).
+history_index() {
+  local json="$1" step="$2" status="$3"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq --arg step "$step" --arg status "$status" \
+      '[(.history // [])[] | (.step == $step and .status == $status)] | index(true) // -1'
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+step, status = sys.argv[1], sys.argv[2]
+idx = -1
+for i, h in enumerate(data.get("history") or []):
+    if h.get("step") == step and h.get("status") == status:
+        idx = i
+        break
+print(idx)
+' "$step" "$status"
+  fi
+}
+
+# history_field JSON STEP STATUS FIELD → valor de FIELD na PRIMEIRA entrada de
+# .history que casa step+status ("" se não houver ou o campo for nulo/ausente).
+history_field() {
+  local json="$1" step="$2" status="$3" field="$4"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq -r --arg step "$step" --arg status "$status" --arg field "$field" \
+      '[(.history // [])[] | select(.step == $step and .status == $status)] | .[0][$field] // empty'
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+data = json.load(sys.stdin)
+step, status, field = sys.argv[1], sys.argv[2], sys.argv[3]
+for h in (data.get("history") or []):
+    if h.get("step") == step and h.get("status") == status:
+        v = h.get(field)
+        print("" if v is None else v)
+        break
+else:
+    print("")
+' "$step" "$status" "$field"
+  fi
+}
+
+# jaeger_trace_count JSON → quantos traces vieram em .data (0 se erro/ausente).
+jaeger_trace_count() {
+  local json="$1"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq '(.data // []) | length' 2>/dev/null
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print(0)
+    sys.exit(0)
+print(len(d.get("data") or []))
+' 2>/dev/null
+  fi
+}
+
+# jaeger_trace_services JSON → nomes de serviço (processes[*].serviceName) do
+# primeiro trace em .data, únicos, ordenados, separados por vírgula.
+jaeger_trace_services() {
+  local json="$1"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq -r '[(((.data // [])[0].processes) // {}) | to_entries[].value.serviceName] | unique | sort | join(",")' 2>/dev/null
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("")
+    sys.exit(0)
+data = d.get("data") or []
+procs = (data[0].get("processes") or {}) if data else {}
+names = sorted({p.get("serviceName") for p in procs.values() if p.get("serviceName")})
+print(",".join(names))
+' 2>/dev/null
+  fi
+}
+
+# gen_hex_id NBYTES → NBYTES*2 hex chars aleatórios (id de trace/span W3C).
+gen_hex_id() {
+  python3 -c 'import secrets, sys; print(secrets.token_hex(int(sys.argv[1])))' "$1"
+}
+
+# wait_for_trace TRACE_ID TIMEOUT_SEG [SERVIÇO...] → poll de 1s em
+# GET $JAEGER_URL/api/traces/<id> até existir exatamente 1 trace contendo TODOS os
+# serviços informados (cada serviço chega ao Jaeger de forma assíncrona e independente —
+# span de um serviço já visível não significa que os outros já foram exportados/batchados,
+# então o "pronto" real é a lista de serviços completa, não só a existência do trace).
+# Seta LAST_TRACE_JSON (o mais recente lido, mesmo em timeout, para diagnóstico).
+wait_for_trace() {
+  local trace_id="$1" timeout="$2"
+  shift 2
+  local required=("$@")
+  local start now cnt services svc ok
+  start=$(date +%s)
+  while true; do
+    http_request GET "$JAEGER_URL/api/traces/$trace_id"
+    if [ "$HTTP_STATUS" = "200" ]; then
+      LAST_TRACE_JSON="$RESP_BODY"
+      cnt="$(jaeger_trace_count "$RESP_BODY")"
+      if [ "$cnt" = "1" ]; then
+        services="$(jaeger_trace_services "$RESP_BODY")"
+        ok=1
+        for svc in "${required[@]}"; do
+          case ",$services," in
+            *",$svc,"*) ;;
+            *) ok=0 ;;
+          esac
+        done
+        if [ "$ok" = "1" ]; then
+          return 0
+        fi
+      fi
+    fi
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$timeout" ]; then
+      return 1
+    fi
+    sleep 1
+  done
 }
 
 json_escape() {
@@ -757,6 +913,203 @@ scenario_customer_orders() {
   return 0
 }
 
+# 9. D6: timeout em INVENTORY → libera reserva e cancela (testes.md §4.1).
+scenario_timeout_inventory() {
+  local sku="SKU-BOOK-001" idem order_id before
+  http_request GET "$INVENTORY_URL/inventory/stock/$sku"
+  before="$(json_get "$RESP_BODY" "available")"
+  idem="$(gen_uuid)"
+  local payload
+  payload="$(order_payload "$sku" 1 49.90 "PHYSICAL" '{"inventory":"TIMEOUT"}')"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $idem" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order_id="$(json_get "$RESP_BODY" "orderId")"
+  SCENARIO_ORDER_ID="$order_id"
+  if ! wait_for_status "$order_id" "CANCELED" 60; then
+    SCENARIO_DETAIL="não atingiu CANCELED em 60s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+  if [ "$(json_get "$LAST_ORDER_JSON" "cancellationReason")" != "STEP_TIMEOUT" ]; then
+    SCENARIO_DETAIL="cancellationReason=$(json_get "$LAST_ORDER_JSON" "cancellationReason") (esperado STEP_TIMEOUT)"
+    return 1
+  fi
+  if ! history_has "$LAST_ORDER_JSON" "INVENTORY" "TIMED_OUT"; then
+    SCENARIO_DETAIL="history sem INVENTORY/TIMED_OUT"
+    return 1
+  fi
+  if ! history_has "$LAST_ORDER_JSON" "INVENTORY" "COMPENSATED"; then
+    SCENARIO_DETAIL="history sem INVENTORY/COMPENSATED"
+    return 1
+  fi
+  http_request GET "$INVENTORY_URL/inventory/reservations/$order_id"
+  local resv_status resv_noop
+  resv_status="$(json_get "$RESP_BODY" "status")"
+  resv_noop="$(json_bool "$RESP_BODY" "noop")"
+  if [ "$resv_status" != "RELEASED" ] || [ "$resv_noop" != "false" ]; then
+    SCENARIO_DETAIL="reservation status=$resv_status noop=$resv_noop (esperado RELEASED, noop=false)"
+    return 1
+  fi
+  if ! wait_for_stock_value "$sku" "$before" 20; then
+    SCENARIO_DETAIL="estoque não voltou a $before em 20s (valor: $LAST_STOCK_VALUE)"
+    return 1
+  fi
+  http_request GET "$PAYMENT_URL/payments/$order_id"
+  if [ "$HTTP_STATUS" != "404" ]; then
+    SCENARIO_DETAIL="GET /payments/$order_id retornou $HTTP_STATUS (esperado 404: nenhum pagamento deveria existir)"
+    return 1
+  fi
+  http_request GET "$SHIPPING_URL/shipments/$order_id"
+  if [ "$HTTP_STATUS" != "404" ]; then
+    SCENARIO_DETAIL="GET /shipments/$order_id retornou $HTTP_STATUS (esperado 404: nenhum envio deveria existir)"
+    return 1
+  fi
+  SCENARIO_DETAIL="timeout no estoque -> CANCELED (STEP_TIMEOUT); reserva RELEASED (noop=false), estoque restaurado ($before); sem pagamento nem envio"
+  return 0
+}
+
+# 10. D6: timeout em SHIPPING → cancela envio, estorna pagamento, libera estoque (testes.md §4.2).
+scenario_timeout_shipping() {
+  local sku="SKU-BOOK-001" idem order_id before
+  http_request GET "$INVENTORY_URL/inventory/stock/$sku"
+  before="$(json_get "$RESP_BODY" "available")"
+  idem="$(gen_uuid)"
+  local payload
+  payload="$(order_payload "$sku" 1 49.90 "PHYSICAL" '{"shipping":"TIMEOUT"}')"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $idem" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order_id="$(json_get "$RESP_BODY" "orderId")"
+  SCENARIO_ORDER_ID="$order_id"
+  if ! wait_for_status "$order_id" "CANCELED" 60; then
+    SCENARIO_DETAIL="não atingiu CANCELED em 60s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+  if [ "$(json_get "$LAST_ORDER_JSON" "cancellationReason")" != "STEP_TIMEOUT" ]; then
+    SCENARIO_DETAIL="cancellationReason=$(json_get "$LAST_ORDER_JSON" "cancellationReason") (esperado STEP_TIMEOUT)"
+    return 1
+  fi
+  local i_timeout i_scomp i_pcomp i_icomp
+  i_timeout="$(history_index "$LAST_ORDER_JSON" "SHIPPING" "TIMED_OUT")"
+  i_scomp="$(history_index "$LAST_ORDER_JSON" "SHIPPING" "COMPENSATED")"
+  i_pcomp="$(history_index "$LAST_ORDER_JSON" "PAYMENT" "COMPENSATED")"
+  i_icomp="$(history_index "$LAST_ORDER_JSON" "INVENTORY" "COMPENSATED")"
+  if [ "$i_timeout" -lt 0 ] || [ "$i_scomp" -lt 0 ] || [ "$i_pcomp" -lt 0 ] || [ "$i_icomp" -lt 0 ]; then
+    SCENARIO_DETAIL="history incompleto: SHIPPING/TIMED_OUT=$i_timeout SHIPPING/COMPENSATED=$i_scomp PAYMENT/COMPENSATED=$i_pcomp INVENTORY/COMPENSATED=$i_icomp (todos deveriam existir)"
+    return 1
+  fi
+  if ! [ "$i_timeout" -lt "$i_scomp" ] || ! [ "$i_scomp" -lt "$i_pcomp" ] || ! [ "$i_pcomp" -lt "$i_icomp" ]; then
+    SCENARIO_DETAIL="ordem incorreta no history (esperado TIMED_OUT < SHIPPING/COMP < PAYMENT/COMP < INVENTORY/COMP; índices: $i_timeout,$i_scomp,$i_pcomp,$i_icomp)"
+    return 1
+  fi
+  http_request GET "$SHIPPING_URL/shipments/$order_id"
+  local ship_status ship_noop
+  ship_status="$(json_get "$RESP_BODY" "status")"
+  ship_noop="$(json_bool "$RESP_BODY" "noop")"
+  if [ "$ship_status" != "CANCELED" ] || [ "$ship_noop" != "false" ]; then
+    SCENARIO_DETAIL="shipment status=$ship_status noop=$ship_noop (esperado CANCELED, noop=false)"
+    return 1
+  fi
+  http_request GET "$PAYMENT_URL/payments/$order_id"
+  if [ "$(json_get "$RESP_BODY" "status")" != "REFUNDED" ]; then
+    SCENARIO_DETAIL="payment status=$(json_get "$RESP_BODY" "status") (esperado REFUNDED)"
+    return 1
+  fi
+  http_request GET "$INVENTORY_URL/inventory/reservations/$order_id"
+  if [ "$(json_get "$RESP_BODY" "status")" != "RELEASED" ]; then
+    SCENARIO_DETAIL="reservation status=$(json_get "$RESP_BODY" "status") (esperado RELEASED)"
+    return 1
+  fi
+  if ! wait_for_stock_value "$sku" "$before" 20; then
+    SCENARIO_DETAIL="estoque não voltou a $before em 20s (valor: $LAST_STOCK_VALUE)"
+    return 1
+  fi
+  SCENARIO_DETAIL="timeout no envio -> CANCELED (STEP_TIMEOUT); shipment CANCELED (noop=false), payment REFUNDED, reserva RELEASED, estoque restaurado ($before), ordem do history correta"
+  return 0
+}
+
+# 11. D6: timeout numa tentativa, sucesso na 2ª (mesmo messageId) → CONFIRMED (testes.md §3).
+scenario_timeout_once() {
+  local sku="SKU-BOOK-001" idem order_id
+  idem="$(gen_uuid)"
+  local payload
+  payload="$(order_payload "$sku" 1 49.90 "PHYSICAL" '{"payment":"TIMEOUT_ONCE"}')"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $idem" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order_id="$(json_get "$RESP_BODY" "orderId")"
+  SCENARIO_ORDER_ID="$order_id"
+  if ! wait_for_status "$order_id" "CONFIRMED" 40; then
+    SCENARIO_DETAIL="não atingiu CONFIRMED em 40s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+  local attempt_timeout attempt_ok
+  attempt_timeout="$(history_field "$LAST_ORDER_JSON" "PAYMENT" "TIMED_OUT" "attempt")"
+  attempt_ok="$(history_field "$LAST_ORDER_JSON" "PAYMENT" "SUCCEEDED" "attempt")"
+  if [ "$attempt_timeout" != "1" ]; then
+    SCENARIO_DETAIL="history sem PAYMENT/TIMED_OUT com attempt=1 (obtido: '$attempt_timeout')"
+    return 1
+  fi
+  if [ "$attempt_ok" != "2" ]; then
+    SCENARIO_DETAIL="history sem PAYMENT/SUCCEEDED com attempt=2 (obtido: '$attempt_ok')"
+    return 1
+  fi
+  http_request GET "$PAYMENT_URL/payments/$order_id"
+  local pay_status pay_noop
+  pay_status="$(json_get "$RESP_BODY" "status")"
+  pay_noop="$(json_bool "$RESP_BODY" "noop")"
+  if [ "$pay_status" != "AUTHORIZED" ] || [ "$pay_noop" != "false" ]; then
+    SCENARIO_DETAIL="payment status=$pay_status noop=$pay_noop (esperado AUTHORIZED, noop=false)"
+    return 1
+  fi
+  http_request GET "$SHIPPING_URL/shipments/$order_id"
+  if [ "$(json_get "$RESP_BODY" "status")" != "CREATED" ]; then
+    SCENARIO_DETAIL="shipment status=$(json_get "$RESP_BODY" "status") (esperado CREATED)"
+    return 1
+  fi
+  SCENARIO_DETAIL="1ª tentativa de pagamento expira (attempt=1), 2ª com o mesmo messageId autoriza (attempt=2) -> CONFIRMED; 1 única autorização (noop=false), shipment CREATED"
+  return 0
+}
+
+# 12. D6: rastreabilidade ponta a ponta via Jaeger (testes.md §5) — traceparent conhecido no
+# POST /orders, depois GET /api/traces/<traceId> até achar os 5 serviços no mesmo trace.
+scenario_trace_end_to_end() {
+  local sku="SKU-BOOK-001" idem order_id trace_id span_id
+  trace_id="$(gen_hex_id 16)"
+  span_id="$(gen_hex_id 8)"
+  idem="$(gen_uuid)"
+  local payload
+  payload="$(order_payload "$sku" 1 49.90 "PHYSICAL" 'null')"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $idem" \
+    -H "traceparent: 00-$trace_id-$span_id-01" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order_id="$(json_get "$RESP_BODY" "orderId")"
+  SCENARIO_ORDER_ID="$order_id"
+  if ! wait_for_status "$order_id" "CONFIRMED" 60; then
+    SCENARIO_DETAIL="não atingiu CONFIRMED em 60s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+  # 60s de margem: cada serviço exporta/batcha spans ao Jaeger de forma independente e
+  # assíncrona (BatchSpanProcessor do OTel); um serviço aparecer no trace não implica que os
+  # outros 4 já chegaram — testes.md sugere 30s, mas a suíte real (12 cenários em sequência)
+  # mostrou casos em que o último serviço leva mais que isso para ser exportado.
+  if ! wait_for_trace "$trace_id" 60 order-service saga-orchestrator inventory-service payment-service shipping-service; then
+    SCENARIO_DETAIL="trace $trace_id não reuniu os 5 serviços em 60s após CONFIRMED (encontrados até agora: $(jaeger_trace_services "$LAST_TRACE_JSON"))"
+    return 1
+  fi
+  SCENARIO_DETAIL="trace $trace_id único no Jaeger com os 5 serviços: $(jaeger_trace_services "$LAST_TRACE_JSON")"
+  return 0
+}
+
 # --------------------------------------------------------------------------
 # Runner
 # --------------------------------------------------------------------------
@@ -814,17 +1167,31 @@ run_scenario() {
 }
 
 write_report() {
-  local n=${#RESULTS[@]} i
+  local n=${#RESULTS[@]} i executed_at git_commit total
+  executed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  git_commit="$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo null)"
+  if [ "$git_commit" != "null" ]; then
+    git_commit="\"$git_commit\""
+  fi
+  total=$((COUNT_PASS + COUNT_FAIL + COUNT_SKIP))
   {
-    echo "["
+    echo "{"
+    echo "  \"executedAt\": \"$executed_at\","
+    echo "  \"gitCommit\": $git_commit,"
+    echo "  \"total\": $total,"
+    echo "  \"passed\": $COUNT_PASS,"
+    echo "  \"failed\": $COUNT_FAIL,"
+    echo "  \"skipped\": $COUNT_SKIP,"
+    echo "  \"scenarios\": ["
     for i in "${!RESULTS[@]}"; do
       if [ "$i" -lt $((n - 1)) ]; then
-        echo "  ${RESULTS[$i]},"
+        echo "    ${RESULTS[$i]},"
       else
-        echo "  ${RESULTS[$i]}"
+        echo "    ${RESULTS[$i]}"
       fi
     done
-    echo "]"
+    echo "  ]"
+    echo "}"
   } > "$REPORT_FILE"
   echo
   echo "Relatório: $REPORT_FILE"
@@ -844,7 +1211,11 @@ print_summary() {
 
 main() {
   local filter="${1:-}"
-  local keys=(happy_path_physical happy_path_digital payment_failure shipping_failure timeout_step coordinator_restart idempotency customer_orders)
+  # trace_end_to_end roda logo no início, antes de coordinator_restart: o restart do
+  # saga-orchestrator reinicia o pipeline OTel do processo e pode atrasar a exportação de
+  # spans por mais do que a janela de poll do Jaeger deste cenário (não é defeito de produto,
+  # é aquecimento do exportador após um restart deliberado de outro cenário).
+  local keys=(happy_path_physical trace_end_to_end happy_path_digital payment_failure shipping_failure timeout_step timeout_inventory timeout_shipping timeout_once coordinator_restart idempotency customer_orders)
   local k found
 
   if [ -n "$filter" ]; then

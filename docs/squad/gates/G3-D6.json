@@ -1,0 +1,33 @@
+{
+  "gate": "G3",
+  "demand": "c6f83b5bb5c7",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.68,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "C1 · Testes de integração Testcontainers verdes", "status": "fail", "weight": 3, "blocking": true,
+     "source": "4 classes *IT escritas (OrderApiIT, OutboxRelayIT, IdempotentConsumerIT, DeadLetterIT) cobrindo replay/409, GET, outbox/relay, consumidor idempotente e DLT, mas nenhuma verde: ver G2-D6 (incompatibilidade de API Docker e defeito de ciclo de vida dos contêineres no AbstractIntegrationIT). Não é só instabilidade do OrbStack; o handoff 012ea22e16a0 marca como 'validate' algo que é defeito corrigível"},
+    {"name": "C2 · e2e timeout_inventory, timeout_shipping, timeout_once", "status": "pass", "weight": 2, "blocking": true,
+     "source": "last-report.json (executedAt 2026-09-23T18:30:38Z, gitCommit 207adef = código do HEAD; 10de932/6534324 só mudam memória/relatório/README): timeout_inventory CANCELED/STEP_TIMEOUT com reserva RELEASED noop=false e sem pagamento/envio; timeout_shipping com shipment CANCELED, payment REFUNDED, reserva RELEASED, estoque restaurado e ordem do history correta; timeout_once CONFIRMED com attempt 2 e uma única autorização"},
+    {"name": "C3 · Trace único com 5 serviços via Jaeger", "status": "pass", "weight": 2, "blocking": true,
+     "source": "trace_end_to_end PASS: trace 9ef6ef44f960516cb37fab156001ed56 único no Jaeger com inventory, order, payment, saga-orchestrator e shipping"},
+    {"name": "C4 · last-report com data e tudo PASS", "status": "pass", "weight": 1, "blocking": false,
+     "source": "{executedAt, gitCommit: 207adef, total 12, passed 12, failed 0, skipped 0}; rodado pelo Orquestrador após rebuild do HEAD (evidência b1c08ce8e27f, 9 tópicos DLT)"},
+    {"name": "C5 · TRACEABILITY coerente com o relatório novo", "status": "validate", "weight": 1, "blocking": false,
+     "source": "tests/TRACEABILITY.md foi regenerado do relatório ANTERIOR (executedAt 18:02:42Z, gitCommit de2fd92): nenhum dos orderIds do relatório final (e55acad5, aa5bee5d, c78bcd44, 5314ad43, 41e9313f…) aparece; ainda marca os IT como '⚠️ pendente (Fase B)'"},
+    {"name": "C6 · README §4 e §9", "status": "pass", "weight": 1, "blocking": false,
+     "source": "6534324: §4 com mvn verify, 12 cenários, tabela com timeouts de estoque/envio/TIMEOUT_ONCE e o trace; §9 sem a limitação 'Cobertura e2e de timeout'. Ressalva: a nova limitação afirma que os IT 'no CI rodam no mvn -B verify', o que não foi demonstrado e, pelo defeito do G2, provavelmente falharia também no CI"},
+    {"name": "C7 · Nenhum contrato muda", "status": "pass", "weight": 1, "blocking": true,
+     "source": "git diff develop...HEAD -- docs/contracts vazio; saga.md §5.2.1 só confirma o comportamento contratado"}
+  ],
+  "open_risks": [
+    "C1 bloqueante: aplicar as correções do G2-D6 (contêineres singleton no AbstractIntegrationIT; Testcontainers compatível com Docker 29 via change-request ao Backend), rodar mvn verify verde e anexar failsafe-reports.",
+    "C5: regenerar TRACEABILITY.md a partir do last-report.json final (207adef, 18:30:38Z) e atualizar o status dos IT depois de verdes.",
+    "README §9: remover a afirmação 'no CI rodam' até haver execução verde (local ou CI) comprovada."
+  ],
+  "human_required": true,
+  "rationale": "Os critérios 2, 3, 4, 6 e 7 estão atendidos com evidência forte: e2e 12/12 sobre o HEAD reconstruído, timeouts em todas as etapas com compensações corretas, trace único com os 5 serviços e contratos intactos. O critério 1 (testes de integração verdes) não está: reproduzi o mvn verify e, além da incompatibilidade de API entre Testcontainers 1.20.6 e Docker 29 (infra), há um defeito de desenho nos testes (contêineres parados entre classes com o contexto Spring em cache) que faria falhar em qualquer ambiente, então não dá para aprovar tratando o item como 'instabilidade local'. O critério 5 está desatualizado em relação ao relatório final. Confiança = (0+2+2+1+0.5+1+1)/11 = 0.68 < 0.70, portanto a intervenção humana é obrigatória pelo protocolo. Recomendação: devolver (QA + change-request ao Backend) para um 2º ciclo curto."
+}
