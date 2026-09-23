@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected"}
 
 
 def main() -> None:
@@ -36,6 +36,10 @@ def main() -> None:
     p.add_argument("--question", action="append", default=[], help='pergunta da validação: "dimensão::texto"')
     p.add_argument("--suggested-kind", choices=["produto", "operacao"])
     p.add_argument("--kind", choices=["produto", "operacao"], help="tipo da demanda")
+    p.add_argument("--pr", type=int, help="número do pull request")
+    p.add_argument("--url", help="url do pull request")
+    p.add_argument("--release", help="versão da release (eventos de release/hotfix)")
+    p.add_argument("--merge-commit", help="commit de merge do PR")
     p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
@@ -68,6 +72,10 @@ def main() -> None:
                        "text": q.split("::", 1)[-1].strip()} for i, q in enumerate(a.question, 1)],
         "suggestedKind": a.suggested_kind,
         "kind": a.kind,
+        "pr": a.pr,
+        "url": a.url,
+        "release": a.release,
+        "mergeCommit": a.merge_commit,
         "refs": a.ref,
         "evidences": evidences,
     }
