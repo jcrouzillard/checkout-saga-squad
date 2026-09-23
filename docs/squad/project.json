@@ -1,0 +1,23 @@
+{
+  "name": "Checkout Saga",
+  "description": "Checkout distribuído com Saga orquestrada (Pedido, Estoque, Pagamento, Envio)",
+  "repository": "https://github.com/jcrouzillard/checkout-saga-squad",
+  "links": [
+    {
+      "label": "Console de Checkout",
+      "url": "http://localhost:8090"
+    },
+    {
+      "label": "API de pedidos",
+      "url": "http://localhost:8081/orders"
+    },
+    {
+      "label": "Jaeger (traces)",
+      "url": "http://localhost:16686"
+    },
+    {
+      "label": "Grafana (dashboard)",
+      "url": "http://localhost:3000"
+    }
+  ]
+}

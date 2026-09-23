@@ -111,7 +111,7 @@
 <body>
 <div class="app"><div class="frame">
   <header>
-    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span>Checkout Saga · Orquestrador + Auditor</span></div>
+    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
     <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
   </header>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
@@ -126,7 +126,7 @@
       <a data-view="agentes">Agentes <span class="count" id="c-ag"></span></a>
       <a data-view="demandas">Demandas <span class="count" id="c-dem"></span></a>
       <h6>PRODUTO</h6>
-      <a href="/checkout.html">Console de Checkout</a>
+      <div id="project-links"></div>
     </nav>
     <main id="main"></main>
   </div>
@@ -154,7 +154,7 @@ const PIPELINE = [
   { id: "G3", title: "Auditor avaliou o gate QA → Release", agent: "auditor", gate: "G3" },
 ];
 
-let state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
+let project = null, state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
@@ -399,6 +399,12 @@ document.addEventListener("click", async ev => {
   }
 });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && drawerAgent) { drawerAgent = null; renderDrawer(); } });
+fetch("/api/project").then(r => r.json()).then(p => {
+  project = p;
+  $("#project-name").textContent = `${p.name} · Orquestrador + Auditor`;
+  document.title = `Squad Control · ${p.name}`;
+  $("#project-links").innerHTML = (p.links || []).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
+}).catch(() => {});
 refresh();
 setInterval(refresh, 3000);
 </script>

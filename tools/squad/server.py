@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Servidor do painel Squad Control (somente stdlib).
 
-- Serve `squad-control/index.html`.
+- Serve `squad-control/index.html` (painel genérico da squad; o produto gerenciado vem de docs/squad/project.json).
 - GET  /api/state  -> log de decisões + pareceres do Auditor + atividade ao vivo de cada agente
                       (lida das transcrições dos subagentes do Claude Code).
 - POST /api/human  -> registra a decisão humana (aceitar/devolver) no log compartilhado;
@@ -16,20 +16,10 @@ import os
 import pathlib
 import re
 import time
-import urllib.error
-import urllib.request
 import uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-# Console de Checkout: o navegador fala só com este servidor, que repassa às APIs reais (evita CORS nos serviços).
-SERVICES = {
-    "order": os.environ.get("ORDER_URL", "http://localhost:8081"),
-    "saga": os.environ.get("SAGA_URL", "http://localhost:8080"),
-    "inventory": os.environ.get("INVENTORY_URL", "http://localhost:8082"),
-    "payment": os.environ.get("PAYMENT_URL", "http://localhost:8083"),
-    "shipping": os.environ.get("SHIPPING_URL", "http://localhost:8084"),
-}
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LOG = ROOT / "docs/squad/memory/decisions.jsonl"
@@ -242,33 +232,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _proxy(self, method: str, body: bytes | None = None):
-        """/api/checkout/<serviço>/<caminho> -> http://<serviço>/<caminho>, repassando status e corpo."""
-        _, _, _, service, *rest = self.path.split("/", 4) + [""]
-        base = SERVICES.get(service)
-        if not base:
-            return self._json({"error": f"serviço desconhecido: {service}"}, 404)
-        req = urllib.request.Request(f"{base}/{rest[0]}", data=body, method=method)
-        for h in ("Content-Type", "Idempotency-Key", "X-Correlation-Id"):
-            if self.headers.get(h):
-                req.add_header(h, self.headers[h])
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data, status = resp.read(), resp.status
-        except urllib.error.HTTPError as e:
-            data, status = e.read(), e.code
-        except (urllib.error.URLError, TimeoutError) as e:
-            return self._json({"error": f"serviço indisponível: {e}"}, 502)
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
     def do_GET(self):
-        if self.path.startswith("/api/checkout/"):
-            return self._proxy("GET")
         if self.path.startswith("/api/state"):
             return self._json({
                 "now": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -277,6 +241,9 @@ class Handler(SimpleHTTPRequestHandler):
                 "runs": collect_runs(),
                 "handoffs": collect_handoffs(),
             })
+        if self.path.startswith("/api/project"):
+            pj = ROOT / "docs/squad/project.json"
+            return self._json(json.loads(pj.read_text(encoding="utf-8")) if pj.exists() else {"name": ROOT.name, "links": []})
         if self.path.startswith("/api/policy"):
             return self._json({
                 "gates": (ROOT / "docs/squad/gates.md").read_text(encoding="utf-8"),
@@ -293,8 +260,6 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-        if self.path.startswith("/api/checkout/"):
-            return self._proxy("POST", raw)
         if self.path.startswith("/api/demand"):
             # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
             data = json.loads(raw or b"{}")

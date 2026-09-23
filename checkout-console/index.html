@@ -57,7 +57,7 @@
 <div class="app">
   <header>
     <div class="brand"><div class="logo">CS</div><b>Checkout Saga</b><span>Console de pedidos</span></div>
-    <nav class="tabs"><a href="/checkout.html" class="on">Checkout</a><a href="/">Squad Control</a></nav>
+    <nav class="tabs"><a href="/" class="on">Novo pedido</a><a href="http://localhost:16686" target="_blank" rel="noopener">Jaeger</a><a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a></nav>
   </header>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
   <main>
@@ -107,7 +107,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hhmmss = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
-const api = (p, opt) => fetch("/api/checkout/" + p, opt).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) }));
+const api = (p, opt) => fetch("/api/" + p, opt).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) }));
 let recent = [], current = null, timer = null, stockBefore = null;
 try { recent = JSON.parse(localStorage.getItem("checkout.recent") || "[]"); } catch (e) {}
 
@@ -177,8 +177,8 @@ function renderOrder(o, stock) {
     </tbody></table>
     <div class="links" style="margin-top:16px">
       <a href="${jaeger}" target="_blank" rel="noopener">Trace no Jaeger</a>
-      <a href="/api/checkout/order/orders/${esc(o.orderId)}" target="_blank" rel="noopener">GET /orders/{id}</a>
-      <a href="/api/checkout/saga/sagas/${esc(o.sagaId)}" target="_blank" rel="noopener">Diagnóstico da saga</a>
+      <a href="/api/order/orders/${esc(o.orderId)}" target="_blank" rel="noopener">GET /orders/{id}</a>
+      <a href="/api/saga/sagas/${esc(o.sagaId)}" target="_blank" rel="noopener">Diagnóstico da saga</a>
     </div>
     <h2 style="margin-top:24px">Equivalente em curl</h2><pre>${esc(current.curl || "")}</pre>`;
 }

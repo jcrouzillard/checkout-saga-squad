@@ -72,7 +72,7 @@ docker compose ps                 # aguarde todos "healthy"
 | Grafana (dashboard "Checkout Saga") | http://localhost:3000 (porta configurável: `GRAFANA_PORT=3001` no `.env`) |
 | Prometheus | http://localhost:9090 |
 | **Squad Control** (painel da squad) | `make squad` → http://localhost:7070 |
-| **Console de Checkout** (criar pedidos com injeção de falha e ver a Saga ao vivo) | http://localhost:7070/checkout.html |
+| **Console de Checkout** (produto: criar pedidos com injeção de falha e ver a Saga ao vivo) | http://localhost:8090 |
 
 Pedido de exemplo:
 ```bash
@@ -167,6 +167,10 @@ sessão do Claude Code em que roda o Orquestrador; o painel registra, acompanha 
 squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` no order-service, cenário e2e
 `customer_orders` e pareceres do Auditor em `docs/squad/gates/*-D1.json`. O Console de Checkout consome esse endpoint.
 
+**Fábrica × produto.** O Squad Control é genérico e pode gerenciar outros projetos: o projeto atual e seus links
+vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto** e sobe como container próprio
+(`checkout-console`) no compose, ao lado dos serviços.
+
 ## 7. Evidências
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
 - Pareceres do Auditor: [`docs/squad/gates/`](docs/squad/gates/)
@@ -184,7 +188,8 @@ services/              common + saga-orchestrator + order/inventory/payment/ship
 infra/                 postgres (init), observability (prometheus, grafana)
 tests/                 e2e, rastreabilidade
 tools/squad/           log da memória compartilhada + servidor do Squad Control
-squad-control/         painel web da squad (index.html) e Console de Checkout (checkout.html)
+checkout-console/      console web do produto (nginx: página + proxy para as APIs)
+squad-control/         painel web da squad (genérico; o projeto gerenciado vem de docs/squad/project.json)
 ```
 
 ## 9. Limitações conhecidas e evolução

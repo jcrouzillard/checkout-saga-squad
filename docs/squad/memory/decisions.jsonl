@@ -52,3 +52,4 @@
 {"id": "396e1d283656", "ts": "2026-09-23T14:52:23+00:00", "agent": "orquestrador", "type": "decision", "title": "D1 entregue: G1 89% · G2 100% · G3 88% · e2e 8/8", "detail": "Pendente confirmação do humano: limit máximo 200 (contrato) × 'máx. 50' (demanda)"}
 {"id": "ae9ccafde6e6", "ts": "2026-09-23T15:04:40+00:00", "agent": "orquestrador", "type": "decision", "title": "Agente gatekeeper renomeado: Jev → Auditor", "detail": "Evita confusão com nomes do ecossistema TypeScript; id interno 'auditor'"}
 {"id": "d9bf6e2d4e69", "ts": "2026-09-23T15:15:31+00:00", "agent": "humano", "type": "human", "title": "Humano aceitou a recomendação", "detail": "Temo algum impedimento?\n", "gate": "G3", "recommendation": "APPROVE"}
+{"id": "cac603fbeeb1", "ts": "2026-09-23T15:19:22+00:00", "agent": "orquestrador", "type": "decision", "title": "Separação fábrica × produto: Console de Checkout vira container do produto; Squad Control genérico via project.json"}

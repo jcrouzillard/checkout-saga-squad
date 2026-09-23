@@ -29,7 +29,7 @@ Abas abertas: Squad Control · GitHub (Issues/Project) · Jaeger :16686 · Grafa
    - Paralelismo real: Arquiteto ∥ DevOps ∥ Observabilidade; Backend dividido em core ∥ participantes; QA test-first.
 
 ## 3. Demo da Saga (6 min)
-Comece pelo **Console de Checkout** (http://localhost:7070/checkout.html): crie um pedido físico sem falha e veja a
+Comece pelo **Console de Checkout** (http://localhost:8090): crie um pedido físico sem falha e veja a
 Saga andar ao vivo; depois um com "Pagamento recusado" e mostre a compensação e o estoque restaurado. A lista
 "Pedidos do cliente" vem do `GET /orders?customerId=`, entregue pela própria squad (demanda D1).
 Em seguida, no terminal:
