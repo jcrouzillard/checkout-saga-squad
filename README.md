@@ -167,6 +167,8 @@ sessão do Claude Code em que roda o Orquestrador; o painel registra, acompanha 
 squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` no order-service, cenário e2e
 `customer_orders` e pareceres do Auditor em `docs/squad/gates/*-D1.json`. O Console de Checkout consome esse endpoint.
 
+**Exemplo real (D2).** A demanda *"Melhorar o visual do checkout"* entrou pelo painel, foi iniciada com prioridade e rota, e passou por: Arquiteto (contrato de tela, ADR-007) → Auditor G1 (83%) → **Frontend** (agente incluído com justificativa) → Auditor G2 (88%) → QA (checklist CA1–CA12 com capturas reais) → Auditor G3 **devolvido** (65%: um comentário editado numa migração Flyway já aplicada mudaria o checksum no próximo rebuild) → **intervenção humana pelo painel** (aceitar devolução) → correção, rebuild e e2e 8/8 → Auditor G3 aprovado (100%).
+
 **Fábrica × produto.** O Squad Control é genérico e pode gerenciar outros projetos: o projeto atual e seus links
 vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto** e sobe como container próprio
 (`checkout-console`) no compose, ao lado dos serviços. A área **Observabilidade** do Squad Control escolhe o produto e

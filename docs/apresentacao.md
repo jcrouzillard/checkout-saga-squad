@@ -57,6 +57,10 @@ Arquiteto (contrato + ADR-006) → Auditor G1 (89%) → Backend + QA em paralelo
 mesma trilha aparece como issues e comentários. Ponto a frisar: **quem executa é a sessão do Orquestrador no Claude
 Code**; o painel é o cockpit humano.
 
+Depois mostre a **D2** ("Melhorar o visual do checkout"): Frontend incluído na squad, G3 **devolvido** pelo Auditor por um
+risco fora do escopo da demanda (checksum de migração Flyway), decisão tomada **na interface** (Aceitar devolução),
+correção executada pelo Orquestrador e G3 aprovado com 100% no 2º ciclo. Sino e pop-ups avisam cada passo.
+
 ## 5. Pergunta da seção 12 e próximos passos (2 min)
 `docs/architecture/README.md` §6. A solução já nasce distribuída; para produção faltariam:
 - Postgres por serviço em instâncias separadas.
