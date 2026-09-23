@@ -4,7 +4,7 @@ Checkout distribuído (Pedido, Estoque, Pagamento, Envio) coordenado por uma **S
 autônoma por uma **squad de agentes de IA** (Claude Code) com gates de qualidade, memória compartilhada e intervenção
 humana opcional, tudo auditável no painel **Squad Control**.
 
-> Desafio original: [`docs/desafio.md`](docs/desafio.md)
+> Desafio original: [`docs/desafio.md`](docs/desafio.md) · Roteiro da apresentação: [`docs/apresentacao.md`](docs/apresentacao.md)
 
 ## Sumário
 1. [Visão geral](#1-visão-geral)
@@ -66,7 +66,7 @@ docker compose ps                 # aguarde todos "healthy"
 | Pedidos (order-service) | http://localhost:8081/orders |
 | Saga (diagnóstico) | http://localhost:8080/sagas/{sagaId} |
 | Jaeger (traces) | http://localhost:16686 |
-| Grafana (dashboard "Checkout Saga") | http://localhost:3000 |
+| Grafana (dashboard "Checkout Saga") | http://localhost:3000 (porta configurável: `GRAFANA_PORT=3001` no `.env`) |
 | Prometheus | http://localhost:9090 |
 | **Squad Control** (painel da squad) | `make squad` → http://localhost:7070 |
 
@@ -158,7 +158,8 @@ transcrições das sessões do Claude Code.
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
 - Pareceres do Jev: [`docs/squad/gates/`](docs/squad/gates/)
 - Handoffs entre agentes: [`docs/squad/memory/handoffs/`](docs/squad/memory/handoffs/)
-- Relatório do último e2e: `tests/e2e/last-report.json`
+- Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **7/7** (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
+- Board da squad no GitHub: issues por agente + Project (kanban) espelhando o log (`make github-sync`)
 - Histórico git: cada fase é um commit do Orquestrador
 
 ## 8. Estrutura do repositório
@@ -172,3 +173,14 @@ tests/                 e2e, rastreabilidade
 tools/squad/           log da memória compartilhada + servidor do Squad Control
 squad-control/         painel web da squad
 ```
+
+## 9. Limitações conhecidas e evolução
+Todas vêm dos riscos em aberto dos pareceres do Jev (`docs/squad/gates/`):
+- **Uma réplica do orquestrador**: o `group.instance.id` é fixo (`saga-orchestrator-1`, sobrescrevível via
+  `KAFKA_GROUP_INSTANCE_ID`). Com N réplicas, cada uma precisa de um id próprio (ex.: nome do pod de um StatefulSet).
+- **Cobertura e2e de timeout**: há cenário próprio só para o pagamento. Timeout de estoque/envio e `TIMEOUT_ONCE`
+  usam o mesmo mecanismo e têm testes unitários, mas não têm cenário e2e dedicado.
+- **Ordem do outbox** garantida com 1 instância por serviço; para escalar o relay: particionamento por `orderId`
+  ou CDC (Debezium).
+- Limpeza de `outbox`/`processed_messages`, DLQ com reprocessamento e schema registry ficam como evolução
+  (ver a resposta da seção 12 em [`docs/architecture/README.md`](docs/architecture/README.md) §6).

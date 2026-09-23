@@ -32,7 +32,9 @@
   "a65c00cca4e3",
   "2d214aec567d",
   "becdaab750c8",
-  "7207f3ba3eb3"
+  "7207f3ba3eb3",
+  "6b083d7e4d3b",
+  "b3687c905abd"
  ],
  "issues": {
   "_diario": {
@@ -174,6 +176,16 @@
    "phase": "G2",
    "handed": false,
    "closed": true
+  },
+  "b3687c905abd": {
+   "number": 15,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/15",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8WBDw",
+   "agent": "jev",
+   "status": "Em andamento",
+   "phase": "G3",
+   "handed": false,
+   "closed": false
   }
  },
  "project": {
