@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "62f458c8038b",
+  "from": "arquiteto",
+  "to": "frontend",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Critérios verificáveis e implementáveis", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/contracts/ui-squad-control-agentes.md: mapa fixo com as 9 chaves de AGENTS (squad-control/index.html:173-183) → 9 emojis distintos, com fallback para chave desconhecida; CA1–CA8 com verificação objetiva (grep emoji, grep 'ini:', git diff --stat, DevTools 1440/390, evento agent 'xyz'). Implementação sugerida (campo emoji + av() com fallback em ini) cabe no av() atual (linha 199), único ponto de avatar (3 usos: faixa 256, aba Agentes 359, gaveta 461); ini segue em uso nos passos da linha do tempo (273/276), coberto pelo CA8"},
+    {"name": "Escopo só em squad-control/index.html", "status": "pass", "weight": 3, "blocking": true,
+     "source": "CA7 restringe o diff a squad-control/index.html, sem API, servidor, tools/squad/log.py ou formato do decisions.jsonl; CA6 proíbe script/link/fonte/imagem nova. Triagem 4257b35150bf e AGENTS.md:40 dão ao Frontend a posse de squad-control/**; branch feature/D3-emojis-nos-agentes (3e4a88ce5304)"},
+    {"name": "Demanda do humano coberta", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Evento 62f458c8038b ('emojis para cada quadrinho… mais visual, mais leve… não pode quebrar nada'): um emoji por papel (CA1) em todos os pontos do avatar (CA2), 🎼 para o Orquestrador como sugerido; 'sem quebrar nada' → CA4 fallback, CA5 layout/dot/reticências preservados, CA7 funcionalidades existentes, CA8 ini mantido"},
+    {"name": "Acessibilidade", "status": "pass", "weight": 1, "blocking": false,
+     "source": "CA3: emoji em elemento aria-hidden=true, nome como texto visível e title inalterados; nos 3 usos de av() o nome já aparece em texto ao lado do avatar, então nada se perde para o leitor de tela"}
+  ],
+  "open_risks": [
+    "Tensão com a identidade visual corporativa adotada (sóbria, sem emojis): o humano pediu explicitamente; a decisão é dele. O impacto se limita ao painel da fábrica (squad-control), não ao produto.",
+    "Emojis com seletor de variação (⚙️, 🛡️) e fontes de sistema diferentes podem alterar largura/altura do avatar: CA5 deve ser conferido também no Windows/Linux, não só no macOS.",
+    ".claude/agents/frontend.md ainda lista só checkout-console/** como responsabilidade; alinhar com AGENTS.md:40 (squad-control/**)."
+  ],
+  "human_required": false,
+  "rationale": "O contrato transforma um pedido estético em 8 critérios verificáveis, com mapa fixo de emojis, fonte única via av() e fallback para papel desconhecido. O escopo fica restrito a squad-control/index.html, sem API, log nem servidor, e a demanda ('mais visual e leve, sem quebrar nada') está coberta por CA1/CA2 e CA4–CA8. A acessibilidade é preservada (aria-hidden + nome em texto). A tensão com a identidade sem emojis fica registrada como risco não bloqueante, porque o humano pediu explicitamente. Confiança = 9/9 = 1.00."
+}
