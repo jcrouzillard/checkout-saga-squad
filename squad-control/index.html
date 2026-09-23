@@ -116,7 +116,7 @@
   .notif-panel { position: absolute; top: 56px; right: 0; width: 400px; max-height: 480px; overflow: auto; background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(28,28,30,.10); z-index: 20; }
   .notif-panel h4 { margin: 0; padding: 12px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
   .notif-panel h4 span { font-weight: 400; color: var(--dim); font-size: 12px; }
-  .notif { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
+  .notif { display: grid; grid-template-columns: minmax(48px, max-content) 1fr; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
   .notif:hover { background: var(--accent-soft); }
   .notif.unread { background: #FBFBF9; }
   .notif time { color: var(--dim); font-size: 12px; }
@@ -177,43 +177,58 @@
   .mrow { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin-top: 3px; font-size: 12px; min-width: 0; }
   .mrow .lbl { color: var(--muted); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  /* D11 (ADR-014): faixa de consumo da IA — fixa no topo de <main>, um bloco por provedor (nunca somados). */
-  .ai-usage { position: sticky; top: 0; z-index: 5; margin: -28px -32px 22px; padding: 8px 32px; background: #fff; border-bottom: 1px solid var(--line);
-              display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; font-size: 12px; line-height: 1.35; }
-  .u-prov { display: grid; grid-template-columns: 104px repeat(2, minmax(0, 1fr)); gap: 4px 16px; align-items: start; min-width: 0; }
+  /* D11 (ADR-014): faixa de consumo da IA — fixa no topo de <main>, um bloco por provedor (nunca somados).
+     Cada bloco = 3 linhas (cabeçalho, 5 h, semana), barra na mesma linha do texto: <= 72 px a partir de 600 px.
+     O texto encurta por container query conforme a largura do bloco; o completo fica no title e no aria-valuetext. */
+  .ai-usage { position: sticky; top: 0; z-index: 5; margin: -28px -32px 22px; padding: 7px 32px; background: #fff; border-bottom: 1px solid var(--line);
+              display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; font-size: 12px; line-height: 16px; }
+  .u-prov { container-type: inline-size; min-width: 0; }
   .u-prov + .u-prov { border-left: 1px solid var(--line2); padding-left: 28px; }
-  .u-name b { display: block; font-size: 13px; font-weight: 600; }
-  .u-name small { color: var(--dim); font-size: 11px; }
-  .u-win { min-width: 0; }
-  .u-win .l1 { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+  .u-grid { display: grid; grid-template-columns: max-content 64px minmax(0, 1fr); gap: 2px 8px; align-items: center; }
+  .u-head { grid-column: 1 / -1; min-width: 0; }
+  .u-head > b { margin-right: 3px; }
+  .u-head b { font-size: 12.5px; font-weight: 600; }
+  .u-head small { color: var(--dim); font-size: 11px; }
+  .u-win { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-width: 0; }
   .u-win .wl { font-weight: 600; color: var(--muted); }
+  .u-win .u-txt { min-width: 0; overflow-wrap: anywhere; }
   .u-win .pct { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; }
-  .u-win .l2 { color: var(--dim); overflow-wrap: anywhere; }
-  .u-meter { height: 4px; background: #D5DCE5; margin: 3px 0; overflow: hidden; }
+  .u-win .rs { color: var(--dim); white-space: nowrap; }
+  .u-meter { height: 4px; background: #D5DCE5; overflow: hidden; }
   .u-meter > div { height: 100%; background: var(--accent); }
-  .u-lvl { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .u-lvl { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
   .u-win.warn .u-meter > div { background: var(--amber); } .u-win.warn .u-lvl { color: var(--amber); }
   .u-win.crit .u-meter > div { background: var(--red); } .u-win.crit .u-lvl { color: var(--red); }
   .u-prov.stale .u-win { opacity: .55; }
-  .u-alert { display: inline-flex; gap: 4px; align-items: baseline; color: var(--amber); font-weight: 600; font-size: 11px; }
-  .u-alert svg { flex: none; align-self: center; }
-  .u-none { grid-column: 2 / -1; color: var(--muted); }
-  .u-none b { color: var(--amber); font-weight: 600; }
-  .u-reason { display: block; color: var(--dim); font-size: 11px; overflow-wrap: anywhere; }
+  .u-alert { display: inline-flex; gap: 4px; align-items: center; color: var(--amber); font-weight: 600; font-size: 11px; white-space: nowrap; }
+  .u-alert svg { flex: none; }
+  .u-none-t { color: var(--amber); font-weight: 600; font-size: 11px; }
+  .u-reason { color: var(--dim); font-size: 11px; min-width: 0; overflow-wrap: anywhere; }
+  .u-none-r { grid-column: 1 / -1; }
+  .u-sm { display: none; }
+  /* bloco estreito: some a hora entre parênteses e o "em"; muito estreito: some "usado"/"renova" (vira ↻) e o reason do stale */
+  @container (max-width: 470px) { .u-lg1 { display: none; } .u-head .u-reason { display: none; } .u-grid { grid-template-columns: max-content 40px minmax(0, 1fr); } }
+  @container (max-width: 400px) { .u-lg2 { display: none; } .u-sm { display: inline; } .u-grid { grid-template-columns: max-content 24px minmax(0, 1fr); column-gap: 6px; } }
+  @container (max-width: 340px) { .u-lg3 { display: none; } }
+  @media (max-width: 900px) {
+    .ai-usage { padding: 7px 16px; margin-left: -32px; margin-right: -32px; column-gap: 16px; }
+    .u-prov + .u-prov { padding-left: 12px; }
+  }
   @media (max-width: 600px) {
     /* D11: blocos empilhados. Também corrige a rolagem horizontal antiga a 390 px (cabeçalho com abas sem quebra). */
     header { height: auto; flex-wrap: wrap; padding: 0 16px; gap: 0 12px; }
     .brand { min-height: 48px; } .brand span { display: none; }
     .tabs { gap: 16px; } .tabs button { height: 44px; } .bell { height: 44px; }
-    .notif-panel { top: 44px; width: min(400px, calc(100vw - 32px)); }
+    header { position: relative; } .hdr-actions { position: static !important; }
+    .notif-panel { top: 100%; left: 16px; right: 16px; width: auto; max-height: 70vh; }
     .strip { flex-wrap: wrap; gap: 2px 12px; padding: 7px 16px; }
     main { padding: 20px 16px; }
-    .ai-usage { grid-template-columns: 1fr; margin: -20px -16px 18px; padding: 8px 16px; }
-    .u-prov { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .u-prov + .u-prov { border-left: none; padding-left: 0; border-top: 1px solid var(--line2); padding-top: 6px; }
-    .u-name { grid-column: 1 / -1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-    .u-name b { display: inline; }
-    .u-none { grid-column: 1 / -1; }
+    .ai-usage { margin: -20px -16px 18px; }
+  }
+  @media (max-width: 599.98px) {
+    /* D11: lado a lado a partir de 600 px; abaixo, blocos empilhados */
+    .ai-usage { grid-template-columns: 1fr; padding: 6px 16px; row-gap: 5px; }
+    .u-prov + .u-prov { border-left: none; padding-left: 0; border-top: 1px solid var(--line2); padding-top: 5px; }
   }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
 </style>
@@ -222,7 +237,7 @@
 <div class="app"><div class="frame">
   <header>
     <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
-    <div style="display:flex;align-items:center;gap:20px;position:relative">
+    <div class="hdr-actions" style="display:flex;align-items:center;gap:20px;position:relative">
     <button class="bell" id="bell" aria-label="Notificações" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span class="badge" id="bell-badge" hidden></span></button>
     <div class="notif-panel" id="notif-panel" hidden></div>
     <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
@@ -895,38 +910,47 @@ function usageWinLabel(w, fallback) {
   if (m % 1440 === 0) return `${m / 1440} dias`;
   return m % 60 === 0 ? `${m / 60} h` : `${m} min`;
 }
-function usageResetText(w) {
+// Renovação: texto completo (title/aria) + HTML que encurta por largura (.u-lg1/.u-lg2 somem, .u-sm aparece).
+function usageReset(w) {
   const d = new Date(w?.resetsAt);
-  if (!w?.resetsAt || isNaN(d)) return "renovação não informada";
-  const ms = d - Date.now();
-  if (ms <= 0) return `janela renovada às ${usageHM(d)}`;
-  if (ms < 24 * 3600e3) { const m = Math.round(ms / 60000); return `renova em ${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")} (${usageHM(d)})`; }
-  return `renova ${d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")} ${usageHM(d)}`;
+  if (!w?.resetsAt || isNaN(d)) return { full: "renovação não informada", html: "renovação não informada" };
+  const ms = d - Date.now(), hm = esc(usageHM(d));
+  if (ms <= 0) return { full: `janela renovada às ${usageHM(d)}`, html: `<span class="u-lg2">janela </span>renovada às ${hm}` };
+  const pre = `<span class="u-lg2">renova </span><span class="u-sm" aria-hidden="true">↻ </span>`;
+  if (ms < 24 * 3600e3) {
+    const m = Math.round(ms / 60000), dur = `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+    return { full: `renova em ${dur} (${usageHM(d)})`, html: `${pre}<span class="u-lg1">em </span>${dur}<span class="u-lg1"> (${hm})</span>` };
+  }
+  const day = esc(d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""));
+  return { full: `renova ${day} ${usageHM(d)}`, html: `${pre}${day}<span class="u-lg3"> ${hm}</span>` };
 }
 function usageWinHtml(w, fallbackLabel, provLabel) {
   const label = usageWinLabel(w, fallbackLabel);
   const used = usageNum(w?.usedPercent);
-  if (used == null) return `<div class="u-win"><div class="l1"><span class="wl">${esc(label)}</span><span class="muted">sem valor na fonte</span></div></div>`;
+  if (used == null) return `<div class="u-win"><span class="wl">${esc(label)}</span><span></span><span class="u-txt muted">sem valor na fonte</span></div>`;
   const rem = usageNum(w.remainingPercent) ?? Math.max(0, 100 - used);
   const lvl = used >= 95 ? ["crit", "Crítico"] : used >= 80 ? ["warn", "Atenção"] : null;
-  return `<div class="u-win ${lvl ? lvl[0] : ""}"><div class="l1"><span class="wl">${esc(label)}</span><span><span class="pct">${usagePct(used)}</span> usado · falta <span class="pct">${usagePct(rem)}</span></span>${lvl ? `<span class="u-lvl">${lvl[1]}</span>` : ""}</div>
-    <div class="u-meter" role="meter" aria-valuenow="${Math.round(used * 10) / 10}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${usagePct(used)} usado${lvl ? ", " + lvl[1].toLowerCase() : ""}" aria-label="${esc(provLabel)} · janela ${esc(label)}: uso"><div style="width:${used}%"></div></div>
-    <div class="l2">${esc(usageResetText(w))}</div></div>`;
+  const rs = usageReset(w);
+  const full = `${usagePct(used)} usado · falta ${usagePct(rem)} · ${rs.full}${lvl ? " · " + lvl[1] : ""}`;
+  const wl = label === "Semana" ? `<span class="u-lg2">Semana</span><span class="u-sm">7 d</span>` : esc(label);
+  return `<div class="u-win ${lvl ? lvl[0] : ""}" title="${esc(provLabel)} · ${esc(label)}: ${esc(full)}"><span class="wl">${wl}</span>
+    <div class="u-meter" role="meter" aria-valuenow="${Math.round(used * 10) / 10}" aria-valuemin="0" aria-valuemax="100" aria-valuetext="${esc(full)}" aria-label="${esc(provLabel)} · janela ${esc(label)}: uso"><div style="width:${used}%"></div></div>
+    <span class="u-txt"><span class="pct">${usagePct(used)}</span><span class="u-lg2"> usado</span> · falta <span class="pct">${usagePct(rem)}</span> · <span class="rs">${rs.html}</span>${lvl ? ` <span class="u-lvl">${lvl[1]}</span>` : ""}</span></div>`;
 }
 function usageProvHtml(p, meta) {
   const label = p?.label || meta.label;
   const has = p && (usageNum(p.fiveHour?.usedPercent) != null || usageNum(p.week?.usedPercent) != null);
   const status = p?.status === "fresh" && p.available !== false && has ? "fresh" : (p?.status !== "none" && has) ? "stale" : "none";
   const reason = p?.reason ? String(p.reason) : (p ? "" : "Servidor sem dados de consumo (campo usage ausente)");
-  const plan = p?.plan ? `<small>plano ${esc(p.plan)}</small>` : "";
-  if (status === "none") return `<div class="u-prov none"><div class="u-name"><b>${esc(label)}</b>${plan}</div>
-    <div class="u-none" title="${esc(reason)}"><b>Indisponível — sem fonte real</b>${reason ? `<span class="u-reason">${esc(reason)}</span>` : ""}</div></div>`;
+  const plan = p?.plan ? ` <small>· plano ${esc(p.plan)}</small>` : "";
+  if (status === "none") return `<div class="u-prov none"><div class="u-grid"><div class="u-head"><b>${esc(label)}</b> <span class="u-none-t" title="${esc(reason)}">Indisponível — sem fonte real</span>${plan}</div>
+    ${reason ? `<div class="u-reason u-none-r">${esc(reason)}</div>` : ""}</div></div>`;
   const when = p.collectedAt ? usageHM(p.collectedAt) : "";
   const head = status === "stale"
-    ? `<span class="u-alert" title="${esc(reason || "Dado desatualizado")}">${USAGE_ALERT}<span>Indisponível · coletado às ${esc(when || "—")}</span></span>${reason ? `<span class="u-reason">${esc(reason)}</span>` : ""}`
+    ? `<span class="u-alert" title="${esc(reason || "Dado desatualizado")}">${USAGE_ALERT}<span>Indisponível · coletado às ${esc(when || "—")}</span></span>${reason ? ` <span class="u-reason">· ${esc(reason)}</span>` : ""}`
     : `<small>coletado às ${esc(when || "—")}</small>${plan}`;
-  return `<div class="u-prov ${status}"><div class="u-name"><b>${esc(label)}</b>${head}</div>
-    ${usageWinHtml(p.fiveHour, "5 h", label)}${usageWinHtml(p.week, "Semana", label)}</div>`;
+  return `<div class="u-prov ${status}"><div class="u-grid"><div class="u-head"><b>${esc(label)}</b> ${head}</div>
+    ${usageWinHtml(p.fiveHour, "5 h", label)}${usageWinHtml(p.week, "Semana", label)}</div></div>`;
 }
 // Chamado a cada polling, mesmo com formulário em edição: só toca a faixa (sem foco, sem campos, sem aria-live).
 let usageLastHtml = null;
