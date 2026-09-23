@@ -64,6 +64,7 @@
   .step { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--dim); }
   .step.done { color: var(--green); }
   .step.now { color: var(--accent); font-weight: 600; }
+  .step.fail { color: var(--red); font-weight: 600; }
   .tl b { display: block; font-size: 14px; font-weight: 600; }
   .tl p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
   .tl .when { color: var(--dim); font-size: 12px; white-space: nowrap; }
@@ -222,19 +223,47 @@ function renderSquadStrip() {
   }).join("")}</div>`;
 }
 
+// Demanda ativa (iniciada e ainda não concluída): a tela Execuções passa a ser dela.
+function activeDemand() {
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
+  const infos = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
+  return infos.filter(x => x.status !== "Registrada" && x.status !== "Concluída").at(-1) || null;
+}
+// Linha do tempo de uma demanda, montada a partir dos eventos (task → handoff → gate), na ordem em que aconteceram.
+function demandSteps(active) {
+  const byAgent = runsByAgent();
+  const steps = [];
+  for (const e of state.log.filter(e => e.demand === active.d.id)) {
+    if (e.type === "task" && e.agent !== "humano") {
+      steps.push({ id: AGENTS[e.to]?.ini || "•", agent: e.to, title: `${AGENTS[e.to]?.label || e.to}: ${e.title.replace(/^D\d+: /, "")}`, st: "next", entry: null, ts: e.ts });
+    } else if (e.type === "handoff") {
+      const s = [...steps].reverse().find(s => s.agent === e.agent && s.st !== "done");
+      if (s) { s.st = "done"; s.entry = e; } else steps.push({ id: AGENTS[e.agent]?.ini || "•", agent: e.agent, title: `${AGENTS[e.agent]?.label || e.agent}: ${e.title}`, st: "done", entry: e, ts: e.ts });
+    } else if (e.type === "gate") {
+      const s = [...steps].reverse().find(s => s.agent === "auditor" && s.st !== "done");
+      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${Math.round((e.confidence || 0) * 100)}%`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
+      if (s) Object.assign(s, item); else steps.push(item);
+    }
+  }
+  let marked = false;
+  for (const s of steps) if (s.st === "next" && !marked) { s.st = "now"; marked = true; }
+  return steps;
+}
+
 function renderExecucoes() {
-  const pipe = pipelineStatus();
+  const active = activeDemand();
+  const pipe = active ? demandSteps(active) : pipelineStatus();
   const now = pipe.find(p => p.st === "now");
   const anyRunning = state.runs.some(r => r.status === "trabalhando");
-  const g = latestGate();
+  const g = active ? ([...state.log].reverse().find(e => e.type === "gate" && e.demand === active.d.id) || null) : latestGate();
   const human = g && humanFor(g.gate);
   const conf = g?.confidence != null ? Math.round(g.confidence * 100) : null;
   const evs = g?.evidences || [];
   const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
   return `
   <div class="title-row">
-    <div><h1>${esc(now ? now.title : "Squad concluída")}</h1>
-    <div class="sub">Acompanhe a passagem entre agentes e intervenha somente quando necessário.</div></div>
+    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.d.title.replace(/^Demanda: /, "") : (now ? now.title : "Squad concluída"))}</h1>
+    <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div></div>
     <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
   </div>
   ${renderSquadStrip()}
@@ -243,9 +272,9 @@ function renderExecucoes() {
       <h3>Linha do tempo</h3>
       <ol class="tl">${pipe.map((p, i) => `
         <li><div class="step ${p.st}">${p.id}</div>
-          <div><b>${esc(p.title)}</b><p>${esc(p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
-          <span class="when">${p.st === "done" ? "concluído" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}
-      </ol>
+          <div><b>${esc(p.title)}</b><p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
+          <span class="when">${p.st === "done" ? (p.ts ? hhmm(p.ts) : "concluído") : p.st === "fail" ? "devolvido" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}
+      </ol>${active ? "" : ""}
       ${g ? `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
         <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
         <div class="bar"><div style="width:${conf ?? 0}%"></div></div>

@@ -163,7 +163,7 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
     run_id = path.stem.replace("agent-", "")
     if delegations_only:
         status = "coordenando"
-    elif completed is not None and run_id in completed and ended_turn:
+    elif ended_turn and ((completed is not None and run_id in completed) or (time.time() - updated) > 90):
         status = "concluído"
     elif recent or not ended_turn:
         status = "trabalhando"
