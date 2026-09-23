@@ -3,6 +3,7 @@ package com.checkout.common.kafka;
 import com.checkout.common.messaging.MalformedMessageException;
 import com.checkout.common.messaging.Topics;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -47,8 +48,11 @@ public class KafkaCommonConfiguration {
     @Bean
     @ConditionalOnMissingBean(CommonErrorHandler.class)
     public DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> template) {
-        DefaultErrorHandler handler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(template),
-                new FixedBackOff(500L, 2L));
+        // Destino explícito <tópico>.DLT (events.md §1): o default do Spring Kafka seria "<tópico>-dlt", que não
+        // existe (não é pré-criado) e faria a mensagem venenosa se perder com UNKNOWN_TOPIC_OR_PARTITION.
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(template,
+                (record, ex) -> new TopicPartition(record.topic() + Topics.DLT_SUFFIX, record.partition()));
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(500L, 2L));
         ExponentialBackOff transientBackOff = new ExponentialBackOff(500L, 2.0);
         transientBackOff.setMaxInterval(10_000L);
         handler.setBackOffFunction((record, ex) -> isPoison(ex) ? null : transientBackOff);
