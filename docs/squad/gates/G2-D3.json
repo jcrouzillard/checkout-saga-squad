@@ -1,0 +1,27 @@
+{
+  "gate": "G2",
+  "demand": "62f458c8038b",
+  "from": "frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Painel servido com a mudança", "status": "pass", "weight": 3, "blocking": true,
+     "source": "curl localhost:7070/ → 200; HTML servido contém o campo emoji (12 ocorrências de 'emoji'), ou seja, é a versão do commit c58414a"},
+    {"name": "Escopo e nenhuma chamada nova", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git show --stat c58414a (implementação): só squad-control/index.html (+ log e captura). O diff não adiciona fetch, <script src> nem <link>; API, servidor, tools/squad/log.py e formato do log intactos. Em git diff develop --stat também aparecem .claude/agents/frontend.md, AGENTS.md e tools/squad/gitflow.py (STATE += docs/squad/inbox/), vindos dos commits de governança b855118/2900401 do Orquestrador, não da implementação"},
+    {"name": "Acessibilidade e tamanho fixo do avatar", "status": "validate", "weight": 2, "blocking": false,
+     "source": "av(): emoji em <span aria-hidden=\"true\">; nome segue como texto nos 3 usos (faixa, aba Agentes, gaveta); title do card e do dot sem alteração. .av.emo com caixa fixa 22×22 (32×32 na gaveta), min/max-width/height, overflow:hidden, line-height 1, fontes de emoji do sistema, o que trata o risco de largura do G1-D3. Ressalva: a 390 px a página tem rolagem horizontal (visível em tests/ui/squad-control-d3-390.png), o que contraria a letra do CA5; a causa não está no diff do D3 (só o avatar mudou), mas não foi demonstrado que já existia antes"},
+    {"name": "Aderência ao contrato (CA1–CA8)", "status": "pass", "weight": 1, "blocking": false,
+     "source": "CA1 mapa idêntico (🎼📐⚙️🔭🧩🎨🧪🛡️👤, sem repetição); CA2 fonte única AGENTS[x].emoji via av(); CA3 aria-hidden; CA4 fallback m.ini || '?' e objeto {ini:'?'} para chave desconhecida; CA6 sem recurso externo; CA8 ini mantido nas 9 entradas e usado na linha do tempo"}
+  ],
+  "open_risks": [
+    "Rolagem horizontal da página a 390 px (CA5): confirmar se já existia em develop; se sim, abrir demanda própria, se não, corrigir no D3.",
+    "Desvio de protocolo registrado (a4b265184f10): o QA foi acionado antes deste G2; este parecer usa o código atual, que é o mesmo validado pelo QA.",
+    "Tensão com a identidade visual sem emojis: decisão do humano, que pediu explicitamente."
+  ],
+  "human_required": false,
+  "rationale": "Implementação mínima e aderente ao contrato: campo emoji nas 9 entradas, av() com span aria-hidden e fallback, e avatar em caixa fixa, o que resolve o risco de largura do G1. O commit de implementação só toca squad-control/index.html e o painel é servido com a mudança. Única ressalva: a rolagem horizontal a 390 px, sem ligação demonstrada com o diff (validar). Confiança = (3+2+1+1)/8 = 0.88."
+}

@@ -1,0 +1,27 @@
+{
+  "gate": "G3",
+  "demand": "62f458c8038b",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Checklist CA1–CA8", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-squad-control-d3.md: 7 ✅ e CA2 ⚠️ só por falta de captura da gaveta/aba Agentes. Conferi no código que av() é a única fonte do avatar nos 3 pontos (faixa, aba Agentes, gaveta), então CA2 é garantido por construção. Nenhum defeito registrado"},
+    {"name": "Capturas 1440 e 390 px", "status": "validate", "weight": 2, "blocking": false,
+     "source": "squad-control-d3.png (1440): 8 cards com emoji distinto, nome (reticências em 'Orquestra…'/'Observabi…'), dot visível, altura do card inalterada. squad-control-d3-390-tall.png: grade 2 colunas com emoji, nome e dot, sem corte. Mas squad-control-d3-390.png mostra rolagem horizontal da página a 390 px (CA5 'nada transborda'); o QA a atribui a trecho anterior ao D3, sem comparação com develop"},
+    {"name": "Nada de API, log ou servidor alterado", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop --stat: nenhuma mudança em services/, docker-compose.yml, tools/squad/log.py ou tools/squad/server.py; implementação (c58414a) só em squad-control/index.html; tools/squad/gitflow.py mudou 1 linha no commit de triagem do Orquestrador (governança, fora do produto)"},
+    {"name": "Demanda do humano atendida", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Evento 62f458c8038b ('uns emojis para cada quadrinho… mais visual, mais leve… sem quebrar nada'): emojis visíveis nos cards (capturas), funcionalidades e ini preservados. Tensão com a identidade visual corporativa (sem emojis) aceita como decisão do humano, que pediu explicitamente; efeito limitado ao painel da fábrica"}
+  ],
+  "open_risks": [
+    "Rolagem horizontal a 390 px no Squad Control: comparar com develop; se já existia, tratar em demanda própria (não bloqueia o D3).",
+    "CA2 (gaveta e aba Agentes) e CA4 (evento agent 'xyz') sem evidência visual ou ao vivo, só pelo código; smoke manual recomendado antes do merge.",
+    "Identidade visual: os emojis destoam do padrão sóbrio adotado; decisão registrada do humano, reversível removendo o campo emoji de AGENTS."
+  ],
+  "human_required": false,
+  "rationale": "O checklist do QA (7 ✅, CA2 garantido pela fonte única av()) e as capturas mostram os emojis por papel nos 8 cards, com nome, dot e tamanho preservados. Nada de API, log ou servidor mudou, e a demanda do humano está atendida. O desvio de ordem (QA antes do G2) foi registrado e compensado: G2 e G3 avaliaram o mesmo código. Restam só riscos não bloqueantes (rolagem a 390 px sem causa demonstrada no D3, CA2/CA4 sem evidência visual, identidade visual). Confiança = (3+1+2+1)/8 = 0.88."
+}
