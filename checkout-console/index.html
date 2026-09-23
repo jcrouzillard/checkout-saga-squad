@@ -57,7 +57,7 @@
 <div class="app">
   <header>
     <div class="brand"><div class="logo">CS</div><b>Checkout Saga</b><span>Console de pedidos</span></div>
-    <nav class="tabs"><a href="/" class="on">Novo pedido</a><a href="http://localhost:16686" target="_blank" rel="noopener">Jaeger</a><a href="http://localhost:3000" target="_blank" rel="noopener">Grafana</a></nav>
+    <nav class="tabs"><a href="/" class="on">Novo pedido</a></nav>
   </header>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
   <main>
@@ -157,7 +157,6 @@ async function follow() {
 }
 
 function renderOrder(o, stock) {
-  const jaeger = `http://localhost:16686/search?service=saga-orchestrator&tags=${encodeURIComponent(JSON.stringify({ orderId: o.orderId }))}`;
   $("#result").innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px">
       <div><h1>Pedido <code style="font-size:16px">${esc(o.orderId.slice(0, 8))}</code></h1>
@@ -176,7 +175,6 @@ function renderOrder(o, stock) {
       ${o.status === "PENDING" ? `<tr><td colspan="5" style="color:var(--dim)">Saga em andamento…</td></tr>` : ""}
     </tbody></table>
     <div class="links" style="margin-top:16px">
-      <a href="${jaeger}" target="_blank" rel="noopener">Trace no Jaeger</a>
       <a href="/api/order/orders/${esc(o.orderId)}" target="_blank" rel="noopener">GET /orders/{id}</a>
       <a href="/api/saga/sagas/${esc(o.sagaId)}" target="_blank" rel="noopener">Diagnóstico da saga</a>
     </div>

@@ -169,7 +169,8 @@ squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` n
 
 **Fábrica × produto.** O Squad Control é genérico e pode gerenciar outros projetos: o projeto atual e seus links
 vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto** e sobe como container próprio
-(`checkout-console`) no compose, ao lado dos serviços.
+(`checkout-console`) no compose, ao lado dos serviços. A área **Observabilidade** do Squad Control escolhe o produto e
+embute o Grafana e o Jaeger dele (o Auditor usa traces e métricas como evidência nos gates).
 
 ## 7. Evidências
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)

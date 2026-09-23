@@ -242,8 +242,17 @@ class Handler(SimpleHTTPRequestHandler):
                 "handoffs": collect_handoffs(),
             })
         if self.path.startswith("/api/project"):
+            # Portas locais podem variar (.env do compose): placeholders {{VAR}} são resolvidos aqui.
             pj = ROOT / "docs/squad/project.json"
-            return self._json(json.loads(pj.read_text(encoding="utf-8")) if pj.exists() else {"name": ROOT.name, "links": []})
+            raw = pj.read_text(encoding="utf-8") if pj.exists() else '{"current": null, "products": []}'
+            env = dict(os.environ)
+            dotenv = ROOT / ".env"
+            if dotenv.exists():
+                for line in dotenv.read_text().splitlines():
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1); env.setdefault(k.strip(), v.strip())
+            raw = re.sub(r"\{\{(\w+)\}\}", lambda m: env.get(m.group(1), {"GRAFANA_PORT": "3000", "CONSOLE_PORT": "8090"}.get(m.group(1), "")), raw)
+            return self._json(json.loads(raw))
         if self.path.startswith("/api/policy"):
             return self._json({
                 "gates": (ROOT / "docs/squad/gates.md").read_text(encoding="utf-8"),

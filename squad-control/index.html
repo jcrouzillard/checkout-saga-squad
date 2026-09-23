@@ -126,6 +126,7 @@
       <a data-view="agentes">Agentes <span class="count" id="c-ag"></span></a>
       <a data-view="demandas">Demandas <span class="count" id="c-dem"></span></a>
       <h6>PRODUTO</h6>
+      <a data-view="observabilidade">Observabilidade</a>
       <div id="project-links"></div>
     </nav>
     <main id="main"></main>
@@ -154,7 +155,7 @@ const PIPELINE = [
   { id: "G3", title: "Auditor avaliou o gate QA → Release", agent: "auditor", gate: "G3" },
 ];
 
-let project = null, state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
+let project = null, product = null, obsTool = "grafana", state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
@@ -354,7 +355,7 @@ async function render() {
   $("#c-dec").textContent = state.log.length;
   $("#c-ag").textContent = state.runs.filter(r => r.status === "trabalhando").length || "";
   $("#c-dem").textContent = state.log.filter(e => e.type === "task" && e.agent === "humano").length || "";
-  const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias, demandas: renderDemandas }[view];
+  const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias, demandas: renderDemandas, observabilidade: renderObservabilidade }[view];
   const draft = { t: $("#dem-title")?.value, d: $("#dem-detail")?.value };
   const note = $("#note")?.value;
   const focused = document.activeElement?.id === "note";
@@ -367,7 +368,7 @@ async function render() {
 // Enquanto o usuário digita num campo do painel, o polling não redesenha a tela (senão o campo perde o foco).
 const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
 async function refresh() {
-  try { state = await fetch("/api/state").then(r => r.json()); if (!editing()) render(); }
+  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); }
   catch (e) { $("#main").innerHTML = `<p class="warn-msg">Servidor indisponível. Rode <code>make squad</code>.</p>`; }
 }
 
@@ -376,12 +377,14 @@ document.addEventListener("click", async ev => {
   if (nav) {
     view = nav.dataset.view || nav.dataset.tab;
     document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.view === view));
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "execucoes" && !["politicas", "demandas"].includes(view))));
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "execucoes" && !["politicas", "demandas", "observabilidade"].includes(view))));
     return render();
   }
   const ag = ev.target.closest("[data-agent]");
   if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
   if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  const ob = ev.target.closest("[data-obs]");
+  if (ob) { obsTool = ob.dataset.obs; return render(); }
   if (ev.target.closest("[data-demand]")) {
     const title = $("#dem-title")?.value.trim(); if (!title) { flash = "Informe um título para a demanda."; return render(); }
     const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "" }) });
@@ -398,13 +401,30 @@ document.addEventListener("click", async ev => {
     refresh();
   }
 });
+document.addEventListener("change", ev => { if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && drawerAgent) { drawerAgent = null; renderDrawer(); } });
 fetch("/api/project").then(r => r.json()).then(p => {
   project = p;
-  $("#project-name").textContent = `${p.name} · Orquestrador + Auditor`;
-  document.title = `Squad Control · ${p.name}`;
-  $("#project-links").innerHTML = (p.links || []).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
+  product = (p.products || []).find(x => x.id === p.current) || (p.products || [])[0];
+  if (!product) return;
+  $("#project-name").textContent = `${product.name} · Orquestrador + Auditor`;
+  document.title = `Squad Control · ${product.name}`;
+  $("#project-links").innerHTML = (product.links || []).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
 }).catch(() => {});
+
+function renderObservabilidade() {
+  const products = project?.products || [];
+  const url = product?.observability?.[obsTool];
+  return `<h1>Observabilidade</h1><div class="sub">Escolha o produto e a ferramenta. O Auditor usa traces e métricas como evidência nos gates.</div>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:18px">
+    <label for="obs-product" class="muted" style="font-size:12px;font-weight:500">Produto</label>
+    <select id="obs-product" style="padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${products.map(p => `<option value="${esc(p.id)}" ${p.id === product?.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
+    <div class="tabs" style="margin-left:8px"><button data-obs="grafana" class="${obsTool === "grafana" ? "on" : ""}" style="height:40px">Grafana · métricas</button><button data-obs="jaeger" class="${obsTool === "jaeger" ? "on" : ""}" style="height:40px">Jaeger · traces</button></div>
+    ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="margin-left:auto;font-size:13px">Abrir em nova aba</a>` : ""}
+  </div>
+  ${url ? `<iframe src="${esc(url)}" title="${esc(obsTool)} · ${esc(product.name)}" style="width:100%;height:calc(100vh - 260px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:#fff"></iframe>`
+        : `<p class="muted" style="margin-top:18px">Este produto não tem ${esc(obsTool)} configurado em docs/squad/project.json.</p>`}`;
+}
 refresh();
 setInterval(refresh, 3000);
 </script>
