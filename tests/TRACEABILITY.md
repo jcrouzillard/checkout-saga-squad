@@ -104,6 +104,20 @@ sem esse teste.
 reconstruídas no `HEAD` (`docker compose up -d --build`) e e2e **12/12** (`last-report.json`,
 `gitCommit` `e2d66c5`, 20:48:07Z).
 
+## 9. Alinhamento documentação × código × infra (D10, `docs/contracts/d10-alinhamento.md`)
+
+Execução do QA em 2026-09-23, branch `feature/D10-alinhar-documentacao-codigo-infra`, HEAD `ba78c68`.
+Checklist CA a CA: `tests/d10-checklist.md`.
+
+| CA | Requisito | Evidência | Status |
+|---|---|---|---|
+| CA1 | `saga.md` §3.1/3.2/3.5/3.7/4.5/5 + ADR-013 refletem o código | `findDue`, `lockDue`, `lockResumable`, `resumeAfterRestart`, `RESUMED_AFTER_RESTART`, `incrementAttempts`, `shouldReply` existem em `services/*/src/main`; `docs/adr/013-carencia-de-prazos-na-retomada.md` presente; carência provada ao vivo no CA6 | ✅ |
+| CA2 | Tópicos e `.DLT` criados explicitamente; auto-create desligado | Após `down -v`: broker `auto.create.topics.enable=false` (`STATIC_BROKER_CONFIG`); 9 tópicos + 9 `.DLT` + `__consumer_offsets`, nenhum extra; todos com 3 partições; `DeadLetterIT` verde | ✅ |
+| CA3 | Log JSON com `trace_id`/`span_id`/`orderId`/`sagaId` | `OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED` no `docker-compose.yml`; linha real do `saga-orchestrator` com os 4 campos; o `trace_id` abre no Jaeger (31 spans, 4 serviços) | ✅ |
+| CA4 | Healthcheck em todos os containers | `docker compose ps`: 11/11 `(healthy)` 40 s após `up --build -d` (cache de build quente) | ✅ |
+| CA5 | README explica o Squad Control fora do compose | Verificado pelo Auditor no G2 (fora do escopo de teste do QA) | ✅ (G2) |
+| CA6 | Regressão completa | e2e **12/12** (`last-report.json`, `gitCommit` `ba78c68`); reinício: `RESUMED_AFTER_RESTART` no `GET /sagas/{id}` **e** `saga_resumed_total` = 1; `mvn -B verify` BUILD SUCCESS (66 unitários + 9 IT) | ✅ |
+
 ## Observações / lacunas conhecidas
 
 1. **DLT com nome de tópico divergente**: defeito `162e55358052` **corrigido em `e2d66c5`**; `DeadLetterIT`
@@ -114,6 +128,9 @@ reconstruídas no `HEAD` (`docker compose up -d --build`) e e2e **12/12** (`last
    continua disponível para a demo.
 4. **409 em `Idempotency-Key` repetida com corpo diferente**: coberto tanto no e2e (bônus, não obrigatório)
    quanto agora em `OrderApiIT` (obrigatório, IT).
+5. **D10 / CA2 no nível de IT**: o Kafka do Testcontainers em `AbstractIntegrationIT` continua com a
+   auto-criação padrão (ligada); o "se possível" do CA2 não foi aplicado nesta rodada. A prova de que os
+   `.DLT` não dependem de auto-criação é a verificação ao vivo no broker do compose (tabela da seção 9).
 
 ## Demandas da fábrica (Squad Control)
 
