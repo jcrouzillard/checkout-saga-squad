@@ -7,6 +7,8 @@ public final class Topics {
     private Topics() {}
 
     public static final int PARTITIONS = 3;
+    /** Sufixo dos dead-letter topics (DeadLetterPublishingRecoverer): ex. {@code order.commands.DLT}. */
+    public static final String DLT_SUFFIX = ".DLT";
 
     public static final String ORDER_EVENTS = "order.events";
     public static final String ORDER_COMMANDS = "order.commands";

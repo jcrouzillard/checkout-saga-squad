@@ -1,0 +1,29 @@
+{
+  "gate": "G2",
+  "demand": "c6f83b5bb5c7",
+  "from": "backend+qa",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.70,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "mvn verify com ≥ 4 classes IT verdes", "status": "fail", "weight": 3, "blocking": true,
+     "source": "Rodei 'mvn -B -pl services/order-service -am verify' duas vezes. (1) Sem ajuste: as 4 IT falham antes de começar, com 'client version 1.32 is too old. Minimum supported API version is 1.40' (Testcontainers 1.20.6 × Docker Engine 29.4.0 do OrbStack: problema de INFRA/versão). (2) Com DOCKER_API_VERSION=1.44 / -Dapi.version=1.44: os contêineres sobem e o resultado é 9 testes, 4 falhas e 4 erros. OrderApiIT dá 500 em todos os casos (inclusive GET de id inexistente) por 'Connection to localhost:32788 refused' / 'HikariPool… total=0'; IdempotentConsumerIT e OutboxRelayIT com NPE ao ler orderId da resposta 500; DeadLetterIT em ConditionTimeout esperando order.commands.DLT-0. Diagnóstico: DEFEITO DE TESTE, não só infra. AbstractIntegrationIT usa @Testcontainers + @Container em campos static da classe base: a extensão JUnit PARA os contêineres ao fim de cada classe, enquanto o contexto Spring em cache (mesma configuração) continua apontando para as portas antigas. As classes seguintes falham com conexão recusada. O javadoc diz 'sobem uma vez por JVM', o que não é verdade com @Container"},
+    {"name": "mvn test sem Docker (unitários)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Na mesma execução, o surefire do order-service passou (OrderListByCustomerTest 6/6), e common e demais módulos compilam; o build só falhou no failsafe"},
+    {"name": "Escopo e contratos", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop...HEAD -- docs/contracts vazio. Em src/main só services/common (KafkaCommonConfiguration + Topics.DLT_SUFFIX: tópicos <tópico>.DLT com 3 partições), mudança de produção aceita como exceção (decisões 2963f9cdb094 e e0f539efd543) e validada pelo e2e sobre o HEAD reconstruído. poms via change-request b48079d72088"},
+    {"name": "Cenários e2e novos", "status": "pass", "weight": 2, "blocking": false,
+     "source": "tests/e2e/run.sh com timeout_inventory, timeout_shipping, timeout_once e trace_end_to_end (12/12 no HEAD, ver G3-D6)"},
+    {"name": "Sem Thread.sleep nos testes", "status": "pass", "weight": 1, "blocking": false,
+     "source": "grep -rn 'Thread.sleep' services/*/src/test → só a menção no javadoc do AbstractIntegrationIT; esperas com Awaitility"}
+  ],
+  "open_risks": [
+    "CORRIGIR (QA, AbstractIntegrationIT): trocar @Testcontainers/@Container por contêineres singleton iniciados num bloco static (POSTGRES.start(); KAFKA.start()) mantendo @ServiceConnection, ou usar @DynamicPropertySource com contêineres singleton, para que os contêineres vivam a JVM inteira e o contexto Spring em cache continue válido. Depois reexecutar mvn verify e anexar failsafe-reports (≥ 4 classes, 0 skipped).",
+    "CORRIGIR (Backend, change-request): Testcontainers 1.20.6 fala a API Docker 1.32, recusada pelo Docker Engine 29 (mínimo 1.40). Subir o BOM do Testcontainers para uma versão compatível (≥ 1.21.x) ou documentar DOCKER_API_VERSION; o CI (ubuntu-latest) tende a receber o mesmo Docker.",
+    "Se, depois das duas correções, o DeadLetterIT ainda não receber em order.commands.DLT, investigar o listener anunciado do KafkaContainer no OrbStack (o sintoma do handoff 012ea22e16a0) antes de classificar como infra."
+  ],
+  "human_required": false,
+  "rationale": "A implementação de e2e, o escopo e o build unitário estão corretos, e a mudança de produção nos tópicos DLT é uma exceção justificada e validada pelo e2e. Porém o critério bloqueante do G2 (mvn verify verde com as 4 IT) falha, e a minha reprodução mostra que não é só infraestrutura: há incompatibilidade de API entre Testcontainers 1.20.6 e Docker 29 (infra/versão) e, contornada essa, um defeito de desenho no AbstractIntegrationIT (@Container static com contexto Spring em cache → conexões recusadas a partir da 2ª classe). As duas correções são pequenas; devolvo ao QA (teste) com change-request ao Backend (versão do Testcontainers). Confiança = (0+2+2+2+1)/10 = 0.70."
+}

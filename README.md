@@ -87,20 +87,26 @@ curl -s localhost:8081/orders/<orderId>
 ## 4. Como testar e reproduzir as falhas
 ```bash
 make test                          # testes unitários (mvn test)
-make e2e                           # 7 cenários ponta a ponta contra o compose
+mvn -B verify                      # + testes de integração *IT (Testcontainers: Postgres e Kafka reais; exige Docker)
+make e2e                           # 12 cenários ponta a ponta contra o compose
 bash tests/e2e/run.sh payment_failure   # um cenário específico
 ```
 Falhas são injetadas pelo objeto `simulate` no `POST /orders` (ver [`docs/contracts/api.md`](docs/contracts/api.md)).
 Cada cenário, com o `curl` equivalente e o resultado esperado, está em [`tests/e2e/scenarios.md`](tests/e2e/scenarios.md).
+Estratégia de testes em camadas (unitário → integração → e2e): [`docs/architecture/testes.md`](docs/architecture/testes.md) (ADR-010).
 
 | Cenário | Como reproduzir | Continuidade / compensações |
 |---|---|---|
 | Falha no pagamento | `"simulate":{"payment":"DECLINE"}` | libera estoque → cancela pedido |
 | Falha no envio | `"simulate":{"shipping":"FAIL"}` | estorna pagamento → libera estoque → cancela pedido |
-| Timeout em etapa | `"simulate":{"payment":"TIMEOUT"}` | retries com o mesmo `messageId` → compensação (estorno idempotente) |
+| Timeout no pagamento | `"simulate":{"payment":"TIMEOUT"}` | retries com o mesmo `messageId` → compensação (estorno idempotente) |
+| Timeout no estoque | `"simulate":{"inventory":"TIMEOUT"}` | retries → libera a reserva real → cancela pedido |
+| Timeout no envio | `"simulate":{"shipping":"TIMEOUT"}` | retries → cancela o envio → estorna pagamento → libera estoque → cancela pedido |
+| Timeout só na 1ª tentativa | `"simulate":{"payment":"TIMEOUT_ONCE"}` | retry com o mesmo `messageId` → segue normalmente → **CONFIRMED** |
 | Reinício do coordenador | `"simulate":{"payment":"SLOW"}` + `make kill-orchestrator` | estado e deadlines no banco; o scheduler retoma de onde parou |
 
-Detalhes e diagramas de sequência: [`docs/architecture/saga.md` §4-5](docs/architecture/saga.md).
+O cenário `trace_end_to_end` verifica automaticamente, pela API do Jaeger, que um pedido gera **um único trace com os
+5 serviços**. Detalhes e diagramas de sequência: [`docs/architecture/saga.md` §4-5](docs/architecture/saga.md).
 
 ## 5. Observabilidade
 - **Traces**: OpenTelemetry Java Agent em todos os serviços; `traceparent` persistido no outbox, de modo que o trace
@@ -192,7 +198,7 @@ Detalhes e diagrama: [`docs/squad/git-flow.md`](docs/squad/git-flow.md) · hist�
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
 - Pareceres do Auditor: [`docs/squad/gates/`](docs/squad/gates/)
 - Handoffs entre agentes: [`docs/squad/memory/handoffs/`](docs/squad/memory/handoffs/)
-- Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **8/8** (7 cenários originais + `customer_orders` da demanda D1) (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
+- Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **12/12** (inclui timeouts de estoque, envio e com recuperação, e o trace ponta a ponta, da demanda D6) (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
 - Board da squad no GitHub: issues por agente + Project (kanban) espelhando o log (`make github-sync`)
 - Histórico git: cada fase é um commit do Orquestrador
 
@@ -213,8 +219,8 @@ squad-control/         painel web da squad (genérico; o projeto gerenciado vem 
 Todas vêm dos riscos em aberto dos pareceres do Auditor (`docs/squad/gates/`):
 - **Uma réplica do orquestrador**: o `group.instance.id` é fixo (`saga-orchestrator-1`, sobrescrevível via
   `KAFKA_GROUP_INSTANCE_ID`). Com N réplicas, cada uma precisa de um id próprio (ex.: nome do pod de um StatefulSet).
-- **Cobertura e2e de timeout**: há cenário próprio só para o pagamento. Timeout de estoque/envio e `TIMEOUT_ONCE`
-  usam o mesmo mecanismo e têm testes unitários, mas não têm cenário e2e dedicado.
+- **Testes de integração (`*IT`, Testcontainers)**: rodam no `mvn -B verify` e exigem Docker disponível. O CI executa
+  `mvn -B verify`, mas a execução dos `*IT` no CI ainda não foi comprovada nesta entrega (o Auditor registrou o ponto).
 - **Ordem do outbox** garantida com 1 instância por serviço; para escalar o relay: particionamento por `orderId`
   ou CDC (Debezium).
 - Limpeza de `outbox`/`processed_messages`, DLQ com reprocessamento e schema registry ficam como evolução

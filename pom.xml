@@ -32,6 +32,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Alinhado ao OpenTelemetry Java Agent v2.8.0 (bridge da API 1.42) -->
         <opentelemetry.version>1.42.1</opentelemetry.version>
+        <!-- D6: 1.20.6 (BOM do Boot 3.4.5) usa API Docker antiga, recusada pelo Docker 29 (exige >= 1.44).
+             1.21.4 = última 1.x (2.x renomeia os artefatos para testcontainers-*). -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -43,4 +46,37 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <!-- ADR-010: *Test → surefire (fase test, sem Docker); *IT → failsafe (integration-test + verify, Testcontainers).
+         -DskipITs desliga os ITs explicitamente. Versões geridas pelo spring-boot-starter-parent. -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
