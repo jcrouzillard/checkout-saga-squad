@@ -128,7 +128,15 @@
   "3ee5d2f804e2",
   "b08c7b74d6a4",
   "5fd4e631c5e2",
-  "be59ff218d27"
+  "be59ff218d27",
+  "446356dc258d",
+  "d91b7a8b31d9",
+  "2dcdd405533b",
+  "ce66a5764c17",
+  "ccecad9691d5",
+  "724fa24a19e6",
+  "ee06042cf2f9",
+  "661c9ef22541"
  ],
  "issues": {
   "_diario": {
@@ -591,6 +599,17 @@
    "phase": "G3",
    "handed": false,
    "closed": true,
+   "kind": "task"
+  },
+  "d91b7a8b31d9": {
+   "number": 49,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/49",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8Ye6U",
+   "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
    "kind": "task"
   }
  },

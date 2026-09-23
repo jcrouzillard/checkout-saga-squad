@@ -1,0 +1,39 @@
+{
+  "demand": "d91b7a8b31d9",
+  "title": "Backlog nas demandas",
+  "detail": "Eu quero ter a possibilidade de criar demanda para o Squad, mas já em backlog, e ter uma lista de backlog. Aí, escolher quando eu quero que inicie para ser feito, que entre na fila para ser feito.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T17:29:49+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Hoje uma demanda registrada já fica parada ('Registrada'/'Validada') até alguém clicar em 'Iniciar', que a coloca na fila do Orquestrador (docs/squad/inbox/). O que o backlog deve ter de diferente: é só um novo nome e uma lista separada para esse estado pré-início, ou um fluxo novo? Por exemplo, a demanda passaria a ser registrada direto na fila por padrão e o backlog seria uma opção explícita.",
+      "dimension": "objetivo",
+      "answer": "O backlog é para um pré-início mesmo. É separado em um estado de pré-início. Então, ao criar uma nova demanda, ele pode criar em backlog ou já criar para início imediato."
+    },
+    {
+      "question": "A validação do Arquiteto continua rodando no registro da demanda em backlog, ou só quando ela sai do backlog para a fila? Hoje o 'Iniciar' fica bloqueado sem validação ok, sem respostas ou sem override com nota.",
+      "dimension": "escopo",
+      "answer": "Nesse momento, não que tiver em backlog, não vamos ao arquiteto. A gente pode, em outro momento, criar uma opção para validar com arquiteto, tipo \"backlog\", e depois selecionar também \"validar com arquiteto backlog\"."
+    },
+    {
+      "question": "A lista de backlog precisa de ordenação manual (reordenar ou priorizar itens dentro do backlog), ou basta listar por data de registro e usar a prioridade alta/normal/baixa que já é escolhida ao iniciar?",
+      "dimension": "escopo",
+      "answer": "A ordenação é por priorização mesmo: se é alto, baixo ou médio, né? Como já existe"
+    },
+    {
+      "question": "Dentro do backlog dá para editar título e descrição e remover ou arquivar a demanda? E uma demanda que já entrou na fila pode voltar para o backlog?",
+      "dimension": "escopo",
+      "answer": "Pode editar no backlog, sim, boa."
+    },
+    {
+      "question": "O que 'entrar na fila para ser feito' deve garantir? O Orquestrador precisa pegar uma demanda por vez, na ordem da fila, ou continua consumindo a inbox como hoje e o backlog apenas controla quando a demanda chega nela?",
+      "dimension": "aceite",
+      "answer": "Eu acho que o processador tem que pegar a demanda por ordem da fila mesmo, né? Ou seja, ele vai pegar tudo, menos o backlog. Hoje vai ser assim."
+    }
+  ],
+  "override": false
+}
