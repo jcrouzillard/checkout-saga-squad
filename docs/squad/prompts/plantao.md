@@ -22,6 +22,9 @@ grava o evento `validation`). Meta: perguntas visíveis no painel em menos de 1 
 - `RETURN` → devolva ao agente de origem com as observações.
 
 ## C) Fila `docs/squad/inbox/*.json`
+Processe os itens `fila` **na ordem listada pelo `pending.py`** (prioridade, depois chegada), um por vez. Demandas em
+backlog nunca aparecem na fila: só entram quando o humano as move para a fila no painel.
+
 1. Leia a demanda (inclui `kind` e `clarifications`: use as respostas do humano como parte dos critérios); mova o
    arquivo para `docs/squad/inbox/done/`.
 2. `python3 tools/squad/gitflow.py feature-start <código> <slug> --demand <id>`.

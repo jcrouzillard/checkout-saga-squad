@@ -9,7 +9,7 @@ rows = [json.loads(l) for l in (ROOT / "docs/squad/memory/decisions.jsonl").read
 pending = []
 from datetime import datetime, timedelta, timezone
 now = datetime.now(timezone.utc)
-for d in [r for r in rows if r.get("type") == "task" and r.get("agent") == "humano" and r.get("kind")]:
+for d in [r for r in rows if r.get("type") == "task" and r.get("agent") == "humano" and r.get("kind") and not r.get("backlog")]:
     rel = [r for r in rows if r.get("demand") == d["id"]]
     if any(r.get("type") in ("validation", "start") for r in rel) or any(r.get("type") == "control" and r.get("action") == "cancel" for r in rel):
         continue
@@ -17,8 +17,21 @@ for d in [r for r in rows if r.get("type") == "task" and r.get("agent") == "huma
             and now - datetime.fromisoformat(r["ts"]) < timedelta(minutes=5)]
     if not busy:
         pending.append(f"validação: {d['id']}")
-for f in sorted((ROOT / "docs/squad/inbox").glob("*.json")):
-    pending.append(f"fila: {f.name}")
+RANK = {"alta": 0, "normal": 1, "baixa": 2}
+queue = []
+for f in (ROOT / "docs/squad/inbox").glob("*.json"):
+    try:
+        item = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        item = {}
+    # prioridade efetiva = última repriorização humana da demanda, senão a do início (contrato D5 §2.6)
+    repri = [r for r in rows if r.get("type") == "control" and r.get("action") == "reprioritize"
+             and r.get("demand") == item.get("demand") and r.get("priority")]
+    pri = repri[-1]["priority"] if repri else item.get("priority", "normal")
+    queue.append((RANK.get(pri, 1), item.get("startedAt", ""), f.name, pri))
+queue.sort()
+for i, (_, _, name, pri) in enumerate(queue, 1):
+    pending.append(f"fila {i}/{len(queue)}: {name} · {pri}")
 handled_ctl = {r.get("demand") for r in rows if r.get("agent") == "orquestrador" and "cancelada" in r.get("title", "")}
 for c in [r for r in rows if r.get("type") == "control" and r.get("action") == "cancel" and r.get("demand") not in handled_ctl]:
     pending.append(f"cancelamento: {c['demand']}")

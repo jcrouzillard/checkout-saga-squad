@@ -112,3 +112,4 @@ para múltiplas réplicas (ver `change-request` do Backend ao DevOps, id `b164b0
    `.claude/agents/qa.md` cobre apenas "mesmo `Idempotency-Key` duas vezes → um único pedido").
 | Emoji por papel nos cards dos agentes (demanda D3, Squad Control) | `squad-control/index.html` (`docs/contracts/ui-squad-control-agentes.md`) | `tests/ui/checklist-squad-control-d3.md` + capturas 1440/390 | ✅ G3 88% |
 | Tipo da demanda + validação agêntica (demanda D4, Squad Control) | `tools/squad/{server,triage,pending}.py`, `squad-control/index.html` (`docs/contracts/ui-demandas-v2.md`, ADR-008) | `tests/ui/checklist-demandas-v2.md` (API, 4 triagens reais 10–21 s, capturas) | ✅ G3 80% |
+| Backlog de demandas (demanda D5, Squad Control) | `tools/squad/{server,pending,github_sync}.py`, `squad-control/index.html` (`docs/contracts/ui-backlog-de-demandas.md`, ADR-009) | `tests/ui/checklist-backlog-d5.md` (API, fila por prioridade, capturas) | ✅ G2 100% (2º ciclo) · G3 94% |

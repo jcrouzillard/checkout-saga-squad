@@ -171,8 +171,32 @@ class Sync:
             label = f"tipo:{e['kind']}"
             subprocess.run(["gh", "label", "create", label, "--color", "5A6B7F", "-R", REPO, "-f"], capture_output=True)
             labels.append(label)
+        if e.get("backlog"):
+            subprocess.run(["gh", "label", "create", "backlog", "--color", "9AA1B2", "-R", REPO, "-f"], capture_output=True)
+            labels.append("backlog")
         self.create_issue(e["id"], e["title"] if phase else f"{e['title']}", self.body(e, "Delegação do Orquestrador"),
-                          to, labels, "Em andamento", phase)
+                          to, labels, "Backlog" if e.get("backlog") else "Em andamento", phase)
+
+    def on_edit(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        ch = e.get("changes") or {}
+        args = ["gh", "issue", "edit", str(issue["number"]), "-R", REPO]
+        if ch.get("title"):
+            args += ["--title", f"Demanda: {ch['title']}"]
+        if "detail" in ch:
+            args += ["--body", ch["detail"] or "(sem descrição)"]
+        for field, prefix, values in (("kind", "tipo", ("produto", "operacao")), ("priority", "prioridade", ("alta", "normal", "baixa"))):
+            if ch.get(field):
+                subprocess.run(["gh", "label", "create", f"{prefix}:{ch[field]}", "--color", "5A6B7F", "-R", REPO, "-f"], capture_output=True)
+                args += ["--add-label", f"{prefix}:{ch[field]}"]
+                for v in values:
+                    if v != ch[field]:
+                        args += ["--remove-label", f"{prefix}:{v}"]
+        subprocess.run(args, capture_output=True)
+        lines = "\n".join(f"- **{k}**: {v}" for k, v in ch.items())
+        self.comment(issue, f"**Editada no backlog** · {e['ts']}\n\n{lines}\n\n<sub>evento `{e['id']}`</sub>")
 
     def on_validation(self, e):
         issue = self.s["issues"].get(e.get("demand"))
@@ -258,6 +282,8 @@ class Sync:
             return
         self.comment(issue, self.body(e, f"Demanda iniciada pelo humano · prioridade {e.get('priority', 'normal')} · rota {e.get('route', 'padrao')}"))
         self.set_field(issue, "Status", "Em andamento")
+        if e.get("fromBacklog"):
+            subprocess.run(["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--remove-label", "backlog"], capture_output=True)
         label = f"prioridade:{e.get('priority', 'normal')}"
         subprocess.run(["gh", "label", "create", label, "--color", "1F3A5F", "-R", REPO, "-f"], capture_output=True)
         subprocess.run(["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", label], capture_output=True)
@@ -286,7 +312,7 @@ class Sync:
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] in ("progress", "validation", "clarification") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
+        if not issue or e["type"] in ("progress", "validation", "clarification", "edit") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
@@ -299,7 +325,8 @@ class Sync:
         handlers = {"task": self.on_task, "handoff": self.on_handoff, "evidence": self.on_evidence,
                     "gate": self.on_gate, "human": self.on_human, "defect": self.on_ticket,
                     "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control,
-                    "validation": self.on_validation, "clarification": self.on_clarification}
+                    "validation": self.on_validation, "clarification": self.on_clarification,
+                    "edit": self.on_edit}
         n = 0
         for e in events:
             if e["id"] in done:

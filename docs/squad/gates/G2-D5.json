@@ -1,0 +1,29 @@
+{
+  "gate": "G2",
+  "demand": "d91b7a8b31d9",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.80,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Integração ponta a ponta (cópia descartável :7073)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Cópia de tools/ + squad-control/ com log vazio (sem GitHub, sem 7070). POST /api/demand: when inválido → 400, priority inválida → 400, backlog → 201 com backlog:true, imediata/sem when → 201 sem backlog. pending.py: 'validação:' só para as 2 imediatas; backlog nunca listado. edit: 201 (changes só dos campos alterados), kind inválido 400, sem mudança 400, inexistente 404, demanda imediata 409, após ir para a fila 409. Mover para a fila: 201 com fromBacklog:true, sem validação; inbox com título editado, fromBacklog:true, clarifications []; repetido → 409 'demanda já iniciada'. Imediata sem validação continua 409 (D4 intacta). 3 starts fora de ordem (baixa, alta, normal) + 1 anterior normal → pending.py 'fila 1/4 · alta, 2/4 · normal, 3/4 · normal, 4/4 · baixa' (prioridade e depois startedAt)"},
+    {"name": "Aderência ao contrato (§2.6 ordem da fila)", "status": "fail", "weight": 2, "blocking": true,
+     "source": "Contrato §2.6: prioridade da fila = 'a do último control reprioritize da demanda, senão a do start'; ADR-009 §4: pending.py é a fonte única da ordem para o plantão. pending.py ordena só por item['priority'] do arquivo do inbox (a do start) e ignora control reprioritize; server.py /api/demand/control só grava o evento, sem atualizar o inbox. O painel (demandInfo) considera o reprioritize, então painel e plantão divergem quando o humano repriorizar uma demanda na fila. Secundário: /api/demand/start usa data.get('priority','normal') e ignora a prioridade efetiva (edits) quando o cliente não manda priority (teste: backlog editado para 'baixa' entrou na fila como 'normal' via API). O painel não é afetado, porque pré-seleciona eff.priority"},
+    {"name": "Campos do painel = campos gravados", "status": "pass", "weight": 2, "blocking": false,
+     "source": "squad-control/index.html envia when (rádio dem-when, padrão imediato) e priority no registro; edit envia {id, …changes} só com campos alterados; lê d.backlog, edit.changes (effectiveDemand aplica em ordem de ts), start.fromBacklog (tag e mensagem) e priority (reprioritize > start > eff). Backlog ordenado por PRIO_RANK + ts e fila por PRIO_RANK + start.ts. Backlog não mostra 'Em validação': vinfo = inBacklog ? null : validationInfo(...), status 'Backlog' (risco 2 do G1-D5 tratado)"},
+    {"name": "Escopo", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop --stat: docs/adr/009, docs/contracts/ui-backlog-de-demandas.md, gates/G1-D5, prompts/plantao.md, squad-control/index.html, tools/squad/{github_sync,log,pending,server}.py (+ memória da squad). Nada em services/, checkout-console/ ou infra; donos conforme AGENTS.md"},
+    {"name": "Compatibilidade com a D4", "status": "pass", "weight": 1, "blocking": false,
+     "source": "pending.py exclui backlog de 'validação:' (not r.get('backlog')); imediatas seguem com validação e 409 no start sem validação"}
+  ],
+  "open_risks": [
+    "CORRIGIR (Orquestrador, tools/squad/pending.py): calcular a prioridade da fila como a do último evento control reprioritize da demanda no log, senão a do inbox/start (contrato §2.6); opcionalmente o server.py atualiza o priority do arquivo do inbox ao repriorizar. Teste: 2 demandas na fila, repriorizar a de baixo para 'alta' → pending.py deve inverter a ordem.",
+    "CORRIGIR (Orquestrador, tools/squad/server.py /api/demand/start): sem priority no corpo, usar a prioridade efetiva da demanda (task + edits) em vez de 'normal'.",
+    "Não verificado nesta rodada: github_sync (label backlog, comentário de edit, remoção da label ao mover) e o painel em navegador (edição inline, teclado); fica para o QA após a correção."
+  ],
+  "human_required": false,
+  "rationale": "A integração na cópia descartável confirmou quase todo o contrato: backlog sem validação, edit append-only com 201/400/404/409, mover para a fila sem validação e com o estado editado, 409 no 2º start, D4 intacta e fila ordenada por prioridade → startedAt. O painel usa os mesmos nomes de campo e não mostra 'Em validação' no backlog. Porém o pending.py, que o ADR-009 define como fonte única da ordem para o plantão, ignora o control reprioritize exigido pelo §2.6; painel e Orquestrador divergiriam após uma repriorização. A correção é pequena (pending.py + prioridade efetiva no start); devolvo ao Orquestrador (ciclo 1). Servidor :7073 parado; nada gravado no log real. Confiança = (3+0+2+2+1)/10 = 0.80."
+}

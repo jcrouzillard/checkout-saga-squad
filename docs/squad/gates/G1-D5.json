@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "d91b7a8b31d9",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "clarification ee06042cf2f9 = docs/squad/inbox/done/d91b7a8b31d9.json. q1 'pré-início separado, escolhido na criação' → §2.1 rádio 'Quando iniciar' imediato|backlog + estado Backlog. q2 'backlog não vai ao Arquiteto agora' → §2.2 e ADR-009 §3, sem validação na criação nem na saída; validar no backlog fica como evolução (§2.7). q3 'ordenação por prioridade como já existe' → §2.3 alta > normal > baixa, depois criação. q4 'pode editar no backlog' → §2.4 edit de título/descrição/tipo/prioridade, 409 fora do backlog. q5 'processador pega pela ordem da fila, tudo menos o backlog' → §2.6 fila consumida por pending.py, backlog nunca na fila"},
+    {"name": "Critérios verificáveis", "status": "pass", "weight": 3, "blocking": true,
+     "source": "§4 CA1–CA8 com verificação objetiva (log, pending.py, curl edit 400/404/409, start de backlog 201 e repetido 409, 3 demandas com prioridades distintas, 3 starts fora de ordem, gh issue view); §3 mudanças por arquivo com dono; §5 plano de teste. Ambiguidade menor: §5 diz 'edit (200/201…)' sem fixar o código de sucesso"},
+    {"name": "Compatibilidade com a D4", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Demandas imediatas seguem o fluxo D4 intacto (§2.2, CA2); backlog é campo opcional (ausente = imediato). pending.py (a) não lista 'validação:' para backlog: true. Hoje a regra D4 lista toda task com kind, e demanda de backlog tem kind, então sem esse filtro o vigia a validaria (risco apontado pelo Arquiteto, coberto em §3 e CA1). start pula a regra D4 só quando a demanda está em backlog; demais casos inalterados"},
+    {"name": "Log append-only preservado", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Evento edit com changes só dos campos alterados; estado efetivo = task + edits por ts (§1, ADR-009 §1); 'reescrever o task' foi rejeitada explicitamente nas alternativas; log.py TYPES += edit"}
+  ],
+  "open_risks": [
+    "Leitura da q5: o humano disse 'ordem da fila'; o contrato ordena por prioridade e depois startedAt (estendendo a resposta da q3). É coerente, mas uma demanda 'baixa' pode esperar muito; se o humano quiser FIFO puro, basta trocar a regra em pending.py.",
+    "O painel deve tratar backlog antes da validação: validationInfo() da D4 retorna estado para toda demanda com kind e mostraria 'Em validação'/'Validação atrasada' (3 min) num item de backlog; o Frontend precisa excluir backlog: true e o QA deve cobrir no CA1/CA8.",
+    "Backlog entra na fila sem perguntas antecipadas (decisão do humano); mitigação depende de a triagem do plantão mandar critérios vagos ao Arquiteto. Fixar o código de sucesso do edit (201, como os demais POST de eventos)."
+  ],
+  "human_required": false,
+  "rationale": "As 5 respostas do humano estão refletidas no contrato e no ADR-009: backlog como pré-início escolhido na criação, sem validação do Arquiteto, ordenado por prioridade, editável via evento edit append-only e ignorado pelo Orquestrador, que consome a fila em ordem calculada pelo pending.py. Os 8 CAs são verificáveis, com plano de teste. A compatibilidade com a D4 está explícita: imediatas seguem o fluxo validado e pending.py não pede validação para backlog, o risco já apontado pelo Arquiteto. Riscos não bloqueantes: leitura prioridade × FIFO da q5 e a exclusão do backlog em validationInfo() no painel. Confiança = 9/9 = 1.00."
+}
