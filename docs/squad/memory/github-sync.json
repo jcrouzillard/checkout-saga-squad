@@ -136,7 +136,10 @@
   "ccecad9691d5",
   "724fa24a19e6",
   "ee06042cf2f9",
-  "661c9ef22541"
+  "661c9ef22541",
+  "8d7dc45ff6aa",
+  "29446a3a059c",
+  "3ebeaaf18542"
  ],
  "issues": {
   "_diario": {
@@ -606,6 +609,17 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/49",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8Ye6U",
    "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "task"
+  },
+  "3ebeaaf18542": {
+   "number": 50,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/50",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YiKM",
+   "agent": "arquiteto",
    "status": "Em andamento",
    "phase": null,
    "handed": false,
