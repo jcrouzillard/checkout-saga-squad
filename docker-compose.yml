@@ -23,6 +23,14 @@ x-service: &service-base
     OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     OTEL_METRICS_EXPORTER: none
     OTEL_LOGS_EXPORTER: none
+    # Suprime o ruído de traces gerados por threads de background sem contexto
+    # de trace pai (relay do outbox e scheduler de timeouts, @Scheduled a cada
+    # ~200ms): sem isso, cada polling vira um trace-raiz de 1 span isolado no
+    # Jaeger, poluindo a busca e escondendo o trace ponta a ponta do pedido.
+    # Spans de HTTP e Kafka (producer/consumer), que formam a cadeia do
+    # pedido entre serviços, não são afetados por nenhuma das duas flags.
+    OTEL_INSTRUMENTATION_SPRING_SCHEDULING_ENABLED: "false"
+    OTEL_INSTRUMENTATION_JDBC_ENABLED: "false"
 
 services:
   postgres:

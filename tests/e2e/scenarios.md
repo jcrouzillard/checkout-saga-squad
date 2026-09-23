@@ -32,6 +32,10 @@ curl -s http://localhost:8084/shipments/<orderId> | jq .
 `history` contendo `INVENTORY/SUCCEEDED`, `PAYMENT/SUCCEEDED`, `SHIPPING/SUCCEEDED`,
 `ORDER/CONFIRMED`; `GET /shipments/{id}` retorna `200` com `status=CREATED` e `trackingCode`.
 
+**O que mostrar na demo**: `GET /orders/{id}` com o `history` completo dos 4 passos até
+`CONFIRMED`, e o trace no Jaeger (`saga-orchestrator` → `order` → `inventory` → `payment` →
+`shipping`) com um único `trace_id` ponta a ponta.
+
 ## 2. Pedido sem envio aplicável (DIGITAL) → CONFIRMED sem `shipment.created`
 
 ```bash
@@ -52,6 +56,9 @@ curl -i http://localhost:8084/shipments/<orderId>   # deve ser 404
 
 **Esperado**: `status=CONFIRMED`; `history` sem nenhuma entrada `step=SHIPPING`;
 `GET /shipments/{id}` retorna `404` (nenhum `shipment.created` publicado).
+
+**O que mostrar na demo**: `GET /orders/{id}` lado a lado com o do cenário 1 — mesmo fluxo, mas
+sem passo `SHIPPING` no `history` — e `GET /shipments/{id}` retornando `404`.
 
 ## 3. Falha no pagamento → estoque liberado, pedido cancelado
 
@@ -80,6 +87,10 @@ curl -s http://localhost:8082/inventory/stock/SKU-BOOK-001 | jq .available   # d
 `GET /inventory/reservations/{id}` → `status=RELEASED`; estoque volta ao valor original
 (nenhum `payment.refund`, pois nada foi autorizado).
 
+**O que mostrar na demo**: `GET /orders/{id}` com `cancellationReason=PAYMENT_DECLINED` e
+`INVENTORY/COMPENSATED` no `history`; `GET /inventory/stock/{sku}` antes/depois mostrando o
+estoque restaurado.
+
 ## 4. Falha no envio → estorno + liberação + cancelamento
 
 ```bash
@@ -102,6 +113,10 @@ curl -s http://localhost:8082/inventory/reservations/<orderId> | jq .status  # R
 
 **Esperado**: `status=CANCELED`, `cancellationReason=SHIPMENT_FAILED`; pagamento `REFUNDED`;
 reserva `RELEASED`; estoque restaurado.
+
+**O que mostrar na demo**: `GET /orders/{id}` com a cadeia completa de compensação no `history`
+(`SHIPPING/FAILED` → `PAYMENT/COMPENSATED` → `INVENTORY/COMPENSATED`) e `GET /payments/{id}`
+mostrando `status=REFUNDED`.
 
 ## 5. Timeout numa etapa (pagamento) → retries e depois compensação
 
@@ -133,6 +148,10 @@ Variante para mostrar o retry **bem-sucedido** (sem compensação): troque `"pay
 por `"payment": "TIMEOUT_ONCE"` — a 1ª tentativa não responde, a 2ª (mesmo `messageId`) responde
 normalmente, e o pedido chega a `CONFIRMED`.
 
+**O que mostrar na demo**: `GET /orders/{id}` com `PAYMENT/TIMED_OUT` no `history` antes da
+compensação, e o painel Grafana com o contador `saga_timeouts_total{step="PAYMENT"}` subindo
+(`docs/observability.md` §5).
+
 ## 6. Reinício do coordenador no meio da saga → retomada sem duplicar efeito
 
 ```bash
@@ -163,6 +182,10 @@ Atalho equivalente já embrulhado no `Makefile`: `make kill-orchestrator`.
 Postgres e o offset do Kafka só avança após o commit, então a retomada consome a resposta que
 ficou pendente sem reenviar o comando. Pular com `SKIP_RESTART=1` se não houver Docker disponível.
 
+**O que mostrar na demo**: `GET /sagas?orderId={id}` com `RESUMED_AFTER_RESTART` no `log`, e
+`GET /orders/{id}` chegando em `CONFIRMED` com só uma entrada `PAYMENT/SUCCEEDED` no `history`
+(prova de que o restart não duplicou a autorização de pagamento).
+
 ## 7. Idempotência: mesmo `Idempotency-Key` duas vezes
 
 ```bash
@@ -191,6 +214,10 @@ curl -s http://localhost:8082/inventory/stock/SKU-BOOK-001 | jq .available   # "
 `Idempotent-Replayed: true` e o **mesmo** `orderId`; estoque reduz apenas uma unidade no total
 (a segunda chamada não dispara uma nova saga). Bônus: repetir com o mesmo `Idempotency-Key` e
 corpo **diferente** deve retornar `409 Conflict`.
+
+**O que mostrar na demo**: as duas respostas HTTP lado a lado (`202` vs `200` +
+`Idempotent-Replayed: true`, mesmo `orderId`) e `GET /inventory/stock/{sku}` mostrando que só
+caiu uma unidade apesar das duas chamadas.
 
 ## Diagnóstico complementar (todos os cenários)
 

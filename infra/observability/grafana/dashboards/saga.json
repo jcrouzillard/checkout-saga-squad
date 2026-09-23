@@ -297,6 +297,33 @@
       ]
     },
     {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Retomadas após reinício / compensações travadas",
+      "description": "saga_resumed_total (RESUMED_AFTER_RESTART) e saga_compensation_stuck_total{step} (COMPENSATION_STUCK).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "none" } } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(saga_resumed_total[1m]))",
+          "legendFormat": "sagas retomadas após restart"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (step) (increase(saga_compensation_stuck_total[1m]))",
+          "legendFormat": "compensação travada {{step}}"
+        }
+      ]
+    },
+    {
       "id": 13,
       "type": "timeseries",
       "title": "JVM heap por serviço",

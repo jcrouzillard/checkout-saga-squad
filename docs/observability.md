@@ -17,6 +17,8 @@ com nome explícito) — **não** deixe o Spring gerar nomes automáticos.
 | `saga.retries`          | counter | `step`                                   | `saga_retries_total{step=...}`                                  |
 | `saga.step.duration`    | timer (histograma publicado) | `step`, `result`=`OK`\|`FAILED`\|`TIMEOUT` | `saga_step_duration_seconds_count/_sum/_bucket{step,result,le}` |
 | `saga.in.flight`        | gauge   | —                                        | `saga_in_flight`                                                 |
+| `saga.resumed`          | counter | — (confirmado ao vivo: só `application`) | `saga_resumed_total`                                             |
+| `saga.compensation.stuck` | counter | `step` (por convenção, igual a `saga.compensations`; ainda não observado ao vivo — não disparou no ambiente checado) | `saga_compensation_stuck_total{step=...}` |
 
 Onde emitir cada métrica:
 - `saga.started` / `saga.in.flight` (incrementa) — quando o `saga-orchestrator` cria a instância de saga (consome `order.created` ou recebe `POST /orders`, conforme desenho do Arquiteto).
@@ -24,6 +26,8 @@ Onde emitir cada métrica:
 - `saga.compensations{step}` — a cada compensação disparada (release de estoque, refund, cancelamento de envio).
 - `saga.timeouts{step}` — quando um passo estoura o timeout configurado (ver `docs/architecture/saga.md` do Arquiteto para os valores).
 - `saga.retries{step}` — a cada tentativa de retry além da primeira.
+- `saga.resumed` — quando o coordenador retoma, após reinício, uma saga com carência de deadline (ação `RESUMED_AFTER_RESTART` no `saga_step_log`). Confirmado ao vivo via `curl localhost:8080/actuator/prometheus`: `saga_resumed_total{application="saga-orchestrator"} 1.0` — sem tag adicional além de `application`.
+- `saga.compensation.stuck{step}` — quando uma compensação estoura o limite de tentativas e permanece em retry infinito (log `COMPENSATION_STUCK`). Não foi observado ao vivo neste ambiente (nenhuma compensação travou até o momento da checagem), então a tag `step` segue por convenção com `saga.compensations`/`saga.retries` — Backend deve confirmar a tag real assim que o cenário ocorrer.
 - `saga.step.duration{step,result}` — around de cada chamada de passo (`Timer.Sample` ou `@Timed`), do disparo até resposta/erro/timeout.
 
 Todas as métricas de saga são emitidas pelo `saga-orchestrator` (é quem conhece o estado da máquina). Serviços de
@@ -170,7 +174,13 @@ Em todos os casos, o ponto de partida é o **`orderId`** (vem da resposta de `PO
   que a retomada não está usando o `traceparent` salvo, mesmo problema descrito na seção 3).
 - **Métricas**: `saga_in_flight` deve permanecer estável logo após o restart (não deve zerar, se as sagas persistidas
   forem recarregadas do banco), e depois retomar tendência normal; `up{job=~"saga-orchestrator"}` no Prometheus
-  mostra o gap de scrape durante o restart (healthcheck do compose reflete o mesmo).
+  mostra o gap de scrape durante o restart (healthcheck do compose reflete o mesmo). `saga_resumed_total` sobe uma
+  unidade por saga retomada com carência de deadline (ação `RESUMED_AFTER_RESTART` no `saga_step_log`) — é o sinal
+  direto de que a recuperação após restart aconteceu. Se, durante a retomada, uma compensação estourar o limite de
+  tentativas e ficar em retry infinito, `saga_compensation_stuck_total{step}` sobe (log `COMPENSATION_STUCK`) — trate
+  como alerta de intervenção manual, pois a saga não converge sozinha.
 - **Logs**: no boot do `saga-orchestrator`, procurar log de "recuperação de sagas em andamento" (lendo estado
   persistido) com `sagaId` de cada saga retomada; comparar timestamps com o momento do timeout/compensação
-  original para confirmar que nenhuma saga ficou "presa" sem novo timer agendado.
+  original para confirmar que nenhuma saga ficou "presa" sem novo timer agendado. Buscar também por
+  `RESUMED_AFTER_RESTART` (confirma retomada) e `COMPENSATION_STUCK` (compensação sem convergência) no
+  `saga_step_log`/logs do orquestrador, correlacionando por `sagaId`.
