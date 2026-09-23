@@ -1,0 +1,14 @@
+{
+  "demand": "e31bdfb73679",
+  "title": "Avaliação e validação do Arquiteto.",
+  "detail": "Na validação e avaliação do Arquiteto, quando ele retorna alguma pergunta, a gente tem que ter a opção de cancelar a demanda. Por exemplo, eu não quero mais. Entendi que tem muita coisa. Posso cancelar ela e abrir outra.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T18:05:18+00:00",
+  "kind": "operacao",
+  "clarifications": [],
+  "override": false,
+  "fromBacklog": false
+}
