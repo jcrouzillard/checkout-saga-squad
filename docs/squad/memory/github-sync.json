@@ -111,7 +111,24 @@
   "3a256cc38517",
   "fd5c88095d7b",
   "a4b265184f10",
-  "3a3cc13d0118"
+  "3a3cc13d0118",
+  "21851e72a81d",
+  "a87c17b4a26f",
+  "337695d0f5cd",
+  "18c011df0fb5",
+  "cda462636d99",
+  "210eed306462",
+  "784caa12051c",
+  "ba24d2e4378c",
+  "17d05d36f827",
+  "6bb29b05cecd",
+  "4df2a657d7cd",
+  "ba4a90b4925a",
+  "dbc584ef9b82",
+  "3ee5d2f804e2",
+  "b08c7b74d6a4",
+  "5fd4e631c5e2",
+  "be59ff218d27"
  ],
  "issues": {
   "_diario": {
@@ -438,10 +455,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/33",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YDA4",
    "agent": "orquestrador",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "27ee8fbe342b": {
@@ -471,10 +488,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/36",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YGso",
    "agent": "frontend",
-   "status": "Gate (Auditor)",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "e9af92375625": {
@@ -482,10 +499,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/37",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YHS0",
    "agent": "qa",
-   "status": "Gate (Auditor)",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "1cc732c62a2d": {
@@ -493,10 +510,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/38",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YJA8",
    "agent": "orquestrador",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "fd5c88095d7b": {
@@ -504,10 +521,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/39",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YJhM",
    "agent": "arquiteto",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
-   "handed": false,
-   "closed": false,
+   "handed": true,
+   "closed": true,
    "kind": "task"
   },
   "3a3cc13d0118": {
@@ -515,10 +532,65 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/40",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8YJ3Q",
    "agent": "auditor",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false,
+   "closed": true,
+   "kind": "task"
+  },
+  "210eed306462": {
+   "number": 43,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/43",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YLNU",
+   "agent": "auditor",
+   "status": "Concluído",
+   "phase": "G1",
+   "handed": false,
+   "closed": true,
+   "kind": "task"
+  },
+  "ba24d2e4378c": {
+   "number": 44,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/44",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YMLU",
+   "agent": "frontend",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "ba4a90b4925a": {
+   "number": 45,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/45",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YOv8",
+   "agent": "auditor",
+   "status": "Concluído",
+   "phase": "G2",
+   "handed": false,
+   "closed": true,
+   "kind": "task"
+  },
+  "3ee5d2f804e2": {
+   "number": 46,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/46",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YRDA",
+   "agent": "qa",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "5fd4e631c5e2": {
+   "number": 47,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/47",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8YYcE",
+   "agent": "auditor",
+   "status": "Concluído",
+   "phase": "G3",
+   "handed": false,
+   "closed": true,
    "kind": "task"
   }
  },
@@ -564,8 +636,8 @@
   }
  },
  "gates": {
-  "G1": "43084e8b4b81",
-  "G2": "3798c3c0f4aa",
-  "G3": "c3f283487351"
+  "G1": "784caa12051c",
+  "G2": "dbc584ef9b82",
+  "G3": "be59ff218d27"
  }
 }
