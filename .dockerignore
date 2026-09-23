@@ -1,0 +1,15 @@
+**/target/
+.git
+.github
+docs
+squad-control
+tests
+tools
+*.md
+.env
+.env.*
+!.env.example
+.idea
+.vscode
+*.iml
+.DS_Store

@@ -8,7 +8,9 @@ Construir, de forma autônoma, controlada e auditável, um checkout distribuído
 coordenado por uma **Saga orquestrada**, containerizado e observável.
 
 ## Decisões de base (ADR-000, tomadas pelo humano + Orquestrador — não alterar sem novo ADR)
-- Java 21, Spring Boot 3.3, Maven multi-módulo, pacote base `com.checkout`.
+- Java 21, Spring Boot 3.4 (logs estruturados JSON nativos), Maven multi-módulo, pacote base `com.checkout`.
+- Layout: módulos em `services/<modulo>`; cada módulo gera `services/<modulo>/target/<modulo>.jar` (`finalName` = artifactId).
+- Configuração dos serviços somente por variáveis de ambiente padrão do Spring (`SPRING_DATASOURCE_URL`, `SPRING_KAFKA_BOOTSTRAP_SERVERS`, ...) e `OTEL_*`.
 - Topologia: **4 serviços de domínio + 1 orquestrador de Saga**, cada um em seu container.
   | Módulo              | Porta | Banco (Postgres) |
   |---------------------|-------|------------------|
