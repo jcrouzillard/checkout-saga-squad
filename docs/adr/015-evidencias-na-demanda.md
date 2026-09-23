@@ -60,12 +60,16 @@ contra ele exigiria um upload real (vetado nesta demanda) e ainda assim depender
    `task`), publica conforme a tabela, guarda em `github-sync.json` `attachments[sha256] = {comment_url, asset_url,
    status: posted|pending-browser|linked}` e apaga o arquivo do preparo após `posted`. Idempotente pelo id do evento.
    **Reconciliação** do pendente: a cada ciclo, `gh api repos/<repo>/issues/<n>/comments` procura
-   `https://github.com/user-attachments/files/<id>/<nome>` com o nome esperado → `linked`, e apaga o preparo.
+   `https://github.com/user-attachments/files/<id>/<nome>` com o nome esperado **somente em comentários cujo
+   `author_association` seja `OWNER`, `MEMBER` ou `COLLABORATOR`** (demais autores são ignorados); baixa o arquivo e
+   **confere o sha256 contra o hash registrado no evento `attachment`** → só então `linked`, e apaga o preparo. Hash
+   divergente → **não** marca `linked`, mantém `pending-browser` e mostra alerta no painel.
    Pendente há mais de 7 dias → aviso no painel e o preparo é descartado.
 4. **Squad Control**: caixa "Evidências" no formulário e no card de backlog (texto, link, arquivos por arrastar/escolher),
    lista somente leitura das já enviadas (sem editar/remover), selo "pendente de anexo pelo navegador" com o botão.
 5. **Agentes** (triagem pelo Arquiteto e execução): `python3 tools/squad/evidence.py list|fetch --demand <id>` —
-   `list` mostra as evidências (de `github-sync.json` + comentários); `fetch` baixa para `$TMPDIR/squad-evidence/<id>/`
+   `list` mostra as evidências (de `github-sync.json` + comentários, considerando **apenas** comentários com
+   `author_association` `OWNER`/`MEMBER`/`COLLABORATOR`); `fetch` baixa (e confere o sha256 quando houver hash registrado) para `$TMPDIR/squad-evidence/<id>/`
    (fora do repo) e imprime os caminhos para leitura (imagem e PDF são legíveis pelos modelos; TXT/MD já estão no
    comentário). O brief de delegação cita "Evidências: N (ver `evidence.py list`)".
 
@@ -85,7 +89,12 @@ contra ele exigiria um upload real (vetado nesta demanda) e ainda assim depender
 - Varredura de segredos no texto, nos links e no conteúdo TXT/MD (ex.: `gh[pousr]_`, `github_pat_`, `AKIA`,
   `-----BEGIN .*PRIVATE KEY-----`, `sk-`, `xox[bap]-`, JWT, `password=`): se casar, **bloqueia** com 422 indicando a linha.
 - **Repositório público (E6)**: o painel exige marcar "sem dados sensíveis/pessoais" antes de enviar arquivo e avisa que
-  o anexo ficará público; PDF/imagem não são varridos (limitação declarada).
+  o anexo ficará público; o aviso diz também que o **texto e os links** de evidência ficam no log `decisions.jsonl`,
+  que é versionado no git (**histórico permanente**), além de ficarem públicos na issue enquanto o repositório for
+  público. PDF/imagem não são varridos (limitação declarada).
+- Autoria e integridade: conciliação e `evidence.py` só confiam em comentários de `OWNER`/`MEMBER`/`COLLABORATOR`
+  (um terceiro não consegue "satisfazer" um anexo pendente nem injetar evidência para os agentes); o arquivo
+  conciliado precisa ter o mesmo sha256 do preparo.
 - Nada no git: bytes só no preparo fora do repo; `github-sync.json` guarda apenas URLs e hashes.
 - Download pelos agentes: token obtido de `gh auth token` só em memória (nunca em argv, log ou arquivo); o cabeçalho
   `Authorization` só vai para `github.com`/`api.github.com` e é **removido em redirecionamentos** para outros hosts.
@@ -99,6 +108,8 @@ contra ele exigiria um upload real (vetado nesta demanda) e ainda assim depender
   no CA-9 antes de tornar o repo privado.
 - O endpoint de E1 é interno ao `gh`; mudanças do GitHub podem quebrar `--attach` (sintoma: comentário sem imagem e
   erro do `gh` no log do sync; o arquivo permanece no preparo para nova tentativa).
+- O teto de **65 536 caracteres** por comentário (E7) **não foi verificado** nesta investigação; o inline de 60 000
+  depende dele e é coberto pelo CA-10.
 
 ## Critérios de aceite da futura implementação (verificáveis)
 - CA-1 Criar demanda com texto + link + 1 PNG + 1 MD pequeno + 1 PDF → issue recebe comentários com texto, imagem
@@ -114,10 +125,13 @@ contra ele exigiria um upload real (vetado nesta demanda) e ainda assim depender
 - CA-8 Rodar o sync duas vezes não duplica comentários (idempotência por id de evento).
 - CA-9 (antes de um repo privado) download autenticado de um anexo privado demonstrado ou limitação reaberta em ADR.
 - CA-10 Comentário TXT inline com 60 000 caracteres é aceito pelo GitHub; acima disso vira "anexo pendente".
+- CA-11 Com um PDF pendente: (a) comentário de um terceiro (`author_association` `NONE`/`CONTRIBUTOR`) com link
+  `user-attachments/files/<id>/<mesmo nome>` → ignorado pela conciliação e por `evidence.py list`, segue pendente;
+  (b) comentário do dono com arquivo de mesmo nome mas sha256 divergente → recusado (não vira `linked`, alerta no painel).
 
 ## Consequências
 - (+) Atende R2–R5 sem guardar bytes no git; imagens são 100% automáticas; agentes leem tudo por um comando só.
 - (+) Sem contrato de evento Kafka/API de domínio alterado (`events.md`/`api.md` intactos); muda só a API do Squad
   Control (`/api/demand`, nova `/api/demand/evidence`) e o log (tipo `attachment` em `tools/squad/log.py`).
 - (−) PDF depende de um passo humano no navegador; tudo anexado é público enquanto o repo for público.
-- Donos da implementação: Frontend (`squad-control/**`), Orquestrador (`tools/squad/**`), QA (CA-1..CA-10).
+- Donos da implementação: Frontend (`squad-control/**`), Orquestrador (`tools/squad/**`), QA (CA-1..CA-11).

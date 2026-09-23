@@ -1,0 +1,36 @@
+{
+  "gate": "G3",
+  "demand": "1ac2708028fd",
+  "from": "arquiteto",
+  "to": "humano (aprovação do ADR-015)",
+  "cycle": 1,
+  "scope_note": "Entrega somente documental (R1: 'só uma proposta, uma ADR'). G1/G2 não se aplicam por não haver implementação; este é o gate único da entrega. Critérios de G3 de release (e2e, TRACEABILITY, Jaeger) substituídos pelos critérios abaixo, próprios de uma entrega de ADR.",
+  "recommendation": "APPROVE",
+  "confidence": 0.85,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Atende às respostas do humano R1–R5", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/1ac2708028fd.json x ADR-015 §Requisitos/§Decisão: só ADR (commit 00bb404 altera apenas docs/adr/015-evidencias-na-demanda.md); PDF/TXT/MD/imagens comuns; limites no teto da plataforma (10 MB imagem, 25 MB PDF/TXT/MD, 100 MB por envio) — 'não pequeno'; bytes só na issue, preparo fora do repo; agentes acessam por evidence.py list|fetch; backlog só inclui (POST /api/demand/evidence, 409 fora do backlog, sem rota de editar/remover)"},
+    {"name": "Investigação correta e verificável (conferida localmente, sem efeitos colaterais)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "gh --version = 2.101.0 (2026-09-15), igual ao citado; gh issue comment --help: '--attach file  Attach an image or video file', até 50 arquivos, alt após '#' — confirma E2 e é coerente com E3 (lista exata de extensões e limites vem do código-fonte do gh, não reverificada aqui); gh repo view jcrouzillard/checkout-saga-squad --json visibility = PUBLIC (E6). E7 (65 536 caracteres) declarado como não reverificado e coberto pelo CA-10"},
+    {"name": "Limitações declaradas com honestidade", "status": "pass", "weight": 2, "blocking": false,
+     "source": "ADR §Limitações: PDF e TXT/MD grandes exigem arrasto no navegador (sem upload programático suportado; endpoint interno rejeitado, opção A); repo público => anexos públicos e imutáveis; download em repo privado não verificado (CA-9); fragilidade do --attach. Opções D (Release) e E (gist) rejeitadas corretamente por ferirem R3"},
+    {"name": "Segurança do desenho", "status": "validate", "weight": 2, "blocking": true,
+     "source": "Presentes: SVG excluído; extensão + assinatura (magic bytes); UTF-8 sem NUL; nome sanitizado; varredura de segredos com 422; aviso/confirmação de público antes do envio; token de 'gh auth token' só em memória e Authorization removido em redirecionamento; preparo em ~/.squad e fetch em $TMPDIR (fora do repo); conteúdo tratado como dado, nunca instrução. LACUNA: a reconciliação do PDF pendente e o 'evidence.py list' leem comentários da issue de um repo PÚBLICO sem filtrar autor nem conferir hash — um terceiro pode comentar um link user-attachments com o nome esperado e ele seria marcado 'linked' e baixado pelos agentes"},
+    {"name": "Coerência com log append-only e github_sync.py", "status": "pass", "weight": 2, "blocking": false,
+     "source": "tools/squad/github_sync.py:181-190 — on_edit faz 'gh issue edit --body ch[detail]', reescrevendo o corpo: confirma a decisão de evidência sempre em comentário. Novo tipo 'attachment' (append-only, só metadados/hash; bytes nunca no log) não colide com o tipo 'evidence' já existente (log.py:21 TYPES; on_evidence em github_sync.py:233, que é evidência de agente) — ADR prevê incluir o tipo em log.py. Idempotência por id de evento, alinhada ao sync atual"},
+    {"name": "10 CAs verificáveis para a futura implementação", "status": "pass", "weight": 1, "blocking": false,
+     "source": "CA-1..CA-10 têm entrada, ação e resultado observável (409/422/4xx, git status, grep no log, idempotência, ps sem token); CA-9 condicionado à mudança de visibilidade; CA-10 depende do GitHub real"},
+    {"name": "Processo e rastreabilidade", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Log: handoff 22db10af9d5d (arquiteto → auditor) com resumo fiel ao ADR; commit único em português na feature/D12-evidencias-na-demanda; numeração 015 com 014 reservado pela D11 declarada. Sem brief .md em docs/squad/memory/handoffs/ (mesmo padrão das demandas recentes)"}
+  ],
+  "open_risks": [
+    "Segurança (corrigir no ADR antes de aprovar ou como condição da implementação): a reconciliação 'linked' e o 'evidence.py list/fetch' devem aceitar só comentários com author_association OWNER/MEMBER/COLLABORATOR (ou do login do humano) e, para o PDF pendente, conferir o sha256 do arquivo baixado contra o do preparo antes de marcar 'linked' e apagar o preparo. Acrescentar um CA (ex.: CA-11: comentário de terceiro com nome igual não é reconciliado nem listado).",
+    "Repositório público: todo anexo e todo texto de evidência ficam públicos; PDF/imagem não passam por varredura de segredos (limitação declarada). O texto/link de evidência também é gravado em decisions.jsonl, que é versionado no git (não é arquivo, então não fere R3, mas fica no histórico) — explicitar no aviso do painel.",
+    "Lista exata de extensões/limites do 'gh --attach' (E3) vem do código-fonte do gh e só foi confirmada aqui no nível 'image or video' pelo --help; E7 não verificado (CA-10).",
+    "Dependência de endpoint interno do GitHub via 'gh --attach' para imagens; mitigação (arquivo permanece no preparo) declarada.",
+    "Preparo pendente descartado após 7 dias: o humano deve ser avisado antes (o ADR prevê aviso no painel)."
+  ],
+  "human_required": false,
+  "rationale": "O ADR responde às cinco respostas do humano, as afirmações centrais foram conferidas localmente (gh 2.101.0, --attach só imagem/vídeo, repo PUBLIC, on_edit reescreve o corpo), as limitações são declaradas sem maquiagem e as alternativas que ferem 'só na issue' foram rejeitadas com motivo. Único ponto de segurança relevante: confiar em comentários de terceiros num repo público durante a reconciliação/listagem — correção pequena e localizada, registrada como ressalva. Confiança = 11,5/13 ≈ 0,88, arredondada para 0,85 pela verificação parcial de E3/E7. Intervenção humana não é obrigatória pelo gate, mas o ADR já depende da aprovação do humano para sair de 'Proposto'."
+}
