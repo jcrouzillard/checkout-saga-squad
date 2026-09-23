@@ -1,5 +1,5 @@
 // D11 (642a73cb38e5) — faixa de consumo da IA no Squad Control. Executado em Docker:
-//   docker run --rm --add-host=host.docker.internal:host-gateway -v "$PWD/tests/ui:/shots" -v "$WORK:/work" \
+//   docker run --rm --add-host=host.docker.internal:host-gateway -e NODE_PATH=/home/pptruser/node_modules -v "$PWD/tests/ui:/shots" -v "$WORK:/work" \
 //     -w /home/pptruser ghcr.io/puppeteer/puppeteer:latest node /shots/d11-screenshots.js
 // REAL = servidor com os dados reais (Codex real, Claude sem statusline); FIX = servidor com SQUAD_ROOT_DATA e
 // CODEX_HOME de fixture em /work (snapshot do Claude e rollout do Codex escritos por este script).
@@ -124,24 +124,22 @@ function codexRollout(p, s) {
     await p.close();
   }
 
-  // ---------- 3) Altura da faixa entre 600 e 900 px (e 1440) no estado de texto mais longo ----------
-  claudeSnap(85, 97); codexRollout(83, 96);
+  // ---------- 3) Altura da faixa por estado x largura (CA8: <= 72 px a partir de 600 px; 390 px só medido) ----------
+  // Revalidação D11-QA-1: todos os estados (fresh/atencao/critico/stale/none + texto mais longo) em 1440/900/700/600/390.
+  const hstates = [['longo', () => { claudeSnap(85, 97); codexRollout(83, 96); }], ...states.filter(s => s[0] !== 'corrompido'),
+    ['stale+none', () => { claudeSnap(40, 55, 30); fs.writeFileSync(ROLL, ''); }]];
   out.heights = {};
-  for (const w of [600, 601, 700, 800, 900, 1024, 1440]) {
+  for (const w of [1440, 900, 700, 601, 600, 390]) {
     const p = await newPage(w, 900);
-    await p.goto(FIX, { waitUntil: 'networkidle2' }); await sleep(1500);
-    const s = await strip(p);
-    out.heights[w] = { height: s.height, stacked: s.provTops.length === 2 && s.provTops[0] !== s.provTops[1], sw: s.scrollWidth, cw: s.clientWidth };
-    if ([600, 700, 900].includes(w)) await p.screenshot({ path: `/shots/d11-largura-${w}.png`, clip: await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: r.bottom + 8 }; }) });
-    await p.close();
-  }
-  // stale + none também medidos (textos de alerta)
-  claudeSnap(40, 55, 30); fs.writeFileSync(ROLL, '');
-  for (const w of [700, 900, 1440]) {
-    const p = await newPage(w, 900);
-    await p.goto(FIX, { waitUntil: 'networkidle2' }); await sleep(1500);
-    const s = await strip(p);
-    out.heights['stale+none-' + w] = { height: s.height, text: s.text };
+    await p.goto(FIX, { waitUntil: 'networkidle2' }); await sleep(1200);
+    out.heights[w] = {};
+    for (const [name, setup] of hstates) {
+      setup(); await sleep(3800);
+      const s = await strip(p);
+      out.heights[w][name] = { height: s.height, stacked: s.provTops.length === 2 && s.provTops[0] !== s.provTops[1], overflowX: s.scrollWidth > s.clientWidth,
+        text: s.text, titles: s.titles, valuetext: s.meters.map(m => m.text) };
+      if (name === 'longo' && [600, 700, 900].includes(w)) await p.screenshot({ path: `/shots/d11-largura-${w}.png`, clip: await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: r.bottom + 8 }; }) });
+    }
     await p.close();
   }
 
