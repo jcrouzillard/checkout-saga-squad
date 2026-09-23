@@ -140,6 +140,26 @@
   .av.emo span { display: block; line-height: 1; }
   .drawer .head .av.emo { width: 32px; height: 32px; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; font-size: 18px; }
   .drawer .close { margin-left: auto; flex-grow: 0; }
+  /* D4: tipo da demanda, validação agêntica e override */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  fieldset.kind { border: 1px solid var(--line); border-radius: 2px; margin: 0 0 12px; padding: 8px 12px 10px; }
+  fieldset.kind legend { font-size: 12px; font-weight: 500; color: var(--muted); padding: 0 4px; }
+  .kind-opt { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; padding: 8px 0; cursor: pointer; min-height: 44px; }
+  .kind-opt + .kind-opt { border-top: 1px solid var(--line2); }
+  .kind-opt input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
+  .kind-opt small { display: block; color: var(--muted); font-size: 12px; }
+  .qbox { margin-top: 10px; padding: 10px 12px; background: var(--panel2); border-left: 2px solid var(--line); font-size: 13px; }
+  .qbox.open { background: #FBF3F3; border-left-color: var(--red); }
+  .qbox ol { margin: 8px 0 0; padding-left: 18px; }
+  .qbox li { margin-bottom: 10px; }
+  .qbox label { display: block; font-weight: 500; }
+  .qbox .ans { color: var(--muted); margin-top: 2px; }
+  .qbox textarea { margin-top: 4px; }
+  .override { margin-top: 8px; font-size: 13px; }
+  .override > label { display: inline-flex; gap: 8px; align-items: center; min-height: 32px; cursor: pointer; }
+  .override input { accent-color: var(--amber); width: 16px; height: 16px; }
+  .why { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -173,6 +193,7 @@
   </div>
 </div></div>
 <aside class="drawer" id="drawer" hidden></aside>
+<div id="sr-live" class="sr-only" role="status" aria-live="polite"></div>
 
 <script>
 const AGENTS = {
@@ -197,6 +218,10 @@ const PIPELINE = [
 ];
 
 let project = null, product = null, obsTool = "grafana", state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
+let flashErr = false;            // D4: mensagem do formulário de demanda é erro?
+const cardMsg = {};              // D4: mensagem por card de demanda { id: { ok, text } }
+let lastDemandStatus = null;     // D4: para anunciar mudanças de estado via aria-live
+const announce = t => { const el = $("#sr-live"); if (!el || !t) return; el.textContent = ""; setTimeout(() => { el.textContent = t; }, 50); };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const since = ts => { if (!ts) return ""; const s = Math.max(0, Math.round((Date.now() - new Date(ts)) / 1000)); return s < 60 ? `há ${s} s` : s < 3600 ? `há ${Math.floor(s / 60)} min ${s % 60} s` : `há ${Math.floor(s / 3600)} h`; };
@@ -270,7 +295,7 @@ function renderSquadStrip() {
 function activeDemand() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
   const infos = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
-  return infos.filter(x => !["Registrada", "Concluída", "Cancelada"].includes(x.status)).at(-1) || null;
+  return infos.filter(x => !x.preStart && !["Concluída", "Cancelada"].includes(x.status)).at(-1) || null;
 }
 // Linha do tempo de uma demanda, montada a partir dos eventos (task → handoff → gate), na ordem em que aconteceram.
 function demandSteps(active) {
@@ -371,10 +396,35 @@ function renderAgentes() {
 
 const ROUTES = { padrao: "Padrão · Arquiteto → G1 → implementação → G2 → QA → G3", direta: "Direta · implementação → G2 → QA → G3 (mudança pequena, sem contrato novo)" };
 const TARGETS = { auto: "Orquestrador decide", backend: "Backend", frontend: "Frontend", devops: "DevOps", observabilidade: "Observabilidade" };
+// D4 (ADR-008): tipo da demanda e validação agêntica. Demandas antigas (sem kind) não passam por validação.
+const KINDS = {
+  produto:  { name: "Produto", sub: "muda o checkout", tag: "produto", help: "Altera o que o cliente usa: serviços, APIs, eventos, Saga ou o Console de Checkout." },
+  operacao: { name: "Operação / governança", sub: "muda a fábrica", tag: "operação", help: "Altera como a squad trabalha: Squad Control, protocolo, gates, ferramentas de tools/squad." },
+};
+const DIMENSIONS = { objetivo: "objetivo", aceite: "critério de aceite", escopo: "escopo", restricoes: "restrições", tipo: "tipo" };
+const VALIDATION_LATE_MS = 3 * 60 * 1000;
+const VSTATUS = { validando: "Em validação · analisando…", atrasada: "Validação atrasada", perguntas: "Com perguntas", pronta: "Registrada · pronta para iniciar" };
+const VREASON = {
+  validando: "Iniciar fica disponível quando o Arquiteto concluir a validação (em geral em menos de 1 min).",
+  atrasada: "A validação não chegou em 3 min. Aguarde ou marque “Iniciar mesmo assim” com uma nota.",
+  perguntas: "Responda às perguntas do Arquiteto para liberar o início.",
+};
+function validationInfo(d, related) {
+  if (!d.kind) return null;
+  const val = related.filter(e => e.type === "validation").at(-1) || null;
+  const clar = val ? [...related].reverse().find(e => e.type === "clarification" && e.validation === val.id) || null : null;
+  let st;
+  if (!val) st = (Date.now() - Date.parse(d.ts)) >= VALIDATION_LATE_MS ? "atrasada" : "validando";
+  else if (val.status === "perguntas" && !clar) st = "perguntas";
+  else st = "pronta";
+  return { st, val, clar, ready: st === "pronta" };
+}
 function demandInfo(d, index) {
   const related = state.log.filter(e => e.demand === d.id);
   const start = related.find(e => e.type === "start");
-  const work = related.filter(e => e.agent !== "humano");
+  const vinfo = validationInfo(d, related);
+  // A validação (e a triagem antes do início) não é "trabalho" da demanda; demandas sem kind seguem a regra antiga.
+  const work = related.filter(e => e.agent !== "humano" && e.type !== "validation" && (!d.kind || (start && e.ts >= start.ts)));
   const gates = work.filter(e => e.type === "gate");
   const done = gates.some(g => g.gate === "G3" && g.recommendation === "APPROVE");
   const returned = gates.some(g => g.recommendation === "RETURN") && !done;
@@ -383,11 +433,12 @@ function demandInfo(d, index) {
   const canceled = controls.some(c => c.action === "cancel");
   const paused = lastCtl?.action === "pause";
   const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || "normal";
-  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id] };
+  const preStart = !canceled && !done && !paused && !work.length && !start;
+  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart };
 }
 function controlsHtml(info) {
-  if (["Registrada", "Concluída", "Cancelada"].includes(info.status)) return "";
+  if (info.preStart || ["Concluída", "Cancelada"].includes(info.status)) return "";
   const id = info.d.id;
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
     ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
@@ -399,16 +450,19 @@ function controlsHtml(info) {
 function renderDemandas() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
   const cards = demands.map((d, i) => ({ d, ...demandInfo(d, i) })).reverse();
-  const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
-  return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
+  const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+  return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Em validação → (Validada | Com perguntas → Respondida) → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub e o Arquiteto valida a demanda; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
   <div class="grid2">
     <section class="card"><h3>Nova demanda</h3>
       <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
-      <input id="dem-title" placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
+      <input id="dem-title" data-keep placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
       <label for="dem-detail" class="muted" style="font-size:12px;font-weight:500">Descrição, critérios de aceite, restrições</label>
-      <textarea id="dem-detail" rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
+      <textarea id="dem-detail" data-keep rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
+      <fieldset class="kind" style="margin-top:12px"><legend>Tipo (obrigatório)</legend>
+        ${Object.entries(KINDS).map(([k, v]) => `<label class="kind-opt" for="dem-kind-${k}"><input type="radio" name="dem-kind" id="dem-kind-${k}" value="${k}" data-keep aria-describedby="dem-kind-help-${k}"><span><b>${esc(v.name)}</b> — ${esc(v.sub)}<small id="dem-kind-help-${k}">${esc(v.help)}</small></span></label>`).join("")}
+      </fieldset>
       <div class="actions"><button class="btn primary" data-demand="1">Registrar demanda</button></div>
-      ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}
+      ${flash ? `<p class="${flashErr ? "fail" : "ok-msg"}" style="font-size:13px;margin-top:12px">${esc(flash)}</p>` : ""}
       <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (no card ao lado) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>
     <section class="card"><h3>Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
@@ -418,21 +472,58 @@ function renderDemandas() {
         <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.detail || "")}</div>
         <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
           <span class="tag">${hhmm(d.ts)}</span>
+          ${d.kind ? `<span class="tag" title="Tipo da demanda">${esc(KINDS[d.kind]?.tag || d.kind)}</span>` : ""}
+          ${start?.override ? `<span class="tag validate" title="Iniciada sem a validação concluída">iniciada com override</span>` : ""}
           ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
           ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
           ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
         </div>
         ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
-        ${status === "Registrada" ? `
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:10px;align-items:end">
-          <div><label class="muted" style="font-size:11px" for="pr-${d.id}">Prioridade</label><select id="pr-${d.id}" data-pr="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff"><option value="alta">Alta</option><option value="normal" selected>Normal</option><option value="baixa">Baixa</option></select></div>
-          <div><label class="muted" style="font-size:11px" for="rt-${d.id}">Rota</label><select id="rt-${d.id}" data-rt="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
-          <div><label class="muted" style="font-size:11px" for="tg-${d.id}">Agente</label><select id="tg-${d.id}" data-tg="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
-          <button class="btn primary" data-start="${d.id}" style="flex-grow:0;height:40px">Iniciar</button>
-        </div>` : controlsHtml(info)}
+        ${info.preStart ? preStartHtml(info) : controlsHtml(info)}
       </div>`; }).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
     </section>
   </div>`;
+}
+
+// D4: bloco do card antes do início — perguntas/respostas da validação, prioridade/rota/agente, Iniciar e override.
+function questionsHtml(d, v) {
+  if (!v) return "";
+  if (!v.val) return v.st === "validando" ? `<p class="why">O Arquiteto está validando a demanda (registrada ${esc(since(d.ts))}).</p>` : "";
+  const qs = v.val.questions || [];
+  const sug = v.val.suggestedKind && v.val.suggestedKind !== d.kind
+    ? `<p class="why"><b>Sugestão do Arquiteto:</b> tipo ${esc(KINDS[v.val.suggestedKind]?.tag || v.val.suggestedKind)} (registrado como ${esc(KINDS[d.kind]?.tag || d.kind)}).</p>` : "";
+  const dim = q => q.dimension ? `<span class="tag">${esc(DIMENSIONS[q.dimension] || q.dimension)}</span> ` : "";
+  if (v.val.status === "ok") return `<p class="pass" style="font-size:12px;margin:8px 0 0">Validada pelo Arquiteto: nenhuma lacuna bloqueante.</p>${sug}`;
+  if (v.clar) {
+    const ans = Object.fromEntries((v.clar.answers || []).map(a => [a.id, a.text]));
+    return `<div class="qbox"><b>Perguntas do Arquiteto · respondidas às ${esc(hhmm(v.clar.ts))}</b><ol>${qs.map(q => `<li>${dim(q)}${esc(q.text)}<div class="ans">Resposta: ${esc(ans[q.id] || "—")}</div></li>`).join("")}</ol></div>${sug}`;
+  }
+  return `<div class="qbox open"><b>O Arquiteto tem ${qs.length} pergunta${qs.length === 1 ? "" : "s"} antes de iniciar</b>
+    <ol>${qs.map(q => `<li><label for="ans-${d.id}-${esc(q.id)}">${dim(q)}${esc(q.text)}</label><textarea id="ans-${d.id}-${esc(q.id)}" rows="2" data-keep data-ans="${d.id}" data-q="${esc(q.id)}"></textarea></li>`).join("")}</ol>
+    ${qs.length ? `<button class="btn" data-clarify="${d.id}" data-val="${esc(v.val.id)}" style="height:40px">Enviar respostas</button>` : `<p class="why">Nenhuma pergunta listada; use “Iniciar mesmo assim” com uma nota.</p>`}</div>${sug}`;
+}
+function preStartHtml(info) {
+  const { d, vinfo } = info;
+  const ready = !vinfo || vinfo.ready;
+  const sel = "width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff";
+  const msg = cardMsg[d.id];
+  return `${questionsHtml(d, vinfo)}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:10px;align-items:end">
+          <div><label class="muted" style="font-size:11px" for="pr-${d.id}">Prioridade</label><select id="pr-${d.id}" data-keep data-pr="${d.id}" style="${sel}"><option value="alta">Alta</option><option value="normal" selected>Normal</option><option value="baixa">Baixa</option></select></div>
+          <div><label class="muted" style="font-size:11px" for="rt-${d.id}">Rota</label><select id="rt-${d.id}" data-keep data-rt="${d.id}" style="${sel}">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <div><label class="muted" style="font-size:11px" for="tg-${d.id}">Agente</label><select id="tg-${d.id}" data-keep data-tg="${d.id}" style="${sel}">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <button class="btn primary" id="start-${d.id}" data-start="${d.id}" style="flex-grow:0;height:40px" ${ready ? "" : `disabled aria-describedby="why-${d.id}"`}>Iniciar</button>
+        </div>
+        ${ready ? "" : `<p class="why" id="why-${d.id}">${esc(VREASON[vinfo.st] || "")}</p>
+        <div class="override"><label for="ovc-${d.id}"><input type="checkbox" id="ovc-${d.id}" data-keep data-ovc="${d.id}">Iniciar mesmo assim (override registrado no log)</label>
+          <div id="ovb-${d.id}" hidden><label class="muted" style="font-size:12px" for="ovn-${d.id}">Nota obrigatória: por que iniciar sem a validação?</label><textarea id="ovn-${d.id}" rows="2" data-keep></textarea></div></div>`}
+        ${msg ? `<p class="${msg.ok ? "ok-msg" : "fail"}" style="font-size:13px;margin:8px 0 0">${esc(msg.text)}</p>` : ""}`;
+}
+function applyOverride(id) {
+  const cb = document.getElementById(`ovc-${id}`), btn = document.getElementById(`start-${id}`), box = document.getElementById(`ovb-${id}`);
+  if (!cb || !btn) return;
+  btn.disabled = !cb.checked;
+  if (box) box.hidden = !cb.checked;
 }
 
 function renderDecisoes() {
@@ -478,15 +569,41 @@ async function render() {
   $("#c-ag").textContent = state.runs.filter(r => r.status === "trabalhando").length || "";
   $("#c-dem").textContent = state.log.filter(e => e.type === "task" && e.agent === "humano").length || "";
   const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias, demandas: renderDemandas, observabilidade: renderObservabilidade }[view];
-  const draft = { t: $("#dem-title")?.value, d: $("#dem-detail")?.value };
+  // Campos com data-keep (formulário, respostas, override, prioridade/rota/agente) sobrevivem ao redesenho do polling.
+  const keep = {};
+  document.querySelectorAll("#main [data-keep]").forEach(el => { if (el.id) keep[el.id] = (el.type === "checkbox" || el.type === "radio") ? el.checked : el.value; });
+  const fk = focusKey();
   const note = $("#note")?.value;
   const focused = document.activeElement?.id === "note";
   $("#main").innerHTML = html ? html() : await renderPoliticas();
   if ($("#note") && note) { $("#note").value = note; if (focused) $("#note").focus(); }
-  if ($("#dem-title") && (draft.t || draft.d)) { $("#dem-title").value = draft.t || ""; $("#dem-detail").value = draft.d || ""; }
+  for (const [id, v] of Object.entries(keep)) {
+    const el = document.getElementById(id); if (!el) continue;
+    if (el.type === "checkbox" || el.type === "radio") el.checked = v; else el.value = v;
+  }
+  document.querySelectorAll("#main [data-ovc]").forEach(cb => applyOverride(cb.dataset.ovc));
+  if (fk && !focused) { const el = document.querySelector(fk); if (el && !el.disabled) el.focus(); }
   renderDrawer();
 }
 
+function focusKey() {
+  const el = document.activeElement;
+  if (!el || !el.closest || !el.closest("#main")) return null;
+  if (el.id) return "#" + CSS.escape(el.id);
+  for (const a of ["data-start", "data-clarify", "data-demand"]) if (el.hasAttribute(a)) return `[${a}="${CSS.escape(el.getAttribute(a))}"]`;
+  return null;
+}
+// D4: anuncia (aria-live) mudanças de estado das demandas com tipo — o #main é recriado a cada polling.
+function announceDemandChanges() {
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
+  const now = {};
+  demands.forEach((d, i) => { const info = demandInfo(d, i); now[d.id] = { code: info.code, status: info.status }; });
+  if (lastDemandStatus) {
+    const changed = Object.entries(now).filter(([id, v]) => lastDemandStatus[id] && lastDemandStatus[id].status !== v.status);
+    if (changed.length) announce(changed.map(([, v]) => `${v.code}: ${v.status}`).join(". "));
+  }
+  lastDemandStatus = now;
+}
 // Enquanto o usuário digita num campo do painel, o polling não redesenha a tela (senão o campo perde o foco).
 const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
 // ---- Notificações: só o que merece atenção (ação necessária / novidade); o resto fica no log.
@@ -505,6 +622,9 @@ function classify(e) {
   if (e.type === "defect") return { level: "acao", title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, view: "evidencias" };
   if (e.type === "start") return { level: "novidade", title: `${pre}Demanda iniciada`, body: e.title.replace(/^Iniciar: /, ""), view: "demandas" };
   if (e.type === "control") return { level: "novidade", title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", view: "demandas" };
+  if (e.type === "validation") return e.status === "perguntas"
+    ? { level: "acao", title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), view: "demandas" }
+    : { level: "novidade", title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", view: "demandas" };
   return null;
 }
 function notifications() { return state.log.map(e => { const c = classify(e); return c ? { ...c, id: e.id, ts: e.ts } : null; }).filter(Boolean).slice(-30).reverse(); }
@@ -539,7 +659,7 @@ function processNotifications() {
   renderBell();
 }
 async function refresh() {
-  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); processNotifications(); }
+  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); processNotifications(); announceDemandChanges(); }
   catch (e) { $("#main").innerHTML = `<p class="warn-msg">Servidor indisponível. Rode <code>make squad</code>.</p>`; }
 }
 
@@ -576,18 +696,44 @@ document.addEventListener("click", async ev => {
   const st = ev.target.closest("[data-start]");
   if (st) {
     const id = st.dataset.start;
-    const res = await fetch("/api/demand/start", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, priority: $(`[data-pr="${id}"]`)?.value, route: $(`[data-rt="${id}"]`)?.value, target: $(`[data-tg="${id}"]`)?.value }) });
-    flash = res.ok ? "Demanda iniciada e colocada na fila do Orquestrador." : "Falha ao iniciar a demanda.";
+    const payload = { id, priority: $(`[data-pr="${id}"]`)?.value, route: $(`[data-rt="${id}"]`)?.value, target: $(`[data-tg="${id}"]`)?.value };
+    const ovc = document.getElementById(`ovc-${id}`);
+    if (ovc && ovc.checked) {
+      const note = (document.getElementById(`ovn-${id}`)?.value || "").trim();
+      if (!note) { cardMsg[id] = { ok: false, text: "Escreva a nota do override: por que iniciar sem a validação concluída?" }; announce(cardMsg[id].text); render(); document.getElementById(`ovn-${id}`)?.focus(); return; }
+      payload.override = true; payload.note = note;
+    }
+    const res = await fetch("/api/demand/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (res.ok) { delete cardMsg[id]; flashErr = false; flash = payload.override ? "Demanda iniciada com override (registrado no log) e colocada na fila do Orquestrador." : "Demanda iniciada e colocada na fila do Orquestrador."; announce(flash); }
+    else { const j = await res.json().catch(() => ({})); cardMsg[id] = { ok: false, text: `Não foi possível iniciar (${res.status}): ${j.error || "erro no servidor"}.` }; announce(cardMsg[id].text); }
+    return refresh();
+  }
+  const cl = ev.target.closest("[data-clarify]");
+  if (cl) {
+    const id = cl.dataset.clarify;
+    const fields = [...document.querySelectorAll(`[data-ans="${CSS.escape(id)}"]`)];
+    const empty = fields.find(f => !f.value.trim());
+    if (empty) { cardMsg[id] = { ok: false, text: "Responda todas as perguntas antes de enviar." }; announce(cardMsg[id].text); const eid = empty.id; render(); document.getElementById(eid)?.focus(); return; }
+    const res = await fetch("/api/demand/clarify", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, validation: cl.dataset.val, answers: fields.map(f => ({ id: f.dataset.q, text: f.value.trim() })) }) });
+    if (res.ok) { cardMsg[id] = { ok: true, text: "Respostas enviadas ao Arquiteto; a demanda está pronta para iniciar." }; }
+    else { const j = await res.json().catch(() => ({})); cardMsg[id] = { ok: false, text: `Não foi possível enviar as respostas (${res.status}): ${j.error || "erro no servidor"}.` }; }
+    announce(cardMsg[id].text);
     return refresh();
   }
   const ob = ev.target.closest("[data-obs]");
   if (ob) { obsTool = ob.dataset.obs; return render(); }
   if (ev.target.closest("[data-demand]")) {
-    const title = $("#dem-title")?.value.trim(); if (!title) { flash = "Informe um título para a demanda."; return render(); }
-    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "" }) });
-    flash = res.ok ? "Demanda registrada: já está no log e vira issue no GitHub. Defina prioridade e rota no card e clique em Iniciar." : "Falha ao registrar a demanda.";
-    if (res.ok) { $("#dem-title").value = ""; $("#dem-detail").value = ""; }
+    const title = $("#dem-title")?.value.trim();
+    if (!title) { flashErr = true; flash = "Informe um título para a demanda."; announce(flash); await render(); $("#dem-title")?.focus(); return; }
+    const kind = document.querySelector('input[name="dem-kind"]:checked')?.value;
+    if (!kind) { flashErr = true; flash = "Escolha o tipo da demanda: Produto ou Operação / governança."; announce(flash); await render(); $("#dem-kind-produto")?.focus(); return; }
+    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "", kind }) });
+    if (res.ok) {
+      flashErr = false; flash = "Demanda registrada: o Arquiteto está validando (perguntas aparecem no card em até 1 min). Ela também vira issue no GitHub.";
+      $("#dem-title").value = ""; $("#dem-detail").value = ""; document.querySelectorAll('input[name="dem-kind"]').forEach(r => { r.checked = false; });
+    } else { const j = await res.json().catch(() => ({})); flashErr = true; flash = `Não foi possível registrar (${res.status}): ${j.error || "erro no servidor"}.`; }
+    announce(flash);
     return refresh();
   }
   const h = ev.target.closest("[data-human]");
@@ -599,7 +745,7 @@ document.addEventListener("click", async ev => {
     refresh();
   }
 });
-document.addEventListener("change", async ev => { if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
+document.addEventListener("change", async ev => { if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && drawerAgent) { drawerAgent = null; renderDrawer(); } });
 fetch("/api/project").then(r => r.json()).then(p => {
   project = p;
