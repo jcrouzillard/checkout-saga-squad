@@ -45,12 +45,13 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 |---|---|---|---|---|
 | `main` | — | — | ninguém commita direto | só recebe `release/*` e `hotfix/*` por PR; cada merge gera tag `vX.Y.Z` |
 | `develop` | `main` | — | integração | recebe features por PR; é a branch padrão do repositório |
-| `feature/<código>-<slug>` | `develop` | `develop` (PR) | agente/Orquestrador | uma por demanda (`feature/D3-cupom-desconto`); merge **só após G3 APPROVE** |
+| `feature/<código>-<slug>` | `develop` | `develop` (PR) | agente/Orquestrador | uma por demanda (`feature/D3-cupom-desconto`); PR **só após G3 APPROVE**; **merge é do humano** |
 | `release/<x.y.z>` | `develop` | `main` + back-merge em `develop` | Orquestrador | com aprovação humana; fixa a versão do pom e o CHANGELOG |
 | `hotfix/<x.y.z>-<slug>` | `main` | `main` + `develop` | Orquestrador | correção urgente em produção, mesmos gates |
 
 - Use sempre `python3 tools/squad/gitflow.py` (feature-start/finish, release-start/finish, hotfix-start/finish):
-  ele aplica as regras acima e **bloqueia o merge em develop sem G3 aprovado** pelo Auditor.
+  ele aplica as regras acima: só abre PR com G3 aprovado e **nunca faz merge** — o merge é sempre do revisor humano
+  (ADR-011). Demanda "pronta" = PR aberto para revisão; "entregue" = PR integrado.
 - Commits pequenos, em português, um por passo do protocolo (contrato, implementação, testes, parecer).
 - O `--demand <id>` de cada evento do log liga demanda → branch → PR → release (rastreabilidade).
 
@@ -73,7 +74,8 @@ Ao terminar sua tarefa, todo agente:
 3. O próximo agente só começa após o **Auditor** avaliar o gate correspondente (`docs/squad/gates.md`).
 
 ## Limites de autonomia
-- Subagentes não fazem `git push` nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.
+- Subagentes não fazem `git push` nem merge. O Orquestrador abre os PRs via `tools/squad/gitflow.py`;
+  **quem integra (merge) é sempre o revisor humano** (ADR-011).
 - Nenhum agente altera credenciais ou remove dados fora do seu diretório.
 - Mudança de contrato de evento/API → exige ADR do Arquiteto.
 - Gate com confiança < 70% ou risco "alto" → intervenção humana **obrigatória**; caso contrário é opcional.

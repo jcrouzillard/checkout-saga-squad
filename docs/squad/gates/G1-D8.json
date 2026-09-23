@@ -1,0 +1,29 @@
+{
+  "gate": "G1",
+  "demand": "349e5b1bf818",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.78,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "clarification 4bc5be88ef72: q1 'as próximas… Git Flow em cada demanda' → vale para as próximas entregas e releases (cabeçalho); q2 'opção B' (cada PR mostra o G3) → corpo do PR com seção 'Parecer do Auditor · G3' (recomendação, confiança, risco, critérios) e evidências (§2.1, CA3); q4 'pronta = para revisão humana; entregue = merge' → §1 e estados 'Em revisão · PR #n' / 'Entregue' (§4), issue fecha em delivered e não mais no G3 (ADR-011 §5). q3 'Aplica' era condicional à opção (a), descartada pela q2 → sem --force (coerente)"},
+    {"name": "Nenhum merge pela squad e --force removido", "status": "validate", "weight": 2, "blocking": true,
+     "source": "Contrato §2.1/§2.2/§2.4 e ADR-011 §1: feature-finish/release-finish/hotfix-finish só abrem ou reabrem o PR; --force removido; --demand obrigatório; CA4 com grep de 'pr merge'. Hoje gitflow.py:129-137 tem --force e 'gh pr merge' (feature) e :195 (release), que serão removidos. Porém o release-publish mantém o back-merge main → develop como commit do Orquestrador na develop (gitflow.py:202 faz git merge --no-ff), o que contradiz o limite proposto para AGENTS.md ('nenhum agente faz merge em develop/main') e a exigência 'nada da squad faz merge'"},
+    {"name": "Critérios verificáveis e plano de teste seguro", "status": "validate", "weight": 2, "blocking": true,
+     "source": "CA1–CA8 verificáveis; §7.1 com gh falso em PATH temporário + repo git e remote bare locais cobre CA1/2/4/5/6/7 sem tocar o GitHub. §7.2 (PR real descartável fechado sem merge) é aceitável, mas diz 'G3 de teste registrado' sem dizer onde: se for no log real com --demand 349e5b1bf818, o github_sync atual (linhas 247-249) FECHA a issue da D8 no G3 APPROVE e o gate de merge do gitflow atual passaria a considerar a D8 aprovada. Precisa usar demanda de teste própria (id descartável) ou log temporário"},
+    {"name": "Compatibilidade com a D7", "status": "pass", "weight": 1, "blocking": false,
+     "source": "§4: cancelamento tem precedência; cancelar 'Em revisão' fecha o PR (gh pr close) via plantão; server.py sem rota nova e mudanças aditivas em github_sync/index.html, compatíveis com o rebase da D7"},
+    {"name": "Releases/hotfixes com a mesma regra", "status": "pass", "weight": 1, "blocking": false,
+     "source": "§2.4 e CA7: release-finish/hotfix-finish só abrem PR para main; tag no merge commit, GitHub Release e próxima SNAPSHOT só em release-publish/hotfix-publish após MERGED; fechado sem merge → review-rejected, sem tag"}
+  ],
+  "open_risks": [
+    "Back-merge main → develop no release-publish: fazer por PR (release/x.y.z → develop, merge humano), ou registrar exceção explícita no AGENTS.md ('back-merge de conteúdo já integrado pelo humano em main'); do jeito que está, o texto do limite de autonomia e o código ficam contraditórios.",
+    "Plano §7.2: não registrar o G3 de teste no log real com o id da D8 (fecharia a issue da D8 pelo sync atual). Usar demanda de teste descartável (task + G3 próprios) ou um log temporário, e apagar a branch remota ao final.",
+    "Lead time passa a depender do revisor humano; detecção por gh pr view a cada ciclo do plantão (gh autenticado). O merge fica fora do painel (decisão consciente do ADR-011)."
+  ],
+  "human_required": false,
+  "rationale": "O contrato e o ADR-011 traduzem fielmente as respostas do humano: pronta = PR aberto com o parecer G3 no corpo, entregue = PR integrado, só para as próximas entregas e com a mesma regra para releases e hotfixes (tag no merge commit via release-publish). A squad deixa de fazer merge de features e releases, --force sai e a compatibilidade com a D7 está prevista. Duas ressalvas devem ser tratadas na implementação: o back-merge main → develop feito pelo Orquestrador contradiz a regra 'nenhum agente faz merge', e o PR de teste não pode usar um G3 de teste no log real com o id da D8. Risco moderado porque muda o fluxo de entrega de toda demanda. Confiança = (3+1+1+1+1)/9 = 0.78."
+}

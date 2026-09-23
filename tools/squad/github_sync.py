@@ -71,7 +71,7 @@ class Sync:
 
     STATUS_LABEL = {"Backlog": "status:backlog", "Em andamento": "status:em-andamento", "Gate (Jev)": "status:gate",
                     "Gate (Auditor)": "status:gate", "Intervenção humana": "status:intervencao-humana", "Concluído": "status:concluido",
-                    "Cancelado": "status:cancelado"}
+                    "Cancelado": "status:cancelado", "Em revisão": "status:em-revisao"}
 
     def set_field(self, issue: dict, field: str, value: str | None):
         fd = self.s["project"]["fields"].get(field)
@@ -318,15 +318,38 @@ class Sync:
                     args += ["--remove-label", other]
             subprocess.run(args, capture_output=True)
 
+    def on_review(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        self.comment(issue, f"**Em revisão humana** · PR #{e.get('pr')}: {e.get('url')}\n\nO merge é do revisor; ao integrar, a demanda vira *Entregue*.\n\n<sub>evento `{e['id']}`</sub>")
+        subprocess.run(["gh", "label", "create", "status:em-revisao", "--color", "6F5BD8", "-R", REPO, "-f"], capture_output=True)
+        self.status_label(issue, "Em revisão")
+
+    def on_delivered(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        self.comment(issue, f"**Entregue** · {e['title']} · commit `{e.get('mergeCommit', '')}`\n\n<sub>evento `{e['id']}`</sub>")
+        self.set_field(issue, "Status", "Concluído")
+        self.close(issue)
+
+    def on_review_rejected(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        self.reopen(issue)
+        self.comment(issue, f"**Devolvida pelo revisor** · PR #{e.get('pr')} fechado sem merge\n\n{e.get('detail') or ''}\n\n<sub>evento `{e['id']}`</sub>")
+        self.set_field(issue, "Status", "Em andamento")
+
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] in ("progress", "validation", "clarification", "edit") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
+        if not issue or e["type"] in ("progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
-            self.set_field(issue, "Status", "Concluído")
-            self.close(issue)
+            self.set_field(issue, "Status", "Em andamento")  # D8: só o merge humano conclui (evento delivered)
 
     def run_once(self) -> int:
         done = set(self.s["processed"])
@@ -335,7 +358,8 @@ class Sync:
                     "gate": self.on_gate, "human": self.on_human, "defect": self.on_ticket,
                     "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control,
                     "validation": self.on_validation, "clarification": self.on_clarification,
-                    "edit": self.on_edit}
+                    "edit": self.on_edit, "review": self.on_review, "delivered": self.on_delivered,
+                    "review-rejected": self.on_review_rejected}
         n = 0
         for e in events:
             if e["id"] in done:

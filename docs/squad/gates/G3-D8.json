@@ -1,0 +1,33 @@
+{
+  "gate": "G3",
+  "demand": "349e5b1bf818",
+  "from": "qa+orquestrador",
+  "to": "humano (revisão do PR)",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Suíte da entrega por PR (CA1–CA7) verde", "status": "pass", "weight": 3, "blocking": true,
+     "source": "python3 tests/squad/test_entrega_por_pr.py no worktree plankton-d8 (repo e remote bare temporários, gh/mvn falsos, sem GitHub real): 45 PASS, 0 FAIL, código de saída 0; inclui 'CA6 [DEFEITO]: review-sync (MERGED) não quebra com conflito', delivered com mergeCommit, branch apagada e idempotência. O harness copia só tools/squad (não copia .gitattributes), logo o resultado vem de align_memory/push da develop e não do merge=union"},
+    {"name": "Defeito a66b91c8a0d6 corrigido (reprodução independente do Auditor)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Cenário extra (scratchpad, reusando o Harness do teste): duas features em revisão ao mesmo tempo, eventos novos na develop entre elas (inclusive um não commitado), humano integra B antes de A em clones à parte. Os dois review-sync saem 0 com 'entregue', 2 delivered, ids únicos no log, os 3 eventos soltos preservados, árvore limpa, develop local == origin/develop. 'git diff merge^1...merge^2' de cada PR mostra só o arquivo de código (a.txt / b.txt): o PR não toca decisions.jsonl"},
+    {"name": "Nenhum caminho da squad faz merge de integração", "status": "pass", "weight": 2, "blocking": true,
+     "source": "grep 'pr merge|git merge' em tools/squad: 0 'gh pr merge'. gitflow.py:148 'git merge --no-ff --no-commit develop' roda DENTRO da feature em revisão (align_memory) e só traz a develop para a branch do PR — sincronização, não integração; conflito de código aborta e volta para a develop. gitflow.py:339 é o back-merge de main numa branch chore/back-merge-*, que segue por PR (open_review). develop e main só mudam de código por merge humano no GitHub"},
+    {"name": "Rastreabilidade e reprodução (checklist + capturas)", "status": "validate", "weight": 2, "blocking": false,
+     "source": "tests/ui/checklist-entrega-por-pr-d8.md cobre CA1–CA8 e explica como rodar; capturas tests/ui/d8-01..05.png (Em revisão com link, Entregue, Devolvida pelo revisor, Execuções). Porém a linha CA6 do checklist ainda diz '❌ DEFEITO' e a seção de execução diz que o script 'sai 1': documento do QA desatualizado após c9c935e (evidência parcial)"},
+    {"name": "G2-D8 (devolução do ciclo 1) continua resolvida", "status": "pass", "weight": 1, "blocking": false,
+     "source": "open_review segue trocando para a develop antes de registrar o review; teste confirma 'review commitado na develop' e 1 único gh pr create na reexecução; import_memory ainda leva à develop os eventos que só existiam na feature (dedupe por id)"}
+  ],
+  "open_risks": [
+    "Checklist do QA (tests/ui/checklist-entrega-por-pr-d8.md) desatualizado: CA6 ainda consta como defeito e o script como 'sai 1'. O QA deve atualizar para CA6 ✅ citando c9c935e antes (ou junto) da revisão humana do PR.",
+    "open_review e review-sync fazem 'git push origin develop' direto (check=False) com commits só de docs/squad/memory|inbox. Não é merge de código e já existia em sync_develop, mas é escrita da squad na develop sem PR; hoje a develop não é protegida no GitHub (verificado via gh api, somente leitura). Se virar protegida, o push falha em silêncio e o conflito do defeito pode voltar — trocar check=False por aviso explícito.",
+    "align_memory adiciona ao PR um merge commit 'Sincroniza a develop e a memória da squad antes da revisão'; o diff do PR fica limpo, mas o histórico mostra esse commit ao revisor.",
+    "Se align_memory encontrar conflito de código, sai com erro DEPOIS de o PR já estar aberto e o review registrado: a demanda aparece 'Em revisão' com PR que não integra; o humano verá o conflito no GitHub.",
+    ".gitattributes merge=union protege só merges locais; não conte com ele no merge do GitHub (a correção não depende dele).",
+    "O contrato (entrega-por-pr.md §2.1 item 3: 'não troca para develop') diverge do comportamento aceito no G2-D8-2 (volta para a develop para registrar o review); o Arquiteto deve ajustar o texto.",
+    "CA8 (sem regressão) segue 'validar' pelo QA; o 1º PR real deve confirmar Refs #issue e o ciclo Em revisão → Entregue na issue (ressalva do G1/G2)."
+  ],
+  "human_required": false,
+  "rationale": "O único bloqueio do QA (CA6, defeito a66b91c8a0d6) foi corrigido em c9c935e: a develop recebe e publica o review na hora, a feature em revisão é alinhada à develop com memória idêntica (o PR não toca o log) e o delivered é gravado depois de trazer o merge humano. Rodei a suíte (exit 0, 45 PASS) e um cenário mais duro (dois PRs concorrentes, merges fora de ordem, eventos entre eles): sem conflito, sem perda de eventos, develop local = remota. Nenhuma ferramenta faz merge de integração; o merge dentro da feature é sincronização da branch do PR e é aceitável. Critérios de G3 adaptados a uma demanda de ferramenta (sem e2e de produto): (3+3+2+1+2×0,5)/11 = 0,91 (rastreabilidade parcial), reduzida para 0,88 pelos riscos de push direto na develop e do checklist desatualizado. O merge final é do humano no GitHub, que é o próprio controle desta demanda."
+}

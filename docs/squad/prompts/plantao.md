@@ -8,6 +8,13 @@ nada, responda apenas "fila vazia".
 Para cada `validação: <id>` listada, rode `python3 tools/squad/triage.py <id>` (Arquiteto em modo somente leitura;
 grava o evento `validation`). Meta: perguntas visíveis no painel em menos de 1 minuto após o registro.
 
+## R) Revisões humanas de PR (ADR-011)
+- `revisão integrada: demanda <id>` → `python3 tools/squad/gitflow.py review-sync --demand <id>` (registra `delivered`,
+  sincroniza a develop local).
+- `revisão recusada: demanda <id>` → `review-sync` registra `review-rejected`; trate como devolução, com os comentários do PR.
+- `release pronta: release <x.y.z>` → `python3 tools/squad/gitflow.py release-publish <x.y.z>` (tag, GitHub Release e PR
+  de back-merge para revisão). Ninguém da squad faz merge.
+
 ## A) Controles humanos (`type: control` no log)
 - Último controle `pause` → não despache o próximo passo da demanda; `resume` → retome de onde parou.
 - `cancel` → interrompa os agentes da demanda e registre
@@ -35,5 +42,5 @@ backlog nunca aparecem na fila: só entram quando o humano as move para a fila n
    despacho. **Delegação**: use a ferramenta nativa de subagentes do seu runner, se existir; senão
    `python3 tools/squad/run_agent.py <papel> "<tarefa>" --demand <id>` (bloqueante; respeita `SQUAD_RUNNER`).
 6. Commits pequenos em português na feature; com G3 APPROVE:
-   `python3 tools/squad/gitflow.py feature-finish --demand <id>` (merge em develop via PR).
+   `python3 tools/squad/gitflow.py feature-finish --demand <id>` — abre o PR para **revisão humana** (sem merge).
 7. Informe o resultado em poucas linhas. Nunca altere regras de negócio, eventos ou contratos sem Arquiteto e Auditor.

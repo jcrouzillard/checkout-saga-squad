@@ -2,10 +2,11 @@
 """Git Flow da squad (independe do fornecedor de IA: qualquer agente ou humano usa os mesmos comandos).
 
   feature-start <código> <slug>        develop → feature/<código>-<slug>
-  feature-finish [--demand <id>]       push + PR para develop; merge só com G3 APPROVE da demanda
+  feature-finish --demand <id>         G3 APPROVE → push + PR para develop PARA REVISÃO HUMANA (sem merge)
+  review-sync --demand <id>            PR integrado → delivered; fechado sem merge → review-rejected
   release-start <x.y.z>                develop → release/<x.y.z>; versão do pom = x.y.z; CHANGELOG
-  release-finish <x.y.z>               PR para main + merge, tag vX.Y.Z + GitHub Release,
-                                       back-merge em develop e próxima versão -SNAPSHOT
+  release-finish <x.y.z>               PR para main PARA REVISÃO HUMANA (sem merge)
+  release-publish <x.y.z>              após o merge humano: tag no merge commit, GitHub Release e PR de back-merge
   hotfix-start <x.y.z> <slug>          main → hotfix/<x.y.z>-<slug>
   hotfix-finish <x.y.z>                igual ao release-finish, a partir do hotfix
 
@@ -118,29 +119,149 @@ def feature_start(a):
     print(branch)
 
 
+def event(kind: str, title: str, **fields):
+    args = ["python3", "tools/squad/log.py", "--agent", "orquestrador", "--type", kind, "--title", title]
+    for k, v in fields.items():
+        if v is not None:
+            args += [f"--{k.replace('_', '-')}", str(v)]
+    sh(*args)
+
+
+def pr_number(url: str) -> int:
+    return int(url.rstrip("/").split("/")[-1])
+
+
+def import_memory(branch: str):
+    """Na develop: acrescenta ao log os eventos que só existem na branch (append-only, deduplicado por id)."""
+    theirs = sh("git", "show", f"{branch}:{LOG.relative_to(ROOT).as_posix()}", check=False)
+    have = {e.get("id") for e in events()}
+    new = [l for l in theirs.splitlines() if l.strip() and json.loads(l).get("id") not in have]
+    if new:
+        with LOG.open("a", encoding="utf-8") as f:
+            f.write("\n".join(new) + "\n")
+
+
+def align_memory(branch: str):
+    """Leva a develop para dentro da branch em revisão com a memória IGUAL à da develop. Assim o PR não mexe no
+    log e o merge humano no GitHub não conflita com o que a squad segue registrando na develop (defeito a66b91c8a0d6)."""
+    switch(branch)
+    out = subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "develop"], cwd=ROOT, capture_output=True, text=True)
+    for path in STATE:  # um por vez: um caminho ausente não pode impedir os outros
+        sh("git", "checkout", "develop", "--", path, check=False)
+    unmerged = [f for f in sh("git", "diff", "--name-only", "--diff-filter=U").splitlines() if not f.startswith(STATE)]
+    if unmerged:
+        sh("git", "merge", "--abort", check=False)
+        switch("develop")
+        sys.exit("conflito de código entre a feature e a develop; resolva antes de revisar:\n" + "\n".join(unmerged))
+    if out.returncode == 0 or sh("git", "status", "--porcelain"):
+        sh("git", "add", "-A", "--", *STATE)
+        sh("git", "commit", "-q", "--no-edit", "-m", f"Sincroniza a develop e a memória da squad antes da revisão{TRAILER}", check=False)
+    sh("git", "push", "-q", "origin", branch)
+    switch("develop")
+
+
+def open_review(base: str, head: str, title: str, body: str, demand: str | None = None, release: str | None = None) -> str:
+    """Abre (ou reutiliza) o PR, VOLTA para a develop e só então registra UM `review` — no log que o plantão lê
+    (devolução do G2-D8: gravado na feature branch, o evento sumia ao voltar para a develop). Ninguém da squad faz merge."""
+    url = pr(base, head, title, body)
+    switch("develop")
+    sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop", check=False)
+    if head.startswith("feature/"):
+        import_memory(head)
+    already = [e for e in events() if e.get("type") == "review" and e.get("url") == url]
+    if not already:
+        event("review", f"PR #{pr_number(url)} aberto para revisão humana: {title}", demand=demand, release=release,
+              pr=pr_number(url), url=url, branch=head)
+    snapshot_state()
+    # Defeito a66b91c8a0d6 (D8): a develop com o `review` precisa chegar à origin já, senão o merge humano no
+    # GitHub diverge dela e o próximo pull entra em conflito no log.
+    sh("git", "push", "-q", "origin", "develop", check=False)
+    if head.startswith("feature/"):
+        align_memory(head)
+    return url
+
+
 def feature_finish(a):
+    if not a.demand:
+        sys.exit("--demand é obrigatório: a entrega de uma feature é sempre de uma demanda")
     clean_tree()
     branch = current()
     if not branch.startswith("feature/"):
         sys.exit(f"não está numa feature branch ({branch})")
-    gate = None
-    if a.demand:
-        gate = g3_approved(a.demand)
-        if not gate and not a.force:
-            sys.exit("G3 da demanda ainda não aprovado pelo Auditor: o merge em develop fica bloqueado (use --force só "
-                     "com decisão humana registrada)")
+    gate = g3_approved(a.demand)
+    if not gate:
+        sys.exit("G3 da demanda ainda não aprovado pelo Auditor: o PR não é aberto")
+    evs = events()
+    demand = next((e for e in evs if e.get("id") == a.demand and e.get("type") == "task"), {})
+    gates = [e for e in evs if e.get("type") == "gate" and e.get("demand") == a.demand]
+    evid = [f"- {v['name']}: {v['status']}" for e in evs if e.get("demand") == a.demand and e.get("type") in ("evidence", "handoff")
+            for v in e.get("evidences", [])]
     sh("git", "push", "-q", "-u", "origin", branch)
-    body = (f"Demanda `{a.demand}`.\n\n" if a.demand else "") + (
-        f"Auditor · G3 {gate['recommendation']} · {round((gate.get('confidence') or 0) * 100)}% · risco {gate.get('risk')}\n\n"
-        f"{gate.get('detail', '')}\n\n" if gate else "") + "Gerado por `tools/squad/gitflow.py`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-    url = pr("develop", branch, a.title or branch.replace("feature/", "").replace("-", " "), body)
-    sh("gh", "pr", "merge", url, "--merge", "--delete-branch")
-    switch("develop")
-    sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
-    log(f"{branch} integrada em develop via PR", demand=a.demand, ref=url, branch="develop")
-    snapshot_state()
-    sh("git", "push", "-q", "origin", "develop")
+    val = [e for e in evs if e.get("type") == "validation" and e.get("demand") == a.demand]
+    ans = [e for e in evs if e.get("type") == "clarification" and e.get("demand") == a.demand]
+    amap = {x["id"]: x["text"] for x in (ans[-1].get("answers", []) if ans else [])}
+    qa = [f"- **{q['text']}**\n  → {amap.get(q['id'], '(sem resposta)')}" for q in (val[-1].get("questions", []) if val else [])]
+    try:
+        issue = json.loads((ROOT / "docs/squad/memory/github-sync.json").read_text())["issues"].get(a.demand, {}).get("number")
+    except (OSError, json.JSONDecodeError, KeyError):
+        issue = None
+    stat = sh("git", "diff", "--stat", "origin/develop...HEAD", check=False).splitlines()[-12:]
+    body = "\n".join([
+        *([f"Refs #{issue}", ""] if issue else []),
+        f"## Demanda `{a.demand}` — {demand.get('title', '').replace('Demanda: ', '')}",
+        "", (demand.get("detail") or "").strip(), "",
+        "## Pareceres do Auditor",
+        *[f"- {g['gate']} · {g.get('recommendation')} · {round((g.get('confidence') or 0) * 100)}% · risco {g.get('risk')}" for g in gates],
+        "", f"**G3:** {gate.get('detail', '')}", "",
+        "## Evidências", *(evid or ["- (ver log da squad)"]), "",
+        *(["## Perguntas da validação e respostas do humano", *qa, ""] if qa else []),
+        "## Artefatos alterados", "```", *stat, "```", "",
+        "## Checklist do revisor",
+        "- [ ] O diff corresponde aos critérios de aceite da demanda",
+        "- [ ] Nenhum contrato de evento/API mudou sem ADR",
+        "- [ ] Evidências (testes, capturas) conferidas", "",
+        "> Pronta para **revisão humana**. O merge é do revisor; ao integrar, a demanda vira *Entregue* no Squad Control.",
+        "", "🤖 Generated with [Claude Code](https://claude.com/claude-code)"])
+    url = open_review("develop", branch, a.title or demand.get("title", branch).replace("Demanda: ", ""), body, demand=a.demand)
     print(url)
+
+
+def review_sync(a):
+    """Consulta o PR em revisão e registra o desfecho (merge humano ou fechamento)."""
+    key = "release" if a.release else "demand"
+    val = a.release or a.demand
+    reviews = [e for e in events() if e.get("type") == "review" and e.get(key) == val]
+    if not reviews:
+        sys.exit("nenhum PR em revisão para esse item")
+    rv = reviews[-1]
+    done = [e for e in events() if e.get("type") in ("delivered", "review-rejected") and e.get("url") == rv["url"]]
+    if done:
+        print(f"já tratado: {done[-1]['type']}")
+        return
+    info = json.loads(sh("gh", "pr", "view", rv["url"], "--json", "state,mergeCommit,mergedBy,closedAt,comments,reviews"))
+    if info["state"] == "MERGED":
+        commit = (info.get("mergeCommit") or {}).get("oid", "")[:12]
+        who = (info.get("mergedBy") or {}).get("login", "humano")
+        # Primeiro traz o merge humano, depois registra `delivered` e publica (defeito a66b91c8a0d6).
+        if current() == "develop":
+            sync_develop()
+        event("delivered", f"Entregue: PR #{rv['pr']} integrado por {who}", demand=a.demand, release=a.release,
+              pr=rv["pr"], url=rv["url"], merge_commit=commit)
+        if current() == "develop":
+            snapshot_state()
+            sh("git", "push", "-q", "origin", "develop", check=False)
+        else:
+            sh("git", "fetch", "-q", "origin")
+        if rv.get("branch", "").startswith("feature/"):
+            sh("git", "branch", "-q", "-D", rv["branch"], check=False)
+        print(f"entregue ({commit})")
+    elif info["state"] == "CLOSED":
+        notes = [c.get("body", "") for c in info.get("comments", [])] + [r.get("body", "") for r in info.get("reviews", [])]
+        event("review-rejected", f"Devolvida pelo revisor: PR #{rv['pr']} fechado sem merge", demand=a.demand,
+              release=a.release, pr=rv["pr"], url=rv["url"], detail=" | ".join(n for n in notes if n)[:1500])
+        print("devolvida pelo revisor")
+    else:
+        print("ainda em revisão")
 
 
 # ---------------------------------------------------------------- release / hotfix
@@ -187,30 +308,44 @@ def release_finish(a, kind="release"):
     branch = current()
     if not branch.startswith(f"{kind}/"):
         sys.exit(f"não está numa branch {kind}/ ({branch})")
-    tag = f"v{a.version}"
     sh("git", "push", "-q", "-u", "origin", branch)
     notes = CHANGELOG.read_text().split(f"## [{a.version}]", 1)[-1].split("\n## [", 1)[0] if CHANGELOG.exists() else ""
-    url = pr("main", branch, f"{kind.capitalize()} {a.version}",
-             f"{kind.capitalize()} {a.version}.\n\n## [{a.version}]{notes}\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)")
-    sh("gh", "pr", "merge", url, "--merge")
+    url = open_review("main", branch, f"{kind.capitalize()} {a.version}",
+                      f"{kind.capitalize()} {a.version} — pronta para **revisão humana**. Após o merge, "
+                      f"`gitflow.py {kind}-publish {a.version}` cria a tag e abre o PR de back-merge.\n\n## [{a.version}]{notes}"
+                      f"\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)", release=a.version)
+    print(url)
+
+
+def release_publish(a, kind="release"):
+    """Depois do merge HUMANO do PR da release: tag no merge commit, GitHub Release e PR de back-merge para develop."""
+    reviews = [e for e in events() if e.get("type") == "review" and e.get("release") == a.version]
+    if not reviews:
+        sys.exit("release sem PR em revisão")
+    info = json.loads(sh("gh", "pr", "view", reviews[-1]["url"], "--json", "state,mergeCommit"))
+    if info["state"] != "MERGED":
+        sys.exit(f"o PR da release ainda não foi integrado pelo humano (estado: {info['state']})")
+    commit = info["mergeCommit"]["oid"]
+    tag = f"v{a.version}"
+    notes = CHANGELOG.read_text().split(f"## [{a.version}]", 1)[-1].split("\n## [", 1)[0] if CHANGELOG.exists() else ""
+    sh("gh", "release", "create", tag, "-R", REPO, "--target", commit, "--title", tag, "--notes", f"## [{a.version}]{notes}")
+    event("delivered", f"{kind.capitalize()} {a.version} publicada: {tag} no merge commit", release=a.version,
+          pr=reviews[-1]["pr"], url=reviews[-1]["url"], merge_commit=commit[:12])
+    # back-merge também passa por revisão humana (ressalva 1 do G1-D8)
+    clean_tree()
     sh("git", "fetch", "-q", "origin")
-    sh("gh", "release", "create", tag, "-R", REPO, "--target", "main", "--title", f"{tag}",
-       "--notes", f"## [{a.version}]{notes}")
-    # back-merge em develop + próxima versão de desenvolvimento
-    switch("develop")
-    sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
-    sh("git", "merge", "-q", "--no-ff", branch, "-m", f"Back-merge de {branch} em develop{TRAILER}")
+    back = f"chore/back-merge-{a.version}"
+    switch("-c", back, "origin/develop")
+    sh("git", "merge", "-q", "--no-ff", "origin/main", "-m", f"Back-merge de main ({tag}) em develop{TRAILER}")
     major, minor, _ = (int(x) for x in a.version.split("."))
     nxt = f"{major}.{minor + 1}.0-SNAPSHOT"
     set_version(nxt)
     sh("git", "add", "-A")
     sh("git", "commit", "-q", "-m", f"Próxima versão de desenvolvimento: {nxt}{TRAILER}")
-    sh("git", "push", "-q", "origin", "develop")
-    sh("git", "push", "-q", "origin", "--delete", branch, check=False)
-    sh("git", "branch", "-q", "-D", branch, check=False)
-    log(f"{kind.capitalize()} {a.version} publicada: {tag} em main, back-merge em develop ({nxt})", ref=url, branch="main")
-    snapshot_state()
-    sh("git", "push", "-q", "origin", "develop")
+    sh("git", "push", "-q", "-u", "origin", back)
+    url = open_review("develop", back, f"Back-merge {tag} em develop e {nxt}",
+                      f"Back-merge da {kind} {a.version} e próxima versão {nxt}. Revisão humana.\n\n"
+                      "🤖 Generated with [Claude Code](https://claude.com/claude-code)", release=f"{a.version}-back-merge")
     print(url)
 
 
@@ -218,16 +353,21 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("feature-start"); s.add_argument("code"); s.add_argument("slug"); s.add_argument("--demand")
-    s = sub.add_parser("feature-finish"); s.add_argument("--demand"); s.add_argument("--title"); s.add_argument("--force", action="store_true")
+    s = sub.add_parser("feature-finish"); s.add_argument("--demand", required=True); s.add_argument("--title")
+    s = sub.add_parser("review-sync"); s.add_argument("--demand"); s.add_argument("--release")
     s = sub.add_parser("release-start"); s.add_argument("version")
     s = sub.add_parser("release-finish"); s.add_argument("version")
     s = sub.add_parser("hotfix-start"); s.add_argument("version"); s.add_argument("slug")
     s = sub.add_parser("hotfix-finish"); s.add_argument("version")
+    s = sub.add_parser("release-publish"); s.add_argument("version")
+    s = sub.add_parser("hotfix-publish"); s.add_argument("version")
     a = p.parse_args()
     {"feature-start": feature_start, "feature-finish": feature_finish,
      "release-start": release_start, "release-finish": release_finish,
      "hotfix-start": lambda x: release_start(x, source="main", kind="hotfix"),
-     "hotfix-finish": lambda x: release_finish(x, kind="hotfix")}[a.cmd](a)
+     "hotfix-finish": lambda x: release_finish(x, kind="hotfix"),
+     "review-sync": review_sync, "release-publish": release_publish,
+     "hotfix-publish": lambda x: release_publish(x, kind="hotfix")}[a.cmd](a)
 
 
 if __name__ == "__main__":

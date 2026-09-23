@@ -1,0 +1,28 @@
+{
+  "gate": "G2",
+  "demand": "349e5b1bf818",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 0.96,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "review-sync/pending no fluxo real (reprodução do ciclo 1)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "ad707fe open_review: cria/reutiliza o PR, switch('develop') + pull, e só então registra o review e faz snapshot. Mesma reprodução do 1º ciclo (repo e remote bare temporários, gh falso, sem GitHub real) e sem cópia manual: após feature-finish a branch atual é develop e 'git show develop:…decisions.jsonl' tem 1 review; pending.py OPEN → 'nada pendente'; MERGED → 'revisão integrada: demanda … (PR #42)'; review-sync → 'entregue (abcdef123456)' e branch feature/T1-teste apagada"},
+    {"name": "feature-finish idempotente e sem merge", "status": "pass", "weight": 3, "blocking": true,
+     "source": "2ª execução na feature: reutiliza o PR #42 (1 único 'gh pr create'), continua com 1 review no log; 0 chamadas 'gh pr merge'; --demand/G3 obrigatórios e sem --force (inalterado desde o ciclo 1)"},
+    {"name": "Nenhum merge pela squad", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Sem 'pr merge' em tools/squad; back-merge de release por PR; AGENTS.md:54/78 'quem integra (merge) é sempre o revisor humano' (a frase antiga da linha 77 foi removida)"},
+    {"name": "Corpo do PR (CA3)", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Corpo capturado do gh falso: Pareceres do Auditor, Evidências, 'Perguntas da validação e respostas do humano' (Qual o escopo? → Só o painel), 'Artefatos alterados' (git diff --stat: a.txt), 'Checklist do revisor' com 3 itens; 'Refs #<issue>' é incluído quando a demanda tem issue (gitflow.py:174; no teste não havia issue)"},
+    {"name": "Demais itens do ciclo 1", "status": "pass", "weight": 3, "blocking": false,
+     "source": "Inalterados e já verificados no G2-D8: review-rejected em CLOSED com comentários, release-publish recusa sem MERGED, campos pr/url/mergeCommit/release coerentes entre log, sync e painel, e cache de 30 s só para OPEN"}
+  ],
+  "open_risks": [
+    "O review (e o snapshot da memória) fica commitado na develop LOCAL; a develop remota só recebe esse commit no próximo sync_develop (feature-start) ou pull. Aceitável, porque o vigia lê o log local, mas os eventos da demanda na feature branch (G1–G3, handoffs) só voltam à develop com o merge humano: o painel na develop mostra a demanda pelo review/delivered, não pelo histórico completo, até o merge.",
+    "O PR real (ou a 1ª demanda real) deve confirmar o corpo com 'Refs #<issue>' e a sincronização Em revisão → Entregue na issue; o QA deve cobrir com um PR descartável fechado sem merge (ressalva 2 do G1-D8: demanda de teste própria, não a D8)."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. O defeito bloqueante do 1º ciclo (review gravado na feature e perdido ao voltar para a develop) está corrigido: repeti a mesma reprodução, sem cópia manual nem efeito no GitHub real, e o review aparece no log da develop. O pending.py detecta o merge e o review-sync registra delivered e apaga a branch. O corpo do PR agora traz perguntas/respostas, artefatos, checklist e Refs à issue, e o AGENTS.md ficou coerente com 'merge é do humano'. O restante do ciclo 1 continua válido. Confiança = (3+3+2+1+3)/12 = 1.00, reduzida para 0.96 pela divergência temporária de histórico entre a feature e a develop até o merge (risco registrado)."
+}
