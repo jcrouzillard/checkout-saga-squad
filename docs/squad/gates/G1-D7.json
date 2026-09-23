@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "e31bdfb73679",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Critérios verificáveis", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/contracts/ui-cancelar-demanda.md: CA1–CA6 com verificação (painel por estado, pending.py 2×, curl com códigos e mensagens exatos: 404 inexistente, 409 'demanda já concluída' com G3 APPROVE, 409 'demanda já cancelada', 409 'demanda cancelada' em start/clarify/edit; gh issue view com reason not planned, Status Cancelado, label cancelada) e plano de teste em 4 passos"},
+    {"name": "Pedido do humano coberto", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Task e31bdfb73679 ('quando retorna alguma pergunta… opção de cancelar… não quero mais… abrir outra'): cancelar em Com perguntas e, por extensão coerente, nos 5 estados pré-início (Em validação, Com perguntas, Validação atrasada, pronta para iniciar, Backlog), com confirmação inline em 2 cliques e motivo opcional (CA1); card 'Cancelada' sem ações (CA2); abrir outra demanda continua pelo formulário normal"},
+    {"name": "Sem evento novo e ownership", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Reaproveita POST /api/demand/control {action: cancel, note} → evento control cancel; pending.py (linha 14 já não pede validação para cancelada; linhas 35-37 listam 'cancelamento:') e log.py sem mudança. Ajustes por dono: server.py (CA4) e github_sync.py (Status Cancelado, close --reason 'not planned', label cancelada) e plantao.md → Orquestrador (tools/squad, docs/squad); squad-control/index.html (controlsHtml pré-início, esconder perguntas se cancelada, 404/409) → Frontend. A 'situação atual' confere com o código (server.py:369 aceita cancel sem validar a demanda)"},
+    {"name": "Escopo", "status": "pass", "weight": 1, "blocking": false,
+     "source": "git diff develop --stat: só o contrato (+ sync da memória). Fora de escopo explícito: desfazer cancelamento, excluir do log. Sem contrato de produto afetado; sem necessidade de ADR (nenhuma decisão arquitetural nova)"}
+  ],
+  "open_risks": [
+    "CA3 'interromper a triagem em execução' não diz como: triage.py roda o agente como subprocesso sem PID registrado. Definir no plantão (ex.: localizar o processo por .squad/triagem-<id>.md/.squad/runs e encerrá-lo); se não houver como, basta o painel ignorar a validation tardia (já exigido).",
+    "github_sync ainda comentaria na issue fechada uma validation tardia se a recomendação 'opcional' não for implementada; preferir implementá-la para não reabrir ruído.",
+    "Criar a opção 'Cancelado' no campo Status do Project via gh requer a API do Project (GraphQL); validar a permissão do token no G2."
+  ],
+  "human_required": false,
+  "rationale": "O contrato cobre o pedido do humano: cancelar a demanda enquanto o Arquiteto pergunta, estendido de forma coerente a todos os estados antes do início, com confirmação inline e motivo. Os critérios são verificáveis, com códigos HTTP e mensagens exatas. Não há evento novo (reaproveita control cancel), e os ajustes estão com os donos certos: servidor, sync e plantão com o Orquestrador, painel com o Frontend. Riscos não bloqueantes: mecanismo de interromper a triagem em curso, validation tardia comentada na issue e permissão para criar o status 'Cancelado' no Project. Confiança = 9/9 = 1.00."
+}
