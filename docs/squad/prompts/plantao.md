@@ -4,6 +4,10 @@ Você é o Orquestrador da squad em plantão neste repositório (regras em `AGEN
 `docs/squad/orquestrador.md`). Rode `python3 tools/squad/pending.py` e trate apenas o que ele listar; se não houver
 nada, responda apenas "fila vazia".
 
+## 0) Validações pendentes (antes de tudo)
+Para cada `validação: <id>` listada, rode `python3 tools/squad/triage.py <id>` (Arquiteto em modo somente leitura;
+grava o evento `validation`). Meta: perguntas visíveis no painel em menos de 1 minuto após o registro.
+
 ## A) Controles humanos (`type: control` no log)
 - Último controle `pause` → não despache o próximo passo da demanda; `resume` → retome de onde parou.
 - `cancel` → interrompa os agentes da demanda e registre
@@ -18,10 +22,12 @@ nada, responda apenas "fila vazia".
 - `RETURN` → devolva ao agente de origem com as observações.
 
 ## C) Fila `docs/squad/inbox/*.json`
-1. Leia a demanda; mova o arquivo para `docs/squad/inbox/done/`.
+1. Leia a demanda (inclui `kind` e `clarifications`: use as respostas do humano como parte dos critérios); mova o
+   arquivo para `docs/squad/inbox/done/`.
 2. `python3 tools/squad/gitflow.py feature-start <código> <slug> --demand <id>`.
 3. Registre `python3 tools/squad/log.py --agent orquestrador --type task --to <agente> --demand <id> --priority <p> --title "<código>: <tarefa>"`.
-4. Triagem: critérios vagos → Arquiteto (rota padrão); rota "direta" → agente-alvo/dono; `checkout-console/` → Frontend.
+4. Triagem pelo tipo: `produto` → Arquiteto (contrato) → Backend/Frontend do produto; `operacao` → Frontend (painel
+   `squad-control/`) ou Orquestrador (`tools/squad/`, protocolo), com os mesmos gates. Rota "direta" → agente-alvo/dono.
 5. Conduza Arquiteto → Auditor G1 → implementação → Auditor G2 → QA → Auditor G3, reconsultando A antes de cada
    despacho. **Delegação**: use a ferramenta nativa de subagentes do seu runner, se existir; senão
    `python3 tools/squad/run_agent.py <papel> "<tarefa>" --demand <id>` (bloqueante; respeita `SQUAD_RUNNER`).

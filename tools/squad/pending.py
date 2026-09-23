@@ -7,6 +7,16 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 rows = [json.loads(l) for l in (ROOT / "docs/squad/memory/decisions.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
 pending = []
+from datetime import datetime, timedelta, timezone
+now = datetime.now(timezone.utc)
+for d in [r for r in rows if r.get("type") == "task" and r.get("agent") == "humano" and r.get("kind")]:
+    rel = [r for r in rows if r.get("demand") == d["id"]]
+    if any(r.get("type") in ("validation", "start") for r in rel) or any(r.get("type") == "control" and r.get("action") == "cancel" for r in rel):
+        continue
+    busy = [r for r in rel if r.get("type") == "progress" and r.get("agent") == "arquiteto"
+            and now - datetime.fromisoformat(r["ts"]) < timedelta(minutes=5)]
+    if not busy:
+        pending.append(f"validação: {d['id']}")
 for f in sorted((ROOT / "docs/squad/inbox").glob("*.json")):
     pending.append(f"fila: {f.name}")
 handled_ctl = {r.get("demand") for r in rows if r.get("agent") == "orquestrador" and "cancelada" in r.get("title", "")}

@@ -333,6 +333,19 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/demand/clarify"):
+            data = json.loads(raw or b"{}")
+            rows = read_jsonl(LOG)
+            demand = next((e for e in rows if e.get("id") == data.get("id") and e.get("type") == "task"), None)
+            val = next((e for e in rows if e.get("id") == data.get("validation") and e.get("type") == "validation"), None)
+            if not demand or not val:
+                return self._json({"error": "demanda ou validação não encontrada"}, 404)
+            answers = [a for a in (data.get("answers") or []) if (a.get("text") or "").strip()]
+            if not answers:
+                return self._json({"error": "respostas vazias"}, 400)
+            entry = self._append_log({"agent": "humano", "type": "clarification", "to": "orquestrador", "demand": demand["id"],
+                                      "validation": val["id"], "title": "Respostas à validação", "answers": answers})
+            return self._json(entry, 201)
         if self.path.startswith("/api/demand/control"):
             # Controle humano sobre uma demanda em andamento: pausar, retomar, repriorizar, cancelar.
             data = json.loads(raw or b"{}")
@@ -352,7 +365,25 @@ class Handler(SimpleHTTPRequestHandler):
                            and e.get("agent") == "humano"), None)
             if not demand:
                 return self._json({"error": "demanda não encontrada"}, 404)
+            rows = read_jsonl(LOG)
+            clarifications = []
+            if demand.get("kind"):  # demandas v2 (D4): Iniciar só após validação ok, respostas ou override com nota
+                vals = [e for e in rows if e.get("type") == "validation" and e.get("demand") == demand["id"]]
+                last = vals[-1] if vals else None
+                answered = last and any(e.get("type") == "clarification" and e.get("validation") == last["id"] for e in rows)
+                ready = last and (last.get("status") == "ok" or answered)
+                if data.get("override"):
+                    if not (data.get("note") or "").strip():
+                        return self._json({"error": "override exige nota"}, 400)
+                elif not ready:
+                    return self._json({"error": "demanda aguardando validação"}, 409)
+                if last:
+                    ans = next((e for e in reversed(rows) if e.get("type") == "clarification" and e.get("validation") == last["id"]), None)
+                    amap = {a["id"]: a["text"] for a in (ans or {}).get("answers", [])}
+                    clarifications = [{"question": q["text"], "dimension": q.get("dimension"), "answer": amap.get(q["id"])}
+                                      for q in last.get("questions", [])]
             entry = self._append_log({"agent": "humano", "type": "start", "to": "orquestrador", "demand": demand["id"],
+                                      "override": True if data.get("override") else None,
                                       "title": f"Iniciar: {demand['title'].replace('Demanda: ', '')}",
                                       "detail": data.get("note", ""), "priority": data.get("priority", "normal"),
                                       "route": data.get("route", "padrao"), "target": data.get("target", "auto")})
@@ -361,7 +392,8 @@ class Handler(SimpleHTTPRequestHandler):
             (inbox / f"{demand['id']}.json").write_text(json.dumps({
                 "demand": demand["id"], "title": demand["title"].replace("Demanda: ", ""), "detail": demand.get("detail", ""),
                 "priority": entry["priority"], "route": entry["route"], "target": entry["target"],
-                "note": entry.get("detail", ""), "startedAt": entry["ts"]}, ensure_ascii=False, indent=2))
+                "note": entry.get("detail", ""), "startedAt": entry["ts"], "kind": demand.get("kind"),
+                "clarifications": clarifications, "override": bool(data.get("override"))}, ensure_ascii=False, indent=2))
             return self._json(entry, 201)
         if self.path.startswith("/api/demand"):
             # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
@@ -369,9 +401,11 @@ class Handler(SimpleHTTPRequestHandler):
             title = (data.get("title") or "").strip()
             if not title:
                 return self._json({"error": "título obrigatório"}, 400)
+            if data.get("kind") not in ("produto", "operacao"):
+                return self._json({"error": "tipo obrigatório: produto | operacao"}, 400)
             entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
                                       "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
-                                      "priority": data.get("priority", "normal")})
+                                      "priority": data.get("priority", "normal"), "kind": data.get("kind")})
             return self._json(entry, 201)
         if not self.path.startswith("/api/human"):
             return self._json({"error": "not found"}, 404)

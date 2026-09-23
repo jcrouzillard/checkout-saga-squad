@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "1cc732c62a2d",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.89,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Critérios verificáveis (CA1–CA10)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/contracts/ui-demandas-v2.md §5: 10 CAs com verificação objetiva (curl 400/409/201, validation.ts − task.ts < 60 s, 2 demandas de controle, inbox/done, git status limpo após a triagem, pending.py 2×, smoke D1–D3, teclado/leitor de tela). Esquemas JSON de validation/clarification em §3, mudanças por arquivo e dono em §4, plano de QA em §6. Ambiguidades menores: o contrato chama de 'Analista' o que o ADR-008 §3 decide ser o Arquiteto em modo triagem; §2.2 não exclui demandas já iniciadas/canceladas da lista de validação"},
+    {"name": "Demanda do humano coberta", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Evento 1cc732c62a2d: 'tipo… produto (console de checkout) ou operação/governança… para saber onde vai' → §1 campo kind obrigatório sem padrão + tabela de roteamento por tipo (CA1, CA2, CA7); 'validação agêntica quando registro… questionamentos ou coisas que não ficaram claras' → §2 validação em 5 dimensões com 1–5 perguntas, respostas via clarification e exibição no card e na issue (CA3–CA5)"},
+    {"name": "Consistência com protocolo e ownership", "status": "validate", "weight": 2, "blocking": true,
+     "source": "Pontos que passam: ADR-008 §3 não cria papel novo; validador = Arquiteto em modo triagem, sem código (1 evento validation). Bloqueio do Iniciar também no servidor (409 em /api/demand/start, override só com nota; CA6). Demandas antigas sem kind seguem o fluxo atual (§2 fim, CA9). Donos corretos segundo AGENTS.md: tools/squad/** e docs/squad/** do Orquestrador (ferramenta da fábrica, não código de produção), squad-control/** do Frontend. Eventos novos não quebram o que existe: github_sync.py despacha por dicionário de handlers (tipo desconhecido ignorado) e o contrato manda não duplicar no comentário genérico de on_demand_event (linha 263); o painel filtra por e.type, e pending.py só reage a control/gate/human. Ressalvas: a triagem ser 'somente leitura' depende só do prompt, porque run_agent.py:30 concede Write/Edit a todo agente (CA8 detecta depois, não impede); a rota 'operacao' ('Auditor → QA → G3') não diz se há G1/G2 quando o Arquiteto não participa"},
+    {"name": "ADR presente", "status": "pass", "weight": 1, "blocking": false,
+     "source": "docs/adr/008-validacao-agentica-de-demandas.md: contexto, decisão (5 itens), consequências (+/−) e 4 alternativas (validação síncrona, papel novo de Analista, regras fixas, rodadas ilimitadas)"}
+  ],
+  "open_risks": [
+    "Meta < 1 min (CA3) depende do vigia/plantão ativo e do tempo de arranque de run_agent.py; mitigada por 'Validação atrasada' + override após 3 min. O QA deve medir com o vigia ligado e registrar a latência real.",
+    "Triagem 'somente leitura' só por prompt: restringir as ferramentas do modo triagem em run_agent.py (ex.: --allowedTools Read Grep Glob + Bash só para log.py) em vez de confiar no CA8, que só detecta depois.",
+    "Ambiguidades a fechar na implementação: trocar 'Analista' por 'Arquiteto (triagem)'; excluir de pending.py as demandas já iniciadas/canceladas; explicitar os gates da rota 'operacao' (sugestão: G2 e G3 sempre, G1 quando houver contrato)."
+  ],
+  "human_required": false,
+  "rationale": "O contrato e o ADR-008 cobrem os dois pedidos do humano: tipo obrigatório que define o destino, e validação agêntica que devolve perguntas antes do início. Há 10 critérios verificáveis, eventos novos com esquema definido e dono por arquivo conforme AGENTS.md. O bloqueio é reforçado no servidor (409), as demandas antigas não regridem e os consumidores atuais do log ignoram os tipos novos. Ressalvas: o 'somente leitura' da triagem depende só do prompt e há ambiguidades pequenas (Analista, filtro do pending, gates da rota operação). Risco moderado porque a mudança afeta o fluxo de entrada de toda demanda e depende do vigia para a meta de 1 min. Confiança = (3+3+1+1)/9 = 0.89."
+}
