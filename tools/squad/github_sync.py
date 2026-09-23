@@ -166,8 +166,34 @@ class Sync:
     def on_task(self, e):
         to = e.get("to", "orquestrador")
         phase = self.phase_of(e)
+        labels = []
+        if e.get("kind"):
+            label = f"tipo:{e['kind']}"
+            subprocess.run(["gh", "label", "create", label, "--color", "5A6B7F", "-R", REPO, "-f"], capture_output=True)
+            labels.append(label)
         self.create_issue(e["id"], e["title"] if phase else f"{e['title']}", self.body(e, "Delegação do Orquestrador"),
-                          to, [], "Em andamento", phase)
+                          to, labels, "Em andamento", phase)
+
+    def on_validation(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        qs = "\n".join(f"- [ ] **{q.get('dimension', '')}** — {q['text']}" for q in e.get("questions", [])) or "Nenhuma lacuna: pronta para iniciar."
+        sug = f"\n\nTipo sugerido: `{e['suggestedKind']}`" if e.get("suggestedKind") else ""
+        self.comment(issue, f"**Validação agêntica** · `{e['agent']}` · {e['ts']}\n\n### {e['title']}\n\n{qs}{sug}\n\n<sub>evento `{e['id']}`</sub>")
+        label = f"validacao:{e.get('status', 'ok')}"
+        subprocess.run(["gh", "label", "create", label, "--color", "8A5A12" if e.get("status") == "perguntas" else "2F6B45", "-R", REPO, "-f"], capture_output=True)
+        subprocess.run(["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", label], capture_output=True)
+
+    def on_clarification(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        val = next((x for x in [json.loads(l) for l in LOG.read_text(encoding="utf-8").splitlines() if l.strip()]
+                    if x.get("id") == e.get("validation")), {})
+        if not issue:
+            return
+        qmap = {q["id"]: q["text"] for q in val.get("questions", [])}
+        body = "\n".join(f"- **{qmap.get(a['id'], a['id'])}**\n  → {a['text']}" for a in e.get("answers", []))
+        self.comment(issue, f"**Respostas do humano à validação** · {e['ts']}\n\n{body}\n\n<sub>evento `{e['id']}`</sub>")
 
     def on_handoff(self, e):
         agent = e["agent"]
@@ -260,7 +286,7 @@ class Sync:
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] == "progress" or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
+        if not issue or e["type"] in ("progress", "validation", "clarification") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
@@ -272,7 +298,8 @@ class Sync:
         events = [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
         handlers = {"task": self.on_task, "handoff": self.on_handoff, "evidence": self.on_evidence,
                     "gate": self.on_gate, "human": self.on_human, "defect": self.on_ticket,
-                    "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control}
+                    "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control,
+                    "validation": self.on_validation, "clarification": self.on_clarification}
         n = 0
         for e in events:
             if e["id"] in done:

@@ -24,6 +24,10 @@ from datetime import datetime, timezone
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 RUNS = ROOT / ".squad/runs"
 
+READ_ONLY = {
+    "claude": lambda prompt: ["claude", "-p", prompt, "--allowedTools", "Read", "Glob", "Grep"],
+    "codex": lambda prompt: ["codex", "exec", "-C", str(ROOT), "-s", "read-only", prompt],
+}
 RUNNERS = {
     # Claude Code em modo não interativo: edições aceitas, Bash liberado para build/testes/log.py.
     "claude": lambda prompt: ["claude", "-p", prompt, "--permission-mode", "acceptEdits",
@@ -58,6 +62,7 @@ def main():
     p.add_argument("--runner", default=os.environ.get("SQUAD_RUNNER", "claude"), choices=sorted(RUNNERS))
     p.add_argument("--demand")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--read-only", action="store_true", help="sem escrita nem shell (ex.: triagem de demandas)")
     a = p.parse_args()
 
     task = (ROOT / a.task[1:]).read_text(encoding="utf-8") if a.task.startswith("@") else a.task
@@ -74,7 +79,9 @@ def main():
         + (f", sempre com `--demand {a.demand}`" if a.demand else "") + ".\n"
         "- Não faça commit, push nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.\n"
     )
-    cmd = RUNNERS[a.runner](prompt)
+    if a.read_only:
+        prompt = prompt.replace("- Registre marcos do seu trabalho", "- Modo SOMENTE LEITURA: não escreva arquivos nem rode comandos; ignore a linha abaixo sobre registrar marcos.\n- (Não) Registre marcos do seu trabalho")
+    cmd = (READ_ONLY if a.read_only else RUNNERS)[a.runner](prompt)
     if a.dry_run:
         print(json.dumps({"runner": a.runner, "cmd": cmd[:-1] if a.runner == "codex" else cmd[:2] + ["<prompt>"] + cmd[3:],
                           "prompt": prompt}, ensure_ascii=False, indent=2))

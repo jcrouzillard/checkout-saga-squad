@@ -1,0 +1,29 @@
+{
+  "gate": "G3",
+  "demand": "1cc732c62a2d",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.80,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Checklist CA1–CA10", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-demandas-v2.md (handoff b08c7b74d6a4): 10 ✅ com API real no servidor isolado :7071 e 4 triagens reais com o Claude (11/15/21/10 s, todas < 60 s). Vaga → 4 perguntas por dimensão; completa → ok; texto da D1 → pergunta de duplicata (comportamento correto). Matriz de start 409/400/201 com override e nota; inbox com kind/clarifications/override; git status só no log após as triagens; pending.py estável em 2 execuções. Coincide com a minha integração independente do G2 (21 s, mesmos códigos HTTP)"},
+    {"name": "Correções pós-G2 testadas", "status": "validate", "weight": 2, "blocking": true,
+     "source": "648f6b1: clarify exige val.demand == id (server.py) e triage.py marca a falha ('Validação automática falhou…' + detail). O QA testou o 1º item ao vivo: clarify com validation de outra demanda → 404 (CA5/CA6, passo 2). O caminho de falha da triagem (runner sem JSON) só foi conferido no código, sem teste"},
+    {"name": "Branch sem eventos de teste", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff origin/develop --stat -- docs/squad/memory docs/squad/inbox → vazio; docs/squad/inbox/ só com done/ e git status limpo. Os inbox/*.json citados no checklist ficaram fora da branch"},
+    {"name": "Capturas 1440 e 390 px", "status": "pass", "weight": 1, "blocking": false,
+     "source": "demandas-d4-1440-scroll.png: card 'O Arquiteto tem 2 perguntas' com tags de dimensão, textarea por pergunta, 'Enviar respostas', Iniciar desabilitado com motivo em texto, checkbox de override, card 'Iniciada · com override' e tags produto/operação. demandas-d4-390.png: aba Demandas em coluna única com o fluxo de estados explicado; o menu superior cortado à direita é anterior à D4 (header fora do diff)"},
+    {"name": "Matriz de rastreabilidade", "status": "validate", "weight": 2, "blocking": false,
+     "source": "tests/TRACEABILITY.md não tem linha da D4 (nem da D3); a rastreabilidade existe via contrato ui-demandas-v2.md §5 ↔ checklist CA1–CA10 ↔ log --demand, mas não na matriz"}
+  ],
+  "open_risks": [
+    "Meta < 1 min medida só com triage.py chamado à mão (10–21 s); no ambiente principal depende do vigia/plantão ativo e do item 0 do plantao.md. Medir a 1ª demanda real após o merge; se o vigia parar, o card mostra 'Validação atrasada' após 3 min e o humano usa o override.",
+    "Caminho de falha da triagem (runner indisponível ou sem JSON) e comentários/labels do GitHub (tipo:, validacao:, respostas) não exercitados ao vivo: conferir na 1ª demanda real após o merge.",
+    "Registrar D3 e D4 em tests/TRACEABILITY.md; o checklist ainda chama o validador de 'Analista' (o ADR-008 fala em Arquiteto em modo triagem); menu do painel cortado a 390 px (anterior à D4)."
+  ],
+  "human_required": false,
+  "rationale": "A D4 passou por G1 (0.89), G2 (0.95, com integração real feita pelo Auditor) e agora G3 sem devolução. O QA confirmou os 10 critérios com API real e 4 triagens reais abaixo de 60 s, e testou a correção do clarify (404 com validação de outra demanda). A branch não carrega eventos de teste nem arquivos de inbox. A demanda do humano está atendida: tipo produto/operação define o destino, e a validação agêntica devolve perguntas objetivas antes de iniciar. Parciais: o caminho de falha da triagem só foi conferido no código e a matriz de rastreabilidade não tem a linha da D4. Risco moderado porque a meta de 1 min depende do vigia no ambiente principal (mitigado por 'Validação atrasada' + override). Confiança = (3+1+2+1+1)/10 = 0.80."
+}

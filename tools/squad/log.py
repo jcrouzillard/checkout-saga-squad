@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification"}
 
 
 def main() -> None:
@@ -32,6 +32,10 @@ def main() -> None:
     p.add_argument("--priority", choices=["alta", "normal", "baixa"])
     p.add_argument("--branch", help="branch git relacionada ao evento")
     p.add_argument("--run", help="id da execução (tools/squad/run_agent.py)")
+    p.add_argument("--status", choices=["ok", "perguntas"], help="resultado da validação agêntica")
+    p.add_argument("--question", action="append", default=[], help='pergunta da validação: "dimensão::texto"')
+    p.add_argument("--suggested-kind", choices=["produto", "operacao"])
+    p.add_argument("--kind", choices=["produto", "operacao"], help="tipo da demanda")
     p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
@@ -59,6 +63,11 @@ def main() -> None:
         "branch": a.branch,
         "run": a.run,
         "runner": a.runner,
+        "status": a.status,
+        "questions": [{"id": f"q{i}", "dimension": q.split("::", 1)[0].strip() if "::" in q else "escopo",
+                       "text": q.split("::", 1)[-1].strip()} for i, q in enumerate(a.question, 1)],
+        "suggestedKind": a.suggested_kind,
+        "kind": a.kind,
         "refs": a.ref,
         "evidences": evidences,
     }
