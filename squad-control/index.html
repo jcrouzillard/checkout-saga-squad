@@ -159,6 +159,18 @@
   .override > label { display: inline-flex; gap: 8px; align-items: center; min-height: 32px; cursor: pointer; }
   .override input { accent-color: var(--amber); width: 16px; height: 16px; }
   .why { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  /* D5: backlog e fila */
+  .when-opt { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; padding: 6px 0; cursor: pointer; min-height: 40px; }
+  .when-opt input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
+  .when-opt small { display: block; color: var(--muted); font-size: 12px; }
+  .queue { list-style: none; margin: 0 0 18px; padding: 0; }
+  .queue li { display: grid; grid-template-columns: 84px 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line2); align-items: baseline; font-size: 13px; }
+  .queue .pos { font-weight: 600; color: var(--accent); }
+  .bl-item { padding: 12px 0; border-bottom: 1px solid var(--line2); }
+  .bl-edit { margin-top: 10px; padding: 10px 12px; background: var(--panel2); border-left: 2px solid var(--accent); }
+  .bl-edit label.f { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 8px 0 4px; }
+  .bl-edit input[type=text], .bl-edit select { width: 100%; padding: 8px 10px; border: 1px solid #C9C9C5; border-radius: 2px; font: inherit; background: #fff; }
+  .tag.backlog { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
 </style>
@@ -330,7 +342,7 @@ function renderExecucoes() {
   const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
   return `
   <div class="title-row">
-    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.d.title.replace(/^Demanda: /, "") : (now ? now.title : "Squad concluída"))}</h1>
+    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.eff.title : (now ? now.title : "Squad concluída"))}</h1>
     <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div>${active ? controlsHtml(active) : ""}</div>
     <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
   </div>
@@ -419,10 +431,23 @@ function validationInfo(d, related) {
   else st = "pronta";
   return { st, val, clar, ready: st === "pronta" };
 }
+// D5 (ADR-009): estado efetivo = task + eventos edit (changes) em ordem de ts; backlog = task.backlog sem start nem cancel.
+const PRIORITIES = { alta: "Alta", normal: "Normal", baixa: "Baixa" };
+const PRIO_RANK = { alta: 0, normal: 1, baixa: 2 };
+function effectiveDemand(d, related) {
+  const eff = { title: String(d.title || "").replace(/^Demanda: /, ""), detail: d.detail || "", kind: d.kind || null, priority: d.priority || "normal" };
+  related.filter(e => e.type === "edit" && e.changes).map((e, i) => ({ e, i })).sort((a, b) => String(a.e.ts).localeCompare(String(b.e.ts)) || a.i - b.i)
+    .forEach(({ e }) => { for (const k of ["title", "detail", "kind", "priority"]) if (e.changes[k] !== undefined && e.changes[k] !== null) eff[k] = e.changes[k]; });
+  eff.title = String(eff.title).replace(/^Demanda: /, "");
+  return eff;
+}
+let blEditing = new Set();   // D5: itens do backlog em edição inline
 function demandInfo(d, index) {
   const related = state.log.filter(e => e.demand === d.id);
   const start = related.find(e => e.type === "start");
-  const vinfo = validationInfo(d, related);
+  const eff = effectiveDemand(d, related);
+  const inBacklog = d.backlog === true && !start && !related.some(e => e.type === "control" && e.action === "cancel");
+  const vinfo = inBacklog ? null : validationInfo(d, related);
   // A validação (e a triagem antes do início) não é "trabalho" da demanda; demandas sem kind seguem a regra antiga.
   const work = related.filter(e => e.agent !== "humano" && e.type !== "validation" && (!d.kind || (start && e.ts >= start.ts)));
   const gates = work.filter(e => e.type === "gate");
@@ -432,10 +457,11 @@ function demandInfo(d, index) {
   const lastCtl = controls.at(-1);
   const canceled = controls.some(c => c.action === "cancel");
   const paused = lastCtl?.action === "pause";
-  const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || "normal";
+  const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || (inBacklog ? eff.priority : "normal");
   const preStart = !canceled && !done && !paused && !work.length && !start;
-  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart };
+  const queued = !canceled && !done && !paused && !work.length && !!start;
+  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued };
 }
 function controlsHtml(info) {
   if (info.preStart || ["Concluída", "Cancelada"].includes(info.status)) return "";
@@ -449,9 +475,13 @@ function controlsHtml(info) {
 }
 function renderDemandas() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
-  const cards = demands.map((d, i) => ({ d, ...demandInfo(d, i) })).reverse();
+  const all = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
+  const backlog = all.filter(x => x.inBacklog).sort((a, b) => (PRIO_RANK[a.eff.priority] ?? 1) - (PRIO_RANK[b.eff.priority] ?? 1) || String(a.d.ts).localeCompare(String(b.d.ts)));
+  const queue = all.filter(x => x.queued).sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1) || String(a.start.ts).localeCompare(String(b.start.ts)));
+  const qpos = Object.fromEntries(queue.map((x, i) => [x.d.id, i + 1]));
+  const cards = all.filter(x => !x.inBacklog).reverse();
   const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
-  return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Em validação → (Validada | Com perguntas → Respondida) → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub e o Arquiteto valida a demanda; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
+  return `<h1>Demandas para a squad</h1><div class="sub">Iniciar agora: Em validação → (Validada | Com perguntas → Respondida) → Na fila → Em andamento → Concluída. Guardar no backlog: fica no Backlog (sem validação, editável) até você movê-la para a fila. Toda demanda vira issue no GitHub; a fila é consumida pelo Orquestrador (em plantão) por prioridade e ordem de início.</div>
   <div class="grid2">
     <section class="card"><h3>Nova demanda</h3>
       <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
@@ -461,18 +491,33 @@ function renderDemandas() {
       <fieldset class="kind" style="margin-top:12px"><legend>Tipo (obrigatório)</legend>
         ${Object.entries(KINDS).map(([k, v]) => `<label class="kind-opt" for="dem-kind-${k}"><input type="radio" name="dem-kind" id="dem-kind-${k}" value="${k}" data-keep aria-describedby="dem-kind-help-${k}"><span><b>${esc(v.name)}</b> — ${esc(v.sub)}<small id="dem-kind-help-${k}">${esc(v.help)}</small></span></label>`).join("")}
       </fieldset>
+      <fieldset class="kind"><legend>Quando iniciar</legend>
+        <label class="when-opt" for="dem-when-imediato"><input type="radio" name="dem-when" id="dem-when-imediato" value="imediato" data-keep checked><span><b>Iniciar agora</b> — passa pela validação do Arquiteto</span></label>
+        <label class="when-opt" for="dem-when-backlog"><input type="radio" name="dem-when" id="dem-when-backlog" value="backlog" data-keep><span><b>Guardar no backlog</b> — sem validação<small>Você escolhe quando entra na fila (“Mover para a fila”).</small></span></label>
+      </fieldset>
+      <label for="dem-priority" class="muted" style="font-size:12px;font-weight:500">Prioridade</label>
+      <select id="dem-priority" data-keep style="width:100%;margin:6px 0 0;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${k === "normal" ? "selected" : ""}>${v}</option>`).join("")}</select>
       <div class="actions"><button class="btn primary" data-demand="1">Registrar demanda</button></div>
       ${flash ? `<p class="${flashErr ? "fail" : "ok-msg"}" style="font-size:13px;margin-top:12px">${esc(flash)}</p>` : ""}
       <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (no card ao lado) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>
-    <section class="card"><h3>Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
+    <section class="card">
+      <h3>Fila <span class="muted" style="font-weight:400">(${queue.length})</span></h3>
+      ${queue.length ? `<ol class="queue" aria-label="Fila do Orquestrador, na ordem de consumo">${queue.map(x => `<li><span class="pos">${qpos[x.d.id]}º na fila</span><span><span class="mono muted" style="font-size:12px;margin-right:6px">${x.code}</span>${esc(x.eff.title)}</span><span class="tag">prioridade ${esc(x.priority)}</span></li>`).join("")}</ol>`
+        : `<p class="muted" style="margin:0 0 18px;font-size:13px">Nenhuma demanda aguardando o Orquestrador.</p>`}
+      <h3>Backlog <span class="muted" style="font-weight:400">(${backlog.length})</span></h3>
+      <p class="muted" style="font-size:12px;margin:0 0 4px">Ordenado por prioridade e, empatado, pela criação mais antiga. Sem validação; o Orquestrador ignora o backlog.</p>
+      ${backlog.length ? backlog.map(backlogItemHtml).join("") : `<p class="muted" style="font-size:13px">Backlog vazio.</p>`}
+      <h3 style="margin-top:22px">Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
       ${cards.length ? cards.map(info => { const { d, code, status, start, gates, last, issue, priority } = info; return `
       <div style="padding:12px 0;border-bottom:1px solid var(--line2)">
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(d.title.replace(/^Demanda: /, ""))}</b><span class="${cls(status)}" style="font-size:12px;font-weight:600;white-space:nowrap">${esc(status)}</span></div>
-        <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.detail || "")}</div>
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(info.eff.title)}</b><span class="${cls(status)}" style="font-size:12px;font-weight:600;white-space:nowrap">${esc(status)}</span></div>
+        <div class="muted" style="font-size:13px;margin-top:4px">${esc(info.eff.detail)}</div>
         <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
           <span class="tag">${hhmm(d.ts)}</span>
-          ${d.kind ? `<span class="tag" title="Tipo da demanda">${esc(KINDS[d.kind]?.tag || d.kind)}</span>` : ""}
+          ${info.queued ? `<span class="tag backlog">${qpos[d.id]}º na fila</span>` : ""}
+          ${info.eff.kind ? `<span class="tag" title="Tipo da demanda">${esc(KINDS[info.eff.kind]?.tag || info.eff.kind)}</span>` : ""}
+          ${start?.fromBacklog ? `<span class="tag" title="Saiu do backlog sem validação">veio do backlog</span>` : ""}
           ${start?.override ? `<span class="tag validate" title="Iniciada sem a validação concluída">iniciada com override</span>` : ""}
           ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
           ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
@@ -482,6 +527,39 @@ function renderDemandas() {
         ${info.preStart ? preStartHtml(info) : controlsHtml(info)}
       </div>`; }).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
     </section>
+  </div>`;
+}
+
+// D5: item do backlog — leitura, edição inline (título, descrição, tipo, prioridade) e "Mover para a fila".
+function backlogItemHtml(info) {
+  const { d, code, eff, issue } = info;
+  const id = d.id, msg = cardMsg[id];
+  const sel = "width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff";
+  const editing = blEditing.has(id);
+  return `<div class="bl-item" data-bl="${id}">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(eff.title)}</b><span class="tag backlog">Backlog</span></div>
+    ${eff.detail ? `<div class="muted" style="font-size:13px;margin-top:4px">${esc(eff.detail)}</div>` : ""}
+    <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+      <span class="tag">criada ${hhmm(d.ts)}</span>
+      <span class="tag" title="Tipo da demanda">${esc(KINDS[eff.kind]?.tag || eff.kind || "sem tipo")}</span>
+      <span class="tag">prioridade ${esc(eff.priority)}</span>
+      ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
+    </div>
+    ${editing ? `<div class="bl-edit" role="group" aria-label="Editar ${esc(code)}">
+      <label class="f" for="ble-t-${id}">Título</label><input type="text" id="ble-t-${id}" data-keep value="${esc(eff.title)}" maxlength="200">
+      <label class="f" for="ble-d-${id}">Descrição</label><textarea id="ble-d-${id}" data-keep rows="4">${esc(eff.detail)}</textarea>
+      <fieldset class="kind" style="margin-top:8px"><legend>Tipo</legend>${Object.entries(KINDS).map(([k, v]) => `<label class="when-opt" for="ble-k-${id}-${k}"><input type="radio" name="ble-k-${id}" id="ble-k-${id}-${k}" value="${k}" data-keep ${eff.kind === k ? "checked" : ""}><span><b>${esc(v.name)}</b> — ${esc(v.sub)}</span></label>`).join("")}</fieldset>
+      <label class="f" for="ble-p-${id}">Prioridade</label><select id="ble-p-${id}" data-keep>${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${eff.priority === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <div class="actions"><button class="btn primary" data-bl-save="${id}" style="flex-grow:0;height:40px">Salvar</button><button class="btn" data-bl-cancel="${id}" style="height:40px">Cancelar</button></div>
+    </div>` : `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:8px;margin-top:10px;align-items:end">
+      <div><label class="muted" style="font-size:11px" for="pr-${id}">Prioridade</label><select id="pr-${id}" data-keep data-pr="${id}" style="${sel}">${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${eff.priority === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      <div><label class="muted" style="font-size:11px" for="rt-${id}">Rota</label><select id="rt-${id}" data-keep data-rt="${id}" style="${sel}">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <div><label class="muted" style="font-size:11px" for="tg-${id}">Agente</label><select id="tg-${id}" data-keep data-tg="${id}" style="${sel}">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+      <button class="btn" id="ble-btn-${id}" data-bl-edit="${id}" style="height:40px">Editar</button>
+      <button class="btn primary" id="start-${id}" data-start="${id}" data-from-backlog="1" style="flex-grow:0;height:40px">Mover para a fila</button>
+    </div>`}
+    ${msg ? `<p class="${msg.ok ? "ok-msg" : "fail"}" style="font-size:13px;margin:8px 0 0">${esc(msg.text)}</p>` : ""}
   </div>`;
 }
 
@@ -586,6 +664,10 @@ async function render() {
   renderDrawer();
 }
 
+// D5: ao sair da edição, os valores guardados (data-keep) não podem reaparecer na próxima edição.
+function clearEditFields(id) {
+  document.querySelectorAll(`#main [id^="ble-"]`).forEach(el => { if (el.id.includes(id) && el.id !== `ble-btn-${id}`) el.removeAttribute("data-keep"); });
+}
 function focusKey() {
   const el = document.activeElement;
   if (!el || !el.closest || !el.closest("#main")) return null;
@@ -693,6 +775,30 @@ document.addEventListener("click", async ev => {
     flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : "Falha ao registrar o controle.";
     return refresh();
   }
+  const be = ev.target.closest("[data-bl-edit]");
+  if (be) { const id = be.dataset.blEdit; blEditing.add(id); delete cardMsg[id]; await render(); document.getElementById(`ble-t-${id}`)?.focus(); return; }
+  const bc = ev.target.closest("[data-bl-cancel]");
+  if (bc) { const id = bc.dataset.blCancel; blEditing.delete(id); delete cardMsg[id]; clearEditFields(id); await render(); document.getElementById(`ble-btn-${id}`)?.focus(); return; }
+  const bs = ev.target.closest("[data-bl-save]");
+  if (bs) {
+    const id = bs.dataset.blSave;
+    const idx = state.log.filter(e => e.type === "task" && e.agent === "humano").findIndex(x => x.id === id);
+    const cur = idx >= 0 ? demandInfo(state.log.filter(e => e.type === "task" && e.agent === "humano")[idx], idx).eff : null;
+    const next = { title: (document.getElementById(`ble-t-${id}`)?.value || "").trim(), detail: document.getElementById(`ble-d-${id}`)?.value ?? "",
+                   kind: document.querySelector(`input[name="ble-k-${CSS.escape(id)}"]:checked`)?.value || null, priority: document.getElementById(`ble-p-${id}`)?.value };
+    if (!next.title) { cardMsg[id] = { ok: false, text: "O título não pode ficar vazio." }; announce(cardMsg[id].text); await render(); document.getElementById(`ble-t-${id}`)?.focus(); return; }
+    const changes = {};
+    for (const k of ["title", "detail", "kind", "priority"]) if (next[k] && (!cur || next[k] !== cur[k])) changes[k] = next[k];
+    if (cur && next.detail !== cur.detail) changes.detail = next.detail;
+    if (!Object.keys(changes).length) { cardMsg[id] = { ok: false, text: "Nada foi alterado." }; announce(cardMsg[id].text); return render(); }
+    const res = await fetch("/api/demand/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...changes }) });
+    if (res.ok) { blEditing.delete(id); clearEditFields(id); cardMsg[id] = { ok: true, text: "Alterações salvas no backlog." }; }
+    else { const j = await res.json().catch(() => ({})); cardMsg[id] = { ok: false, text: `Não foi possível salvar (${res.status}): ${j.error || "erro no servidor"}.` }; if (res.status === 409 || res.status === 404) blEditing.delete(id); }
+    announce(cardMsg[id].text);
+    await refresh();
+    document.getElementById(blEditing.has(id) ? `ble-t-${id}` : `ble-btn-${id}`)?.focus();
+    return;
+  }
   const st = ev.target.closest("[data-start]");
   if (st) {
     const id = st.dataset.start;
@@ -704,7 +810,7 @@ document.addEventListener("click", async ev => {
       payload.override = true; payload.note = note;
     }
     const res = await fetch("/api/demand/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    if (res.ok) { delete cardMsg[id]; flashErr = false; flash = payload.override ? "Demanda iniciada com override (registrado no log) e colocada na fila do Orquestrador." : "Demanda iniciada e colocada na fila do Orquestrador."; announce(flash); }
+    if (res.ok) { delete cardMsg[id]; flashErr = false; flash = st.dataset.fromBacklog ? "Demanda movida do backlog para a fila do Orquestrador (sem validação)." : payload.override ? "Demanda iniciada com override (registrado no log) e colocada na fila do Orquestrador." : "Demanda iniciada e colocada na fila do Orquestrador."; announce(flash); }
     else { const j = await res.json().catch(() => ({})); cardMsg[id] = { ok: false, text: `Não foi possível iniciar (${res.status}): ${j.error || "erro no servidor"}.` }; announce(cardMsg[id].text); }
     return refresh();
   }
@@ -728,10 +834,13 @@ document.addEventListener("click", async ev => {
     if (!title) { flashErr = true; flash = "Informe um título para a demanda."; announce(flash); await render(); $("#dem-title")?.focus(); return; }
     const kind = document.querySelector('input[name="dem-kind"]:checked')?.value;
     if (!kind) { flashErr = true; flash = "Escolha o tipo da demanda: Produto ou Operação / governança."; announce(flash); await render(); $("#dem-kind-produto")?.focus(); return; }
-    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "", kind }) });
+    const when = document.querySelector('input[name="dem-when"]:checked')?.value || "imediato";
+    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "", kind, when, priority: $("#dem-priority")?.value || "normal" }) });
     if (res.ok) {
-      flashErr = false; flash = "Demanda registrada: o Arquiteto está validando (perguntas aparecem no card em até 1 min). Ela também vira issue no GitHub.";
+      flashErr = false; flash = when === "backlog" ? "Demanda guardada no backlog (sem validação). Edite quando quiser e use “Mover para a fila” para iniciá-la."
+                                                    : "Demanda registrada: o Arquiteto está validando (perguntas aparecem no card em até 1 min). Ela também vira issue no GitHub.";
       $("#dem-title").value = ""; $("#dem-detail").value = ""; document.querySelectorAll('input[name="dem-kind"]').forEach(r => { r.checked = false; });
+      const wi = $("#dem-when-imediato"); if (wi) wi.checked = true; const dp = $("#dem-priority"); if (dp) dp.value = "normal";
     } else { const j = await res.json().catch(() => ({})); flashErr = true; flash = `Não foi possível registrar (${res.status}): ${j.error || "erro no servidor"}.`; }
     announce(flash);
     return refresh();
