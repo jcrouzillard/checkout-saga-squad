@@ -40,5 +40,32 @@ for g in [r for r in rows if r.get("type") == "gate" and r.get("recommendation")
     hum = [r for r in later if r.get("type") == "human" and r.get("gate") == g["gate"]]
     if hum and not [r for r in later if r.get("agent") == "orquestrador" and r["ts"] > hum[-1]["ts"]]:
         pending.append(f"decisão humana: {g['gate']} de {g['demand']} → {hum[-1].get('recommendation')}")
+# D8: PR em revisão humana integrado ou fechado → o plantão registra o desfecho (review-sync / release-publish)
+import subprocess
+open_reviews = [r for r in rows if r.get("type") == "review"
+                and not any(x.get("type") in ("delivered", "review-rejected") and x.get("url") == r.get("url") for x in rows)]
+cache_file = ROOT / ".squad/pr-state.json"  # o vigia roda a cada 3 s: consulta cada PR no GitHub no máximo a cada 30 s
+try:
+    cache = json.loads(cache_file.read_text())
+except (OSError, json.JSONDecodeError):
+    cache = {}
+for r in open_reviews:
+    hit = cache.get(r["url"])
+    if hit and hit["state"] == "OPEN" and now.timestamp() - hit["at"] < 30:
+        state = hit["state"]
+    else:
+        out = subprocess.run(["gh", "pr", "view", r["url"], "--json", "state", "-q", ".state"], capture_output=True, text=True)
+        state = out.stdout.strip() or (hit or {}).get("state", "OPEN")
+        cache[r["url"]] = {"state": state, "at": now.timestamp()}
+    what = f"demanda {r['demand']}" if r.get("demand") else f"release {r.get('release')}"
+    if state == "MERGED":
+        pending.append(f"{'release pronta' if r.get('release') and not r['release'].endswith('back-merge') else 'revisão integrada'}: {what} (PR #{r.get('pr')})")
+    elif state == "CLOSED":
+        pending.append(f"revisão recusada: {what} (PR #{r.get('pr')})")
+try:
+    cache_file.parent.mkdir(exist_ok=True)
+    cache_file.write_text(json.dumps(cache))
+except OSError:
+    pass
 print("\n".join(pending) or "nada pendente")
 sys.exit(0 if pending else 1)
