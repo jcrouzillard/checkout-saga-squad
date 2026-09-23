@@ -307,7 +307,7 @@ function renderSquadStrip() {
 function activeDemand() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
   const infos = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
-  return infos.filter(x => !x.preStart && !["Concluída", "Cancelada"].includes(x.status)).at(-1) || null;
+  return infos.filter(x => !x.preStart && !["Concluída", "Entregue", "Cancelada"].includes(x.status)).at(-1) || null;
 }
 // Linha do tempo de uma demanda, montada a partir dos eventos (task → handoff → gate), na ordem em que aconteceram.
 function demandSteps(active) {
@@ -342,7 +342,7 @@ function renderExecucoes() {
   const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
   return `
   <div class="title-row">
-    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.eff.title : (now ? now.title : "Squad concluída"))}</h1>
+    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.eff.title : (now ? now.title : "Squad concluída"))}</h1>${active ? reviewHtml(active) : ""}
     <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div>${active ? controlsHtml(active) : ""}</div>
     <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
   </div>
@@ -442,6 +442,18 @@ function effectiveDemand(d, related) {
   return eff;
 }
 let blEditing = new Set();   // D5: itens do backlog em edição inline
+const REVIEW_TYPES = ["review", "delivered", "review-rejected"];
+function firstReviewTs() { const e = state.log.find(x => REVIEW_TYPES.includes(x.type)); return e ? String(e.ts) : "\uffff"; }
+const shortSha = c => String(c || "").slice(0, 7);
+// D8: bloco de revisão no card e na tela Execuções.
+function reviewHtml(info) {
+  if (info.canceled) return "";
+  if (info.delivered) { const v = info.delivered; return `<div class="pass" style="font-size:12px;margin-top:6px">Entregue${v.pr ? ` · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">PR #${esc(v.pr)}</a>` : ""}${v.mergeCommit ? ` · commit <code>${esc(shortSha(v.mergeCommit))}</code>` : ""}${v.mergedBy ? ` · integrado por ${esc(v.mergedBy)}` : ""}${v.mergedAt ? ` às ${esc(hhmm(v.mergedAt))}` : ""}</div>`; }
+  if (info.inReview) { const v = info.inReview; return `<div class="validate" style="font-size:13px;margin-top:6px">Aguardando sua revisão · PR #${esc(v.pr ?? "?")} · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">Revisar no GitHub<span class="sr-only"> (abre em nova aba)</span></a></div>`; }
+  if (info.rejected) { const v = info.rejected; return `<div class="qbox open"><b>Devolvida pelo revisor${v.pr ? ` · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">PR #${esc(v.pr)}</a>` : ""}</b><div style="white-space:pre-wrap;margin-top:6px">${esc(v.detail || "Sem comentários do revisor.")}</div></div>`; }
+  if (info.status.startsWith("Aprovada pelo Auditor")) return `<div class="muted" style="font-size:12px;margin-top:6px">G3 aprovado; o Orquestrador está abrindo o PR para a sua revisão.</div>`;
+  return "";
+}
 function demandInfo(d, index) {
   const related = state.log.filter(e => e.demand === d.id);
   const start = related.find(e => e.type === "start");
@@ -453,8 +465,20 @@ function demandInfo(d, index) {
   // A validação (e a triagem antes do início) não é "trabalho" da demanda; demandas sem kind seguem a regra antiga.
   const work = related.filter(e => e.agent !== "humano" && e.type !== "validation" && (!d.kind || (start && e.ts >= start.ts)));
   const gates = work.filter(e => e.type === "gate");
-  const done = gates.some(g => g.gate === "G3" && g.recommendation === "APPROVE");
-  const returned = gates.some(g => g.recommendation === "RETURN") && !done;
+  // D8 (entrega por PR): o estado vem do evento mais recente entre review / delivered / review-rejected.
+  const rf = related.filter(e => REVIEW_TYPES.includes(e.type));
+  const lastRF = rf.at(-1) || null;
+  const rejected = lastRF?.type === "review-rejected" ? lastRF : null;
+  const effGates = rejected ? gates.filter(g => String(g.ts) > String(rejected.ts)) : gates;   // após devolução, só gates novos contam
+  const g3 = [...effGates].reverse().find(g => g.gate === "G3" && g.recommendation === "APPROVE") || null;
+  const delivered = lastRF?.type === "delivered" ? lastRF : null;
+  const inReview = lastRF?.type === "review" ? lastRF : null;
+  // Compatibilidade: G3 APPROVE anterior ao primeiro evento de revisão do log (fluxo pré-D8) continua "Concluída".
+  const legacyDone = !rf.length && !!g3 && String(g3.ts) < firstReviewTs();
+  const done = !!delivered || legacyDone;
+  const approvedOpeningPR = !done && !inReview && !!g3 && (!rf.length || !!rejected);
+  const rejectedIdle = !!rejected && !work.some(e => String(e.ts) > String(rejected.ts) && !REVIEW_TYPES.includes(e.type));
+  const returned = effGates.some(g => g.recommendation === "RETURN") && !done && !approvedOpeningPR;
   const controls = related.filter(e => e.type === "control");
   const lastCtl = controls.at(-1);
   const canceled = controls.some(c => c.action === "cancel");
@@ -462,11 +486,13 @@ function demandInfo(d, index) {
   const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || (inBacklog ? eff.priority : "normal");
   const preStart = !canceled && !done && !paused && !work.length && !start;
   const queued = !canceled && !done && !paused && !work.length && !!start;
-  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "" };
+  const status = canceled ? "Cancelada" : delivered ? "Entregue" : legacyDone ? "Concluída" : paused ? "Pausada"
+    : inReview ? `Em revisão · PR #${inReview.pr ?? "?"}` : approvedOpeningPR ? "Aprovada pelo Auditor · abrindo PR" : rejectedIdle ? "Devolvida pelo revisor"
+    : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
 }
 function controlsHtml(info) {
-  if (info.preStart || ["Concluída", "Cancelada"].includes(info.status)) return "";
+  if (info.preStart || ["Concluída", "Entregue", "Cancelada"].includes(info.status)) return "";
   const id = info.d.id;
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
     ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
@@ -482,8 +508,8 @@ function renderDemandas() {
   const queue = all.filter(x => x.queued).sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1) || String(a.start.ts).localeCompare(String(b.start.ts)));
   const qpos = Object.fromEntries(queue.map((x, i) => [x.d.id, i + 1]));
   const cards = all.filter(x => !x.inBacklog).reverse();
-  const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
-  return `<h1>Demandas para a squad</h1><div class="sub">Iniciar agora: Em validação → (Validada | Com perguntas → Respondida) → Na fila → Em andamento → Concluída. Guardar no backlog: fica no Backlog (sem validação, editável) até você movê-la para a fila. Toda demanda vira issue no GitHub; a fila é consumida pelo Orquestrador (em plantão) por prioridade e ordem de início.</div>
+  const cls = s => (s.startsWith("Concluída") || s.startsWith("Entregue")) ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+  return `<h1>Demandas para a squad</h1><div class="sub">Iniciar agora: Em validação → (Validada | Com perguntas → Respondida) → Na fila → Em andamento → Aprovada pelo Auditor → Em revisão (PR) → Entregue. Guardar no backlog: fica no Backlog (sem validação, editável) até você movê-la para a fila. Toda demanda vira issue no GitHub; a fila é consumida pelo Orquestrador (em plantão) por prioridade e ordem de início.</div>
   <div class="grid2">
     <section class="card"><h3>Nova demanda</h3>
       <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
@@ -525,6 +551,7 @@ function renderDemandas() {
           ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
           ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
         </div>
+        ${reviewHtml(info)}
         ${info.canceled ? `<div class="fail" style="font-size:12px;margin-top:6px">Cancelada${info.cancelNote ? ` · motivo: ${esc(info.cancelNote)}` : " · sem motivo informado"}</div>` : ""}
         ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
         ${info.preStart ? preStartHtml(info) : controlsHtml(info)}
@@ -721,6 +748,13 @@ function classify(e) {
   if (e.type === "defect") return { level: "acao", title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, view: "evidencias" };
   if (e.type === "start") return { level: "novidade", title: `${pre}Demanda iniciada`, body: e.title.replace(/^Iniciar: /, ""), view: "demandas" };
   if (e.type === "control") return { level: "novidade", title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", view: "demandas" };
+  if (REVIEW_TYPES.includes(e.type)) {
+    const who = e.release ? `Release ${e.release} · ` : pre;
+    const pr = e.pr != null ? `PR #${e.pr}` : "PR";
+    if (e.type === "review") return { level: "novidade", title: `${who}${pr} aguardando sua revisão`, body: e.url || e.title || "", view: "demandas" };
+    if (e.type === "delivered") return { level: "novidade", title: `${who}Entregue · ${pr} integrado`, body: [e.mergeCommit ? `commit ${shortSha(e.mergeCommit)}` : "", e.mergedBy ? `por ${e.mergedBy}` : ""].filter(Boolean).join(" ") || e.title || "", view: "demandas" };
+    return { level: "acao", title: `${who}${pr} devolvido pelo revisor`, body: e.detail || e.title || "", view: "demandas" };
+  }
   if (e.type === "validation") return e.status === "perguntas"
     ? { level: "acao", title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), view: "demandas" }
     : { level: "novidade", title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", view: "demandas" };
