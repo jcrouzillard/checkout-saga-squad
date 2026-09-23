@@ -1,0 +1,28 @@
+{
+  "gate": "G2",
+  "demand": "c6f83b5bb5c7",
+  "from": "backend+qa",
+  "to": "qa",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "mvn verify com ≥ 4 classes IT verdes", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Rodei 'mvn -B -pl services/order-service -am verify' SEM DOCKER_API_VERSION/api.version: BUILD SUCCESS. Failsafe 9/9, 0 skipped: DeadLetterIT 1, OutboxRelayIT 1, OrderApiIT 6, IdempotentConsumerIT 1. Nenhuma ocorrência de 'commands-dlt' ou UNKNOWN_TOPIC no log. As 3 devoluções do ciclo 1 estão resolvidas: (a) 196d1f0 fixa testcontainers.version=1.21.4 no pom raiz, e a API Docker é aceita pelo Engine 29; (b) 444255e troca @Testcontainers/@Container por contêineres singleton (static { POSTGRES.start(); KAFKA.start(); }) com @ServiceConnection, e o contexto Spring em cache passa a ser válido entre as classes; (c) o DeadLetterIT, que estava pendente, revelou um defeito real de produção (162e55358052) corrigido em e2d66c5"},
+    {"name": "mvn test (unitários)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "'mvn -B test' no reactor inteiro: 20+6+15+12+13 = 66 testes, 0 falhas. Inclui os módulos que dependem do common alterado em e2d66c5. 'docker compose config -q' OK"},
+    {"name": "Escopo e contratos", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop...HEAD -- docs/contracts vazio. e2d66c5 (common/KafkaCommonConfiguration) passa ao DeadLetterPublishingRecoverer um destinationResolver explícito <tópico>+Topics.DLT_SUFFIX ('.DLT'), mesma partição. Isso ALINHA o código a events.md §1 ('<tópico>.DLT'), sem mudar o contrato. Os DLT são pré-criados com Topics.PARTITIONS, igual aos tópicos de origem, então a mesma partição sempre existe. Mudança de produção feita pelo dono (Backend) a partir de defeito registrado pelo QA"},
+    {"name": "Cenários e2e novos", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Inalterados desde o ciclo 1: tests/e2e/run.sh com timeout_inventory, timeout_shipping, timeout_once e trace_end_to_end (12/12, ver G3-D6-2)"},
+    {"name": "Sem Thread.sleep nos testes", "status": "pass", "weight": 1, "blocking": false,
+     "source": "O diff do ciclo 2 em src/test só toca AbstractIntegrationIT (remove anotações, adiciona bloco static); esperas continuam com Awaitility"}
+  ],
+  "open_risks": [
+    "O e2e (last-report 207adef) é anterior a e2d66c5. A mudança só afeta o caminho de mensagem venenosa (recoverer do error handler) e está coberta pelo DeadLetterIT, mas recomendo reexecutar o e2e sobre o HEAD reconstruído antes da release.",
+    "A execução dos *IT no CI (ubuntu-latest) continua não comprovada; o README §9 já diz isso."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. As correções pedidas no G2-D6 foram aplicadas e confirmadas por execução própria. Com o Testcontainers 1.21.4 não é mais preciso contornar a versão da API. Com os contêineres singleton, as 4 classes compartilham o contexto sem conexões recusadas. A falha restante (DeadLetterIT) era um defeito real de produção, e não do teste: mensagens venenosas iam para 'order.commands-dlt', um tópico inexistente, e se perdiam. A correção foi pequena, no common, e alinha o código ao contrato. mvn verify 9/9 IT + 6 unitários no order-service, 66 unitários no reactor, compose válido. Confiança = 10/10 = 1.00."
+}

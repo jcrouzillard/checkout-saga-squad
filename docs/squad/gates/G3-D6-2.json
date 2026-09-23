@@ -1,0 +1,33 @@
+{
+  "gate": "G3",
+  "demand": "c6f83b5bb5c7",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 0.91,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "C1 · Testes de integração Testcontainers verdes", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Execução própria de 'mvn -B -pl services/order-service -am verify': BUILD SUCCESS, failsafe 9/9 (OrderApiIT 6, OutboxRelayIT 1, IdempotentConsumerIT 1, DeadLetterIT 1), 0 skipped, sem ajuste de ambiente. O DeadLetterIT confirma a mensagem em order.commands.DLT e que o consumidor continua processando (pedido seguinte CONFIRMED). Ver G2-D6-2"},
+    {"name": "C2 · e2e timeout_inventory, timeout_shipping, timeout_once", "status": "pass", "weight": 2, "blocking": true,
+     "source": "last-report.json (18:30:38Z, 207adef, 12/12) inalterado; mesmas evidências do ciclo 1. A única mudança de produção posterior (e2d66c5) fica fora do caminho desses cenários (error handler de mensagem venenosa)"},
+    {"name": "C3 · Trace único com 5 serviços via Jaeger", "status": "pass", "weight": 2, "blocking": true,
+     "source": "trace_end_to_end PASS, trace 9ef6ef44f960516cb37fab156001ed56 com os 5 serviços (inalterado)"},
+    {"name": "C4 · last-report com data e tudo PASS", "status": "validate", "weight": 1, "blocking": false,
+     "source": "12/12 com executedAt e gitCommit, mas gitCommit 207adef não é mais o código do HEAD: e2d66c5 alterou services/common, que é empacotado nos 5 serviços. Risco funcional baixo (unitários 66/66 e DeadLetterIT verdes), porém o relatório não foi gerado sobre o código final"},
+    {"name": "C5 · TRACEABILITY coerente com o relatório novo", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Devolução do ciclo 1 resolvida: 444255e regenerou a matriz do last-report FINAL (18:30:38Z, 207adef). Conferi que os 11 orderIds citados batem com o relatório e que os 12 cenários aparecem. Ficou DESATUALIZADA em relação ao HEAD em outro ponto: foi escrita antes de e2d66c5 e ainda marca DeadLetterIT e 'Mensagem venenosa → DLT' / 'não trava a fila' / 'poison message' como ❌, §8 como '8/9', o defeito 162e55358052 como aberto em 'Lacunas' e o ciclo 2 como 'commit 207adef'. A execução verificada agora é 9/9"},
+    {"name": "C6 · README §4 e §9", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Devolução do ciclo 1 resolvida em 9a89f9a: §9 diz que os *IT exigem Docker e que a execução no CI 'ainda não foi comprovada'. §4 (mvn -B verify + *IT) e §7 (12/12 com link para last-report.json) correspondem às evidências. Não encontrei afirmação sem comprovação"},
+    {"name": "C7 · Nenhum contrato muda", "status": "pass", "weight": 1, "blocking": true,
+     "source": "git diff develop...HEAD -- docs/contracts vazio; e2d66c5 alinha o código a events.md §1"}
+  ],
+  "open_risks": [
+    "Antes do feature-finish (QA, sem gate novo): atualizar tests/TRACEABILITY.md para o estado verificado (DeadLetterIT e as 3 linhas de mensagem venenosa em ✅, §8 9/9, defeito 162e55358052 corrigido em e2d66c5, 'ciclo 2' sem citar 207adef como commit dos IT).",
+    "Antes da release (Orquestrador): reconstruir as imagens no HEAD e reexecutar tests/e2e/run.sh para que o last-report.json aponte para o código final (inclui e2d66c5).",
+    "A execução dos *IT no CI continua não comprovada (declarada no README §9)."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. O bloqueante C1 foi resolvido e reproduzido por mim: 9/9 IT verdes com Testcontainers 1.21.4 e contêineres singleton. O DeadLetterIT pegou e fechou um defeito real de produção (DLT com nome errado, mensagens venenosas perdidas), o que confirma o valor da camada de integração. As devoluções C5 (orderIds) e C6 (README §9) foram atendidas. Ficam duas pendências documentais, sem bloqueio: a matriz ainda descreve o DLT como falho, e o last-report é anterior à última mudança do common. Nenhuma põe em dúvida o comportamento verificado. Confiança = (3+2+2+0.5+0.5+1+1)/11 = 0.91 ≥ 0.70, risco baixo, então a intervenção humana é opcional."
+}
