@@ -39,3 +39,6 @@ kill-orchestrator:
 ## Gera o dashboard da squad (propriedade do Orquestrador).
 squad:
 	python3 tools/squad/server.py # painel em http://localhost:7070
+
+github-sync: ## Espelha o log da squad em Issues + GitHub Project (kanban)
+	python3 tools/squad/github_sync.py --watch 20
