@@ -4,6 +4,8 @@ Checkout distribuído (Pedido, Estoque, Pagamento, Envio) coordenado por uma **S
 autônoma por uma **squad de agentes de IA** (Claude Code) com gates de qualidade, memória compartilhada e intervenção
 humana opcional, tudo auditável no painel **Squad Control**.
 
+**Autor:** Julien Crouzillard, Software Engineer · Desafio técnico Itaú · 23/09/2026
+
 > Desafio original: [`docs/desafio.md`](docs/desafio.md) · Roteiro da apresentação: [`docs/apresentacao.md`](docs/apresentacao.md)
 
 ## Sumário
