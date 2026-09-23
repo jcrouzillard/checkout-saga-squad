@@ -14,7 +14,7 @@ x-service: &service-base
     kafka:
       condition: service_healthy
     jaeger:
-      condition: service_started
+      condition: service_healthy
   environment: &service-env-base
     SPRING_DATASOURCE_USERNAME: checkout
     SPRING_DATASOURCE_PASSWORD: checkout
@@ -23,6 +23,9 @@ x-service: &service-base
     OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
     OTEL_METRICS_EXPORTER: none
     OTEL_LOGS_EXPORTER: none
+    # Injeta trace_id/span_id no MDC do Logback (default do agente 2.x, explicitado
+    # para alinhar com docs/observability.md — D10/CA3).
+    OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
     # Suprime o ruído de traces gerados por threads de background sem contexto
     # de trace pai (relay do outbox e scheduler de timeouts, @Scheduled a cada
     # ~200ms): sem isso, cada polling vira um trace-raiz de 1 span isolado no
@@ -67,7 +70,9 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Tópicos de negócio e seus .DLT são criados explicitamente pelos serviços
+      # (KafkaAdmin/NewTopics); a auto-criação fica desligada (D10/CA2).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_NUM_PARTITIONS: 3
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -91,6 +96,13 @@ services:
     depends_on:
       order-service:
         condition: service_healthy
+    healthcheck:
+      # Imagem sem curl (ou com localhost -> ::1): wget BusyBox em 127.0.0.1 (D10/CA4).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     restart: unless-stopped
 
   jaeger:
@@ -101,6 +113,13 @@ services:
       - "4318:4318"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      # Imagem sem curl (ou com localhost -> ::1): wget BusyBox em 127.0.0.1 (D10/CA4).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:14269/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # Arquivos de configuração (prometheus.yml, provisioning/, dashboards/) são
   # de propriedade do agente Observabilidade — infra/observability/**.
@@ -110,6 +129,13 @@ services:
       - "9090:9090"
     volumes:
       - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      # Imagem sem curl (ou com localhost -> ::1): wget BusyBox em 127.0.0.1 (D10/CA4).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   grafana:
     image: grafana/grafana:11.2.0
@@ -125,7 +151,15 @@ services:
       - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      # Imagem sem curl (ou com localhost -> ::1): wget BusyBox em 127.0.0.1 (D10/CA4).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   saga-orchestrator:
     <<: *service-base

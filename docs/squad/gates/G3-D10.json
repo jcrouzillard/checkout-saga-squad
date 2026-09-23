@@ -1,0 +1,41 @@
+{
+  "gate": "G3",
+  "demand": "f2324e0f25de",
+  "from": "qa+observabilidade",
+  "to": "orquestrador",
+  "cycle": 1,
+  "commit": "2836e6f",
+  "base": "origin/develop",
+  "recommendation": "APPROVE",
+  "confidence": 0.93,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Escopo do diff origin/develop...HEAD", "status": "pass", "weight": 2, "blocking": true,
+     "source": "13 arquivos, todos esperados: README, docker-compose.yml, ADR-013, docs/architecture/{README,saga}.md, docs/contracts/{d10-alinhamento,events}.md, docs/observability.md, gates G1/G2-D10, tests/{TRACEABILITY.md,d10-checklist.md,e2e/last-report.json}. Nenhum services/** alterado (demanda de alinhamento doc/infra)"},
+    {"name": "CA6 e2e completo verde (G3 B,3)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/e2e/last-report.json: 12/12 PASS, gitCommit ba78c68 (HEAD 2836e6f difere só em tests/** e docs do QA). QA: down -v/up --build healthy em 40 s; mvn verify 66 unit + 9 IT (evidência 9d00e7819f1d)"},
+    {"name": "CA4 stack healthy (verificação própria)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "docker compose ps: 11/11 containers (healthy), incluindo jaeger, prometheus, grafana e checkout-console"},
+    {"name": "CA2 .DLT explícitos sem auto-create (verificação própria)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "kafka-configs --describe: auto.create.topics.enable=false (STATIC_BROKER_CONFIG); kafka-topics: 9 tópicos + 9 .DLT, todos com 3 partições; KafkaCommonConfiguration cria t e t+.DLT via TopicBuilder"},
+    {"name": "CA3 log JSON real + trace no Jaeger (G3 peso 2)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Jaeger /api/traces/ef9bd88b7786c767403c7c5ea11e812f: 31 spans, 5 serviços. docker compose logs saga-orchestrator: linha JSON com orderId, sagaId, messageId, trace_id, span_id (SagaService). docs/observability.md atualizado (ba78c68)"},
+    {"name": "CA1 saga.md fiel ao código (amostragem)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "SagaTimeoutScheduler: flag resumed + carência antes do findDue; SagaRepository.findDue sem lock + lock por saga FOR UPDATE SKIP LOCKED; UPDATE ... WHERE version = :version (lock otimista); ReplyPolicy.shouldReply nos 3 participantes — batem com saga.md §3.4/§3.5/§3.7 e ADR-013"},
+    {"name": "Retomada após restart", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Log do orquestrador com RESUMED_AFTER_RESTART (1 ocorrência) e /actuator/prometheus saga_resumed_total 1.0; e2e coordinator_restart PASS"},
+    {"name": "TRACEABILITY cobre requisitos (G3 B,2)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff tests/TRACEABILITY.md: +17/-0 (só adição da §9); seções anteriores intactas"},
+    {"name": "README reproduz falhas + CA5", "status": "pass", "weight": 1, "blocking": false,
+     "source": "README inalterado nas instruções de falha; nova seção Fábrica × produto (CA5) aprovada no G2"},
+    {"name": "DeadLetterIT com auto-create desligado", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Gap declarado pelo QA: DeadLetterIT não roda no Testcontainers com auto-create=false; opcional no contrato d10-alinhamento. DLT coberto ao vivo (tópicos existentes) mas sem teste automatizado de roteamento nesta configuração"}
+  ],
+  "open_risks": [
+    "DeadLetterIT não executa com auto.create.topics.enable=false no Testcontainers — roteamento para .DLT fica sem teste automatizado nessa configuração (follow-up recomendado para QA).",
+    "last-report.json foi gerado em ba78c68, não no HEAD 2836e6f; a diferença é apenas documental (tests/**), sem impacto em runtime.",
+    "ADR-013 registra limitação: cada réplica que sobe re-arma a carência de todas as sagas vencidas — aceitável com 1 instância."
+  ],
+  "human_required": false,
+  "rationale": "Todos os 6 CAs têm evidência e as verificações próprias confirmam: stack 11/11 healthy, broker sem auto-create com 18 tópicos de 3 partições, trace de 31 spans em 5 serviços, log JSON com trace_id/orderId/sagaId, saga.md coerente com scheduler em 2 fases, SKIP LOCKED, lock otimista, carência e ReplyPolicy. Diff restrito aos arquivos esperados e TRACEABILITY só com adições. Única ressalva é o DeadLetterIT (opcional). Confiança = (19 + 0,5)/21 ≈ 0,93."
+}

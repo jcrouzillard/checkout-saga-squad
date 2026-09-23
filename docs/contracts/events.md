@@ -102,7 +102,9 @@ cada comando do participante correspondente. Ausente/`null` = comportamento norm
 
 A simulação afeta **apenas** comandos de ação (`reserve`, `authorize`, `create`); comandos de compensação
 (`release`, `refund`, `cancel`) e `order.confirm/cancel` **sempre** executam normalmente.
-Contagem de "tentativa" para `TIMEOUT_ONCE`: o participante guarda `attempts` no registro de dedupe/domínio.
+Contagem de "tentativa" para `TIMEOUT_ONCE`: o participante guarda `attempts` na **linha de domínio** do pedido
+(`reservations`/`payments`/`shipments`), incrementada a cada recebimento do comando de ação (1º envio, retries com o
+mesmo `messageId` e reentregas); responde se `attempts >= 2`. Independe de `saga_instance.attempt` (ver `saga.md` §3.7).
 
 ## 4. Mensagens e payloads
 

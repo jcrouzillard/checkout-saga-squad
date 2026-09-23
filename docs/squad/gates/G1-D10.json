@@ -1,0 +1,34 @@
+{
+  "gate": "G1",
+  "demand": "f2324e0f25de",
+  "from": "arquiteto",
+  "to": "devops",
+  "cycle": 1,
+  "commit": "ab9059d",
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "saga.md §3.2 (duas fases) fiel ao código", "status": "pass", "weight": 3, "blocking": true,
+     "source": "SagaTimeoutScheduler.scan(): findDue (sem lock, ORDER BY updated_at LIMIT 50, BATCH=50) -> TraceContext.runWith(traceParent, service.tick); SagaService.tick @Transactional -> SagaRepository.lockDue (refaz filtro, FOR UPDATE SKIP LOCKED) -> onTick -> SagaRepository.update (WHERE version = :version; n!=1 -> OptimisticLockingFailureException); lockById = FOR UPDATE sem SKIP; onTick: next_retry_at vencido tratado antes do deadline; SagaMetrics/SagaStateMachine: timeouts/retries só com step.isParticipant()"},
+    {"name": "saga.md §3.5 / ADR-013 (carência) fiéis ao código", "status": "pass", "weight": 3, "blocking": true,
+     "source": "scan(): flag volatile resumed; resumeAfterRestart antes de findDue; exceção vai ao catch externo sem setar resumed (nenhum timeout avaliado antes); SagaService.resumeAfterRestart @Transactional -> lockResumable(now+timeout: deadline_at IS NOT NULL AND deadline_at < :t ORDER BY created_at FOR UPDATE SKIP LOCKED); SagaStateMachine.resumeAfterRestart: deadline=now+timeout, attempt mantido, sem commands/stepEvents, log RESUMED_AFTER_RESTART 'deadline X -> Y (tentativa mantida)', Metric.Resumed registrado em afterCommit (saga.resumed -> saga_resumed_total); application.yml group.instance.id=${KAFKA_GROUP_INSTANCE_ID:saga-orchestrator-1}; logRecovery em ApplicationReadyEvent"},
+    {"name": "saga.md §3.1 colunas e ação RESUMED_AFTER_RESTART", "status": "pass", "weight": 1, "blocking": false,
+     "source": "V1__saga.sql: last_causation_id, step_started_at, failed_step, failure_message; Transition.RESUMED_AFTER_RESTART"},
+    {"name": "events.md §3 / saga.md §3.7 (TIMEOUT_ONCE) só esclarece, sem mudar contrato", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Payment/Inventory/ShippingCommandHandler: tryMarkProcessed não curto-circuita; tombstone -> ALREADY_COMPENSATED antes de contar; linha de domínio criada 1 vez; <Repo>.incrementAttempts = UPDATE ... attempts+1 RETURNING em toda recepção; ReplyPolicy.shouldReply: TIMEOUT false, TIMEOUT_ONCE attempts>=2; Simulate.ALLOWED: TIMEOUT_ONCE só payment/shipping. Payload, tópicos e semântica inalterados; texto antigo ('dedupe/domínio') era compatível"},
+    {"name": "ADR-013 legítimo como registro a posteriori", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Status 'Aceito — formaliza comportamento já implementado'; contexto (defeito G3 inicial), decisão, consequências (+/−, limitações de N réplicas) e alternativas; não altera contratos; hierarquia de verdade passa a ter ADR para o comportamento do código"},
+    {"name": "Plano d10-alinhamento.md verificável e com ownership correto", "status": "pass", "weight": 2, "blocking": true,
+     "source": "CA2 DevOps docker-compose.yml (hoje KAFKA_AUTO_CREATE_TOPICS_ENABLE 'true'); CA3 DevOps env + Observabilidade docs/observability.md; CA4 DevOps; CA5 Orquestrador README; CA6 QA; Arquiteto só escreveu docs/architecture, docs/adr, docs/contracts. Premissas conferidas ao vivo: broker tem exatamente __consumer_offsets + 9 tópicos + 9 .DLT; KafkaCommonConfiguration.checkoutTopics cria Topics.ALL + .DLT com 3 partições; nenhum serviço desliga checkout.kafka.create-topics; wget 127.0.0.1 nos 4 containers (jaeger :14269, prometheus /-/healthy, grafana /api/health, console /) = OK; DeadLetterIT publica só em Topics.ORDER_COMMANDS"}
+  ],
+  "open_risks": [
+    "ADR-013 atribui ao ADR-005 a frase 'scheduler age normalmente' ao voltar; isso estava no saga.md §3.5 antigo, não no ADR-005 (imprecisão de redação, sem efeito). ADR-005 também não aponta para o ADR-013 (sugestão: nota 'complementado por ADR-013' — Arquiteto, opcional).",
+    "Javadoc de SagaTimeoutScheduler ainda diz que 'o primeiro ciclo já encontra os prazos que venceram durante a queda' (desatualizado frente à carência). Cosmético, dono Backend; não bloqueia (código não muda na D10).",
+    "CA2 (auto-create=false): se algum serviço subir antes de o KafkaAdmin criar os tópicos, produtores/consumidores recebem UNKNOWN_TOPIC até a criação; mitigado porque os 5 serviços criam todos os tópicos no startup e o KafkaAdmin roda antes dos listeners. QA deve confirmar com down -v (volume limpo) e não só com o broker já populado.",
+    "CA6 menciona RESUMED_AFTER_RESTART no GET /sagas/{id} OU saga_resumed_total > 0; QA deve registrar qual das duas evidências usou.",
+    "CA3: a linha de log anexada deve ser capturada após o up --build da branch com a variável explícita, e o trace_id aberto no Jaeger."
+  ],
+  "human_required": false,
+  "rationale": "Todas as classes, métodos, consultas SQL e comportamentos citados em saga.md §3.1/§3.2/§3.5/§3.7/§4.5/§5, ADR-013 e events.md §3 conferem com o código da worktree (verificação linha a linha). A mudança em events.md §3 é esclarecimento compatível com a implementação e com o texto anterior; nenhum payload, tópico ou endpoint muda. ADR-013 registra corretamente, a posteriori, uma decisão já implementada e testada, com limitações explícitas. O plano distribui CA2–CA6 aos donos certos (DevOps, Observabilidade, Orquestrador, QA) com comandos de verificação concretos; as premissas técnicas de CA2 e CA4 foram reproduzidas nos containers em execução. Ressalvas não bloqueantes: 2 imprecisões de redação/comentário e cuidados de verificação para o QA."
+}

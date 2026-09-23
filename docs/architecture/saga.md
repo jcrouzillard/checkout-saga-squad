@@ -75,10 +75,13 @@ saga_instance(
   payment_id uuid, shipment_id uuid, tracking_code varchar(64),
   last_command_id uuid,                   -- messageId do comando em voo (reutilizado nos retries)
   last_command_type varchar(40),
+  last_causation_id uuid,                 -- messageId que causou o comando em voo
   attempt int NOT NULL DEFAULT 0,
   deadline_at timestamptz,                -- prazo da resposta do comando em voo
   next_retry_at timestamptz,              -- quando reenviar (backoff)
-  failure_reason varchar(32), correlation_id uuid, trace_parent varchar(64),
+  step_started_at timestamptz,            -- início do passo (saga_step_duration_seconds)
+  failure_reason varchar(32), failed_step varchar(16), failure_message text,
+  correlation_id uuid, trace_parent varchar(64),
   version bigint NOT NULL DEFAULT 0,      -- lock otimista
   created_at timestamptz, updated_at timestamptz)
 INDEX (deadline_at) WHERE status NOT IN ('COMPLETED','CANCELED')
@@ -86,6 +89,7 @@ INDEX (next_retry_at) WHERE status NOT IN ('COMPLETED','CANCELED')
 
 saga_step_log(id bigserial PK, saga_id uuid, step varchar(16), action varchar(32),
   -- COMMAND_SENT | REPLY_RECEIVED | TIMEOUT | RETRY | COMPENSATION_STARTED | IGNORED_LATE_REPLY | COMPENSATION_STUCK
+  -- | RESUMED_AFTER_RESTART (carência pós-reinício, §3.5; ADR-013)
   message_type varchar(40), message_id uuid, attempt int, detail text, created_at timestamptz)
 ```
 Comuns a **todos** os serviços (lib `common`):
@@ -104,9 +108,22 @@ Domínio (sugestão): `orders`, `order_items`, `order_status_history` (orders);
 ### 3.2 Envio de comando, deadline e scheduler de timeouts
 1. Ao entrar num estado que envia comando: novo `last_command_id = UUID`, `attempt = 1`,
    `deadline_at = now() + SAGA_STEP_TIMEOUT_MS`, `next_retry_at = null`, linha no outbox — tudo na mesma transação.
-2. **Scheduler** (`@Scheduled(fixedDelay = SAGA_TIMEOUT_SCAN_INTERVAL_MS)`):
-   `SELECT ... FROM saga_instance WHERE status NOT IN terminais AND (deadline_at < now() OR next_retry_at < now()) FOR UPDATE SKIP LOCKED LIMIT 50`.
-   - `deadline_at` vencido → log `TIMEOUT`, `saga_timeouts_total{step}`, `saga.step-changed(TIMED_OUT)`.
+2. **Scheduler** (`SagaTimeoutScheduler.scan()`, `@Scheduled(fixedDelayString = SAGA_TIMEOUT_SCAN_INTERVAL_MS)`),
+   em **duas fases** (cada saga numa transação própria, para que uma falha não derrube o lote):
+   - **Fase 1 — candidatas, sem lock** (`SagaRepository.findDue`, fora de transação):
+     `SELECT saga_id, trace_parent FROM saga_instance WHERE status NOT IN terminais AND (deadline_at <= :now OR next_retry_at <= :now) ORDER BY updated_at LIMIT 50`.
+   - **Fase 2 — por saga** (`SagaService.tick(sagaId)`, `@Transactional`, dentro do trace restaurado por
+     `TraceContext.runWith(trace_parent)`): `SagaRepository.lockDue` refaz o filtro de vencimento com
+     `SELECT ... WHERE saga_id = :id AND <não terminal> AND (deadline_at <= :now OR next_retry_at <= :now) FOR UPDATE SKIP LOCKED`.
+     Se a linha está travada (resposta sendo processada, outra réplica) ou já não está vencida → nada a fazer
+     (a candidata é descartada neste ciclo). Senão aplica `SagaStateMachine.onTick` e grava com
+     `SagaRepository.update`: `UPDATE ... SET version = version + 1 WHERE saga_id = :id AND version = :version`
+     (**lock otimista**; 0 linhas → `OptimisticLockingFailureException` → rollback, a saga volta no próximo ciclo).
+   - Respostas dos participantes usam o lock **bloqueante** `SagaRepository.lockById` (`FOR UPDATE`, sem SKIP):
+     resposta e scheduler nunca aplicam transições concorrentes na mesma saga; a que chega depois vê o estado novo.
+   - Em `onTick`, `next_retry_at` vencido tem precedência sobre `deadline_at` (os dois nunca estão preenchidos juntos).
+   - `deadline_at` vencido → log `TIMEOUT`, `saga.step-changed(TIMED_OUT)`; `saga_timeouts_total{step}` só para
+     os passos de participante (`INVENTORY`, `PAYMENT`, `SHIPPING`; não para `ORDER`).
      - Estado de **ação** e `attempt <= SAGA_STEP_MAX_RETRIES` → `next_retry_at = now() + SAGA_RETRY_BACKOFF_MS × 2^(attempt-1)`, `deadline_at = null`.
      - Estado de ação com retries esgotados → `failure_reason = STEP_TIMEOUT` e transição de compensação (tabela §2).
      - Estado de compensação/finalização → `next_retry_at = now() + min(backoff × 2^(attempt-1), SAGA_COMPENSATION_BACKOFF_MAX_MS)`;
@@ -126,15 +143,53 @@ Domínio (sugestão): `orders`, `order_items`, `order_status_history` (orders);
 Listener transacional: `processed_messages` + efeito + outbox numa transação; **ack do offset após o commit**
 (`enable.auto.commit=false`, AckMode `RECORD`). Duplicata → apenas ack (participante re-publica resposta, `events.md` §5).
 
-### 3.5 Retomada no startup
-Nenhum estado em memória. Ao subir: (a) consumidor retoma do último offset confirmado; (b) relay publica outbox
-pendente; (c) scheduler encontra deadlines/retries vencidos durante a queda e age normalmente.
-Várias instâncias do orquestrador são seguras: `FOR UPDATE SKIP LOCKED` + `version` (lock otimista) + partições.
+### 3.5 Retomada no startup (com carência — [ADR-013](../adr/013-carencia-de-prazos-na-retomada.md))
+Nenhum estado em memória. Ao subir: (a) consumidor retoma do último offset confirmado (static membership:
+`group.instance.id`, sem esperar o `session.timeout.ms` do membro morto); (b) relay publica outbox pendente;
+(c) `SagaTimeoutScheduler.logRecovery()` (`ApplicationReadyEvent`) registra quantas sagas não terminais existem;
+(d) **carência**: o **primeiro** ciclo do scheduler, antes de qualquer `findDue`, chama
+`SagaService.resumeAfterRestart(SAGA_STEP_TIMEOUT_MS)` (uma única transação):
+- `SagaRepository.lockResumable(now + SAGA_STEP_TIMEOUT_MS)`:
+  `SELECT ... WHERE <não terminal> AND deadline_at IS NOT NULL AND deadline_at < :t ORDER BY created_at FOR UPDATE SKIP LOCKED`
+  — isto é, toda saga com comando em voo cujo prazo **venceu na queda ou venceria antes de um prazo completo**;
+- para cada uma, `SagaStateMachine.resumeAfterRestart`: `deadline_at = now + SAGA_STEP_TIMEOUT_MS`, **sem**
+  incrementar `attempt`, **sem** reenviar comando e sem `saga.step-changed`; grava `saga_step_log`
+  `RESUMED_AFTER_RESTART` (detalhe `deadline <antigo> -> <novo> (tentativa mantida)`) e incrementa `saga_resumed_total`
+  após o commit;
+- sagas aguardando retry (`next_retry_at` preenchido, `deadline_at` nulo) e terminais **não** mudam: o retry
+  pendente sai normalmente no ciclo seguinte;
+- se a carência falhar (banco indisponível), o flag `resumed` continua falso e ela é tentada de novo no próximo
+  ciclo — nenhum timeout é cobrado antes dela.
+
+Motivo: o tempo em que o **coordenador** esteve fora não é culpa do participante; a resposta pode estar no Kafka
+esperando o consumidor voltar. Sem a carência, uma queda maior que o prazo consumia tentativas (ou esgotava os
+retries e compensava) de sagas saudáveis — era o defeito do reinício do coordenador corrigido no G3 inicial.
+
+Réplicas: `FOR UPDATE SKIP LOCKED` (scheduler e carência) + `version` (lock otimista) + partições tornam a varredura
+segura com N instâncias. Limitações conhecidas (ADR-013): cada réplica que **sobe** re-arma a carência também das
+sagas das demais (atrasa a detecção de timeout em até um prazo, uma vez por startup) e o `group.instance.id` padrão
+é fixo (`saga-orchestrator-1`): com mais de uma réplica, cada uma precisa do seu `KAFKA_GROUP_INSTANCE_ID`.
 
 ### 3.6 Rastreabilidade
 `traceparent` do `POST /orders` → outbox → header Kafka → spans de consumo (agente OTel) → comandos seguintes.
 O scheduler (sem contexto ativo) **restaura** o contexto a partir de `saga_instance.trace_parent` ao reenviar/compensar,
 para que retries e compensações fiquem no mesmo trace. MDC com `orderId`, `sagaId`, `messageId` em todo log.
+
+### 3.7 Contagem de tentativas do `simulate` (`TIMEOUT` / `TIMEOUT_ONCE`) nos participantes
+Contrato: [`events.md` §3](../contracts/events.md). Implementação (idêntica em inventory/payment/shipping):
+- A contagem é do **participante**, independente de `saga_instance.attempt`: coluna `attempts` da linha de domínio
+  (`reservations`, `payments`, `shipments`, `UNIQUE(order_id)`), incrementada por
+  `<Repo>.incrementAttempts(orderId)` (`UPDATE ... SET attempts = attempts + 1 ... RETURNING attempts`) na mesma
+  transação do handler, **a cada recebimento do comando de ação** para o pedido — o primeiro, os retries do
+  orquestrador (mesmo `messageId`, já em `processed_messages`) e eventuais reentregas do Kafka.
+- A decisão é `ReplyPolicy.shouldReply(mode, attempts)`: `TIMEOUT` → nunca responde; `TIMEOUT_ONCE` →
+  responde se `attempts >= 2` (silêncio só no 1º recebimento); demais → responde.
+- A ação executa **uma** vez (linha de domínio já existe → re-publica a resposta a partir do estado); só a
+  resposta é suprimida. Se o pedido já foi compensado (tombstone), responde `ALREADY_COMPENSATED` sem contar.
+- Consequência: com `TIMEOUT_ONCE`, o orquestrador vê `TIMEOUT` na tentativa 1 e `REPLY_RECEIVED` na tentativa 2
+  (histórico `PAYMENT TIMED_OUT (1)` → `RETRYING (2)` → `SUCCEEDED (2)`). Uma reentrega do Kafka da 1ª tentativa
+  (queda entre commit e ack) também conta e pode antecipar a resposta — sem efeito funcional (idempotente).
+- Valores aceitos (`Simulate.ALLOWED`, 400 no `POST /orders` para outros): `TIMEOUT_ONCE` só em `payment` e `shipping`.
 
 ## 4. Diagramas de sequência
 
@@ -240,7 +295,9 @@ sequenceDiagram
     S-)O: order.cancel (STEP_TIMEOUT)
     O-)S: order.canceled
 ```
-Com `TIMEOUT_ONCE`, a tentativa 2 recebe resposta e a saga segue normalmente (retry bem-sucedido).
+Com `TIMEOUT_ONCE`, a tentativa 2 recebe resposta e a saga segue normalmente (retry bem-sucedido); a contagem
+é do participante (`attempts` na linha de domínio, §3.7).
+Tempo até a compensação com os defaults: 5 s (t1) + 1 s de backoff + 5 s (t2) + 2 s + 5 s (t3) ≈ 18 s.
 
 ### 4.5 Reinício do coordenador
 ```mermaid
@@ -257,10 +314,11 @@ sequenceDiagram
     K-)P: payment.authorize
     P-)K: payment.authorized (fica no tópico; offset do grupo não avançou)
     Note over S: container reinicia
+    S->>DB: 1º ciclo do scheduler: carência (§3.5) → deadline_at = now + timeout,<br/>RESUMED_AFTER_RESTART, tentativa mantida, sem reenvio
     S->>DB: relay: publica outbox pendente (se houver)
     K-)S: consumo retoma do último offset confirmado → payment.authorized
     S->>DB: TX: dedupe + transição → CREATING_SHIPMENT + outbox(shipment.create)
-    S->>DB: scheduler: deadlines vencidos na queda → retry com mesmo messageId (inofensivo)
+    Note over S: se a resposta não vier dentro do novo prazo → TIMEOUT/retry normais (§3.2)
     Note over S: saga continua até COMPLETED
 ```
 
@@ -271,7 +329,7 @@ sequenceDiagram
 | **Falha no pagamento** | `payment.failed` é resposta de negócio (não há retry); orquestrador transiciona para compensação. | `inventory.release` → `order.cancel` (`PAYMENT_DECLINED`). Nenhum refund (nada autorizado). | `POST /orders` com `"simulate": {"payment": "DECLINE"}` → pedido `CANCELED`; `GET /inventory/reservations/{id}` = `RELEASED`; estoque volta. |
 | **Falha no envio** | `shipment.failed` (não há retry: recusa de negócio). | `payment.refund` → `inventory.release` → `order.cancel` (`SHIPMENT_FAILED`). | `"simulate": {"shipping": "FAIL"}`, `deliveryType=PHYSICAL` → `CANCELED`; pagamento `REFUNDED`; reserva `RELEASED`. |
 | **Timeout em qualquer etapa** | Deadline persistido + scheduler; retry com mesmo `messageId` (participantes idempotentes re-publicam a resposta); esgotado → compensação. | Compensa o próprio passo (pode ter sido executado tardiamente) + anteriores: inventário → `release`; pagamento → `refund` + `release`; envio → `shipment.cancel` + `refund` + `release`; depois `order.cancel` (`STEP_TIMEOUT`). | `"simulate": {"payment": "TIMEOUT"}` (ou `inventory`/`shipping`: `TIMEOUT`) → `CANCELED` em ≈ 3×5 s + backoff. `"payment": "TIMEOUT_ONCE"` → `CONFIRMED` após 1 retry. |
-| **Reinício do coordenador** | Estado 100% em Postgres; offset só confirmado após commit; outbox pendente republicado; scheduler retoma deadlines. | Nenhuma extra — a saga **continua** de onde parou (ou compensa, se um prazo tiver vencido e os retries se esgotarem). | (a) `docker compose stop saga-orchestrator`, `POST /orders`, `docker compose start saga-orchestrator` → `CONFIRMED`. (b) `"simulate": {"payment": "SLOW"}`, `docker compose kill saga-orchestrator` durante o atraso, `start` → `CONFIRMED`. |
+| **Reinício do coordenador** | Estado 100% em Postgres; offset só confirmado após commit; outbox pendente republicado; carência no startup re-arma os prazos vencidos na queda sem consumir tentativa (§3.5, ADR-013); depois o scheduler segue normal. | Nenhuma extra — a saga **continua** de onde parou (ou compensa, se o participante não responder dentro do novo prazo e os retries se esgotarem). | (a) `docker compose stop saga-orchestrator`, `POST /orders`, `docker compose start saga-orchestrator` → `CONFIRMED`. (b) `"simulate": {"payment": "SLOW"}`, `docker compose kill saga-orchestrator` durante o atraso, `start` → `CONFIRMED`. |
 
 ### 5.1 A ambiguidade do timeout
 Timeout **não significa falha**: o participante pode ter executado e a resposta atrasou/perdeu-se. Por isso:

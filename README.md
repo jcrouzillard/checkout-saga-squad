@@ -183,6 +183,18 @@ vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto*
 (`checkout-console`) no compose, ao lado dos serviços. A área **Observabilidade** do Squad Control escolhe o produto e
 embute o Grafana e o Jaeger dele (o Auditor usa traces e métricas como evidência nos gates).
 
+**Decisão: o Squad Control sobe fora do compose.** O `docker compose up --build` sobe só o **produto** (os 5
+serviços, Kafka, Postgres, observabilidade e o `checkout-console`). O Squad Control é a **fábrica** e roda à parte,
+com `make squad` (processo Python local, porta 7070). Motivos:
+- **Ciclo de vida diferente:** a fábrica precisa continuar de pé enquanto o produto é derrubado, reconstruído e
+  testado (`down -v`, `up --build`, e2e de restart do coordenador). Dentro do mesmo compose, cada rebuild do produto
+  derrubaria o painel que acompanha esse rebuild.
+- **Genérica:** a mesma fábrica gerencia outros produtos (`docs/squad/project.json`); amarrá-la a um compose
+  específico a tornaria parte daquele produto.
+- **Acesso local:** ela lê o repositório (git, `docs/squad/**`), as transcrições dos agentes em `~/.claude/` e usa as
+  CLIs `gh`, `claude` e `codex` com as credenciais do desenvolvedor. Num container, isso exigiria montar o home e
+  repassar credenciais, sem ganho para o produto.
+
 ## 6a. Portabilidade entre fornecedores (Claude Code, Codex, …)
 As regras ficam em `AGENTS.md` (lido pelo Codex, Copilot e Devin; importado pelo `CLAUDE.md`). Qualquer papel roda
 com qualquer fornecedor: `SQUAD_RUNNER=codex python3 tools/squad/run_agent.py <papel> "<tarefa>"`, e o plantão do
