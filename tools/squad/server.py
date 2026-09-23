@@ -169,6 +169,8 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
     current = next((a for a in reversed(activity) if a["kind"] == "tool" and a.get("pending")), None)
     if delegations_only:
         status = "coordenando"
+    elif recent and (not ended_turn or current):
+        status = "trabalhando"  # agente retomado várias vezes: notificações antigas de término não valem
     elif ended_turn and ((completed is not None and run_id in completed) or (time.time() - updated) > 90):
         status = "concluído"
     elif recent or not ended_turn or current:
