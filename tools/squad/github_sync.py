@@ -69,6 +69,9 @@ class Sync:
     def save(self):
         STATE.write_text(json.dumps(self.s, ensure_ascii=False, indent=1))
 
+    STATUS_LABEL = {"Backlog": "status:backlog", "Em andamento": "status:em-andamento", "Gate (Jev)": "status:gate",
+                    "Gate (Auditor)": "status:gate", "Intervenção humana": "status:intervencao-humana", "Concluído": "status:concluido"}
+
     def set_field(self, issue: dict, field: str, value: str | None):
         fd = self.s["project"]["fields"].get(field)
         if not value or not fd or value not in fd["options"]:
@@ -77,6 +80,18 @@ class Sync:
            "--field-id", fd["id"], "--single-select-option-id", fd["options"][value])
         if field == "Status":
             issue["status"] = value
+            self.status_label(issue, value)
+
+    def status_label(self, issue: dict, value: str):
+        """Espelha o Status também como label `status:*`: a aba Issues funciona como kanban por filtro
+        (útil quando a indexação do Project atrasa, como no incidente do GitHub de 23/09/2026)."""
+        new = self.STATUS_LABEL.get(value)
+        if not new:
+            return
+        args = ["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", new]
+        for other in set(self.STATUS_LABEL.values()) - {new}:
+            args += ["--remove-label", other]
+        subprocess.run(args, capture_output=True)
 
     # ---------- helpers de issue ----------
     def link(self, path: str) -> str:
