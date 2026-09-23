@@ -1,0 +1,26 @@
+{
+  "gate": "G2",
+  "demand": "e31bdfb73679",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Integração do servidor (ciclo 1)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "G2-D7.json: cancel 201/409/404, concluída 409, start/override/clarify/edit de cancelada 409, pending sem validação, triage.py não roda nem grava para cancelada. O commit 6f62655 só altera github_sync.py (+ gate), sem afetar esses caminhos"},
+    {"name": "Painel (ciclo 1)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Inalterado: Cancelar + confirmação nos 5 estados pré-início; card Cancelada sem ações e sem perguntas tardias"},
+    {"name": "Sincronização GitHub (CA5)", "status": "validate", "weight": 2, "blocking": true,
+     "source": "6f62655 github_sync.on_control cancel: close --reason 'not planned' com o motivo, label cancelada, cria status:cancelado e aplica status_label('Cancelado'), que remove as demais status:* (inclusive status:concluido). STATUS_LABEL ganhou 'Cancelado': 'status:cancelado'; py_compile ok. O desvio do contrato (campo Status do Project sem a opção 'Cancelado') está justificado na decisão 02a3ae767bb3: alterar as opções do single-select recria os ids e zeraria o Status de todos os cards, e o kanban por labels status:* já é o fallback em uso. Aceito como risco: o card da demanda cancelada fica com o Status antigo no Project, mas fechado como not planned e com status:cancelado"},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Correção restrita a tools/squad/github_sync.py (Orquestrador); sem evento novo"}
+  ],
+  "open_risks": [
+    "Risco aceito (decisão 02a3ae767bb3): no Project, o card cancelado mantém o Status anterior (ex.: 'Backlog'/'Em andamento'); a fonte de verdade visual é a label status:cancelado + issue fechada 'not planned'. Evolução: criar a opção 'Cancelado' pela UI do Project (sem recriar ids) e então usar set_field. Atualizar o CA5 do contrato para refletir a decisão.",
+    "CA5 continua sem teste contra o GitHub real: o QA deve conferir gh issue view (state CLOSED, stateReason NOT_PLANNED, labels cancelada + status:cancelado, sem status:concluido) numa demanda controlada."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. A devolução foi corrigida: demanda cancelada não recebe mais status:concluido; recebe status:cancelado, que substitui as outras status:*, além de fechar como not planned com o motivo e a label cancelada. Não criar a opção 'Cancelado' no Status do Project é um desvio justificado e registrado (evita apagar o Status de todos os cards) e fica como risco aceito, com o fallback por labels já em uso. O servidor e o painel verificados no ciclo 1 não mudaram. Confiança = (3+2+1+1)/8 = 0.88."
+}

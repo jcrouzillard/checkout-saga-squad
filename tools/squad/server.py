@@ -262,6 +262,15 @@ def effective_demand(rows: list[dict], demand: dict) -> dict:
     return eff
 
 
+def is_canceled(rows: list[dict], demand_id: str) -> bool:
+    return any(r.get("type") == "control" and r.get("action") == "cancel" and r.get("demand") == demand_id for r in rows)
+
+
+def is_done(rows: list[dict], demand_id: str) -> bool:
+    return any(r.get("type") == "gate" and r.get("gate") == "G3" and r.get("recommendation") == "APPROVE"
+               and r.get("demand") == demand_id for r in rows)
+
+
 def in_backlog(rows: list[dict], demand: dict) -> bool:
     return bool(demand.get("backlog")) and not any(
         r.get("demand") == demand["id"] and (r.get("type") == "start" or (r.get("type") == "control" and r.get("action") == "cancel"))
@@ -358,6 +367,8 @@ class Handler(SimpleHTTPRequestHandler):
                         and e.get("demand") == data.get("id")), None)  # a validação precisa ser desta demanda
             if not demand or not val:
                 return self._json({"error": "demanda ou validação não encontrada"}, 404)
+            if is_canceled(rows, demand["id"]):
+                return self._json({"error": "demanda cancelada"}, 409)
             answers = [a for a in (data.get("answers") or []) if (a.get("text") or "").strip()]
             if not answers:
                 return self._json({"error": "respostas vazias"}, 400)
@@ -371,6 +382,13 @@ class Handler(SimpleHTTPRequestHandler):
             if action not in ("pause", "resume", "reprioritize", "cancel"):
                 return self._json({"error": "ação inválida"}, 400)
             titles = {"pause": "Pausar", "resume": "Retomar", "reprioritize": "Repriorizar", "cancel": "Cancelar"}
+            rows = read_jsonl(LOG)
+            if not any(e.get("id") == data.get("id") and e.get("type") == "task" for e in rows):
+                return self._json({"error": "demanda não encontrada"}, 404)
+            if is_canceled(rows, data.get("id")):
+                return self._json({"error": "demanda já cancelada"}, 409)
+            if action == "cancel" and is_done(rows, data.get("id")):
+                return self._json({"error": "demanda já concluída"}, 409)
             entry = self._append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": data.get("id"),
                                       "action": action, "priority": data.get("priority"),
                                       "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
@@ -382,6 +400,8 @@ class Handler(SimpleHTTPRequestHandler):
                            and e.get("agent") == "humano"), None)
             if not demand:
                 return self._json({"error": "demanda não encontrada"}, 404)
+            if is_canceled(rows, demand["id"]):
+                return self._json({"error": "demanda cancelada"}, 409)
             if not in_backlog(rows, demand):
                 return self._json({"error": "só é possível editar demandas em backlog"}, 409)
             eff = effective_demand(rows, demand)
@@ -418,6 +438,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not demand:
                 return self._json({"error": "demanda não encontrada"}, 404)
             rows = read_jsonl(LOG)
+            if is_canceled(rows, demand["id"]):
+                return self._json({"error": "demanda cancelada"}, 409)
             if any(r.get("type") == "start" and r.get("demand") == demand["id"] for r in rows):
                 return self._json({"error": "demanda já iniciada"}, 409)
             from_backlog = in_backlog(rows, demand)
