@@ -102,6 +102,29 @@
   pre { white-space: pre-wrap; background: var(--panel2); border: 1px solid var(--line); padding: 14px; font-size: 12.5px; overflow-x: auto; font-family: "IBM Plex Mono", monospace; }
   .tag { font-size: 11px; padding: 1px 6px; background: var(--panel2); border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
   details.card { padding: 10px 0; }
+  /* notificações */
+  .bell { position: relative; background: none; border: none; cursor: pointer; padding: 0 4px; height: 56px; display: flex; align-items: center; color: var(--muted); }
+  .bell:hover { color: var(--text); }
+  .bell .badge { position: absolute; top: 12px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; color: #fff; background: var(--accent); }
+  .bell .badge.acao { background: var(--red); }
+  .notif-panel { position: absolute; top: 56px; right: 0; width: 400px; max-height: 480px; overflow: auto; background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(28,28,30,.10); z-index: 20; }
+  .notif-panel h4 { margin: 0; padding: 12px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .notif-panel h4 span { font-weight: 400; color: var(--dim); font-size: 12px; }
+  .notif { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
+  .notif:hover { background: var(--accent-soft); }
+  .notif.unread { background: #FBFBF9; }
+  .notif time { color: var(--dim); font-size: 12px; }
+  .notif b { display: block; font-weight: 600; }
+  .notif .lvl { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-weight: 600; color: var(--accent); }
+  .notif .lvl.acao { color: var(--red); }
+  .notif small { color: var(--muted); }
+  .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 30; width: 380px; max-width: calc(100vw - 32px); }
+  .toast { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: 0 8px 24px rgba(28,28,30,.12); padding: 12px 14px; font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+  .toast.acao { border-left-color: var(--red); }
+  .toast b { display: block; font-weight: 600; }
+  .toast .t-actions { display: flex; gap: 6px; }
+  .toast button { background: none; border: 1px solid var(--line); border-radius: 2px; font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; color: var(--text); }
+  .toast button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); background: #fff; border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgba(28,28,30,.08); padding: 24px 28px; overflow: auto; z-index: 10; }
   .drawer .head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .drawer .head .av { width: 32px; height: 32px; font-size: 13px; }
@@ -113,8 +136,13 @@
 <div class="app"><div class="frame">
   <header>
     <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
+    <div style="display:flex;align-items:center;gap:20px;position:relative">
+    <button class="bell" id="bell" aria-label="Notificações" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span class="badge" id="bell-badge" hidden></span></button>
+    <div class="notif-panel" id="notif-panel" hidden></div>
     <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
+    </div>
   </header>
+  <div class="toasts" id="toasts"></div>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
   <div class="layout">
     <nav>
@@ -441,12 +469,72 @@ async function render() {
 
 // Enquanto o usuário digita num campo do painel, o polling não redesenha a tela (senão o campo perde o foco).
 const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
+// ---- Notificações: só o que merece atenção (ação necessária / novidade); o resto fica no log.
+const notifStore = { get(k, d) { try { return JSON.parse(localStorage.getItem("sc.notif." + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("sc.notif." + k, JSON.stringify(v)); } catch (e) {} } };
+let notifOpen = false, toastCursor = notifStore.get("toastCursor", null), lastSeen = notifStore.get("lastSeen", null);
+function demandCode(id) { const ds = state.log.filter(e => e.type === "task" && e.agent === "humano"); const i = ds.findIndex(d => d.id === id); return i >= 0 ? `D${i + 1}` : null; }
+function classify(e) {
+  const code = e.demand ? demandCode(e.demand) : null;
+  const pre = code ? `${code} · ` : "";
+  if (e.type === "gate") {
+    const conf = Math.round((e.confidence || 0) * 100);
+    const acao = e.recommendation === "RETURN" || (e.confidence != null && e.confidence < 0.7) || e.risk === "alto";
+    return { level: acao ? "acao" : "novidade", title: `${pre}Auditor ${e.recommendation === "APPROVE" ? "aprovou" : "devolveu"} ${e.gate} · ${conf}%`, body: acao ? "Intervenção humana necessária." : (e.detail || ""), view: "execucoes" };
+  }
+  if (e.type === "handoff") return { level: "novidade", title: `${pre}${AGENTS[e.agent]?.label || e.agent} → ${AGENTS[e.to]?.label || "squad"}`, body: e.title, view: "execucoes" };
+  if (e.type === "defect") return { level: "acao", title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, view: "evidencias" };
+  if (e.type === "start") return { level: "novidade", title: `${pre}Demanda iniciada`, body: e.title.replace(/^Iniciar: /, ""), view: "demandas" };
+  if (e.type === "control") return { level: "novidade", title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", view: "demandas" };
+  return null;
+}
+function notifications() { return state.log.map(e => { const c = classify(e); return c ? { ...c, id: e.id, ts: e.ts } : null; }).filter(Boolean).slice(-30).reverse(); }
+function renderBell() {
+  const items = notifications();
+  const unread = items.filter(n => !lastSeen || n.ts > lastSeen);
+  const badge = $("#bell-badge");
+  badge.hidden = unread.length === 0; badge.textContent = unread.length; badge.classList.toggle("acao", unread.some(n => n.level === "acao"));
+  document.title = (unread.length ? `(${unread.length}) ` : "") + `Squad Control · ${product?.name || ""}`.replace(/ · $/, "");
+  const panel = $("#notif-panel");
+  panel.hidden = !notifOpen;
+  if (notifOpen) panel.innerHTML = `<h4>Notificações <span>${unread.length ? unread.length + " novas" : "tudo lido"}</span></h4>` +
+    (items.length ? items.map(n => `<div class="notif ${(!lastSeen || n.ts > lastSeen) ? "unread" : ""}" data-goto="${n.view}"><time>${hhmm(n.ts)}</time><div><span class="lvl ${n.level}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small>${esc((n.body || "").slice(0, 140))}</small></div></div>`).join("") : `<div class="notif" style="cursor:default"><time></time><small>Nenhuma notificação ainda.</small></div>`);
+}
+function toast(n) {
+  const box = $("#toasts");
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = document.createElement("div");
+  el.className = `toast ${n.level}`;
+  el.innerHTML = `<div><span class="lvl" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:${n.level === "acao" ? "var(--red)" : "var(--accent)"}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small class="muted">${esc((n.body || "").slice(0, 120))}</small></div><div class="t-actions"><button class="primary" data-goto="${n.view}">Ver</button><button data-dismiss="1" aria-label="Fechar">×</button></div>`;
+  box.appendChild(el);
+  if (n.level !== "acao") setTimeout(() => el.remove(), 6000);
+  if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+    try { new Notification(n.title, { body: n.body || "", tag: n.id }); } catch (e) {}
+  }
+}
+function processNotifications() {
+  const items = notifications().slice().reverse();
+  if (toastCursor === null) { toastCursor = items.at(-1)?.ts || new Date().toISOString(); notifStore.set("toastCursor", toastCursor); renderBell(); return; }
+  for (const n of items) if (n.ts > toastCursor) toast(n);
+  const newest = items.at(-1)?.ts; if (newest && newest > toastCursor) { toastCursor = newest; notifStore.set("toastCursor", toastCursor); }
+  renderBell();
+}
 async function refresh() {
-  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); }
+  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); processNotifications(); }
   catch (e) { $("#main").innerHTML = `<p class="warn-msg">Servidor indisponível. Rode <code>make squad</code>.</p>`; }
 }
 
 document.addEventListener("click", async ev => {
+  if (ev.target.closest("#bell")) {
+    notifOpen = !notifOpen;
+    if (notifOpen) { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
+    else { lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); }
+    return renderBell();
+  }
+  if (!ev.target.closest("#notif-panel") && notifOpen) { notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); renderBell(); }
+  const go = ev.target.closest("[data-goto]");
+  if (go) { const t = go.closest(".toast"); if (t) t.remove(); view = go.dataset.goto; notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen);
+    document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.view === view)); renderBell(); return render(); }
+  if (ev.target.closest("[data-dismiss]")) { ev.target.closest(".toast").remove(); return; }
   const nav = ev.target.closest("[data-view],[data-tab]");
   if (nav) {
     view = nav.dataset.view || nav.dataset.tab;
