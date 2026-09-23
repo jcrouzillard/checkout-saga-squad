@@ -70,6 +70,45 @@ serviços — não misture).
   agente ativo, `trace_id`/`span_id` aparecem como campos JSON de primeira classe automaticamente — não precisa de
   `MDC.put` para eles.
 
+### Onde a variável está definida (D10, CA3)
+
+As duas variáveis ficam no bloco comum `x-service` do `docker-compose.yml` (âncora `&service-env-base`, em
+`x-service.environment`), herdado pelos 5 serviços (`saga-orchestrator`, `order-service`, `inventory-service`,
+`payment-service`, `shipping-service`) — commit `c52c73c`:
+
+```yaml
+x-service: &service-base
+  environment: &service-env-base
+    OTEL_LOGS_EXPORTER: none
+    OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
+```
+
+O agente OTel 2.8.0 já injetava `trace_id`/`span_id` por padrão; a variável agora deixa isso explícito no compose.
+Conferência no container: `docker compose exec saga-orchestrator env | grep LOGBACK_MDC` →
+`OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED=true`.
+
+### Evidência: log JSON real correlacionado ao trace (2026-09-23)
+
+Capturada após `docker compose down -v && docker compose up --build -d` da branch
+`feature/D10-alinhar-documentacao-codigo-infra` (container `saga-orchestrator` criado em 2026-09-23T21:56:12Z),
+com um pedido pelo caminho feliz (`POST /orders`, `SKU-BOOK-001`, `PHYSICAL`, sem `simulate` → HTTP 202,
+status final `CONFIRMED`):
+
+- `orderId` = `2c21ea15-924e-48c1-b409-cc6ccdf475c6`, `sagaId` = `490195fd-74c5-431f-9544-7b43e8ae2b45`
+
+Comando: `docker compose logs --no-log-prefix saga-orchestrator | grep '"sagaId"' | grep '"trace_id"' | tail -1`
+(filtrado pelo `orderId` acima). Linha capturada:
+
+```json
+{"@timestamp":"2026-09-23T21:56:56.317866070Z","log.level":"INFO","process.pid":1,"process.thread.name":"org.springframework.kafka.KafkaListenerEndpointContainer#0-0-C-1","service.name":"saga-orchestrator","service.version":"1.1.0-SNAPSHOT","log.logger":"com.checkout.saga.app.SagaService","message":"Transição CONFIRMING_ORDER -> COMPLETED por order.confirmed","orderId":"2c21ea15-924e-48c1-b409-cc6ccdf475c6","messageId":"cbe6a74c-8248-4275-a7ad-3f716fffbe27","sagaId":"490195fd-74c5-431f-9544-7b43e8ae2b45","trace_id":"ef9bd88b7786c767403c7c5ea11e812f","trace_flags":"01","span_id":"aa4022a0646589db","ecs.version":"8.11"}
+```
+
+As 5 linhas do saga-orchestrator com esse `orderId` carregam o mesmo `trace_id`. No Jaeger,
+`GET http://localhost:16686/api/traces/ef9bd88b7786c767403c7c5ea11e812f` retorna o trace com **31 spans** de
+**5 serviços**: `saga-orchestrator`, `order-service`, `inventory-service`, `payment-service`, `shipping-service`.
+O `span_id` `aa4022a0646589db` da linha está no trace (serviço `saga-orchestrator`, operação
+`order.events process`).
+
 ## 3. Traces e propagação de contexto
 
 - Instrumentação automática via **OpenTelemetry Java Agent v2.8.0** anexado a cada JAR (`-javaagent:/otel/opentelemetry-javaagent.jar`), configurado por variáveis de ambiente padrão do ADR-000:
