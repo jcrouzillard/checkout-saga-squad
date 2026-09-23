@@ -1,115 +1,122 @@
 # Matriz de rastreabilidade — requisito → mecanismo → teste
 
 > Fonte dos requisitos: `docs/desafio.md` §3 (funcionais), §6 (não funcionais), §7 (cenários de
-> falha). Fonte dos mecanismos: ADRs e contratos (`docs/adr/`, `docs/contracts/`,
-> `docs/architecture/saga.md`). Fonte dos testes: `tests/e2e/run.sh` (cenários e2e, execução real
-> contra `docker compose up --build`) e `services/*/src/test/**` (testes unitários do Backend).
+> falha), demanda D6 (`c6f83b5bb5c7`, testes de integração e timeout em toda etapa). Fonte dos
+> mecanismos: ADRs e contratos (`docs/adr/`, `docs/contracts/`, `docs/architecture/saga.md`,
+> `docs/architecture/testes.md`, ADR-010). Fonte dos testes: `tests/e2e/run.sh` (12 cenários e2e) e
+> `services/*/src/test/**` (unitários) + `services/order-service/src/test/java/com/checkout/order/it/**`
+> (integração, Testcontainers — Fase B do D6, ver observação abaixo).
 >
-> **Status atualizado após execução real** (ver `tests/e2e/last-report.json` e seção "Histórico de
-> execução" abaixo). Legenda: ✅ passou · ⚠️ parcial (funciona mas sem asserção automatizada, ou
-> gap de cobertura conhecido) · ❌ falhou.
+> **Regenerada a partir de `tests/e2e/last-report.json`** (`executedAt`: 2026-09-23T18:02:42Z,
+> `gitCommit`: `de2fd92`, `total`: 12, `passed`: 12, `failed`: 0, `skipped`: 0). Legenda: ✅ passou ·
+> ⚠️ parcial · ❌ falhou.
 
 ## 3. Requisitos funcionais obrigatórios
 
 | Requisito | Mecanismo (doc/ADR) | Teste que prova | Status |
 |---|---|---|---|
-| Criar pedido | `POST /orders` (`docs/contracts/api.md` §1); outbox `order.created` (`saga.md` §3.3) | e2e: `happy_path_physical` (PASS, `orderId=9a9b6317...`) e os demais 6 cenários (todos criam pedido, `tests/e2e/last-report.json`) | ✅ passou |
-| Reservar estoque | `inventory.reserve`/`inventory.reserved`, tudo-ou-nada (`events.md` §4.3); tabela `stock`/`reservations` (`saga.md` §3.1) | e2e: `happy_path_physical` (`history` com `INVENTORY/SUCCEEDED`); unitário: `services/inventory-service/src/test/java/com/checkout/inventory/domain/StockAllocatorTest.java` (5 testes, alocação tudo-ou-nada) | ✅ passou |
-| Autorizar pagamento | `payment.authorize`/`payment.authorized` (`events.md` §4.4) | e2e: `happy_path_physical`/`happy_path_digital` (`PAYMENT/SUCCEEDED`); `coordinator_restart` (`GET /payments/{id}`=`AUTHORIZED`, 1 única autorização); unitário: `services/payment-service/src/test/java/com/checkout/payment/messaging/PaymentCommandHandlerTest.java` (9 testes) | ✅ passou |
-| Gerar envio quando aplicável | `shipment.create`/`shipment.created`, só `deliveryType=PHYSICAL` (`events.md` §4.5; `api.md` regra de validação) | e2e: `happy_path_physical` (`GET /shipments/{id}`=`CREATED`, tracking presente); `happy_path_digital` (ausência: `404`); unitário: `services/shipping-service/src/test/java/com/checkout/shipping/messaging/ShippingCommandHandlerTest.java` (7 testes) | ✅ passou |
-| Confirmar pedido | `order.confirm`→`order.confirmed`, estado terminal `COMPLETED`/`CONFIRMED` (`saga.md` §1-2) | e2e: `happy_path_physical`, `happy_path_digital`, `coordinator_restart`, `idempotency` (todos chegam a `CONFIRMED`); unitário: `services/saga-orchestrator/src/test/java/com/checkout/saga/domain/SagaStateMachineTest.java` (20 testes, transições terminais) | ✅ passou |
-| Cancelar pedido | `order.cancel`→`order.canceled` com `reason`/`failedStep` (`events.md` §4.1) | e2e: `payment_failure` (PASS, `PAYMENT_DECLINED`), `shipping_failure` (PASS, `SHIPMENT_FAILED`), `timeout_step` (PASS, `STEP_TIMEOUT`); unitário: `SagaStateMachineTest.java` (transições de compensação/cancelamento) | ✅ passou |
-| Consultar status do pedido | `GET /orders/{orderId}` com `history` (`api.md` §1) | e2e: os 7 cenários originais fazem poll de `GET /orders/{orderId}` via `wait_for_status` (`tests/e2e/run.sh`) | ✅ passou |
-| Listar pedidos de um cliente (demanda D1, Squad Control → ADR-006) | `GET /orders?customerId=&limit=` (`docs/contracts/api.md` §1; `docs/adr/006-consulta-de-pedidos-por-cliente.md`) — leitura só no database `orders`, ordenação `createdAt desc`/`orderId desc`, `limit` 1–200 (default 50), `200`+`[]` nunca `404`, `400` sem `customerId` | e2e: `customer_orders` (`tests/e2e/run.sh`) — 3 pedidos do mesmo cliente (DIGITAL feliz, PHYSICAL feliz, PHYSICAL com `payment=DECLINE`), lista completa na ordem correta com os 6 campos do contrato, `limit=2`, cliente inexistente `[]`, sem `customerId` `400` | ✅ passou (e2e 8/8, customer_orders) |
-| Melhorar o visual do checkout (demanda D2, Squad Control → ADR-007) | `checkout-console/index.html` servido em `http://localhost:8090` via proxy nginx; contrato `docs/contracts/ui-checkout-console.md` (CA1–CA12, sem API nova, sem regra de negócio no front) | Checklist manual `tests/ui/checklist-console.md` — CA1–CA12 (10 ✅, 2 ⚠️ parcial: CA7 e CA9 não observados interativamente no navegador); fluxo real pelo proxy (feliz e `payment=DECLINE`) igual ao direto no `order-service`; capturas `tests/ui/console-1440.png`/`console-390.png` (Chrome headless) | ✅ passou (com ressalvas ⚠️ registradas) |
+| Criar pedido | `POST /orders` (`api.md` §1); outbox `order.created` (`saga.md` §3.3) | e2e: os 12 cenários criam pedido (`tests/e2e/last-report.json`) | ✅ passou |
+| Reservar estoque | `inventory.reserve`/`inventory.reserved`, tudo-ou-nada (`events.md` §4.3) | e2e: `happy_path_physical` (`orderId=6852a3b9…`, `INVENTORY/SUCCEEDED`); `timeout_inventory` (reserva real, depois liberada); unitário: `StockAllocatorTest.java` | ✅ passou |
+| Autorizar pagamento | `payment.authorize`/`payment.authorized` (`events.md` §4.4) | e2e: `happy_path_physical`, `happy_path_digital`, `coordinator_restart`, `timeout_once`; unitário: `PaymentCommandHandlerTest.java` | ✅ passou |
+| Gerar envio quando aplicável | `shipment.create`/`shipment.created`, só `deliveryType=PHYSICAL` | e2e: `happy_path_physical` (`CREATED`); `happy_path_digital` (`404`); `timeout_once` (`CREATED` na 2ª tentativa) | ✅ passou |
+| Confirmar pedido | `order.confirm`→`order.confirmed`, `CONFIRMED` (`saga.md` §1-2) | e2e: `happy_path_physical`, `happy_path_digital`, `timeout_once` (`orderId=1550c90a…`), `coordinator_restart`, `idempotency` | ✅ passou |
+| Cancelar pedido | `order.cancel`→`order.canceled` com `reason`/`failedStep` | e2e: `payment_failure`, `shipping_failure`, `timeout_step`, `timeout_inventory` (`orderId=24bb5707…`), `timeout_shipping` (`orderId=949cc5e8…`) — todos `STEP_TIMEOUT`/motivo coerente | ✅ passou |
+| Consultar status do pedido | `GET /orders/{orderId}` com `history` | e2e: os 12 cenários fazem poll via `wait_for_status` | ✅ passou |
+| Listar pedidos de um cliente (D1, ADR-006) | `GET /orders?customerId=&limit=` | e2e: `customer_orders` (`orderId=6d474f33…`, cliente `qa-e2e-cust-32f058f5…`, 3 pedidos, ordem correta, `limit=2`, cliente inexistente `[]`, sem `customerId` `400`) | ✅ passou |
 
-## 4. APIs por domínio (desafio §4)
+## 4. APIs por domínio
 
 | Operação | Mecanismo | Teste que prova | Status |
 |---|---|---|---|
-| Estoque: `reserve` | comando Kafka `inventory.reserve` (não HTTP, ADR-001) | e2e: `happy_path_physical` (sucesso); `payment_failure`/`shipping_failure`/`timeout_step` (reserva seguida de release); unitário: `StockAllocatorTest.java` + `InventoryCommandHandlerTest.java` (7 testes) | ✅ passou |
-| Estoque: `release` | comando Kafka `inventory.release`, idempotente com tombstone `noop` (`events.md` §4.3, §5.4) | e2e: `payment_failure` (estoque restaurado a 996), `shipping_failure`, `timeout_step` — todos checam `GET /inventory/reservations/{id}`=`RELEASED`; unitário: `InventoryCommandHandlerTest.java` (casos de release/noop) | ✅ passou |
-| Pagamento: `authorize` | comando Kafka `payment.authorize` | e2e: `happy_path_physical`, `happy_path_digital`, `coordinator_restart`; unitário: `PaymentCommandHandlerTest.java` | ✅ passou |
-| Pagamento: `refund` | comando Kafka `payment.refund`, idempotente com `noop` | e2e: `shipping_failure` (`REFUNDED`), `timeout_step` (`REFUNDED`, estorno de autorização real feita por `simulate.payment=TIMEOUT`); unitário: `PaymentCommandHandlerTest.java` | ✅ passou |
-| Envio: solicitar entrega | comando Kafka `shipment.create` (`events.md` §4.5) | e2e: `happy_path_physical` (PASS); unitário: `ShippingCommandHandlerTest.java` | ✅ passou |
-| Envio: o que acontece se der erro | `saga.md` §5.2 (erro de negócio → `shipment.failed`/compensação; erro técnico → tratado como timeout) | e2e: `shipping_failure` (erro de negócio, PASS); `timeout_step` cobre o mecanismo de timeout via `payment` (variante `shipping=TIMEOUT` não automatizada, ver Observações §1); unitário: `services/shipping-service/src/test/java/com/checkout/shipping/domain/ReplyPolicyTest.java` (3 testes) | ⚠️ parcial (timeout de shipping não tem cenário e2e dedicado) |
+| Estoque: `reserve` | comando Kafka `inventory.reserve` | e2e: `happy_path_physical`; `payment_failure`/`shipping_failure`/`timeout_step`/`timeout_inventory`/`timeout_shipping` (reserva seguida de release) | ✅ passou |
+| Estoque: `release` | comando Kafka `inventory.release`, idempotente (`noop`) | e2e: todos os cenários de compensação verificam `GET /inventory/reservations/{id}`=`RELEASED` (`noop=false`) e estoque restaurado — estoque disponível de `SKU-BOOK-001` chegou a 960 após `payment_failure`/`shipping_failure`/`timeout_step`/`timeout_inventory`/`timeout_shipping` na mesma execução (`last-report.json`) | ✅ passou |
+| Pagamento: `authorize` | comando Kafka `payment.authorize` | e2e: `happy_path_physical`, `happy_path_digital`, `coordinator_restart`, `timeout_once` (autoriza na tentativa 2, `noop=false`) | ✅ passou |
+| Pagamento: `refund` | comando Kafka `payment.refund`, idempotente | e2e: `shipping_failure`, `timeout_step`, `timeout_shipping` (`orderId=949cc5e8…`, `REFUNDED`) | ✅ passou |
+| Envio: solicitar entrega | comando Kafka `shipment.create` | e2e: `happy_path_physical`, `timeout_shipping` (cria de fato antes de nunca responder), `timeout_once` | ✅ passou |
+| Envio: erro de negócio / timeout | `saga.md` §5.2, §5.2.1 | e2e: `shipping_failure` (erro de negócio); `timeout_shipping` (timeout real, `shipment.cancel`→`CANCELED`, `noop=false`, compensação de 3 passos na ordem `SHIPPING`→`PAYMENT`→`INVENTORY`) | ✅ passou |
 
 ## 6. Requisitos não funcionais obrigatórios
 
 | Requisito | Mecanismo (doc/ADR) | Teste que prova | Status |
 |---|---|---|---|
-| Idempotência | `Idempotency-Key` + `UNIQUE(idempotency_key)` (`api.md` §1); `processed_messages` + retry com mesmo `messageId` (`events.md` §5, ADR-005) | e2e: `idempotency` (PASS — mesmo `orderId=40de2069...`, header `Idempotent-Replayed=true`, estoque reduz de 995→994, uma única vez); indiretamente em `timeout_step`/`coordinator_restart` (retries não duplicam efeito) | ✅ passou |
-| Retries | Scheduler de timeouts, `SAGA_STEP_MAX_RETRIES` (2), backoff exponencial (`saga.md` §3.2) | e2e: `timeout_step` (PASS — `history` mostra `PAYMENT/TIMED_OUT` antes da compensação, 20s de duração real); unitário: `SagaStateMachineTest.java` (transições de retry) e `ReplyPolicyTest.java` de cada participante (`shouldReply(mode, attempts)`, `TIMEOUT_ONCE`) | ✅ passou |
-| Timeouts | `deadline_at`/`SAGA_STEP_TIMEOUT_MS` (`api.md` §5; `saga.md` §3.2) | e2e: `timeout_step` (PASS — `cancellationReason=STEP_TIMEOUT` após esgotar retries); unitário: `SagaStateMachineTest.java` | ✅ passou |
-| Recuperação após falhas | Estado 100% em Postgres, offset só avança após commit, outbox republica pendências, scheduler retoma deadlines (`saga.md` §3.5) | e2e: `coordinator_restart` (PASS na 2ª execução — ver Histórico de execução abaixo; `docker compose kill`/`up -d saga-orchestrator`, saga conclui `CONFIRMED`, exatamente 1 autorização de pagamento); unitário: `SagaStateMachineTest.java` (4 testes de `resumeAfterRestart`, dos 20 totais) | ✅ passou |
-| Rastreabilidade ponta a ponta | `traceparent` W3C propagado via outbox → header Kafka → spans (ADR-002; `observability.md` §3); `correlationId` no envelope | Não coberto por asserção automatizada em `run.sh` (checagem visual no Jaeger); script imprime o link do Jaeger por `orderId` em cada cenário (`jaeger_link` em `tests/e2e/run.sh`) para inspeção manual no G3 | ⚠️ parcial (evidência manual/visual, não automatizada) |
-| Publicação de eventos | outbox transacional + relay (`events.md` §1, ADR-002); 6 eventos obrigatórios do desafio §5 | e2e: todos os 7 cenários dependem da publicação real dos eventos para a saga progredir (`order.created`, `inventory.reserved`, `payment.authorized`, `shipment.created`, `order.confirmed`, `order.canceled`); efeito observado indiretamente via `GET /orders/{id}` e endpoints de participantes | ✅ passou |
+| Idempotência | `Idempotency-Key` + `processed_messages` (ADR-005) | e2e: `idempotency` (`orderId=590621ab…`, `Idempotent-Replayed=true`, estoque 958→957, reduz uma vez); IT: `OrderApiIT`/`IdempotentConsumerIT` (Fase B, ver observação) | ✅ passou (e2e) · ⚠️ IT pendente (Fase B) |
+| Retries | Scheduler de timeouts, `SAGA_STEP_MAX_RETRIES` (2), backoff exponencial | e2e: `timeout_step` (`PAYMENT/TIMED_OUT`, 20s); `timeout_inventory` (20s); `timeout_shipping` (22s); `timeout_once` (retry com sucesso, `attempt=2`, 7s) | ✅ passou |
+| Timeouts **em qualquer etapa** | `deadline_at`/`SAGA_STEP_TIMEOUT_MS` | e2e: agora cobre as **3 etapas participantes** — `timeout_step` (pagamento), `timeout_inventory` (estoque), `timeout_shipping` (envio) — antes só pagamento era coberto (lacuna fechada pela D6) | ✅ passou |
+| Recuperação após falhas | Estado em Postgres, offset após commit, scheduler retoma | e2e: `coordinator_restart` (`orderId=98807308…`, 1 única autorização) | ✅ passou |
+| Rastreabilidade ponta a ponta | `traceparent` W3C propagado via outbox/Kafka/HTTP, spans nos 5 serviços | e2e: **agora automatizado** — `trace_end_to_end` (`orderId=987d784e…`, trace `2dad6d78f94ba8fee5757e6cd7f4578f`, verificado via `GET /api/traces/{id}` do Jaeger com os 5 `processes[*].serviceName` presentes); antes da D6 era só inspeção manual | ✅ passou (automatizado) |
+| Publicação de eventos | outbox transacional + relay (ADR-002) | e2e: os 12 cenários dependem da publicação real para a saga progredir; IT: `OutboxRelayIT` prova o mecanismo isoladamente (Fase B) | ✅ passou (e2e) · ⚠️ IT pendente (Fase B) |
 
 ## 7. Cenários de falha obrigatórios
 
 | Cenário | Mecanismo de continuidade | Compensações esperadas | Teste que prova | Status |
 |---|---|---|---|---|
-| Falha no pagamento | `payment.failed` é resposta de negócio, sem retry (`saga.md` §5) | `inventory.release` → `order.cancel(PAYMENT_DECLINED)` | e2e: `payment_failure` (PASS, 1s, `orderId=02c195dc...`, "CANCELED (PAYMENT_DECLINED), reserva RELEASED, estoque restaurado (996)") | ✅ passou |
-| Falha no envio | `shipment.failed`, sem retry (recusa de negócio) | `payment.refund` → `inventory.release` → `order.cancel(SHIPMENT_FAILED)` | e2e: `shipping_failure` (PASS, 2s, `orderId=ce36add0...`, "CANCELED (SHIPMENT_FAILED), payment REFUNDED, reserva RELEASED, estoque restaurado (996)") | ✅ passou |
-| Timeout em qualquer etapa | Deadline persistido + scheduler; retry com mesmo `messageId`; esgotado → compensação (`saga.md` §3.2, §5.1) | Compensa o passo expirado + anteriores; aqui: `payment.refund` → `inventory.release` → `order.cancel(STEP_TIMEOUT)` | e2e: `timeout_step` (PASS, 20s, `orderId=b6d2d297...`, "retries esgotados (TIMED_OUT) -> CANCELED (STEP_TIMEOUT), refund+release aplicados") | ✅ passou |
-| Reinício inesperado do coordenador da Saga | Estado em Postgres; offset após commit; outbox republica; scheduler retoma (`saga.md` §3.5, §4.5) | Nenhuma extra — saga continua de onde parou | e2e: `coordinator_restart` (❌ na 1ª execução, ✅ **PASS** na 2ª — 11s, `orderId=602c9f34...`, "saga retomou após restart do coordenador; 1 única autorização de pagamento"); unitário: `SagaStateMachineTest.java` (`resumeAfterRestart`) | ✅ passou (após correção — ver Histórico) |
+| Falha no pagamento | `payment.failed`, sem retry (negócio) | `inventory.release` → `order.cancel(PAYMENT_DECLINED)` | e2e: `payment_failure` (`orderId=e484b376…`, 2s) | ✅ passou |
+| Falha no envio | `shipment.failed`, sem retry (negócio) | `payment.refund` → `inventory.release` → `order.cancel(SHIPMENT_FAILED)` | e2e: `shipping_failure` (`orderId=815ef918…`, 2s) | ✅ passou |
+| Timeout no **pagamento** | Deadline + scheduler; retry mesmo `messageId`; esgotado → compensação | `payment.refund`(autorização real) → `inventory.release` → `order.cancel(STEP_TIMEOUT)` | e2e: `timeout_step` (`orderId=cf5fa59a…`, 20s) | ✅ passou |
+| Timeout no **estoque** (D6, antes era lacuna) | Idem, aplicado à etapa `INVENTORY` (`saga.md` §5.2.1) | `inventory.release` → `order.cancel(STEP_TIMEOUT)`; nenhum pagamento/envio | e2e: `timeout_inventory` (`orderId=24bb5707…`, 20s) | ✅ passou |
+| Timeout no **envio** (D6, antes era lacuna) | Idem, aplicado à etapa `SHIPPING`; compensação de 3 passos | `shipment.cancel` → `payment.refund` → `inventory.release` → `order.cancel(STEP_TIMEOUT)`, **nesta ordem** | e2e: `timeout_shipping` (`orderId=949cc5e8…`, 22s, ordem do `history` verificada por índice) | ✅ passou |
+| Timeout com retry bem-sucedido (D6) | 1ª tentativa expira, 2ª (mesmo `messageId`) responde | Nenhuma — a saga se recupera sozinha, sem compensar | e2e: `timeout_once` (`orderId=1550c90a…`, 7s, `attempt=1`→`TIMED_OUT`, `attempt=2`→`SUCCEEDED`) | ✅ passou |
+| Reinício inesperado do coordenador | Estado em Postgres; offset após commit; scheduler retoma | Nenhuma extra | e2e: `coordinator_restart` (`orderId=98807308…`, 10s) | ✅ passou |
+
+## 8. Testes de integração (D6, ADR-010, `services/order-service/src/test/java/com/checkout/order/it/`)
+
+> Fase B da demanda: aguardando o Backend adicionar `maven-failsafe-plugin` (`pom.xml` raiz) e as
+> dependências de teste do `order-service` (Testcontainers, Awaitility) via `change-request` do QA
+> (ADR-010 §7). QA escreve as 4 classes `*IT` e roda `mvn -B -pl services/order-service -am verify`
+> assim que o handoff "D6: pom pronto…" for registrado pelo Backend.
+
+| Classe | Casos | Status |
+|---|---|---|
+| `OrderApiIT` | `POST /orders` 202+`Location`; replay 200 (`Idempotent-Replayed`); mesma key/corpo diferente → 409; sem header → 400; `GET /orders/{id}` 200 `PENDING`/`CREATED`; id inexistente → 404 | ⏳ pendente (Fase B) |
+| `OutboxRelayIT` | `order.created` chega em `order.events` com envelope completo; `outbox.published_at` preenchido | ⏳ pendente (Fase B) |
+| `IdempotentConsumerIT` | `order.confirm` 2× mesmo `messageId` → 1 linha em `processed_messages`, 1 `CONFIRMED`, 1 `order.confirmed` | ⏳ pendente (Fase B) |
+| `DeadLetterIT` | Mensagem não-JSON em `order.commands` → `order.commands.DLT` (≤30s); consumidor segue processando depois | ⏳ pendente (Fase B) |
 
 ## Histórico de execução
 
-**1ª execução (2026-09-23 13:57, integração completa)** — 6/7 verde.
-- Falhou `coordinator_restart`: após `docker compose kill saga-orchestrator`, o membro antigo do
-  grupo Kafka só saía do consumer group após `session.timeout.ms` (45s, default). Os deadlines de
-  passo da Saga (`SAGA_STEP_TIMEOUT_MS=5000`) venciam 3× antes do rebalance terminar, e o scheduler
-  compensava a saga por timeout. As respostas do `payment-service`, que chegaram depois do rebalance,
-  foram descartadas como `IGNORED_LATE_REPLY`.
-- Defeito registrado no log (`docs/squad/memory/decisions.jsonl` id `23d3ca1dd0de`), `--to backend`,
-  com passos de reprodução (`saga_step_log` 54-81 da saga `79af41f9`).
+**1ª execução (2026-09-23 13:57, integração completa)** — 6/7 verde. Falhou `coordinator_restart`
+(rebalance do Kafka de 45s vs. deadline de 5s da Saga; defect `23d3ca1dd0de`). Corrigido pelo
+Backend com static membership + carência no startup (handoff 04). **2ª execução** (mesmo dia,
+14:00) — 7/7 verde.
 
-**Correção do Backend** (`docs/squad/memory/handoffs/04-backend-core-para-qa.md`, seção
-"Correção pós-e2e (ciclo 1)"):
-1. **Static membership do Kafka** no `saga-orchestrator`: `group.instance.id` fixo
-   (`KAFKA_GROUP_INSTANCE_ID`, default `saga-orchestrator-1`), `session.timeout.ms=15000` e
-   `heartbeat.interval.ms=3000` — evita o rebalance completo em um restart de instância única.
-2. **Carência no startup**: antes da 1ª varredura do scheduler, sagas com deadline vencido (ou
-   próximo do vencimento) ganham `deadline_at = now + SAGA_STEP_TIMEOUT_MS` sem consumir
-   tentativa nem reenviar comando (`SagaStateMachine.resumeAfterRestart`, `saga_step_log`
-   `RESUMED_AFTER_RESTART`, métrica `saga_resumed_total`, 4 testes unitários novos).
+**D6 — 3ª execução (2026-09-23 18:02:42Z, commit `de2fd92`)** — 12/12 verde
+(`tests/e2e/last-report.json`), 5 cenários novos em relação à suíte original:
+`timeout_inventory`, `timeout_shipping`, `timeout_once`, `trace_end_to_end` (mais `customer_orders`
+da D1). Dois ajustes de teste feitos nesta rodada (não são defeitos de produto):
+1. **`json_bool` novo** em `run.sh`: o helper `json_get` existente usa `// empty` no `jq`, que trata
+   `false` como "falsy" e descarta o valor — inválido para os campos `noop` que a D6 passou a checar
+   de verdade (`noop=false` em reservas/pagamentos/envios compensados). Corrigido com um helper
+   dedicado a booleanos, sem alterar `json_get` (usado em várias outras asserções que dependem do
+   comportamento atual para campos ausentes).
+2. **`trace_end_to_end`: espera por serviço completo, não só existência do trace**. Os 5 serviços
+   exportam spans ao Jaeger de forma assíncrona e independente (`BatchSpanProcessor` por processo);
+   em 2 execuções de teste o trace apareceu no Jaeger com só 3-4 serviços dentro da janela de 30s
+   sugerida por `testes.md` §5, e o serviço faltante surgia poucos segundos depois. `wait_for_trace`
+   foi generalizado para só considerar "pronto" quando os 5 serviços aparecem juntos, com folga de
+   60s — sem isso, o cenário seria estruturalmente flaky mesmo com o produto correto.
 
-**2ª execução (2026-09-23 14:00, pós-correção)** — 7/7 verde
-(`tests/e2e/last-report.json`), incluindo `coordinator_restart` (11s, `RESUMED_AFTER_RESTART` →
-`payment.authorized` aceito 91ms depois, tentativa 1, sem duplicar autorização).
-
-**Aprendizado**: o timeout de um passo da Saga (`SAGA_STEP_TIMEOUT_MS`) precisa ser maior que o
-tempo de rebalance do consumer group do Kafka (`session.timeout.ms`) para que um restart do
-coordenador não seja confundido com uma falha real do passo em andamento — ou, como aqui, usar
-static membership para evitar o rebalance completo nesse caso (1 réplica). Isso é uma dependência
-implícita entre a config de infraestrutura (Kafka) e a config de negócio (deadlines da Saga) que
-não estava explícita em nenhum ADR; vale registrar como nota operacional se o serviço for escalado
-para múltiplas réplicas (ver `change-request` do Backend ao DevOps, id `b164b075d5cf`).
+**Aprendizado (D6)**: cobertura de timeout agora existe nas 3 etapas participantes (pagamento,
+estoque, envio) e não só no pagamento; rastreabilidade ponta a ponta deixou de ser verificação
+manual e passou a ser um cenário automatizado determinístico (trace id conhecido enviado no
+`POST /orders`).
 
 ## Observações / lacunas conhecidas
 
-1. **Timeout em INVENTORY e SHIPPING**: `timeout_step` cobre apenas `simulate.payment=TIMEOUT` (etapa
-   intermediária, exercita compensação de 2 passos). O mecanismo é idêntico para `inventory`/`shipping`
-   (`events.md` §3); não há função e2e dedicada para essas variantes — pode ser adicionada com o mesmo
-   padrão (`order_payload ... '{"inventory":"TIMEOUT"}'` / `'{"shipping":"TIMEOUT"}'`) se o Auditor exigir
-   cobertura mais ampla no G3.
-2. **`TIMEOUT_ONCE`** (retry bem-sucedido, sem compensação): documentado como variante manual em
-   `tests/e2e/scenarios.md` §5, não automatizado como cenário próprio (os 7 cenários da suíte seguem
-   exatamente a lista de `.claude/agents/qa.md`).
-3. **Rastreabilidade no Jaeger**: verificação é visual/manual (o script apenas imprime o link); não há
-   dependência do cliente HTTP do Jaeger no `run.sh` para manter a suíte simples e sem dependências
-   extras. Evidência para o G3 deve ser um screenshot/link anexado pelo Auditor.
-4. **Testes unitários**: existem 60 testes em `services/*/src/test/**`, todos verdes (ver
-   `services/*/target/surefire-reports/*.txt`) — `SagaStateMachineTest` (20, saga-orchestrator),
-   `PaymentCommandHandlerTest`+`ReplyPolicyTest` (12, payment), `InventoryCommandHandlerTest`+
-   `StockAllocatorTest`+`ReplyPolicyTest` (15, inventory), `ShippingCommandHandlerTest`+`CarrierTest`+
-   `ReplyPolicyTest` (13, shipping). **Gap conhecido**: `order-service` e `common` não têm
-   `src/test/**` próprio — sua cobertura vem só da suíte e2e (criação/consulta/idempotência de
-   pedido, outbox, `IdempotencyGuard`), sem teste unitário isolado.
-5. **409 em `Idempotency-Key` repetida com corpo diferente**: mencionado como verificação "bônus" em
-   `scenarios.md` §7, não incluído como assert obrigatório em `scenario_idempotency` (o requisito do
-   `.claude/agents/qa.md` cobre apenas "mesmo `Idempotency-Key` duas vezes → um único pedido").
-| Emoji por papel nos cards dos agentes (demanda D3, Squad Control) | `squad-control/index.html` (`docs/contracts/ui-squad-control-agentes.md`) | `tests/ui/checklist-squad-control-d3.md` + capturas 1440/390 | ✅ G3 88% |
-| Tipo da demanda + validação agêntica (demanda D4, Squad Control) | `tools/squad/{server,triage,pending}.py`, `squad-control/index.html` (`docs/contracts/ui-demandas-v2.md`, ADR-008) | `tests/ui/checklist-demandas-v2.md` (API, 4 triagens reais 10–21 s, capturas) | ✅ G3 80% |
-| Backlog de demandas (demanda D5, Squad Control) | `tools/squad/{server,pending,github_sync}.py`, `squad-control/index.html` (`docs/contracts/ui-backlog-de-demandas.md`, ADR-009) | `tests/ui/checklist-backlog-d5.md` (API, fila por prioridade, capturas) | ✅ G2 100% (2º ciclo) · G3 94% |
+1. ~~**Timeout em INVENTORY e SHIPPING**~~ — **fechada pela D6**: `timeout_inventory` e
+   `timeout_shipping` cobrem as duas variantes que antes só tinham o padrão documentado, sem cenário
+   e2e dedicado.
+2. **`TIMEOUT_ONCE`** — **fechada pela D6**: antes era variante manual documentada em
+   `scenarios.md`, agora é o cenário automatizado `timeout_once`.
+3. ~~**Rastreabilidade no Jaeger**~~ — **fechada pela D6**: `trace_end_to_end` verifica via API do
+   Jaeger; o link manual continua disponível em cada cenário para inspeção visual na demo.
+4. **Testes de integração (`*IT`)**: escritos e rodados só depois da Fase B (Backend adiciona
+   Testcontainers/failsafe ao `pom.xml` via change-request do QA, ADR-010 §7) — ver seção 8.
+5. **Testes unitários**: 66 testes em `services/*/src/test/**`, todos verdes —
+   `SagaStateMachineTest` (20), `PaymentCommandHandlerTest`+`ReplyPolicyTest` (12),
+   `InventoryCommandHandlerTest`+`StockAllocatorTest`+`ReplyPolicyTest` (15),
+   `ShippingCommandHandlerTest`+`CarrierTest`+`ReplyPolicyTest` (13),
+   `OrderListByCustomerTest` (6, D1). `common` continua sem `src/test/**` próprio.
+6. **409 em `Idempotency-Key` repetida com corpo diferente**: ainda tratado como verificação
+   "bônus" em `scenarios.md`, não obrigatória em `scenario_idempotency`; a demanda D6 exige esse
+   caso nos testes de **integração** (`OrderApiIT`), não no e2e — cobertura fica completa após a
+   Fase B.
