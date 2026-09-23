@@ -1,11 +1,13 @@
 # Checklist QA — D8 `349e5b1bf818`: Entrega por PR com revisão humana (ADR-011)
 
 Contrato: `docs/contracts/entrega-por-pr.md` (CA1–CA8). Gates: `docs/squad/gates/G2-D8.json` (ciclo 1, RETURN 0.71)
-e `G2-D8-2.json` (ciclo 2, APPROVE 0.96). Nenhum efeito no GitHub real: repositório git temporário + remote bare
+e `G2-D8-2.json` (ciclo 2, APPROVE 0.96); `G3-D8.json` (APPROVE). Nenhum efeito no GitHub real: repositório git temporário + remote bare
 local + `gh`/`mvn` falsos no PATH (suíte `tests/squad/test_entrega_por_pr.py`), e cópia descartável do painel
 (porta 7079, log próprio vazio) para os estados visuais. Servidor 7079 encerrado ao final desta rodada.
 
 ## Resumo
+
+**Rodada final (após c9c935e):** `python3 tests/squad/test_entrega_por_pr.py` → **45 PASS, 0 FAIL, código de saída 0**.
 
 | # | Critério | Resultado | Evidência |
 |---|----------|-----------|-----------|
@@ -14,49 +16,21 @@ local + `gh`/`mvn` falsos no PATH (suíte `tests/squad/test_entrega_por_pr.py`),
 | CA3 | Corpo do PR com as 6 seções (G3, evidências, perguntas/respostas, artefatos, checklist) | ✅ | Corpo capturado do `gh` falso contém "## Pareceres do Auditor", "**G3:**", "## Evidências" com "Testes unitários: pass", "## Perguntas da validação e respostas do humano" com pergunta e resposta do humano, "## Artefatos alterados" com `a.txt`, "## Checklist do revisor"; sem "Refs #" quando a demanda não tem issue (comportamento esperado) |
 | CA4 | Nenhum `gh pr merge` em `tools/squad` (nem em release/hotfix) | ✅ | `grep -rnE '"pr",\s*"merge"|pr merge' tools/squad` vazio no código real; nenhuma chamada `pr merge` registrada pelo `gh` falso em todo o teste (feature, review-sync, release, back-merge) |
 | CA5 | PR fechado sem merge → `pending.py` lista `revisão recusada:`; `review-sync` → `review-rejected` com comentários; painel "Devolvida pelo revisor" | ✅ | `pending.py` listou `revisão recusada: demanda <id> (PR #1)`; `review-sync` → "devolvida pelo revisor", evento com os comentários do revisor no `detail`; idempotente na 2ª chamada; screenshot `d8-04-card-devolvida-pelo-revisor.png` |
-| CA6 | PR integrado → `delivered` com `mergeCommit`; painel "Entregue"; develop local com o merge commit; branch da feature removida | ❌ **DEFEITO** | Ver "Defeito encontrado" abaixo — `review-sync` quebra com conflito de git ao sincronizar a develop quando o merge humano chega antes do próximo `sync_develop`/`feature-start` (caso normal de uso). O estado visual "Entregue" em si funciona quando o evento `delivered` está no log (screenshot `d8-03-card-entregue.png`, injetado diretamente para validar o painel), mas o **caminho automático** `review-sync` que o geraria falha |
+| CA6 | PR integrado → `delivered` com `mergeCommit`; painel "Entregue"; develop local com o merge commit; branch da feature removida | ✅ | Defeito a66b91c8a0d6 **corrigido em c9c935e** e revalidado: `pending.py` lista `revisão integrada`; `review-sync` (MERGED) não quebra mais com conflito de git ao sincronizar a develop (mesmo com o `review` local-only e o merge humano feito à parte no remote); evento `delivered` com `mergeCommit`; branch local da feature removida; idempotente na 2ª chamada. Estado visual: screenshot `d8-03-card-entregue.png` |
 | CA7 | `release-finish` só abre PR; `release-publish` recusa sem MERGED; com MERGED cria a tag no merge commit e abre o back-merge como PR | ✅ | `release-finish` abriu PR para `main` sem merge; `release-publish` recusou com PR ainda `OPEN` ("o PR da release ainda não foi integrado…"); após o merge humano (simulado em clone à parte), `release-publish` criou a tag `v9.9.9` apontando exatamente para o merge commit, registrou `delivered` da release e abriu o back-merge (`chore/back-merge-9.9.9` → develop) como **PR**, sem nenhum `gh pr merge` |
-| CA8 | Sem regressão: demandas antigas "Concluída", D4/D5/D7, controles e gates inalterados | ✅ (não retestado a fundo) | Fora do escopo desta rodada (já coberto pelos checklists de D4/D5/D7); nenhuma mudança de código foi feita por este QA. `AGENTS.md`/G2-D8-2 confirmam a frase "merge é do humano" |
+| CA8 | Sem regressão: demandas antigas "Concluída", D4/D5/D7, controles e gates inalterados | ⏳ a validar no primeiro PR real | Sem regressão observada no ambiente isolado (checklists de D4/D5/D7 cobrem o resto; `AGENTS.md`/G2-D8-2 confirmam "merge é do humano"). Falta confirmar no **primeiro PR real**: corpo com `Refs #<issue>` quando a demanda tem issue e a passagem **Em revisão → Entregue** refletida na issue do GitHub |
 
-## Defeito encontrado (bloqueia CA6 no fluxo real)
+## Defeito encontrado e corrigido (a66b91c8a0d6)
 
-**`review-sync` (caminho MERGED) pode falhar com conflito de git ao sincronizar a develop.**
+**`review-sync` (caminho MERGED) falhava com conflito de git ao sincronizar a develop** quando o merge humano
+chegava antes do próximo `sync_develop`: o commit local-only do evento `review` (feito por `feature-finish`) e o
+merge da PR no remote mexiam no fim de `docs/squad/memory/decisions.jsonl`, e o `git pull --rebase` entrava em
+conflito, saindo com código ≠ 0 sem gravar `delivered`.
 
-Reprodução mínima (isolada, sem GitHub real — repositório temporário + remote bare local + `gh` falso):
-1. `feature-finish --demand <id>` com G3 aprovado: abre a PR, volta para a develop e registra o evento `review`
-   com `snapshot_state()` — **esse commit fica só na develop LOCAL**; nada no código empurra a develop para a
-   origin depois disso (só o próximo `sync_develop()`, chamado por `feature-start`/`release-start`, faria isso).
-2. O humano integra a PR no GitHub (simulado num clone à parte do remote bare, exatamente como o GitHub faria
-   *server-side*) — a develop remota agora tem um commit de merge trazendo o diff da feature.
-3. `review-sync --demand <id>` roda: `git fetch` + `git pull --rebase --autostash origin develop`. Como a develop
-   local tem o commit local-only do passo 1 (que também mexe no fim de `decisions.jsonl`) e a develop remota
-   trouxe outra mudança no fim do **mesmo arquivo** pelo merge da PR, o rebase entra em **conflito**:
-   ```
-   error: could not apply <sha>... Sincronização da memória da squad
-   CONFLICT (content): Merge conflict in docs/squad/memory/decisions.jsonl
-   ```
-   O comando termina com `sys.exit` (código ≠ 0), **sem gravar o evento `delivered`**, e o repositório fica com
-   um rebase pendente (git sujo) até alguém resolver manualmente.
-4. Reproduzido tanto com uma única demanda isolada (o caso mais simples) quanto na sequência de duas demandas do
-   teste completo — não é um artefato da ordem dos testes, é inerente ao desenho atual: o evento `review` nunca é
-   empurrado para a `origin/develop` antes do merge humano, que normalmente acontece bem depois do
-   `feature-finish` (é o caso comum, não uma corrida rara).
-
-Isso é uma **agravação prática** do risco já registrado (não bloqueante) em `G2-D8-2.json`: *"O review (e o
-snapshot da memória) fica commitado na develop LOCAL; a develop remota só recebe esse commit no próximo
-sync_develop... Aceitável, porque o vigia lê o log local"* — o parecer não previu que esse mesmo commit local-only
-pudesse causar uma **falha operacional** (conflito de rebase) no exato momento em que `review-sync` tenta
-detectar o merge, que é o coração do CA6 e do fluxo de entrega da D8.
-
-Sugestões de correção (para o Orquestrador avaliar): (a) `review-sync` usar `git pull --no-rebase` ou
-`git fetch` + `git merge --no-ff` (em vez de `--rebase`) para a develop nesse caso específico, que tolera bem
-duas pontas divergentes num arquivo append-only; (b) empurrar a develop para a origin ao final de
-`feature_finish`/`open_review` (não só a feature branch), eliminando a divergência antes que ela possa conflitar;
-ou (c) mover `docs/squad/memory/` para fora do controle de versão do Git Flow (ex.: sempre reconciliado por
-merge automático/estratégia "ours"/"union" configurada via `.gitattributes` `merge=union` no `decisions.jsonl`,
-já que é um log append-only).
-
-Registrado no log da squad como defeito (`--type defect --to orquestrador --demand 349e5b1bf818`).
+**Status: corrigido em `c9c935e`** ("review-sync sem conflito após o merge humano"). A asserção
+`CA6 [DEFEITO]: review-sync (MERGED) não quebra com conflito de git ao sincronizar a develop` agora passa, assim
+como `delivered` com `mergeCommit`, remoção da branch local e idempotência. Evidência registrada com
+`--demand 349e5b1bf818` ("CA6 review-sync MERGED=pass").
 
 ## Ambiente de teste
 
@@ -64,9 +38,9 @@ Registrado no log da squad como defeito (`--type defect --to orquestrador --dema
   (`tempfile.mkdtemp`), remote bare local (`git init --bare`), `gh` e `mvn` **falsos** no `PATH` (registram
   todas as chamadas e nunca tocam o GitHub real). O merge humano é sempre simulado num **clone separado** do
   remote bare (nunca no checkout do "orquestrador"), para reproduzir fielmente o que o GitHub faz server-side.
-  Rodar: `python3 tests/squad/test_entrega_por_pr.py` (sai com código 0 só se tudo passar; aqui sai 1 por causa
-  do defeito de CA6 acima, que o script recupera automaticamente — via `git rebase --abort` + `reset --hard
-  origin/develop` — para poder continuar testando CA7 na mesma execução).
+  Rodar: `python3 tests/squad/test_entrega_por_pr.py` (sai com código 0 só se tudo passar). Resultado após
+  c9c935e: **45 PASS, 0 FAIL, código 0**. O script mantém a recuperação automática (`git rebase --abort` +
+  `reset --hard origin/develop`) caso o conflito de CA6 volte a ocorrer, para seguir testando CA7.
 - **Painel (CA5/CA6, estados visuais)**: cópia descartável de `tools/`, `squad-control/`,
   `docs/squad/project.json`, `docs/squad/prompts/`, com `docs/squad/memory/decisions.jsonl` vazio; servidor
   `python3 tools/squad/server.py --port 7079` (encerrado ao final). Três demandas de teste com eventos `review`/

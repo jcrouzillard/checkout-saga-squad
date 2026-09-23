@@ -26,7 +26,20 @@ stateDiagram-v2
 1. `--demand` **obrigatório**; sem `G3 APPROVE` mais recente da demanda → sai com erro (sem opção `--force`).
 2. `git push -u origin <feature>`; abre o PR para `develop` (ou reaproveita o aberto / reabre o fechado da mesma
    branch com `gh pr reopen`) e atualiza o corpo (`gh pr edit --body`) — idempotente.
-3. **Não** chama `gh pr merge`, **não** troca para develop, **não** apaga a branch.
+3. **Não** chama `gh pr merge` e **não** apaga a branch. Depois de abrir o PR, **troca para a develop** (comportamento
+   aceito no G2-D8-2; `open_review`, `import_memory`, `align_memory` em `tools/squad/gitflow.py`):
+   a. atualiza a develop (`git pull --rebase origin develop`) e leva a ela os eventos do log
+      (`docs/squad/memory/decisions.jsonl`) que só existiam na feature (dedupe por `id`);
+   b. registra o `review` (item 4) **na develop** e publica a develop (`git push origin develop`);
+   c. volta para a feature, faz merge da develop deixando a memória da squad (`docs/squad/memory/`,
+      `docs/squad/inbox/`) **idêntica** à da develop, publica a feature e retorna à develop — assim o PR não toca o
+      log e o merge humano não conflita (defeito `a66b91c8a0d6`).
+   Visível ao revisor: um commit extra **"Sincroniza a develop e a memória da squad antes da revisão"** no PR. Se a
+   sincronização der **conflito de código** (fora da memória), a ferramenta aborta o merge (`git merge --abort`),
+   volta para a develop e para com erro listando os arquivos — o PR já aberto e o `review` já registrado permanecem;
+   o conflito deve ser resolvido na feature antes da revisão.
+   Premissa: a develop hoje **não é protegida**; se passar a exigir PR/checks, os pushes de memória do passo b (e os
+   de `review-sync`/`release-publish`) deixam de funcionar e exigem novo ADR (ressalva 2 do G3-D8).
 4. Registra `review` (abaixo) — só se ainda não houver `review` aberto para o mesmo PR.
 
 Corpo do PR (Markdown, nesta ordem): título `<código>: <título da demanda>`; **Resumo** (título, descrição, tipo,
