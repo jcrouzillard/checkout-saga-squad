@@ -91,6 +91,12 @@
   .tool { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-right: 8px; color: var(--accent); }
   .tool.err { color: var(--red); }
   .feed .txt { color: var(--muted); white-space: pre-wrap; }
+  .feed li.live { background: var(--accent-soft); border-left: 3px solid var(--accent); padding-left: 10px; margin-left: -13px; }
+  .feed details { margin-top: 4px; } .feed summary { cursor: pointer; font-size: 12px; color: var(--accent); }
+  .feed pre { margin: 6px 0 0; font-size: 11.5px; max-height: 160px; overflow: auto; }
+  .live-now { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--accent-soft); border-top: 2px solid var(--accent); margin: 12px 0; font-size: 13px; }
+  .live-now .pulse { width: 9px; height: 9px; background: var(--green); animation: blink 1.2s infinite; flex: none; }
+  .live-now b { display: block; }
   .files { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
   .files code { font-size: 11.5px; background: var(--panel2); border: 1px solid var(--line); padding: 2px 6px; }
   .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 28px; margin-top: 24px; }
@@ -188,6 +194,7 @@ const PIPELINE = [
 let project = null, product = null, obsTool = "grafana", state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const since = ts => { if (!ts) return ""; const s = Math.max(0, Math.round((Date.now() - new Date(ts)) / 1000)); return s < 60 ? `há ${s} s` : s < 3600 ? `há ${Math.floor(s / 60)} min ${s % 60} s` : `há ${Math.floor(s / 3600)} h`; };
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
 const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" }; return `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini}</div>`; };
 const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
@@ -331,13 +338,16 @@ function renderExecucoes() {
 function feedHtml(runs) {
   if (!runs?.length) return `<p class="muted">Este agente ainda não recebeu nenhuma tarefa.</p>`;
   return runs.slice().reverse().map(r => `
+    ${r.status === "trabalhando" ? `<div class="live-now"><span class="pulse"></span><div><span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600">Executando agora</span>
+      <b>${r.current ? `${esc(r.current.tool)} · ${esc(r.current.summary)}` : "Pensando / escrevendo a próxima ação"}</b>
+      <span class="muted">${r.current ? since(r.current.ts) : since(r.updated)} · sessão iniciada ${hhmm(r.started)} · ${r.toolCount} ações</span></div></div>` : ""}
     <div style="margin-bottom:18px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.description || "Sessão")}</b>
         <span class="tag">${esc(r.status)}</span><span class="tag">${esc(r.model || "")}</span><span class="tag">${r.toolCount} ações</span>
         <span class="muted" style="font-size:12px">início ${hhmm(r.started)} · última ${hhmm(r.updated)}</span></div>
       ${r.files.length ? `<div class="files">${r.files.map(f => `<code>${esc(f)}</code>`).join("")}</div>` : ""}
-      <ul class="feed">${r.activity.slice().reverse().map(a => `<li><time>${hhmm(a.ts)}</time><div>${a.kind === "tool"
-        ? `<span class="tool ${a.error ? "err" : ""}">${esc(a.tool)}</span>${esc(a.summary)}`
+      <ul class="feed">${r.activity.slice().reverse().map(a => `<li class="${a.kind === "tool" && a.pending && r.status === "trabalhando" ? "live" : ""}"><time>${hhmm(a.ts)}</time><div>${a.kind === "tool"
+        ? `<span class="tool ${a.error ? "err" : ""}">${esc(a.tool)}</span>${esc(a.summary)}${a.pending && r.status === "trabalhando" ? ` <span class="muted">· em execução ${since(a.ts)}</span>` : (a.error ? ` <span class="fail">· erro</span>` : "")}${a.detail ? `<details><summary>detalhe</summary><pre>${esc(a.detail)}</pre></details>` : ""}`
         : `<span class="txt">${esc(a.summary)}</span>`}</div></li>`).join("")}</ul>
     </div>`).join("");
 }
@@ -447,9 +457,11 @@ function renderDrawer() {
   if (!drawerAgent) { d.hidden = true; return; }
   const runs = runsByAgent()[drawerAgent];
   const scroll = d.scrollTop;
+  const opened = new Set([...d.querySelectorAll("details[open]")].map(el => el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80)));
   d.innerHTML = `<div class="head">${av(drawerAgent)}<div><b style="font-size:17px">${AGENTS[drawerAgent].label}</b><div class="muted">${AGENTS[drawerAgent].role} · ${agentStatus(runs)}</div></div>
     <button class="btn close" id="closeDrawer">Fechar</button></div><hr>${feedHtml(runs)}`;
   d.hidden = false; d.scrollTop = scroll;
+  d.querySelectorAll("details").forEach(el => { if (opened.has(el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80))) el.open = true; });
 }
 
 async function render() {

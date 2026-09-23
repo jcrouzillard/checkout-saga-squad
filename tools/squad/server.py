@@ -136,7 +136,9 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
                 if delegations_only and name != "Agent":
                     continue
                 tool_count += 1
-                item = {"ts": ts, "kind": "tool", "tool": name, "summary": summarize_tool(name, inp)}
+                item = {"ts": ts, "kind": "tool", "tool": name, "summary": summarize_tool(name, inp), "pending": True,
+                        "detail": (inp.get("command") or inp.get("old_string") or inp.get("pattern") or "")[:400]
+                        if name in ("Bash", "Edit", "Grep", "Glob") else ""}
                 written = [rel(inp.get("file_path", ""))] if name in ("Write", "Edit") else []
                 if name == "Bash":
                     written = [w for w in HEREDOC_WRITE.findall(inp.get("command", "")) if not w.startswith("/dev/")]
@@ -151,8 +153,11 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
                     activity.append({"ts": ts, "kind": "text", "summary": text[:600]})
             elif r.get("type") == "user" and t == "tool_result":
                 item = pending.pop(c.get("tool_use_id"), None)
-                if item and c.get("is_error"):
-                    item["error"] = True
+                if item:
+                    item["pending"] = False
+                    item["endedAt"] = ts
+                    if c.get("is_error"):
+                        item["error"] = True
     updated = path.stat().st_mtime
     meaningful = [r for r in rows if r.get("type") in ("assistant", "user")]
     last = meaningful[-1] if meaningful else rows[-1]
@@ -161,11 +166,12 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
         x.get("type") != "tool_use" for x in last_content)
     recent = (time.time() - updated) < RUNNING_WINDOW_S
     run_id = path.stem.replace("agent-", "")
+    current = next((a for a in reversed(activity) if a["kind"] == "tool" and a.get("pending")), None)
     if delegations_only:
         status = "coordenando"
     elif ended_turn and ((completed is not None and run_id in completed) or (time.time() - updated) > 90):
         status = "concluído"
-    elif recent or not ended_turn:
+    elif recent or not ended_turn or current:
         status = "trabalhando"
     else:
         status = "trabalhando" if (time.time() - updated) < 900 else "parado"
@@ -178,6 +184,7 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
         "started": rows[0].get("timestamp"),
         "updated": datetime.fromtimestamp(updated, timezone.utc).isoformat(timespec="seconds"),
         "toolCount": tool_count,
+        "current": current if status == "trabalhando" else None,
         "files": files,
         "activity": activity[-80:],
     }

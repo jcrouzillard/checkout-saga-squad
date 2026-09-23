@@ -154,6 +154,9 @@ entradas, saídas, critérios de gate e limites.
   ciclo de devolução.
 - Autocorreção: um `RETURN` gera nova delegação com as instruções do parecer.
 
+**Como o painel monitora a squad** (sem banco: log de eventos + transcrições do Claude Code):
+[`docs/squad/monitoramento.md`](docs/squad/monitoramento.md).
+
 **Squad Control** (`make squad` → http://localhost:7070): linha do tempo das fases, recomendação do Auditor com
 confiança, evidências, botões de intervenção humana (gravados no log) e o **feed ao vivo de cada agente**, lido das
 transcrições das sessões do Claude Code.
