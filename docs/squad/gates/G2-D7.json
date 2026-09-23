@@ -1,0 +1,47 @@
+{
+  "gate": "G2",
+  "demand": "e31bdfb73679",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.75,
+  "risk": "baixo",
+  "evidences": [
+    {
+      "name": "Integração do servidor (cópia descartável :7077)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "Cópia de tools/, squad-control/, docs/squad/prompts e project.json com log vazio (sem 7070, sem log real). Imediata: pending 'validação:' → cancel 201 → cancel de novo 409 'demanda já cancelada' → start 409 e override com nota 409 'demanda cancelada' → pending só 'cancelamento:', sem 'validação:'; triage.py → 'demanda cancelada: triagem não executada' (e revalida o log antes de gravar, cobrindo cancelamento durante a triagem). Backlog: cancel 201 → edit 409 e start 409. Inexistente → 404. Clarify de cancelada (com validation tardia injetada) → 409. Com G3 APPROVE → 409 'demanda já concluída'"
+    },
+    {
+      "name": "Painel (5 estados, card Cancelada)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "preCancelHtml() nos 3 pontos pré-início: item do Backlog (index.html:565) e bloco pré-início com e sem validação (602, 607), cobrindo Em validação, Validação atrasada, Com perguntas, pronta para iniciar e Backlog. 1º clique abre confirmação com <label for> 'Motivo (opcional)' e foco no campo; 'Confirmar cancelamento' envia control cancel com note; 'Voltar' devolve o foco. Cancelada: vinfo = null quando há cancelEv, então as perguntas de uma validation posterior não aparecem; preStart/inBacklog falsos, então nenhuma ação; motivo exibido. 404/409 mostrados com a mensagem do servidor"
+    },
+    {
+      "name": "Sincronização GitHub (CA5)",
+      "status": "fail",
+      "weight": 2,
+      "blocking": true,
+      "source": "github_sync.on_control cancel: comentário + close --reason 'not planned' + label cancelada OK, e validation tardia não comenta em issue fechada. Porém o contrato CA5 exige Status do Project 'Cancelado' (criar a opção se não existir), e o código não define Status nenhum e chama status_label(issue, 'Concluído'), o que aplica a label status:concluido e remove as outras a uma demanda CANCELADA. Nem 'Cancelado' existe em STATUS_LABEL. Nenhuma decisão ou change-request no log justifica o desvio"
+    },
+    {
+      "name": "Escopo e ownership",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "git diff develop --stat: contrato, gate G1, squad-control/index.html (Frontend), tools/squad/{server,github_sync,triage}.py (Orquestrador). Sem evento novo; pending.py e log.py intactos. plantao.md não foi alterado: a interrupção da triagem ficou no triage.py (checa o cancelamento antes e depois de rodar o agente), o que é aceitável como equivalente"
+    }
+  ],
+  "open_risks": [
+    "CORRIGIR (Orquestrador, github_sync.py on_control cancel): em vez de status_label('Concluído'), usar Status 'Cancelado': incluir 'Cancelado': 'status:cancelado' em STATUS_LABEL, chamar set_field(issue, 'Status', 'Cancelado') (criar a opção no Project se não existir) e status_label(issue, 'Cancelado'). Se o token não permitir criar a opção no Project, registrar decisão e manter só a label status:cancelado, nunca status:concluido.",
+    "Não exercitado contra o GitHub real (evitar issues de teste): o QA deve conferir CA5 com gh issue view numa demanda de teste controlada ou na 1ª real.",
+    "O botão 'Cancelar demanda' pré-início usa só cor vermelha na borda e no texto, mas o rótulo textual é explícito (ok para acessibilidade)."
+  ],
+  "human_required": false,
+  "rationale": "A integração em cópia descartável (:7077) confirmou todo o comportamento de servidor do CA4 (201/409/404, concluída 409, bloqueio de start/override/clarify/edit) e o CA3: pending sem validação e triage.py que não roda nem grava para demanda cancelada. O painel oferece o cancelamento com confirmação nos 5 estados pré-início e esconde perguntas tardias. Porém o CA5 não foi cumprido: a issue de uma demanda cancelada recebe a label status:concluido e o Status 'Cancelado' não é definido, o que é um desvio do contrato sem justificativa registrada. A correção é pequena e fica no github_sync.py; devolvo ao Orquestrador (ciclo 1). Servidor :7077 parado. Confiança = (3+2+0+1)/8 = 0.75."
+}

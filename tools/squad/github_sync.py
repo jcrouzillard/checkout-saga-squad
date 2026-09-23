@@ -70,7 +70,8 @@ class Sync:
         STATE.write_text(json.dumps(self.s, ensure_ascii=False, indent=1))
 
     STATUS_LABEL = {"Backlog": "status:backlog", "Em andamento": "status:em-andamento", "Gate (Jev)": "status:gate",
-                    "Gate (Auditor)": "status:gate", "Intervenção humana": "status:intervencao-humana", "Concluído": "status:concluido"}
+                    "Gate (Auditor)": "status:gate", "Intervenção humana": "status:intervencao-humana", "Concluído": "status:concluido",
+                    "Cancelado": "status:cancelado"}
 
     def set_field(self, issue: dict, field: str, value: str | None):
         fd = self.s["project"]["fields"].get(field)
@@ -305,7 +306,9 @@ class Sync:
                                 "--comment", f"Demanda cancelada pelo humano. Motivo: {e.get('detail') or '(não informado)'}"],
                                capture_output=True)
                 issue["closed"] = True
-            self.status_label(issue, "Concluído")
+            subprocess.run(["gh", "label", "create", "status:cancelado", "--color", "9B2C2C", "-R", REPO, "-f"], capture_output=True)
+            self.status_label(issue, "Cancelado")  # campo Status do Project não ganha opção nova: recriar opções apagaria os cards
+            issue["status"] = "Cancelado"
         elif e.get("action") == "reprioritize" and e.get("priority"):
             label = f"prioridade:{e['priority']}"
             subprocess.run(["gh", "label", "create", label, "--color", "1F3A5F", "-R", REPO, "-f"], capture_output=True)
