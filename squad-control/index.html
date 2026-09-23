@@ -447,7 +447,9 @@ function demandInfo(d, index) {
   const start = related.find(e => e.type === "start");
   const eff = effectiveDemand(d, related);
   const inBacklog = d.backlog === true && !start && !related.some(e => e.type === "control" && e.action === "cancel");
-  const vinfo = inBacklog ? null : validationInfo(d, related);
+  // D7: demanda cancelada não mostra validação (nem perguntas que cheguem depois do cancelamento).
+  const cancelEv = related.find(e => e.type === "control" && e.action === "cancel") || null;
+  const vinfo = (inBacklog || cancelEv) ? null : validationInfo(d, related);
   // A validação (e a triagem antes do início) não é "trabalho" da demanda; demandas sem kind seguem a regra antiga.
   const work = related.filter(e => e.agent !== "humano" && e.type !== "validation" && (!d.kind || (start && e.ts >= start.ts)));
   const gates = work.filter(e => e.type === "gate");
@@ -461,7 +463,7 @@ function demandInfo(d, index) {
   const preStart = !canceled && !done && !paused && !work.length && !start;
   const queued = !canceled && !done && !paused && !work.length && !!start;
   const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued };
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "" };
 }
 function controlsHtml(info) {
   if (info.preStart || ["Concluída", "Cancelada"].includes(info.status)) return "";
@@ -523,6 +525,7 @@ function renderDemandas() {
           ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
           ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
         </div>
+        ${info.canceled ? `<div class="fail" style="font-size:12px;margin-top:6px">Cancelada${info.cancelNote ? ` · motivo: ${esc(info.cancelNote)}` : " · sem motivo informado"}</div>` : ""}
         ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
         ${info.preStart ? preStartHtml(info) : controlsHtml(info)}
       </div>`; }).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
@@ -558,7 +561,8 @@ function backlogItemHtml(info) {
       <div><label class="muted" style="font-size:11px" for="tg-${id}">Agente</label><select id="tg-${id}" data-keep data-tg="${id}" style="${sel}">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
       <button class="btn" id="ble-btn-${id}" data-bl-edit="${id}" style="height:40px">Editar</button>
       <button class="btn primary" id="start-${id}" data-start="${id}" data-from-backlog="1" style="flex-grow:0;height:40px">Mover para a fila</button>
-    </div>`}
+    </div>
+    ${preCancelHtml(id)}`}
     ${msg ? `<p class="${msg.ok ? "ok-msg" : "fail"}" style="font-size:13px;margin:8px 0 0">${esc(msg.text)}</p>` : ""}
   </div>`;
 }
@@ -595,8 +599,21 @@ function preStartHtml(info) {
         ${ready ? "" : `<p class="why" id="why-${d.id}">${esc(VREASON[vinfo.st] || "")}</p>
         <div class="override"><label for="ovc-${d.id}"><input type="checkbox" id="ovc-${d.id}" data-keep data-ovc="${d.id}">Iniciar mesmo assim (override registrado no log)</label>
           <div id="ovb-${d.id}" hidden><label class="muted" style="font-size:12px" for="ovn-${d.id}">Nota obrigatória: por que iniciar sem a validação?</label><textarea id="ovn-${d.id}" rows="2" data-keep></textarea></div></div>`}
+        ${preCancelHtml(d.id)}
         ${msg ? `<p class="${msg.ok ? "ok-msg" : "fail"}" style="font-size:13px;margin:8px 0 0">${esc(msg.text)}</p>` : ""}`;
 }
+// D7: "Cancelar demanda" antes do início — 1º clique abre a confirmação (motivo opcional), 2º confirma.
+let cancelOpen = new Set();
+function preCancelHtml(id) {
+  if (!cancelOpen.has(id)) return `<div class="actions" style="margin-top:8px"><button class="btn" id="pc-${id}" data-precancel-open="${id}" style="height:36px;color:var(--red);border-color:var(--red)">Cancelar demanda</button></div>`;
+  return `<div class="qbox open" role="group" aria-label="Confirmar cancelamento">
+    <label for="cn-${id}">Motivo (opcional)</label>
+    <input type="text" id="cn-${id}" data-keep maxlength="500" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">
+    <p class="why">A demanda não poderá ser iniciada, respondida nem editada depois de cancelada.</p>
+    <div class="actions"><button class="btn" data-precancel-confirm="${id}" style="height:36px;color:#fff;background:var(--red);border-color:var(--red)">Confirmar cancelamento</button><button class="btn" data-precancel-back="${id}" style="height:36px">Voltar</button></div>
+  </div>`;
+}
+
 function applyOverride(id) {
   const cb = document.getElementById(`ovc-${id}`), btn = document.getElementById(`start-${id}`), box = document.getElementById(`ovb-${id}`);
   if (!cb || !btn) return;
@@ -767,12 +784,35 @@ document.addEventListener("click", async ev => {
   const ag = ev.target.closest("[data-agent]");
   if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
   if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  const pco = ev.target.closest("[data-precancel-open]");
+  if (pco) { const id = pco.dataset.precancelOpen; cancelOpen.add(id); delete cardMsg[id]; await render(); document.getElementById(`cn-${id}`)?.focus(); return; }
+  const pcb = ev.target.closest("[data-precancel-back]");
+  if (pcb) { const id = pcb.dataset.precancelBack; cancelOpen.delete(id); document.getElementById(`cn-${id}`)?.removeAttribute("data-keep"); await render(); document.getElementById(`pc-${id}`)?.focus(); return; }
+  const pcc = ev.target.closest("[data-precancel-confirm]");
+  if (pcc) {
+    const id = pcc.dataset.precancelConfirm;
+    const note = (document.getElementById(`cn-${id}`)?.value || "").trim();
+    const res = await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action: "cancel", note }) });
+    if (res.ok) {
+      cancelOpen.delete(id); blEditing.delete(id); delete cardMsg[id];
+      document.getElementById(`cn-${id}`)?.removeAttribute("data-keep");
+      flashErr = false; flash = "Demanda cancelada antes do início; nenhuma validação ou execução seguirá.";
+      announce(flash);
+    } else {
+      const j = await res.json().catch(() => ({}));
+      cardMsg[id] = { ok: false, text: `Não foi possível cancelar (${res.status}): ${j.error || "erro no servidor"}.` };
+      if (res.status === 404 || res.status === 409) cancelOpen.delete(id);
+      announce(cardMsg[id].text);
+    }
+    return refresh();
+  }
   const ctl = ev.target.closest("[data-ctl]");
   if (ctl) {
     const id = ctl.dataset.id, action = ctl.dataset.ctl;
     if (action === "cancel" && !ctl.dataset.confirm) { ctl.dataset.confirm = "1"; ctl.textContent = "Confirmar cancelamento"; return; }
     const res = await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, priority: $(`[data-ctlpr="${id}"]`)?.value }) });
-    flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : "Falha ao registrar o controle.";
+    const cj = res.ok ? null : await res.json().catch(() => ({}));
+    flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : `Falha ao registrar o controle (${res.status}): ${cj.error || "erro no servidor"}.`;
     return refresh();
   }
   const be = ev.target.closest("[data-bl-edit]");
