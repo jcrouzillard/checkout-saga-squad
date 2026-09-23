@@ -1,0 +1,27 @@
+{
+  "gate": "G3",
+  "demand": "e31bdfb73679",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.93,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Checklist CA1–CA6", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-cancelar-d7.md (handoff e448b85d179c): CA1–CA4 e CA6 ✅, CA5 ⚠️. A matriz de curl bate com o contrato: cancel 201, repetido 409, inexistente 404, concluída 409, start/override/clarify/edit de cancelada 409, backlog cancelada 201. pending.py sem 'validação:' da cancelada; triage.py não roda nem grava. Coincide com a minha integração independente do G2 (:7077)"},
+    {"name": "Teste isolado e branch limpa", "status": "pass", "weight": 2, "blocking": true,
+     "source": "QA usou cópia descartável (porta 7078, log vazio). Log real: nenhum control cancel nem task humana de teste desde 18:00Z. Branch: git ls-files docs/squad/inbox sem arquivos fora de done/; git diff develop -- docs/squad/memory só mostra github-sync.json (estado de sync real vindo do commit de triagem, não dados de teste); decisions.jsonl sem diff"},
+    {"name": "Capturas", "status": "pass", "weight": 1, "blocking": false,
+     "source": "d7-02: card 'Com perguntas' com 'Cancelar demanda' abaixo de Iniciar/override. d7-04: demanda cancelada com validation tardia mostra só 'Cancelada · motivo: desisti, muito complexo', sem perguntas nem ações. d7-03/d7-05: cancelada com motivo e vinda do backlog; d7-01: Backlog (0). A confirmação inline (2º clique) só foi conferida no código"},
+    {"name": "Sincronização GitHub (CA5)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Só no código (github_sync.py 301-310): not planned + motivo, label cancelada, status:cancelado substituindo as outras status:*. Status do Project sem 'Cancelado' é risco aceito (decisão 02a3ae767bb3, G2-D7-2). Não exercitado no GitHub real"}
+  ],
+  "open_risks": [
+    "CA5 contra o GitHub real (gh issue view: CLOSED/NOT_PLANNED, labels cancelada + status:cancelado) fica para o 1º cancelamento real; o card no Project mantém o Status antigo (risco aceito).",
+    "Pela regra da D8, após este G3 o PR da D7 deve ser ABERTO para revisão humana, sem merge automático; a D7 só conta como 'entregue' após o merge humano.",
+    "Atualizar o CA5 do contrato para refletir a decisão de usar label em vez do Status do Project."
+  ],
+  "human_required": false,
+  "rationale": "A D7 passou por G1 (1.00), G2 (devolvido no ciclo 1 por status:concluido em cancelada, aprovado no ciclo 2 com 0.88) e agora G3. O QA confirmou em cópia descartável todos os critérios de servidor, painel e pending/triagem, com capturas do botão no estado 'Com perguntas' e do card cancelado ignorando uma validação tardia, exatamente o pedido do humano. O log real e a branch estão limpos de dados de teste. Só a sincronização com o GitHub (CA5) ficou verificada no código, com o desvio do Status já aceito. Confiança = (3+2+1+0.5)/7 = 0.93."
+}
