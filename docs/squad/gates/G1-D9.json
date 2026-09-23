@@ -1,0 +1,32 @@
+{
+  "gate": "G1",
+  "demand": "174084ec85d0",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.91,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/174084ec85d0.json: q1 'A, B e C' → contrato §6 (a) cartão de execução, (b) resumo da demanda, (c) linha do tempo + tabela de Decisões, CA7–CA9; q2 'dia exato… fornecedor' (= ID exato) → chip '<ID> · <Fornecedor>', alias só em modelRequested (§2, §3, CA3); q3 retroativo 'se der' + 'não registrado' + 'importante é daqui para frente' → §4 enriquecimento com modelSource, CA5, gravação na origem para runs/eventos novos (§2)"},
+    {"name": "Premissas técnicas batem com o código real", "status": "pass", "weight": 3, "blocking": true,
+     "source": "server.py:182 parse_run usa meta.get('model','') e o .meta.json do subagente não tem model (conferido em agent-a836cf80e5b6c21cc.meta.json); server.py:246 collect_external_runs põe 'model': meta.get('runner'); transcrição agent-a836cf80e5b6c21cc.jsonl: 22 linhas assistant com message.model='claude-opus-5-5'; .squad/runs/20260923163500-auditor-9a491c.log tem 'model: gpt-5.6-sol' e 'provider: openai' e o .json só runner; log.py sem campo model (já tem --run e --runner); index.html:391 único uso de r.model; 'claude --help' confirma --session-id e --model"},
+    {"name": "Critérios de aceite verificáveis", "status": "validate", "weight": 2, "blocking": true,
+     "source": "CA1–CA11 com comando/inspeção objetivos (jq no /api/state, dry-run, python3 -c para provider_of, git diff --stat). Parcial: CA1 fala em 'log de teste', mas log.py tem LOG fixo (sem env/flag) — executar no worktree grava no decisions.jsonl versionado; CA5 depende de .squad/runs da cópia principal (não existe no worktree)"},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 2, "blocking": false,
+     "source": "tools/squad/{log,run_agent,server}.py → Orquestrador; squad-control/index.html → Frontend; contrato e ADR-012 em docs/contracts e docs/adr → Arquiteto (commit 32ac074 só toca esses 2 arquivos); campos aditivos, log append-only preservado"},
+    {"name": "Nada muda no produto (checkout)", "status": "pass", "weight": 1, "blocking": false,
+     "source": "CA11 proíbe diff em services/** e docs/contracts/events.md; nenhuma API do checkout citada"}
+  ],
+  "open_risks": [
+    "CA1: não rodar os testes de log.py contra o decisions.jsonl real/do worktree. Ou adicionar env de caminho do log (ex.: SQUAD_LOG, aditivo) ou testar uma cópia de log.py em diretório temporário do scratchpad.",
+    "Worktree: transcripts_root() deriva o slug do ROOT; no plankton-d9 aponta para outro projeto do ~/.claude. Validar CA4/CA5/CA8 com SQUAD_TRANSCRIPTS apontando para o slug da cópia principal e com o .squad/runs da cópia principal.",
+    "Parser do cabeçalho do Codex: o .log real começa com linhas de ruído ('Reading additional input…', ERROR rmcp) antes de 'OpenAI Codex vX'; procurar '^model:'/'^provider:' só dentro do primeiro bloco entre '--------', não na saída inteira (o próprio prompt/resposta pode conter 'model:').",
+    "Enriquecimento por transcrição (§4b) roda a cada /api/state: cachear por (path, mtime) para não reler todas as transcrições a cada poll; casar o --title tolerando aspas/escapes do shell; ignorar '<synthetic>' e linhas sem model.",
+    "run_agent: também passar --model aos eventos 'Iniciado/Finalizado via …' quando conhecido, e manter --runner; para claude sem --model, o modelo só é conhecido após o início (enriquecimento via run cobre os eventos do filho).",
+    "Heurística agente+título+120 s pode atribuir modelo errado em raros casos; exibir modelSource no title do chip, como previsto."
+  ],
+  "human_required": false,
+  "rationale": "Contrato e ADR-012 traduzem fielmente as três respostas do humano (lugares a/b/c, ID exato + fornecedor, retroativo quando possível e 'não registrado' caso contrário, foco daqui para frente). Todas as premissas técnicas foram conferidas no código e em artefatos reais (transcrição de subagente com message.model, cabeçalho do Codex, server.py:182/246, index.html:391, flags do claude). Ownership correto e nada no checkout muda. Ressalva parcial nos CAs: o teste do log.py e a validação no worktree precisam de isolamento (log e transcrições). Risco baixo: mudança aditiva só no ferramental da squad. Confiança = (3+3+1+2+1)/11 = 0.91."
+}
