@@ -5,14 +5,18 @@ Exemplo:
   python3 tools/squad/log.py --agent backend --type handoff --to qa \
       --title "Saga implementada" --detail "Outbox, retries e retomada" \
       --evidence "Build e testes unitários=pass" --evidence "Concorrência=validate"
+
+Modelo (ADR-012): `--model <ID exato>` ou env `SQUAD_MODEL`; `--run` herda de `SQUAD_RUN` (exportados por
+run_agent.py). `SQUAD_LOG=<arquivo>` grava em outro log (testes).
 """
 import argparse
 import json
+import os
 import pathlib
 import uuid
 from datetime import datetime, timezone
 
-LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
+LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl")
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
 TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected"}
 
@@ -31,7 +35,10 @@ def main() -> None:
     p.add_argument("--demand", help="id do evento da demanda a que este evento pertence")
     p.add_argument("--priority", choices=["alta", "normal", "baixa"])
     p.add_argument("--branch", help="branch git relacionada ao evento")
-    p.add_argument("--run", help="id da execução (tools/squad/run_agent.py)")
+    p.add_argument("--run", default=os.environ.get("SQUAD_RUN") or None,
+                   help="id da execução (tools/squad/run_agent.py); padrão: $SQUAD_RUN")
+    p.add_argument("--model", default=os.environ.get("SQUAD_MODEL") or None,
+                   help="ID exato do modelo que produziu o evento (ex.: claude-opus-5-5); padrão: $SQUAD_MODEL")
     p.add_argument("--status", choices=["ok", "perguntas"], help="resultado da validação agêntica")
     p.add_argument("--question", action="append", default=[], help='pergunta da validação: "dimensão::texto"')
     p.add_argument("--suggested-kind", choices=["produto", "operacao"])
@@ -67,6 +74,7 @@ def main() -> None:
         "branch": a.branch,
         "run": a.run,
         "runner": a.runner,
+        "model": a.model,
         "status": a.status,
         "questions": [{"id": f"q{i}", "dimension": q.split("::", 1)[0].strip() if "::" in q else "escopo",
                        "text": q.split("::", 1)[-1].strip()} for i, q in enumerate(a.question, 1)],
