@@ -1,0 +1,28 @@
+{
+  "gate": "G3",
+  "demand": "D1",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Suíte e2e (8 cenários)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/e2e/last-report.json (mtime 14:50:45Z, coerente com o evento 3023c5e8b9d4 do Orquestrador às 14:50:54Z): 8/8 PASS, incluindo customer_orders: 3 pedidos do cliente na ordem mais recente → mais antigo, limit=2, cliente inexistente [] e 400 sem customerId"},
+    {"name": "Matriz de rastreabilidade", "status": "validate", "weight": 2, "blocking": true,
+     "source": "tests/TRACEABILITY.md linha 23 'Listar pedidos de um cliente (demanda D1…)' com mecanismo (api.md §1, ADR-006) e teste (customer_orders), mas o status ficou 'pendente execução', sem atualizar para ✅ após o 8/8"},
+    {"name": "Trace da consulta no Jaeger", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Jaeger service=order-service operation='GET /orders': traces presentes (ex.: e2bdb2af22ca), só com order-service, como esperado para uma leitura local sem Saga"},
+    {"name": "Reprodução documentada", "status": "pass", "weight": 1, "blocking": false,
+     "source": "tests/e2e/scenarios.md §8 'D1: listar pedidos de um cliente' com curl de criação dos 3 pedidos e da listagem; bash tests/e2e/run.sh customer_orders"},
+    {"name": "Riscos do G1-D1 tratados", "status": "validate", "weight": 0, "blocking": false,
+     "source": "trim: tratado (400 sem trim, conferido via curl %20x); cenário e2e: tratado (customer_orders PASS); limit máx. 200 × 'máx. 50': mantido, sem confirmação do humano no log"}
+  ],
+  "open_risks": [
+    "TRACEABILITY.md: atualizar o status da linha D1 de 'pendente execução' para ✅ com o orderId 402a68a9… da execução 8/8.",
+    "limit máx. 200 × 'máx. 50' da demanda: pedir confirmação do humano ou limitar a 50."
+  ],
+  "human_required": false,
+  "rationale": "D1 percorreu G1 (0.89) → G2 (1.00) → G3 sem devoluções. O cenário customer_orders passa na suíte 8/8, coerente com o log, e a consulta aparece no Jaeger. O cenário está documentado em scenarios.md §8. Os riscos de trim e do cenário e2e do G1-D1 foram fechados. Pendências não bloqueantes: o status da linha D1 na matriz ficou desatualizado e a divergência de limit ainda não foi confirmada pelo humano. Confiança = (3+1+2+1)/8 = 0.88."
+}

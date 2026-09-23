@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "D1",
+  "from": "arquiteto",
+  "to": "backend",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.89,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Contrato implementável", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/contracts/api.md §1 GET /orders?customerId=&limit=: parâmetros (customerId 1–100 chars, limit int 1–200 default 50), ordenação createdAt desc + desempate orderId desc, 200 com array ([] se vazio, nunca 404), 6 campos com exemplo, cancellationReason null exceto CANCELED, 400 problem+json com exemplo, índice Flyway. Ressalva menor: 'sem espaços nas pontas' não diz se faz trim ou devolve 400"},
+    {"name": "Escopo da demanda respeitado", "status": "pass", "weight": 3, "blocking": true,
+     "source": "git diff: só docs/contracts/api.md (+29 linhas no §1 order-service), ADR-006 novo e handoff; nenhuma mudança em docs/contracts/events.md, docs/architecture/saga.md ou services/; contrato declara leitura só no database orders, sem eventos nem chamadas à Saga"},
+    {"name": "Critérios de aceite cobertos", "status": "validate", "weight": 2, "blocking": true,
+     "source": "Evento 13e55010e3f5: ordenação, campos, 400 sem customerId, lista vazia e contrato documentado estão cobertos. 'máx. 50': o default 50 atende, mas limit aceita até 200 (divergência aceitável, registrada como risco). O cenário e2e de criação + listagem não é citado no handoff D1 nem no ADR"},
+    {"name": "ADR presente", "status": "pass", "weight": 1, "blocking": false,
+     "source": "docs/adr/006-consulta-de-pedidos-por-cliente.md: contexto, decisão, consequências (+/−) e alternativas (Saga, CQRS, paginação)"}
+  ],
+  "open_risks": [
+    "Divergência 'máx. 50' (demanda) × limit máx. 200 (contrato): aceitável porque sem limit o retorno fica em ≤ 50 e 200 é extensão opt-in; o humano deve confirmar ou o Backend limita a 50.",
+    "Cenário e2e de criação + listagem (critério de aceite) não está no handoff: o Orquestrador deve atribuí-lo ao QA (tests/e2e/run.sh + TRACEABILITY.md).",
+    "customerId 'sem espaços nas pontas' é ambíguo (trim × 400): o Backend deve rejeitar com 400, sem trim, e o QA deve cobrir o caso."
+  ],
+  "human_required": false,
+  "rationale": "Contrato do GET /orders?customerId= completo e sem ambiguidade relevante, com escopo restrito ao order-service (git diff sem mudança em eventos, Saga ou outros serviços) e ADR-006 presente. A cobertura dos critérios de aceite é parcial: limit até 200 diverge do 'máx. 50' da demanda (aceitável porque o default é 50) e o cenário e2e não foi atribuído. Nenhum bloqueante falhou. Confiança = (3+3+1+1)/9 = 0.89."
+}

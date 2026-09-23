@@ -1,0 +1,26 @@
+{
+  "gate": "G2",
+  "demand": "D1",
+  "from": "backend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Build e testes unitários", "status": "pass", "weight": 3, "blocking": true,
+     "source": "mvn -q -B -pl services/order-service -am package → exit 0; surefire OrderListByCustomerTest: 6 testes, 0 falhas/erros"},
+    {"name": "Serviço no ar com migração aplicada", "status": "pass", "weight": 2, "blocking": true,
+     "source": "order-service responde em :8081; flyway_schema_history do database orders: versões 0.1, 1 e 2 com success=t; pg_indexes contém idx_orders_customer_created (V2__idx_orders_customer_created.sql: orders (customer_id, created_at DESC))"},
+    {"name": "Aderência ao contrato do endpoint", "status": "pass", "weight": 2, "blocking": true,
+     "source": "OrderController.listByCustomer: DEFAULT_LIMIT 50, MAX_LIMIT 200, rejeita customerId vazio/>100/com espaços nas pontas (sem trim); OrderRepository.findByCustomer: ORDER BY created_at DESC, order_id DESC LIMIT, cancellationReason só em CANCELED. Amostra real: customerId=d1-backend-check → 2 pedidos com createdAt 14:48:25.525 > 14:48:25.147 (desc), 6 campos do contrato; '%20x', ausente, vazio, limit=0/201/abc → 400 application/problem+json; cliente inexistente → 200 []"},
+    {"name": "Escopo da demanda respeitado", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff HEAD~1 --stat (cb40462): código só em services/order-service (controller, repository, migração V2, teste); nenhuma mudança em services/common, saga-orchestrator, participantes nem docs/contracts/events.md"}
+  ],
+  "open_risks": [
+    "limit máx. 200 × 'máx. 50' da demanda continua sem confirmação do humano (risco herdado do G1-D1).",
+    "Sem paginação por cursor: clientes com mais de 200 pedidos não veem o histórico completo (evolução registrada no ADR-006)."
+  ],
+  "human_required": false,
+  "rationale": "Implementação aderente ao contrato do api.md §1 e restrita ao order-service. Build e 6 testes unitários passam, a migração V2 está aplicada com o índice e as amostras ao vivo confirmam ordem desc, 400 sem trim, validação de limit e [] para cliente inexistente. Os riscos de trim e do cenário e2e do G1-D1 foram tratados. Confiança = 9/9 = 1.00."
+}

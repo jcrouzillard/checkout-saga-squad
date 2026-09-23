@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/orders}
+    username: ${SPRING_DATASOURCE_USERNAME:checkout}
+    password: ${SPRING_DATASOURCE_PASSWORD:checkout}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+server:
+  port: ${SERVER_PORT:8081}

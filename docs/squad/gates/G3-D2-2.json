@@ -1,0 +1,31 @@
+{
+  "gate": "G3",
+  "demand": "48b6ace91207",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Checklist de UI (CA1–CA12)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Sem mudança desde o ciclo 1: tests/ui/checklist-console.md 10 ✅ e 2 ⚠️ (CA7, CA9 só por código), sem defeito de UI; checkout-console/ não mudou em e762d6c"},
+    {"name": "Capturas 1440 e 390 px", "status": "pass", "weight": 1, "blocking": false,
+     "source": "tests/ui/console-1440.png e console-390.png (ciclo 1): hierarquia, coluna única, alvos ≥ 44 px; quebra do passo 3 a 390 px é cosmética"},
+    {"name": "Matriz de rastreabilidade", "status": "pass", "weight": 2, "blocking": true,
+     "source": "tests/TRACEABILITY.md linha 24 (D2)"},
+    {"name": "Suíte e2e (8 cenários)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/e2e/last-report.json 8/8 PASS, mtime 16:11:59Z. Linha do tempo coerente: containers dos 5 serviços criados às 16:10:49Z (rebuild), Flyway do order-service validou às 16:11:03Z, 1º pedido do relatório (happy_path) criado às 16:11:16Z e CONFIRMED, restart do orquestrador às 16:11:47Z (cenário coordinator_restart), commit e762d6c às 16:12:07Z e evento do Orquestrador b0b23f0d6c0b"},
+    {"name": "Regras de negócio e contratos preservados", "status": "pass", "weight": 2, "blocking": true,
+     "source": "e762d6c restaura V0_1__outbox_and_processed_messages.sql ('parecer G1 do Jev'): git diff 2d2da56~1 -- <arquivo> vazio e CRC32 Flyway = 654970704, igual ao flyway_schema_history 0.1 dos 5 databases. docker compose logs --since 30m sem 'checksum mismatch'/FlywayValidateException; 5 serviços healthy. api.md/events.md sem mudança; POST /orders idêntico (CA12)"},
+    {"name": "Correção do 1º ciclo aceita pelo humano", "status": "pass", "weight": 0, "blocking": false,
+     "source": "Evento human 23033d4758fb (16:08:09Z, APPROVE da devolução), decisão do Orquestrador 1d508c5e7d90 e evidência b0b23f0d6c0b"}
+  ],
+  "open_risks": [
+    "CA7 (aviso após 120 s) e CA9 (navegação só por teclado) seguem sem teste interativo em navegador; aceitos como limitação, com verificação recomendada na próxima demanda de UI.",
+    "No 390 px o passo '3 Acompanhar' quebra de linha com o conector solto (cosmético; ajuste do Frontend no próximo ciclo de UI).",
+    "Higiene de commit: a entrega do Frontend está no commit da49b89 junto com squad-control/ e tools/; sem impacto funcional, mas prejudica a rastreabilidade por commit. Lição: migrações aplicadas são imutáveis, inclusive nos comentários (renomeações em massa devem excluir db/migration)."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. O ciclo 1 devolveu o G3 porque a renomeação Jev→Auditor tinha alterado uma migração Flyway já aplicada; o humano aceitou a devolução e o Orquestrador corrigiu. Verifiquei com evidência própria: arquivo idêntico ao original (CRC32 654970704 = checksum gravado nos 5 databases), rebuild às 16:10:49Z, Flyway validado sem mismatch, 5 serviços healthy e e2e 8/8 executado depois do rebuild. A UI da D2 já atendia à demanda (mais intuitiva e fluida, sem API ou regra nova, POST /orders idêntico). Restam só riscos não bloqueantes (CA7/CA9 manuais, quebra cosmética a 390 px, higiene de commit). Confiança = 10/10 = 1.00."
+}

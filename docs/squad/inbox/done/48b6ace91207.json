@@ -1,0 +1,10 @@
+{
+  "demand": "48b6ace91207",
+  "title": "Melhorar o Visual do checkout",
+  "detail": "Melhorar o visual do checkout afim de deixar mais intuitivo e fluido. Não se pode quebrar ou modificar regras de negocio ja existentes.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T15:43:22+00:00"
+}

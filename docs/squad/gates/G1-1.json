@@ -1,0 +1,32 @@
+{
+  "gate": "G1",
+  "from": "arquiteto",
+  "to": "backend",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.96,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Eventos obrigatórios modelados", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/contracts/events.md §1 (tabela de tópicos, l.21-31), §2 envelope (l.43-77), §4.1-4.5 payloads de order.created/confirmed/canceled, inventory.reserved, payment.authorized, shipment.created; chave = orderId (l.13)"},
+    {"name": "Compensações por etapa", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docs/architecture/saga.md §1 máquina de estados (l.13-48) e §2 tabela de passos com compensação por passo (l.54-64)"},
+    {"name": "Cenários de falha", "status": "pass", "weight": 2, "blocking": true,
+     "source": "docs/architecture/saga.md §4.2-4.5 sequências e §5 tabela dos 4 cenários (l.261-268), §5.1 ambiguidade do timeout, §5.2 erro na entrega (seção 4 do desafio)"},
+    {"name": "RNFs (idempotência, retries, timeouts)", "status": "pass", "weight": 2, "blocking": false,
+     "source": "docs/contracts/events.md §5 (l.204-222); saga.md §3.2-3.6; docs/architecture/README.md §4 RNF → mecanismo; api.md §1 Idempotency-Key e §5 env vars"},
+    {"name": "ADRs", "status": "pass", "weight": 1, "blocking": false,
+     "source": "docs/adr/001-saga-orquestrada.md, 002-outbox-transacional.md, 003-database-per-service.md, 004-kafka-como-broker.md, 005-idempotencia-e-retries.md (todos Aceito)"},
+    {"name": "Pergunta de evolução (seção 12)", "status": "pass", "weight": 1, "blocking": false,
+     "source": "docs/architecture/README.md §6 (l.137-150): banco, descoberta, síncrona, assíncrona, observabilidade, escalabilidade, resiliência"},
+    {"name": "Consistência com infra/observabilidade", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Portas/bancos/tópicos/nomes de métricas batem (docker-compose.yml l.106-209, infra/postgres/init/01-databases.sql, prometheus.yml, KAFKA_NUM_PARTITIONS=3). Divergências: coluna outbox trace_parent varchar(64) (saga.md l.93) × traceparent VARCHAR(55) (observability.md l.103); tag outcome=CONFIRMED (observability.md l.14, dashboard saga.json) × estado terminal COMPLETED (saga.md l.9); ADR-003 l.10 'usuário próprio por database' × usuário único checkout no compose (l.19-20)"}
+  ],
+  "open_risks": [
+    "Usar a coluna do outbox definida em saga.md §3.1 (trace_parent) e ignorar o nome traceparent de observability.md §3; relay deve reaplicar o header traceparent da linha.",
+    "Emitir saga_completed_total com outcome=CONFIRMED|CANCELED (mapear o estado COMPLETED → CONFIRMED), pois o dashboard filtra por outcome=\"CONFIRMED\".",
+    "Credenciais: compose usa um único usuário checkout para os 5 databases (diverge do ADR-003); ler usuário/senha só de SPRING_DATASOURCE_* e não assumir usuário por serviço."
+  ],
+  "human_required": false,
+  "rationale": "Todos os critérios bloqueantes e não bloqueantes do G1 têm evidência verificável no repositório (6/6); a única ressalva são 3 divergências menores de nomenclatura com DevOps/Observabilidade, contadas como 'validar' (confiança = 12.5/13 = 0.96)."
+}

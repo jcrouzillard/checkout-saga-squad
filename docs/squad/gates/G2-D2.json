@@ -1,0 +1,27 @@
+{
+  "gate": "G2",
+  "demand": "48b6ace91207",
+  "from": "frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Página servida e fluxo real pelo proxy", "status": "pass", "weight": 3, "blocking": true,
+     "source": "curl localhost:8090/ → 200. POST localhost:8090/api/order/orders com simulate.payment=DECLINE → 202 (orderId 8b850cca…); GET /api/order/orders/8b850cca… → CANCELED/PAYMENT_DECLINED, histórico INVENTORY SUCCEEDED → PAYMENT FAILED(DECLINED) → INVENTORY COMPENSATED → ORDER CANCELED; GET /api/order/orders?customerId=c-auditor-d2 e /api/inventory/inventory/stock/SKU-BOOK-001 → 200"},
+    {"name": "Nenhuma chamada fora de api.md", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Único fetch em api() (index.html:273, prefixo /api/). Chamadas: POST order/orders, GET order/orders/{id}, GET order/orders?customerId=&limit=20, GET inventory/inventory/stock/{sku}; links GET /api/saga/sagas/{id} e ?orderId=, todos em api.md. nginx.conf sem diff desde 9ab6361 (5 locations: order, saga, inventory, payment, shipping). Hosts externos só fonts.googleapis.com/fonts.gstatic.com; nenhum <script src>"},
+    {"name": "Acessibilidade básica e responsividade", "status": "validate", "weight": 2, "blocking": false,
+     "source": "Código: label for nos 5 campos (customer, sku, qty, delivery, fault); aria-live=polite em #form-msg e #track (subregiões com aria-live=off); lang=pt-BR; :focus-visible 2px var(--accent); min-height 44px nos controles; contraste calculado --dim #626368 = 5.99:1 em #FFFFFF e 5.54:1 em #F6F6F4 (≥ 4.5). Navegação por teclado e layout a 390 px não foram testados em navegador (vão para o checklist manual do QA)"},
+    {"name": "Aderência ao contrato de tela (amostra CA1, CA2, CA5, CA12)", "status": "pass", "weight": 1, "blocking": false,
+     "source": "CA1 pass: nav#steps com aria-current=step movido por setPhase(1/2/3). CA2 pass: recordsFor separa ORDER/CREATED de ORDER CONFIRMED|CANCELED (ressalva 1 do G1-D2 tratada); stepState segue a tabela §2 (tentativa N, compensando, Compensada, Não se aplica em DIGITAL); aplicado ao histórico real do DECLINE → Estoque Compensada, Pagamento Falhou, Envio Não executada, Desfecho cancelado. CA5 pass (código): botão 'Enviando…' desabilitado e protegido por 'sending', 'Pedido aceito — Saga iniciada · <id>' no 202 antes do 1º poll (tempo < 1 s a medir pelo QA). CA12 pass: buildBody idêntico ao handler de 9ab6361 (campos, endereço, simulate), options de SKU/preço/cenário idênticas (diff vazio)"}
+  ],
+  "open_risks": [
+    "Higiene de commit: o index.html do Frontend entrou no commit da49b89 ('Squad Control: controles humanos…') misturado com squad-control/ e tools/; o escopo de produto está correto (sem services, contratos ou nginx), mas o git diff HEAD~1 não mostra a entrega.",
+    "CA3 sticky, CA5 tempo < 1 s, CA9 teclado e CA10 390 px só foram verificados no código: o QA deve registrar evidência manual por item (ressalva 3 do G1-D2 ainda aberta).",
+    "A lista do cliente usa limit=20 (válido no contrato 1–200, mas diferente do default 50 do D1); pedido aberto pela lista não mostra o bloco curl nem o cenário."
+  ],
+  "human_required": false,
+  "rationale": "A página é servida pelo container e o fluxo real pelo proxy funciona: o DECLINE termina CANCELED com a compensação do estoque. Todas as chamadas estão em api.md e o nginx não mudou. O corpo do POST /orders é idêntico ao anterior (CA12). CA1, CA2 e CA5 aderem ao contrato, e as ressalvas 1 (step ORDER) e 2 (total de totalAmount) do G1-D2 foram tratadas. Acessibilidade e responsividade só foram verificadas no código, sem navegador (validar). Confiança = (3+2+1+1)/8 = 0.88."
+}

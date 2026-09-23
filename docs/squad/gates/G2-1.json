@@ -1,0 +1,32 @@
+{
+  "gate": "G2",
+  "from": "backend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.95,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Build e testes unitários", "status": "pass", "weight": 3, "blocking": true,
+     "source": "mvn -q -B package → exit 0; surefire: 60 testes, 0 falhas/erros (SagaStateMachineTest 20, inventory 15, payment 12, shipping 13)"},
+    {"name": "Compose válido e serviços healthy", "status": "pass", "weight": 2, "blocking": true,
+     "source": "docker compose config -q → exit 0; docker compose ps: saga-orchestrator, order/inventory/payment/shipping-service, postgres, kafka = healthy (9 healthchecks no docker-compose.yml)"},
+    {"name": "Aderência ao contrato de eventos", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Topics.java: 9 tópicos e 21 types idênticos a docs/contracts/events.md §1; amostras Kafka (payment.commands, order.events, shipping.events): envelope completo (messageId, type, version=1, source, occurredAt, sagaId, orderId, correlationId, causationId null só em order.created), chave=orderId, headers type+traceparent, amount=49.90 numérico com 2 casas"},
+    {"name": "Outbox e dedupe em todos os serviços", "status": "pass", "weight": 2, "blocking": false,
+     "source": "psql \\dt nos databases saga, orders, inventory, payments, shipping: todos com outbox + processed_messages (payments também com delayed_replies)"},
+    {"name": "Métricas de negócio da Saga", "status": "validate", "weight": 1, "blocking": false,
+     "source": "curl :8080/actuator/prometheus: saga_started_total, saga_completed_total{outcome=CONFIRMED|CANCELED}, saga_compensations_total, saga_timeouts_total, saga_retries_total, saga_step_duration_seconds, saga_in_flight = docs/observability.md; extras fora do contrato: saga_resumed_total (exposta) e saga_compensation_stuck_total (SagaMetrics.java:60, lazy)"},
+    {"name": "Injeção de falhas", "status": "pass", "weight": 1, "blocking": false,
+     "source": "simulate propagado no payload (ex.: {\"shipping\":\"FAIL\"} em payment.authorize); tests/e2e/last-report.json 7/7 PASS (payment_failure, shipping_failure, timeout_step, coordinator_restart, idempotency, 2 caminhos felizes)"},
+    {"name": "Trace ponta a ponta", "status": "pass", "weight": 0, "blocking": false,
+     "source": "Jaeger /api/traces/a8e357a7… (165 spans) e c17f6181… (111 spans): 5 processos (order, saga-orchestrator, inventory, payment, shipping). Busca por service=order-service/saga-orchestrator lista apenas traces de 1 serviço (ruído de relay/scheduler) — evidência também para G3"}
+  ],
+  "open_risks": [
+    "Métricas extras saga_resumed_total e saga_compensation_stuck_total fora de docs/observability.md: Observabilidade/Arquiteto devem registrá-las no contrato.",
+    "Traces de polling (relay do outbox/scheduler) de 1 serviço poluem a busca no Jaeger; filtrar ou suprimir para a demonstração do G3.",
+    "Static membership com group.instance.id fixo pressupõe 1 réplica do orquestrador (change-request aberto ao DevOps)."
+  ],
+  "human_required": false,
+  "rationale": "Todos os critérios bloqueantes do G2 verificados com evidência própria (build+60 testes, compose healthy, tópicos/types/envelope/amount aderentes). Outbox+dedupe nos 5 databases e injeção de falhas cobertos pela suíte e2e 7/7, verde após o ciclo 1 de autocorreção (defect do QA no reinício do coordenador corrigido pelo Backend com static membership + carência no startup). Única ressalva: 2 métricas extras fora do contrato (validar). Confiança = 10.5/11 = 0.95."
+}

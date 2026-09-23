@@ -1,0 +1,27 @@
+{
+  "gate": "G1",
+  "demand": "48b6ace91207",
+  "from": "arquiteto",
+  "to": "frontend",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.83,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Critérios verificáveis e implementáveis", "status": "validate", "weight": 3, "blocking": true,
+     "source": "docs/contracts/ui-checkout-console.md §3: CA1–CA12, cada um com 'como verificar' objetivo (aria-current, aria-live, 4.5:1, 390 px, 44 px, polling 1 s/120 s, grep de <script src>, payload antes/depois); §2 com tabela de mapeamento history[] → estado visual (texto + ícone); §4 wireframe + Mermaid; §5 smoke automatizável + checklist manual. Ambiguidade: 'Pedido criado' e 'Desfecho' usam o mesmo step ORDER, e a regra 'último registro do step' faria 'Pedido criado' mostrar CANCELED; além disso, CA3 não diz que o total vem de totalAmount da API"},
+    {"name": "Escopo sem regra de negócio nova", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Contrato §1 proíbe API/campo novo, lógica de status no front e mudança no corpo do POST /orders (CA12, regressão byte a byte). Endpoints usados existem em api.md (GET /orders/{id}, GET /orders?customerId=, GET /inventory/stock/{sku} linha 124, GET /sagas/{sagaId}) e nas rotas de checkout-console/nginx.conf; valores de simulate (DECLINE, FAIL, TIMEOUT, TIMEOUT_ONCE, SLOW) são os atuais. Commit 9ab6361 não toca api.md, events.md nem services/"},
+    {"name": "Demanda do humano coberta", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Evento 48b6ace91207 ('mais intuitivo e fluido, sem quebrar regras'): intuitivo → CA1 passos, CA4 'o que vai acontecer', CA2 linha do tempo sem JSON, CA6 erros claros; fluido → CA5 feedback < 1 s, CA7 polling/parada, CA3 resumo sticky, CA10 responsivo; sem quebrar regras → §1 restrições + CA12"},
+    {"name": "ADR e justificativa do agente Frontend", "status": "pass", "weight": 1, "blocking": false,
+     "source": "docs/adr/007-contrato-de-tela-do-console.md (contexto, decisão, consequências, alternativas: Frontend livre, BFF). .claude/agents/frontend.md: dono só de checkout-console/**, justificado pela UI sem dono; produz mas não aprova, segue para G2 'Frontend → QA' (critério próprio em docs/squad/gates.md:14) e depois validação do QA; linha nova na tabela de ownership do CLAUDE.md:39; decisão do Orquestrador 59af0d8c926e"}
+  ],
+  "open_risks": [
+    "§2: 'Pedido criado' deve considerar só ORDER/CREATED e 'Desfecho' só ORDER CONFIRMED/CANCELED (não o último registro do step ORDER); o Arquiteto deve explicitar isso no contrato ou o Frontend deve seguir essa leitura.",
+    "CA3: o total exibido no acompanhamento deve vir de totalAmount de GET /orders/{id}, não de cálculo no front (regra 'nenhuma regra de negócio no front').",
+    "Grande parte dos critérios (CA2, CA3, CA5, CA9, CA10) é manual: o QA deve registrar evidência por item (--type evidence --demand 48b6ace91207)."
+  ],
+  "human_required": false,
+  "rationale": "O contrato transforma uma demanda subjetiva em 12 critérios verificáveis, com mapeamento de estados, wireframe e plano de QA. O escopo é só de apresentação: nenhuma API, campo ou evento novo, só endpoints de api.md, e o POST /orders fica protegido por regressão (CA12). A demanda (intuitivo, fluido, sem quebrar regras) está coberta item a item. O agente Frontend está justificado e subordinado aos gates G2/G3. Ressalva: a dupla leitura do step ORDER na linha do tempo (validar). Confiança = (1.5+3+2+1)/9 = 0.83."
+}

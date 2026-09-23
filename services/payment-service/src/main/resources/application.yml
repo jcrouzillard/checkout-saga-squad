@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/payments}
+    username: ${SPRING_DATASOURCE_USERNAME:checkout}
+    password: ${SPRING_DATASOURCE_PASSWORD:checkout}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8083}
+
+checkout:
+  simulate:
+    slow-ms: ${SIMULATE_SLOW_MS:2000}
+    # Intervalo do agendador que publica respostas atrasadas de simulate.payment=SLOW
+    delayed-reply-poll-ms: 100

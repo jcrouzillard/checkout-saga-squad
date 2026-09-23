@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console de Checkout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Identidade corporativa: fundo claro, grafite, destaque único azul-marinho; verde/âmbar só para status, vermelho para falha. */
+  :root { --bg:#FFFFFF; --panel2:#F6F6F4; --line:#DCDCD8; --line2:#ECECE8; --text:#1C1C1E; --muted:#4A4B50; --dim:#626368;
+          --accent:#1F3A5F; --accent-soft:#F3F5F8; --green:#2F6B45; --green-soft:#EAF2EC; --amber:#8A5A12; --amber-soft:#FBF7EF;
+          --red:#9B2C2C; --red-soft:#F7E9E9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "IBM Plex Sans", -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .app { max-width: 1440px; margin: 0 auto; min-height: 100vh; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; min-height: 56px; border-bottom: 1px solid var(--line); gap: 16px; }
+  .brand { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .logo { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px; border-radius: 2px; }
+  .brand b { font-size: 15px; }
+  .brand span { color: var(--muted); padding-left: 14px; border-left: 1px solid var(--line); }
+  .strip { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; padding: 7px 28px; background: var(--panel2); border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--dim); }
+
+  main { padding: 24px 32px 40px; display: grid; gap: 28px 32px; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+         grid-template-areas: "steps steps" "form track" "list list"; }
+  #steps { grid-area: steps; } #compose { grid-area: form; } #track { grid-area: track; min-width: 0; } #customer-orders { grid-area: list; }
+
+  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; padding-top: 10px; border-top: 1px solid var(--text); }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .hint { font-size: 12px; color: var(--dim); margin: 6px 0 0; }
+  .empty { color: var(--dim); padding: 16px 0; margin: 0; }
+
+  /* Passos 1-2-3 (CA1) */
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .steps li { display: flex; align-items: center; gap: 10px; color: var(--dim); min-height: 44px; }
+  .steps li + li::before { content: ""; width: 32px; height: 1px; background: var(--line); }
+  .steps .n { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 2px; display: grid; place-items: center; font-weight: 600; font-size: 13px; }
+  .steps li[aria-current="step"] { color: var(--text); font-weight: 600; }
+  .steps li[aria-current="step"] .n { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Formulário (A/B) */
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 14px 0 4px; }
+  input, select { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #8E8F93; border-radius: 2px; background: #fff; color: var(--text); font: inherit; }
+  input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--red); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-err { color: var(--red); font-size: 12px; margin: 4px 0 0; }
+  .explain { margin: 8px 0 0; padding: 10px 12px; background: var(--accent-soft); border-left: 2px solid var(--accent); font-size: 13px; }
+  .explain b { font-weight: 600; }
+  .btn { min-height: 44px; padding: 0 18px; border: 1px solid var(--text); border-radius: 2px; background: #fff; color: var(--text); font: inherit; font-weight: 500; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; width: 100%; margin-top: 18px; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+  .btn.small { min-height: 44px; padding: 0 12px; font-size: 13px; }
+  .msg { padding: 10px 12px; margin-top: 12px; font-size: 13px; border-left: 2px solid; }
+  .msg.err { background: var(--red-soft); color: var(--red); border-color: var(--red); }
+  .msg.ok { background: var(--green-soft); color: var(--green); border-color: var(--green); }
+  .msg ul { margin: 6px 0 0; padding-left: 18px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible { outline-offset: 0; }
+
+  /* Resumo (C) */
+  .summary { background: var(--bg); padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .sum-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sum-id { font-size: 18px; font-weight: 600; }
+  .sum-id code { font-size: 17px; }
+  .badge { display: inline-block; padding: 3px 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; border-radius: 2px; }
+  .b-PENDING { background: var(--amber-soft); color: var(--amber); } .b-CONFIRMED { background: var(--green-soft); color: var(--green); }
+  .b-CANCELED { background: var(--red-soft); color: var(--red); } .b-OTHER { background: var(--panel2); color: var(--muted); }
+  .reason { color: var(--red); font-weight: 500; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin: 12px 0 0; border-top: 1px solid var(--line2); }
+  .facts div { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line2); min-width: 0; }
+  .facts dt { font-size: 12px; color: var(--dim); } .facts dd { margin: 0; font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+  .ticker { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  .slow { margin: 8px 0 0; padding: 8px 12px; background: var(--amber-soft); color: var(--amber); font-size: 13px; }
+  .slow a { color: var(--accent); }
+
+  /* Linha do tempo (D) */
+  .saga { margin-top: 20px; }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .timeline li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line2); }
+  .ico { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid currentColor; border-radius: 2px; font-size: 13px; line-height: 1; font-weight: 600; }
+  .t-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .t-row b { font-weight: 600; min-width: 110px; }
+  .t-state { font-weight: 600; }
+  .t-time { margin-left: auto; font-size: 12px; color: var(--dim); }
+  .t-note { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  .st-done { color: var(--green); } .st-fail { color: var(--red); } .st-run, .st-comp { color: var(--amber); }
+  .st-wait, .st-skip, .st-na { color: var(--dim); }
+  details { margin-top: 14px; border-top: 1px solid var(--line2); }
+  summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 500; color: var(--accent); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line2); vertical-align: top; }
+  thead th { border-top: 1px solid var(--text); color: var(--dim); font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  pre { background: var(--panel2); border: 1px solid var(--line); padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin: 0 0 8px; }
+  .links { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 14px 0 0; }
+  .links a { color: var(--accent); min-height: 44px; display: inline-flex; align-items: center; }
+
+  /* Pedidos do cliente (E) */
+  .orders { list-style: none; padding: 0; margin: 0; }
+  .orow { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; min-height: 44px; padding: 8px 6px;
+          background: #fff; border: 0; border-bottom: 1px solid var(--line2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .orow:hover { background: var(--panel2); }
+  .orow { border-left: 2px solid transparent; }
+  .orow[aria-current="true"] { background: var(--accent-soft); border-left-color: var(--accent); }
+  .orow code { color: var(--muted); }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  @media (min-width: 901px) { .summary { position: sticky; top: 0; z-index: 1; padding-top: 0; } }
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "steps" "form" "track" "list"; padding: 20px 16px 32px; }
+    header, .strip { padding-left: 16px; padding-right: 16px; }
+    .steps li + li::before { width: 12px; }
+    .orow { grid-template-columns: minmax(0, 1fr) auto; }
+    .orow .o-when { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo" aria-hidden="true">CS</div><b>Checkout Saga</b><span>Console de pedidos</span></div>
+  </header>
+  <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
+  <main>
+    <nav id="steps" aria-label="Etapas do checkout">
+      <ol class="steps">
+        <li data-step="1" aria-current="step"><span class="n">1</span>Montar pedido</li>
+        <li data-step="2"><span class="n">2</span>Enviar</li>
+        <li data-step="3"><span class="n">3</span>Acompanhar</li>
+      </ol>
+    </nav>
+
+    <!-- A + B: montar e enviar -->
+    <section id="compose" aria-labelledby="compose-h">
+      <h1 id="compose-h">Novo pedido</h1>
+      <p class="sub">Monte o pedido, escolha um cenário e acompanhe a Saga (estoque, pagamento, envio) até o desfecho.</p>
+      <form id="f" novalidate>
+        <label for="customer">Cliente</label>
+        <input id="customer" value="c-demo" autocomplete="off" aria-describedby="customer-err">
+        <p class="field-err" id="customer-err" hidden></p>
+        <div class="row">
+          <div><label for="sku">Produto (SKU)</label>
+            <select id="sku" aria-describedby="stock sku-err">
+              <option value="SKU-BOOK-001|49.90|PHYSICAL">SKU-BOOK-001 · livro · R$ 49,90</option>
+              <option value="SKU-PHONE-001|2499.00|PHYSICAL">SKU-PHONE-001 · celular · R$ 2.499,00</option>
+              <option value="SKU-EBOOK-001|29.90|DIGITAL">SKU-EBOOK-001 · e-book · R$ 29,90</option>
+              <option value="SKU-COURSE-001|199.00|DIGITAL">SKU-COURSE-001 · curso · R$ 199,00</option>
+              <option value="SKU-LIMITED-001|999.00|PHYSICAL">SKU-LIMITED-001 · edição limitada (estoque 1)</option>
+            </select>
+            <p class="field-err" id="sku-err" hidden></p></div>
+          <div><label for="qty">Quantidade</label>
+            <input id="qty" type="number" inputmode="numeric" value="1" aria-describedby="qty-err">
+            <p class="field-err" id="qty-err" hidden></p></div>
+        </div>
+        <p class="hint" id="stock">Estoque disponível: consultando…</p>
+        <label for="delivery">Entrega</label>
+        <select id="delivery" aria-describedby="delivery-err"><option value="PHYSICAL">Física (gera envio)</option><option value="DIGITAL">Digital (sem envio)</option></select>
+        <p class="field-err" id="delivery-err" hidden></p>
+        <label for="fault">Cenário de falha (injeção via <code>simulate</code>)</label>
+        <select id="fault" aria-describedby="fault-explain fault-err">
+          <option value="">Nenhum · caminho feliz</option>
+          <option value='{"payment":"DECLINE"}'>Pagamento recusado → libera estoque, cancela</option>
+          <option value='{"shipping":"FAIL"}'>Falha no envio → estorna, libera, cancela</option>
+          <option value='{"payment":"TIMEOUT"}'>Timeout no pagamento → 3 tentativas, depois compensa (~20 s)</option>
+          <option value='{"payment":"TIMEOUT_ONCE"}'>Timeout só na 1ª tentativa → retry com o mesmo messageId</option>
+          <option value='{"inventory":"OUT_OF_STOCK"}'>Sem estoque → cancela sem cobrar</option>
+          <option value='{"payment":"SLOW"}'>Pagamento lento → use para derrubar o coordenador (make kill-orchestrator)</option>
+        </select>
+        <p class="field-err" id="fault-err" hidden></p>
+        <p class="explain" id="fault-explain"></p>
+        <button class="btn primary" type="submit" id="send">Criar pedido</button>
+        <div id="form-msg" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <!-- C + D: acompanhamento -->
+    <div id="track" role="region" aria-label="Acompanhamento do pedido" aria-live="polite">
+      <section id="summary" class="summary" aria-labelledby="sum-h">
+        <h2 id="sum-h">Resumo do pedido</h2>
+        <p class="empty" id="sum-empty">Crie um pedido para acompanhar a Saga aqui.</p>
+        <div id="sum-body" hidden>
+          <div class="sum-head">
+            <div class="sum-id">Pedido <code id="sum-id"></code></div>
+            <div><button type="button" class="btn small" id="copy">Copiar ID completo</button></div>
+          </div>
+          <p id="sum-status" style="margin:8px 0 0"></p>
+          <p class="hint" id="copy-msg" aria-live="off"></p>
+          <dl class="facts">
+            <div><dt>Itens</dt><dd id="sum-items">—</dd></div>
+            <div><dt>Total</dt><dd id="sum-total">—</dd></div>
+            <div><dt>Entrega</dt><dd id="sum-delivery">—</dd></div>
+            <div><dt>Rastreio</dt><dd id="sum-tracking">—</dd></div>
+            <div><dt>Estoque do SKU</dt><dd id="sum-stock" aria-live="off">—</dd></div>
+          </dl>
+          <p class="ticker" id="ticker" aria-live="off"></p>
+          <p class="slow" id="slow" hidden>A Saga está demorando; consulte o <a id="slow-link" href="#" target="_blank" rel="noopener">diagnóstico</a>.</p>
+        </div>
+      </section>
+
+      <section id="saga" class="saga" aria-labelledby="saga-h">
+        <h2 id="saga-h">Linha do tempo da Saga</h2>
+        <p class="empty" id="saga-empty">Crie um pedido para acompanhar a Saga aqui.</p>
+        <div id="saga-body" hidden>
+          <p class="hint" id="saga-scenario" style="margin:0 0 6px"></p>
+          <ol class="timeline" id="timeline"></ol>
+          <div aria-live="off">
+            <details id="det-hist"><summary>Detalhes da Saga (<code>history</code> completo)</summary>
+              <div class="table-wrap"><table>
+                <thead><tr><th scope="col">Hora</th><th scope="col">Etapa</th><th scope="col">Status</th><th scope="col">Tentativa</th><th scope="col">Detalhe</th></tr></thead>
+                <tbody id="hist"></tbody>
+              </table></div>
+            </details>
+            <details id="det-curl"><summary>Equivalente em curl</summary><pre id="curl"></pre></details>
+            <p class="links">
+              <a id="lnk-order" href="#" target="_blank" rel="noopener">GET /orders/{id}</a>
+              <a id="lnk-saga" href="#" target="_blank" rel="noopener">Diagnóstico da saga (GET /sagas/{id})</a>
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- E: pedidos do cliente -->
+    <section id="customer-orders" aria-labelledby="orders-h">
+      <h2 id="orders-h">Pedidos do cliente <code id="recent-customer"></code></h2>
+      <p class="hint" style="margin:0 0 8px">Fonte: <code>GET /orders?customerId=</code> (mais recentes primeiro). Selecione um pedido para acompanhá-lo.</p>
+      <ul class="orders" id="recent"></ul>
+    </section>
+  </main>
+</div>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hhmmss = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+const dateTime = ts => ts ? new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+const brl = v => (v === null || v === undefined || v === "" || isNaN(Number(v))) ? "—" : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const TERMINAL = ["CONFIRMED", "CANCELED"];
+const ORDER_STATUS = { PENDING: "Em andamento", CONFIRMED: "Confirmado", CANCELED: "Cancelado" };
+const REASONS = { PAYMENT_DECLINED: "pagamento recusado", SHIPMENT_FAILED: "falha no envio", OUT_OF_STOCK: "sem estoque", UNKNOWN_SKU: "produto inexistente",
+                  PAYMENT_TIMEOUT: "pagamento sem resposta", INVENTORY_TIMEOUT: "estoque sem resposta", SHIPPING_TIMEOUT: "envio sem resposta" };
+const reasonText = r => r ? (REASONS[r] ? `${REASONS[r]} (${r})` : r) : "";
+const deliveryText = d => d === "PHYSICAL" ? "Física" : d === "DIGITAL" ? "Digital" : (d || "—");
+const badge = s => `<span class="badge ${ORDER_STATUS[s] ? "b-" + s : "b-OTHER"}">${esc(ORDER_STATUS[s] || s || "—")}</span>`;
+
+// Frases "o que vai acontecer" (CA4) — uma por valor atual de simulate.
+const EXPLAIN = {
+  "": "Caminho feliz: o estoque é reservado, o pagamento autorizado e, se a entrega for física, o envio criado; o pedido termina confirmado.",
+  '{"payment":"DECLINE"}': "O pagamento será recusado; o estoque reservado será liberado e o pedido cancelado.",
+  '{"shipping":"FAIL"}': "A transportadora recusará o envio; o pagamento será estornado, o estoque liberado e o pedido cancelado (só tem efeito em entrega física).",
+  '{"payment":"TIMEOUT"}': "O pagamento não responderá: a Saga tenta 3 vezes (~20 s), depois libera o estoque e cancela o pedido.",
+  '{"payment":"TIMEOUT_ONCE"}': "A 1ª tentativa de pagamento expira; a Saga reenvia o mesmo comando e o pedido termina confirmado na tentativa 2.",
+  '{"inventory":"OUT_OF_STOCK"}': "O estoque recusará a reserva; nada é cobrado e o pedido é cancelado.",
+  '{"payment":"SLOW"}': "O pagamento responde com atraso (~2 s), dentro do prazo, e o pedido termina confirmado; útil para derrubar o coordenador no meio da Saga."
+};
+
+function uuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// Chamada às APIs do produto via proxy nginx (/api/<serviço>/...). Nunca lança: erro de rede vira { network: true }.
+async function api(path, opt) {
+  try {
+    const r = await fetch("/api/" + path, opt);
+    const body = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, body, network: false };
+  } catch (e) {
+    return { ok: false, status: 0, body: {}, network: true };
+  }
+}
+
+let current = null;       // { orderId, sagaId, sku, scenario, curl, deliveryType, order }
+let stockBefore = null;
+let sending = false;
+let lastFailed = null;    // { json, key } — reaproveita a Idempotency-Key ao repetir o mesmo formulário após falha de rede (CA6)
+let followGen = 0, pollTimer = null, recentGen = 0;
+const track = { startedAt: 0, lastOkAt: 0, pollErr: "", lastSig: "", announced: "" };
+
+function setPhase(n) {
+  document.querySelectorAll("#steps li").forEach(li => {
+    if (Number(li.dataset.step) === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+  });
+}
+
+function skuInfo() { const [sku, price, kind] = $("#sku").value.split("|"); return { sku, price: Number(price), kind }; }
+
+async function refreshStock() {
+  const { sku } = skuInfo();
+  const r = await api(`inventory/inventory/stock/${encodeURIComponent(sku)}`);
+  $("#stock").textContent = r.ok ? `Estoque disponível de ${sku}: ${r.body.available} (${r.body.reserved} reservados)` : "Estoque disponível: serviço de estoque indisponível";
+  return r.ok ? r.body : null;
+}
+
+function updateExplain() {
+  const v = $("#fault").value;
+  $("#fault-explain").innerHTML = `<b>O que vai acontecer:</b> ${esc(EXPLAIN[v] || "Cenário sem descrição; o resultado aparece na linha do tempo.")}`;
+}
+
+// Corpo do POST /orders: idêntico à versão anterior do console (CA12).
+function buildBody() {
+  const { sku, price } = skuInfo();
+  const delivery = $("#delivery").value;
+  const body = { customerId: $("#customer").value, deliveryType: delivery,
+    items: [{ sku, quantity: Number($("#qty").value), unitPrice: price }] };
+  if (delivery === "PHYSICAL") body.shippingAddress = { street: "Av. Paulista", number: "1000", complement: null, city: "São Paulo", state: "SP", zipCode: "01310-100", country: "BR" };
+  if ($("#fault").value) body.simulate = JSON.parse($("#fault").value);
+  return body;
+}
+
+function curlFor(body, key) {
+  return `curl -s -X POST localhost:8081/orders \\\n  -H 'Content-Type: application/json' -H 'Idempotency-Key: ${key}' \\\n  -d '${JSON.stringify(body)}'`;
+}
+
+const FIELDS = ["customer", "sku", "qty", "delivery", "fault"];
+function fieldFor(f) {
+  f = String(f || "");
+  if (f === "customerId") return "customer";
+  if (/^items\[\d+\]\.quantity$/.test(f)) return "qty";
+  if (/^items(\[\d+\](\.(sku|unitPrice))?)?$/.test(f)) return "sku";
+  if (f === "deliveryType") return "delivery";
+  if (f.startsWith("simulate")) return "fault";
+  return null;
+}
+function clearErrors() {
+  FIELDS.forEach(id => { $("#" + id).removeAttribute("aria-invalid"); const e = $(`#${id}-err`); e.hidden = true; e.textContent = ""; });
+  $("#form-msg").innerHTML = "";
+}
+function showMsg(kind, html) { $("#form-msg").innerHTML = `<div class="msg ${kind}">${html}</div>`; }
+function showProblem(r) {
+  const b = r.body || {};
+  const loose = [];
+  let first = null;
+  (Array.isArray(b.errors) ? b.errors : []).forEach(e => {
+    const id = fieldFor(e.field);
+    if (!id) { loose.push(`${e.field}: ${e.message}`); return; }
+    const el = $(`#${id}-err`);
+    el.textContent = el.textContent ? `${el.textContent}; ${e.message}` : String(e.message || "valor inválido");
+    el.hidden = false; $("#" + id).setAttribute("aria-invalid", "true");
+    if (!first) first = $("#" + id);
+  });
+  let head = b.detail || b.title || `Erro ${r.status}`;
+  if (r.status === 409) head += " (mesma Idempotency-Key com corpo diferente)";
+  showMsg("err", `<b>${esc(r.status)}</b> · ${esc(head)}${loose.length ? `<ul>${loose.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`);
+  if (first) first.focus();
+}
+
+$("#sku").addEventListener("change", () => { $("#delivery").value = skuInfo().kind; refreshStock(); });
+$("#fault").addEventListener("change", updateExplain);
+$("#f").addEventListener("input", () => { if (!sending) setPhase(1); });
+$("#customer").addEventListener("change", renderRecent);
+
+$("#f").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  if (sending) return;
+  clearErrors();
+  const body = buildBody();
+  const json = JSON.stringify(body);
+  const key = (lastFailed && lastFailed.json === json) ? lastFailed.key : uuid();
+  const scenario = $("#fault").selectedOptions[0].textContent;
+  sending = true; setPhase(2);
+  $("#send").disabled = true; $("#send").textContent = "Enviando…";
+  let r;
+  try {
+    stockBefore = await refreshStock();
+    r = await api("order/orders", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key }, body: json });
+  } finally {
+    sending = false; $("#send").disabled = false; $("#send").textContent = "Criar pedido";
+  }
+  if (r.network || r.status >= 500) {
+    lastFailed = { json, key };
+    const down = r.network || [502, 503, 504].includes(r.status);
+    showMsg("err", down ? "Serviço de pedidos indisponível — tente novamente."
+                        : `Erro no serviço de pedidos (${esc(r.status)}${r.body.detail ? " · " + esc(r.body.detail) : ""}) — tente novamente.`);
+    setPhase(1); return;
+  }
+  lastFailed = null;
+  if (!r.ok) { showProblem(r); setPhase(1); return; }
+
+  // 202 (ou 200 de replay idempotente): feedback imediato, sem esperar o primeiro poll (CA5).
+  const replay = r.status === 200;
+  current = { orderId: r.body.orderId, sagaId: r.body.sagaId, sku: body.items[0].sku, scenario, curl: curlFor(body, key), deliveryType: body.deliveryType, order: null };
+  showMsg("ok", `${replay ? "Pedido já existente (mesma Idempotency-Key)" : "Pedido aceito — Saga iniciada"} · <code>${esc(current.orderId.slice(0, 8))}</code>`);
+  setPhase(3);
+  openTracking({ orderId: current.orderId, sagaId: current.sagaId, status: r.body.status || "PENDING", deliveryType: body.deliveryType,
+                 items: body.items, totalAmount: null, trackingCode: null, cancellationReason: null, history: [] }, true);
+  renderRecent();
+  follow();
+});
+
+// ---------- Acompanhamento (C + D) ----------
+const STEPS = [
+  { key: "created", label: "Pedido criado" },
+  { key: "INVENTORY", label: "Estoque" },
+  { key: "PAYMENT", label: "Pagamento" },
+  { key: "SHIPPING", label: "Envio" },
+  { key: "outcome", label: "Desfecho" }
+];
+const VIEW = {
+  wait: { icon: "○", text: "Aguardando" },
+  skip: { icon: "–", text: "Não executada" },
+  run:  { icon: "◐", text: "Em andamento" },
+  done: { icon: "✓", text: "Concluída" },
+  fail: { icon: "✕", text: "Falhou" },
+  comp: { icon: "↺", text: "Compensada (desfeita)" },
+  na:   { icon: "–", text: "Não se aplica (entrega digital)" }
+};
+
+function sortedHistory(o) {
+  return (o.history || []).map((h, i) => ({ h, i, t: Date.parse(h.at) || 0 }))
+    .sort((a, b) => (a.t - b.t) || (a.i - b.i)).map(x => x.h);
+}
+
+// Regra de apresentação do contrato §2. O step ORDER aparece duas vezes: "Pedido criado" considera só ORDER/CREATED e
+// "Desfecho" só ORDER/CONFIRMED|CANCELED — assim "Pedido criado" nunca herda o estado final (ressalva do G1).
+function recordsFor(step, hist) {
+  if (step === "created") return hist.filter(h => h.step === "ORDER" && h.status === "CREATED");
+  if (step === "outcome") return hist.filter(h => h.step === "ORDER" && TERMINAL.includes(h.status));
+  return hist.filter(h => h.step === step);
+}
+function stepState(step, recs, o) {
+  const terminal = TERMINAL.includes(o.status);
+  if (step === "SHIPPING" && o.deliveryType === "DIGITAL") return { st: "na" };
+  if (!recs.length) return { st: terminal ? "skip" : "wait" };
+  const last = recs[recs.length - 1];
+  const maxAttempt = Math.max(...recs.map(h => Number(h.attempt) || 1));
+  const tries = n => n > 1 ? `tentativa ${n}` : "";
+  switch (last.status) {
+    case "SUCCEEDED": case "CREATED": case "CONFIRMED":
+      return { st: "done", last, extra: "", note: maxAttempt > 1 ? `Concluída na ${tries(maxAttempt)}` : (last.detail || "") };
+    case "FAILED": case "CANCELED":
+      return { st: "fail", last, extra: "", note: last.detail || "" };
+    case "TIMED_OUT":
+      return terminal ? { st: "fail", last, extra: "", note: last.detail || "" }
+                      : { st: "run", last, extra: tries(Number(last.attempt) || 1), note: last.detail || "" };
+    case "STARTED": case "RETRYING":
+      return { st: "run", last, extra: tries(Number(last.attempt) || 1), note: last.detail || "" };
+    case "COMPENSATING":
+      return { st: "run", last, extra: "compensando", note: last.detail || "" };
+    case "COMPENSATED":
+      return { st: "comp", last, extra: "", note: `Havia sido concluída e foi desfeita${last.detail ? ": " + last.detail : ""}` };
+    default:
+      return { st: "run", last, extra: String(last.status), note: last.detail || "" };
+  }
+}
+
+function buildTimeline() {
+  $("#timeline").innerHTML = STEPS.map(s => `<li data-key="${s.key}"><span class="ico" aria-hidden="true"></span>
+    <div><div class="t-row"><b>${esc(s.label)}</b><span class="t-state"></span><time class="t-time mono"></time></div><div class="t-note"></div></div></li>`).join("");
+}
+function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+
+function renderTimeline(o) {
+  const hist = sortedHistory(o);
+  STEPS.forEach(s => {
+    const li = $(`#timeline li[data-key="${s.key}"]`);
+    const v = stepState(s.key, recordsFor(s.key, hist), o);
+    const view = VIEW[v.st];
+    let text = view.text + (v.extra ? ` · ${v.extra}` : "");
+    if (s.key === "outcome" && v.st === "done") text += " · pedido confirmado";
+    if (s.key === "outcome" && v.st === "fail") text += " · pedido cancelado";
+    const cls = "st-" + v.st;
+    const ico = li.querySelector(".ico"), state = li.querySelector(".t-state");
+    if (ico.className !== "ico " + cls) ico.className = "ico " + cls;
+    if (state.className !== "t-state " + cls) state.className = "t-state " + cls;
+    setText(ico, view.icon); setText(state, text);
+    const tm = li.querySelector(".t-time");
+    setText(tm, v.last ? hhmmss(v.last.at) : "");
+    if (v.last) tm.setAttribute("datetime", v.last.at); else tm.removeAttribute("datetime");
+    setText(li.querySelector(".t-note"), v.note || "");
+  });
+  $("#hist").innerHTML = hist.map(h => `<tr><td class="mono">${esc(hhmmss(h.at))}</td><td>${esc(h.step)}</td><td>${esc(h.status)}</td><td>${esc(h.attempt)}</td><td class="mono" style="color:var(--muted)">${esc(h.detail || "")}</td></tr>`).join("")
+    || `<tr><td colspan="5" style="color:var(--dim)">Sem registros ainda.</td></tr>`;
+}
+
+function renderSummary(o, stock) {
+  setText($("#sum-id"), String(o.orderId || "").slice(0, 8));
+  $("#sum-id").title = o.orderId || "";
+  const reason = o.cancellationReason ? ` <span class="reason">Motivo: ${esc(reasonText(o.cancellationReason))}</span>` : "";
+  const html = `Status: ${badge(o.status)}${reason}`;
+  if ($("#sum-status").innerHTML !== html) $("#sum-status").innerHTML = html;
+  setText($("#sum-items"), (o.items || []).map(i => `${i.sku} × ${i.quantity}`).join(", ") || "—");
+  // Total sempre de totalAmount da API (nunca calculado no front); antes do 1º GET mostra "aguardando".
+  setText($("#sum-total"), o.totalAmount === null || o.totalAmount === undefined ? "aguardando o serviço" : brl(o.totalAmount));
+  setText($("#sum-delivery"), deliveryText(o.deliveryType));
+  setText($("#sum-tracking"), o.trackingCode || (o.deliveryType === "DIGITAL" ? "não se aplica" : "—"));
+  if (stock) setText($("#sum-stock"), `${stock.available} disponíveis${stockBefore && current && stockBefore.sku === stock.sku ? ` (antes do pedido: ${stockBefore.available})` : ""}`);
+}
+
+function openTracking(o, fresh) {
+  $("#sum-empty").hidden = true; $("#saga-empty").hidden = true;
+  $("#sum-body").hidden = false; $("#saga-body").hidden = false;
+  buildTimeline();
+  $("#copy-msg").textContent = ""; $("#slow").hidden = true; $("#sum-stock").textContent = "—";
+  setText($("#saga-scenario"), current.scenario ? `Cenário: ${current.scenario}` : "");
+  $("#curl").textContent = current.curl || "Disponível apenas para pedidos criados nesta sessão do console.";
+  $("#lnk-order").href = `/api/order/orders/${encodeURIComponent(current.orderId)}`;
+  setSagaLinks(current.sagaId);
+  track.lastSig = ""; track.announced = "";
+  renderSummary(o, null); renderTimeline(o);
+  markRecent();
+}
+function setSagaLinks(sagaId) {
+  const href = sagaId ? `/api/saga/sagas/${encodeURIComponent(sagaId)}` : `/api/saga/sagas?orderId=${encodeURIComponent(current.orderId)}`;
+  $("#lnk-saga").href = href; $("#slow-link").href = href;
+}
+
+function renderOrder(o, stock) {
+  current.order = o;
+  if (o.sagaId && o.sagaId !== current.sagaId) { current.sagaId = o.sagaId; setSagaLinks(o.sagaId); }
+  const sig = JSON.stringify(o);
+  if (sig !== track.lastSig) { track.lastSig = sig; renderSummary(o, stock); renderTimeline(o); }
+  else if (stock) renderSummary(o, stock);
+}
+
+function updateTicker() {
+  if (!current) return;
+  const o = current.order;
+  const now = Date.now();
+  let t;
+  if (o && TERMINAL.includes(o.status)) t = `Saga encerrada (${ORDER_STATUS[o.status].toLowerCase()}). Atualização automática parada.`;
+  else if (track.pollErr) t = track.pollErr;
+  else if (!track.lastOkAt) t = "Saga em andamento… aguardando a primeira atualização.";
+  else t = `Saga em andamento… atualizado há ${Math.max(0, Math.round((now - track.lastOkAt) / 1000))} s`;
+  setText($("#ticker"), t);
+  $("#slow").hidden = !(o ? !TERMINAL.includes(o.status) : true) || (now - track.startedAt) < 120000;
+}
+setInterval(updateTicker, 1000);
+
+// Polling de GET /orders/{id} a cada 1 s; para no estado terminal (CA7).
+function follow() {
+  const my = ++followGen;
+  clearTimeout(pollTimer);
+  track.startedAt = Date.now(); track.lastOkAt = 0; track.pollErr = "";
+  const id = current.orderId;
+  const tick = async () => {
+    if (my !== followGen) return;
+    const r = await api(`order/orders/${encodeURIComponent(id)}`);
+    if (my !== followGen) return;
+    if (r.ok) {
+      track.lastOkAt = Date.now(); track.pollErr = "";
+      const o = r.body;
+      const sku = (o.items && o.items[0] && o.items[0].sku) || current.sku;
+      current.sku = sku;
+      const s = sku ? await api(`inventory/inventory/stock/${encodeURIComponent(sku)}`) : null;
+      if (my !== followGen) return;
+      renderOrder(o, s && s.ok ? s.body : null);
+      if (TERMINAL.includes(o.status)) { updateTicker(); refreshStock(); renderRecent(); return; }
+    } else if (r.status === 404) {
+      track.pollErr = "Pedido não encontrado (404)."; updateTicker(); return;
+    } else {
+      track.pollErr = r.network || r.status >= 500 ? "Sem resposta do serviço de pedidos; tentando novamente…" : `Erro ${r.status} ao consultar o pedido; tentando novamente…`;
+    }
+    updateTicker();
+    pollTimer = setTimeout(tick, 1000);
+  };
+  tick();
+}
+
+$("#copy").addEventListener("click", async () => {
+  if (!current) return;
+  let ok = false;
+  try { await navigator.clipboard.writeText(current.orderId); ok = true; } catch (e) { ok = false; }
+  $("#copy-msg").textContent = ok ? `ID copiado: ${current.orderId}` : `Copie manualmente: ${current.orderId}`;
+});
+
+// ---------- Pedidos do cliente (E) ----------
+function markRecent() {
+  document.querySelectorAll("#recent .orow").forEach(b => {
+    if (current && b.dataset.id === current.orderId) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+  });
+}
+async function renderRecent() {
+  const customer = $("#customer").value.trim();
+  $("#recent-customer").textContent = customer;
+  const list = $("#recent");
+  if (!customer) { list.innerHTML = `<li class="empty">Informe um cliente para ver os pedidos.</li>`; return; }
+  const my = ++recentGen;
+  const r = await api(`order/orders?customerId=${encodeURIComponent(customer)}&limit=20`);
+  if (my !== recentGen) return;
+  const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest("#recent .orow");
+  const focusId = focused ? focused.dataset.id : null;
+  if (!(r.ok && Array.isArray(r.body))) {
+    list.innerHTML = `<li class="empty">Não foi possível carregar os pedidos (${r.network || r.status >= 500 ? "serviço de pedidos indisponível" : "erro " + esc(r.status)}).</li>`;
+    return;
+  }
+  list.innerHTML = r.body.map(o => `<li><button type="button" class="orow" data-id="${esc(o.orderId)}">
+      <span class="o-when mono">${esc(dateTime(o.createdAt))}</span>
+      <span>${badge(o.status)} ${esc(deliveryText(o.deliveryType))} · ${esc(brl(o.totalAmount))}${o.cancellationReason ? ` · <span class="reason">${esc(reasonText(o.cancellationReason))}</span>` : ""}</span>
+      <code>${esc(String(o.orderId).slice(0, 8))}</code></button></li>`).join("")
+    || `<li class="empty">Este cliente ainda não tem pedidos.</li>`;
+  markRecent();
+  if (focusId) { const again = list.querySelector(`.orow[data-id="${CSS.escape(focusId)}"]`); if (again) again.focus(); }
+}
+$("#recent").addEventListener("click", ev => {
+  const b = ev.target.closest(".orow"); if (!b) return;
+  const id = b.dataset.id;
+  if (!current || current.orderId !== id) {
+    current = { orderId: id, sagaId: null, sku: null, scenario: "", curl: "", deliveryType: null, order: null };
+    stockBefore = null;
+  }
+  setPhase(3);
+  openTracking({ orderId: id, status: "PENDING", items: [], totalAmount: null, history: [], deliveryType: null }, false);
+  setText($("#ticker"), "Carregando pedido…");
+  follow();
+  $("#summary").scrollIntoView({ block: "start", behavior: "smooth" });
+});
+
+updateExplain(); renderRecent(); refreshStock();
+</script>
+</body>
+</html>

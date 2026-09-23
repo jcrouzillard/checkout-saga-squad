@@ -1,0 +1,25 @@
+{
+  "current": "checkout-saga",
+  "products": [
+    {
+      "id": "checkout-saga",
+      "name": "Checkout Saga",
+      "description": "Checkout distribuído com Saga orquestrada (Pedido, Estoque, Pagamento, Envio)",
+      "repository": "https://github.com/jcrouzillard/checkout-saga-squad",
+      "links": [
+        {
+          "label": "Console de Checkout",
+          "url": "http://localhost:8090"
+        },
+        {
+          "label": "API de pedidos",
+          "url": "http://localhost:8081/orders"
+        }
+      ],
+      "observability": {
+        "grafana": "http://localhost:{{GRAFANA_PORT}}/d/checkout-saga?kiosk&refresh=5s",
+        "jaeger": "http://localhost:16686/search?service=saga-orchestrator&lookback=1h"
+      }
+    }
+  ]
+}

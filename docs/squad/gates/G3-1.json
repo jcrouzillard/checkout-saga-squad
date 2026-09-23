@@ -1,0 +1,30 @@
+{
+  "gate": "G3",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Suíte e2e (7 cenários)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/e2e/last-report.json: 7/7 PASS (happy_path_physical, happy_path_digital, payment_failure, shipping_failure, timeout_step, coordinator_restart, idempotency); mtime 14:08:01Z, coerente com o evento do Orquestrador 6b083d7e4d3b (14:08:09Z). Amostragem: GET :8081/orders/0be75a35… (shipping_failure) = CANCELED/SHIPMENT_FAILED com histórico SHIPPING FAILED(CARRIER_REJECTED) → PAYMENT COMPENSATED(refund) → INVENTORY COMPENSATED(release) → ORDER CANCELED; GET /orders/4d1751a2… (happy_path_physical) = CONFIRMED, tracking BR284628849"},
+    {"name": "Matriz de rastreabilidade", "status": "pass", "weight": 2, "blocking": true,
+     "source": "tests/TRACEABILITY.md cobre item a item desafio §3 (7/7 funcionais), §6 (6/6 não funcionais) e §7 (4/4 cenários de falha), cada um com mecanismo + teste; 'Rastreabilidade ponta a ponta' marcada ⚠️ (verificação manual) — suprida pela evidência de Jaeger abaixo; orderIds citados são da 2ª execução (não da última)"},
+    {"name": "Trace ponta a ponta no Jaeger", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Jaeger POST /orders trace d1fb1fdefa2c3f5e contém orderId 4d1751a2… (happy_path_physical): 31 spans, 5 serviços (order, saga-orchestrator, inventory, payment, shipping). Busca service=order-service limit=50 lookback=30m: 3 traces multi-serviço (4-5 serviços); traces de relay/scheduler ausentes após restart 14:04:47Z (OTEL_INSTRUMENTATION_SPRING_SCHEDULING_ENABLED/JDBC_ENABLED=false). Restantes de 1 serviço = GET /orders (poll do e2e) e /actuator (scrape/healthcheck)"},
+    {"name": "Reprodução de falhas documentada", "status": "pass", "weight": 1, "blocking": false,
+     "source": "README.md §4: tabela dos 4 cenários de falha com simulate/comando e compensações + make e2e / run.sh <cenario>; tests/e2e/scenarios.md §1-7 com curl e resultado esperado"},
+    {"name": "Riscos do G2 tratados", "status": "validate", "weight": 0, "blocking": false,
+     "source": "(1) saga_resumed_total e saga_compensation_stuck_total no contrato docs/observability.md (decisão 2d214aec567d) — tratado; (2) ruído de polling no Jaeger removido via docker-compose.yml (handoff DevOps 7207f3ba3eb3) — tratado; (3) group.instance.id fixo: registrado em TRACEABILITY.md (Aprendizado), change-request b164b075d5cf e docs/apresentacao.md (evolução), mas ausente de README/docs/architecture/ADR e KAFKA_GROUP_INSTANCE_ID não explícito no compose — parcial"},
+    {"name": "Entregáveis da seção 14", "status": "pass", "weight": 0, "blocking": false,
+     "source": "Dockerfile, docker-compose.yml, infra/ (postgres init, Prometheus, Grafana provisionado); docs/architecture/README.md (3 blocos Mermaid, incl. visão agêntica) e saga.md (6); .claude/agents/ (6 agentes); evidências: decisions.jsonl (35 eventos), 7 handoffs, gates G1-1/G2-1/G3-1; README §1-8 (visão geral, arquitetura, executar, testar/falhas, squad)"}
+  ],
+  "open_risks": [
+    "group.instance.id fixo (1 réplica do orquestrador) não aparece como limitação/evolução em README ou docs/architecture/README.md §6; registrar lá e expor KAFKA_GROUP_INSTANCE_ID no docker-compose.yml.",
+    "TRACEABILITY.md cita orderIds da 2ª execução e mantém Rastreabilidade ponta a ponta como ⚠️; atualizar com a última execução e o trace d1fb1fdefa2c3f5e.",
+    "Timeout de inventory/shipping e TIMEOUT_ONCE sem cenário e2e dedicado (mesmo mecanismo do timeout de payment); GET /orders e /actuator ainda geram traces de 1 serviço no Jaeger."
+  ],
+  "human_required": false,
+  "rationale": "Trajetória: G1 aprovado (96%) → G2 aprovado (95%) após o ciclo 1 de autocorreção (defect do QA no reinício do coordenador → static membership + carência no startup pelo Backend) → G3. Verifiquei no repositório e no ambiente em execução: suíte e2e 7/7 (relatório coerente com o log; shipping_failure conferido via API com compensações refund+release), matriz cobrindo 17/17 requisitos de §3/§6/§7, trace do happy_path_physical com 5 serviços no Jaeger e sem ruído de polling, reprodução de falhas no README §4 e scenarios.md. Dois dos três riscos do G2 tratados; o de group.instance.id está só parcialmente documentado (não bloqueante). Confiança = 8/8 = 1.00."
+}

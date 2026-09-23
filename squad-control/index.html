@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squad Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFFFFF; --panel: #FFFFFF; --panel2: #F6F6F4; --line: #DCDCD8; --line2: #ECECE8; --text: #1C1C1E;
+    --muted: #4A4B50; --dim: #7A7B80; --accent: #1F3A5F; --accent-soft: #F3F5F8; --green: #2F6B45;
+    --green-soft: #EAF2EC; --amber: #8A5A12; --amber-soft: #FBF7EF; --red: #9B2C2C; --blue: #1F3A5F;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  code, time, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .app { max-width: 1440px; margin: 0 auto; }
+  .frame { background: var(--panel); min-height: 100vh; }
+  header { display: flex; align-items: stretch; justify-content: space-between; padding: 0 28px; height: 56px; border-bottom: 1px solid var(--line); gap: 12px; }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .logo { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .brand b { font-size: 15px; font-weight: 600; }
+  .brand span { color: var(--muted); font-size: 14px; padding-left: 14px; border-left: 1px solid var(--line); }
+  .tabs { display: flex; gap: 28px; }
+  .tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; padding: 0; height: 56px; }
+  .tabs button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .strip { display: flex; justify-content: space-between; padding: 7px 28px; background: var(--panel2); border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--dim); }
+  .btn { background: #fff; color: var(--text); border: 1px solid var(--text); border-radius: 2px; padding: 0 20px; height: 44px; font: inherit; font-weight: 500; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; flex-grow: 1; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .layout { display: grid; grid-template-columns: 208px 1fr; min-height: calc(100vh - 90px); }
+  nav { background: var(--panel2); border-right: 1px solid var(--line); padding: 24px 0; }
+  nav h6 { margin: 18px 24px 8px; color: var(--dim); font-size: 11px; letter-spacing: .1em; font-weight: 600; }
+  nav h6:first-child { margin-top: 0; }
+  nav a { display: flex; align-items: center; padding: 9px 24px 9px 27px; color: var(--muted); cursor: pointer; text-decoration: none; font-size: 14px; }
+  nav a.on { background: #fff; color: var(--text); font-weight: 600; border-left: 3px solid var(--accent); padding-left: 24px; }
+  nav a .count { margin-left: auto; font-size: 12px; color: var(--dim); font-family: "IBM Plex Mono", monospace; }
+  main { padding: 28px 32px; min-width: 0; }
+  .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin-top: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-weight: 600; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  .pill.run { background: var(--green-soft); color: var(--green); }
+  .pill.idle { background: var(--panel2); color: var(--muted); }
+  .card { background: var(--panel); border-top: 1px solid var(--text); padding: 12px 0 0; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; margin-top: 24px; }
+  h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  .squad { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--line); }
+  .agent { padding: 10px 12px; cursor: pointer; min-width: 0; border-left: 1px solid var(--line); background: #fff; }
+  .agent:first-child { border-left: none; }
+  .agent:hover { background: var(--accent-soft); }
+  .agent .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .av { width: 22px; height: 22px; display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
+  .agent .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .agent .now { color: var(--muted); font-size: 12px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 7px; height: 7px; margin-left: auto; flex: none; background: #A7A8AC; }
+  .dot.trabalhando, .dot.coordenando { background: var(--green); animation: blink 1.6s infinite; }
+  .dot.concluído { background: var(--accent); }
+  @keyframes blink { 50% { opacity: .35; } }
+  .tl { list-style: none; margin: 0; padding: 0; }
+  .tl li { display: grid; grid-template-columns: 36px 1fr auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line2); align-items: baseline; }
+  .tl li:last-child { border-bottom: none; }
+  .step { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--dim); }
+  .step.done { color: var(--green); }
+  .step.now { color: var(--accent); font-weight: 600; }
+  .step.fail { color: var(--red); font-weight: 600; }
+  .tl b { display: block; font-size: 14px; font-weight: 600; }
+  .tl p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .tl .when { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .reco { margin-top: 12px; background: var(--accent-soft); border-top: 2px solid var(--accent); padding: 16px 18px; }
+  .reco small { letter-spacing: .1em; color: var(--muted); font-size: 11px; font-weight: 600; }
+  .reco .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .reco h2 { margin: 6px 0 10px; font-size: 18px; font-weight: 600; }
+  .conf { color: var(--accent); font-weight: 600; font-size: 13px; }
+  .bar { height: 4px; background: #D5DCE5; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .4s; }
+  .reco p { color: var(--muted); margin: 10px 0 0; font-size: 13px; }
+  .ev { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line2); }
+  .ev .s { font-weight: 600; white-space: nowrap; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  .pass { color: var(--green); } .fail { color: var(--red); } .validate { color: var(--amber); }
+  hr { border: none; border-top: 1px solid var(--text); margin: 20px 0 12px; }
+  .muted { color: var(--muted); }
+  .ok-msg { color: var(--green); margin-top: 12px; font-size: 13px; }
+  .warn-msg { color: var(--amber); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  textarea { width: 100%; margin-top: 8px; background: #fff; color: var(--text); border: 1px solid #C9C9C5; border-radius: 2px; padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical; }
+  .feed { list-style: none; margin: 0; padding: 0; font-size: 13px; border-top: 1px solid var(--line); }
+  .feed li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line2); }
+  .feed time { color: var(--dim); font-size: 12px; }
+  .tool { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-right: 8px; color: var(--accent); }
+  .tool.err { color: var(--red); }
+  .feed .txt { color: var(--muted); white-space: pre-wrap; }
+  .feed li.live { background: var(--accent-soft); border-left: 3px solid var(--accent); padding-left: 10px; margin-left: -13px; }
+  .feed details { margin-top: 4px; } .feed summary { cursor: pointer; font-size: 12px; color: var(--accent); }
+  .feed pre { margin: 6px 0 0; font-size: 11.5px; max-height: 160px; overflow: auto; }
+  .live-now { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background: var(--accent-soft); border-top: 2px solid var(--accent); margin: 12px 0; font-size: 13px; }
+  .live-now .pulse { width: 9px; height: 9px; background: var(--green); animation: blink 1.2s infinite; flex: none; }
+  .live-now b { display: block; }
+  .files { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+  .files code { font-size: 11.5px; background: var(--panel2); border: 1px solid var(--line); padding: 2px 6px; }
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 28px; margin-top: 24px; }
+  .agents-grid .card { max-height: 560px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line2); vertical-align: top; }
+  thead th { border-top: 1px solid var(--text); border-bottom: 1px solid var(--line); color: var(--dim); font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .tbl { overflow-x: auto; margin-top: 24px; }
+  pre { white-space: pre-wrap; background: var(--panel2); border: 1px solid var(--line); padding: 14px; font-size: 12.5px; overflow-x: auto; font-family: "IBM Plex Mono", monospace; }
+  .tag { font-size: 11px; padding: 1px 6px; background: var(--panel2); border: 1px solid var(--line); white-space: nowrap; color: var(--muted); }
+  details.card { padding: 10px 0; }
+  /* notificações */
+  .bell { position: relative; background: none; border: none; cursor: pointer; padding: 0 4px; height: 56px; display: flex; align-items: center; color: var(--muted); }
+  .bell:hover { color: var(--text); }
+  .bell .badge { position: absolute; top: 12px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; color: #fff; background: var(--accent); }
+  .bell .badge.acao { background: var(--red); }
+  .notif-panel { position: absolute; top: 56px; right: 0; width: 400px; max-height: 480px; overflow: auto; background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(28,28,30,.10); z-index: 20; }
+  .notif-panel h4 { margin: 0; padding: 12px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .notif-panel h4 span { font-weight: 400; color: var(--dim); font-size: 12px; }
+  .notif { display: grid; grid-template-columns: 48px 1fr; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
+  .notif:hover { background: var(--accent-soft); }
+  .notif.unread { background: #FBFBF9; }
+  .notif time { color: var(--dim); font-size: 12px; }
+  .notif b { display: block; font-weight: 600; }
+  .notif .lvl { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-weight: 600; color: var(--accent); }
+  .notif .lvl.acao { color: var(--red); }
+  .notif small { color: var(--muted); }
+  .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 30; width: 380px; max-width: calc(100vw - 32px); }
+  .toast { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: 0 8px 24px rgba(28,28,30,.12); padding: 12px 14px; font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+  .toast.acao { border-left-color: var(--red); }
+  .toast b { display: block; font-weight: 600; }
+  .toast .t-actions { display: flex; gap: 6px; }
+  .toast button { background: none; border: 1px solid var(--line); border-radius: 2px; font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; color: var(--text); }
+  .toast button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); background: #fff; border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgba(28,28,30,.08); padding: 24px 28px; overflow: auto; z-index: 10; }
+  .drawer .head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .drawer .head .av { width: 32px; height: 32px; font-size: 13px; }
+  .drawer .close { margin-left: auto; flex-grow: 0; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app"><div class="frame">
+  <header>
+    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
+    <div style="display:flex;align-items:center;gap:20px;position:relative">
+    <button class="bell" id="bell" aria-label="Notificações" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span class="badge" id="bell-badge" hidden></span></button>
+    <div class="notif-panel" id="notif-panel" hidden></div>
+    <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
+    </div>
+  </header>
+  <div class="toasts" id="toasts"></div>
+  <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
+  <div class="layout">
+    <nav>
+      <h6>OPERAÇÃO</h6>
+      <a data-view="execucoes" class="on">Execuções</a>
+      <a data-view="decisoes">Decisões <span class="count" id="c-dec"></span></a>
+      <a data-view="evidencias">Evidências</a>
+      <h6>GOVERNANÇA</h6>
+      <a data-view="politicas">Políticas</a>
+      <a data-view="agentes">Agentes <span class="count" id="c-ag"></span></a>
+      <a data-view="demandas">Demandas <span class="count" id="c-dem"></span></a>
+      <h6>PRODUTO</h6>
+      <a data-view="observabilidade">Observabilidade</a>
+      <div id="project-links"></div>
+    </nav>
+    <main id="main"></main>
+  </div>
+</div></div>
+<aside class="drawer" id="drawer" hidden></aside>
+
+<script>
+const AGENTS = {
+  orquestrador:    { label: "Orquestrador",    ini: "O", color: "#1F3A5F", role: "Delegação, coordenação e consolidação" },
+  arquiteto:       { label: "Arquiteto",       ini: "A", color: "#1F3A5F", role: "Bounded contexts, Saga e contratos" },
+  devops:          { label: "DevOps",          ini: "D", color: "#1F3A5F", role: "Docker, compose e CI" },
+  observabilidade: { label: "Observabilidade", ini: "Ob", color: "#1F3A5F", role: "Logs, traces, métricas e dashboards" },
+  backend:         { label: "Backend",         ini: "B", color: "#1F3A5F", role: "Serviços, APIs, mensageria e persistência" },
+  frontend:        { label: "Frontend",        ini: "F", color: "#1F3A5F", role: "Interface do produto (Console de Checkout)" },
+  qa:              { label: "QA",              ini: "Q", color: "#1F3A5F", role: "Testes e cenários de falha" },
+  auditor:             { label: "Auditor",             ini: "Au", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
+  humano:          { label: "Humano",          ini: "H", color: "#1F3A5F", role: "Intervém quando necessário" },
+};
+// Pipeline da squad (docs/squad/orquestrador.md)
+const PIPELINE = [
+  { id: "F1", title: "Arquiteto definiu a Saga e os contratos", agent: "arquiteto", doneWhen: e => e.agent === "arquiteto" && e.type === "handoff" },
+  { id: "G1", title: "Auditor avaliou o gate Arquitetura → Implementação", agent: "auditor", gate: "G1" },
+  { id: "F2", title: "Backend, DevOps e Observabilidade implementaram", agent: ["backend", "devops", "observabilidade"], doneWhen: e => e.agent === "backend" && e.type === "handoff" },
+  { id: "G2", title: "Auditor avaliou o gate Backend → QA", agent: "auditor", gate: "G2" },
+  { id: "F3", title: "QA injeta falhas e valida a Saga", agent: "qa", doneWhen: e => e.agent === "qa" && e.type === "handoff" },
+  { id: "G3", title: "Auditor avaliou o gate QA → Release", agent: "auditor", gate: "G3" },
+];
+
+let project = null, product = null, obsTool = "grafana", state = null, view = "execucoes", drawerAgent = null, policy = null, flash = "";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const since = ts => { if (!ts) return ""; const s = Math.max(0, Math.round((Date.now() - new Date(ts)) / 1000)); return s < 60 ? `há ${s} s` : s < 3600 ? `há ${Math.floor(s / 60)} min ${s % 60} s` : `há ${Math.floor(s / 3600)} h`; };
+const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" }; return `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini}</div>`; };
+const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
+
+function runsByAgent() {
+  const map = {};
+  for (const r of state.runs) (map[r.agent] ||= []).push(r);
+  for (const k in map) map[k].sort((a, b) => (a.started || "").localeCompare(b.started || ""));
+  return map;
+}
+function agentStatus(runs) {
+  if (!runs?.length) return "ocioso";
+  if (runs.some(r => r.status === "trabalhando" || r.status === "coordenando")) return runs.find(r => r.status !== "concluído").status;
+  return runs.at(-1).status;
+}
+function lastAction(runs) {
+  const a = runs?.at(-1)?.activity?.at(-1);
+  if (!a) return "aguardando delegação";
+  return a.kind === "tool" ? `${a.tool} · ${a.summary}` : a.summary.split("\n")[0];
+}
+function latestGate() {
+  const fromFiles = state.gates.at(-1);
+  const fromLog = [...state.log].reverse().find(e => e.type === "gate");
+  if (fromFiles && (!fromLog || fromFiles.mtime * 1000 >= Date.parse(fromLog.ts) - 5000)) return fromFiles;
+  if (fromLog) return { gate: fromLog.gate, recommendation: fromLog.recommendation, confidence: fromLog.confidence, risk: fromLog.risk, evidences: fromLog.evidences, rationale: fromLog.detail, from: fromLog.agent, to: fromLog.to };
+  return null;
+}
+function humanFor(gate, demand, after) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate && (e.demand || null) === (demand || null) && (!after || e.ts > after)); }
+
+function pipelineStatus() {
+  const byAgent = runsByAgent();
+  let foundNow = false;
+  return PIPELINE.map(p => {
+    let done, entry;
+    if (p.gate) {
+      entry = [...state.log].reverse().find(e => e.type === "gate" && e.gate === p.gate) || state.gates.find(g => g.gate === p.gate);
+      done = !!entry && entry.recommendation === "APPROVE";
+    } else {
+      entry = [...state.log].reverse().find(p.doneWhen);
+      done = !!entry;
+    }
+    const agents = [].concat(p.agent);
+    const working = agents.some(a => ["trabalhando"].includes(agentStatus(byAgent[a])));
+    let st = done ? "done" : (!foundNow && (working || entry)) ? "now" : "next";
+    if (st === "now") foundNow = true;
+    return { ...p, st, entry };
+  }).map((p, i, arr) => {
+    // se nada está "agora", o primeiro pendente vira "agora"
+    if (!arr.some(x => x.st === "now") && p.st === "next" && arr.slice(0, i).every(x => x.st === "done")) p.st = "now";
+    return p;
+  });
+}
+
+function renderSquadStrip() {
+  const byAgent = runsByAgent();
+  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "frontend", "qa", "auditor"].map(a => {
+    const runs = byAgent[a], st = agentStatus(runs);
+    return `<div class="agent" data-agent="${a}" title="Ver o que ${AGENTS[a].label} está fazendo">
+      <div class="top">${av(a)}<span class="name">${AGENTS[a].label}</span><span class="dot ${st}" title="${st}"></span></div>
+      <div class="now">${esc(st === "ocioso" ? "aguardando delegação" : lastAction(runs))}</div></div>`;
+  }).join("")}</div>`;
+}
+
+// Demanda ativa (iniciada e ainda não concluída): a tela Execuções passa a ser dela.
+function activeDemand() {
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
+  const infos = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
+  return infos.filter(x => !["Registrada", "Concluída", "Cancelada"].includes(x.status)).at(-1) || null;
+}
+// Linha do tempo de uma demanda, montada a partir dos eventos (task → handoff → gate), na ordem em que aconteceram.
+function demandSteps(active) {
+  const byAgent = runsByAgent();
+  const steps = [];
+  for (const e of state.log.filter(e => e.demand === active.d.id)) {
+    if (e.type === "task" && e.agent !== "humano") {
+      steps.push({ id: AGENTS[e.to]?.ini || "•", agent: e.to, title: `${AGENTS[e.to]?.label || e.to}: ${e.title.replace(/^D\d+: /, "")}`, st: "next", entry: null, ts: e.ts });
+    } else if (e.type === "handoff") {
+      const s = [...steps].reverse().find(s => s.agent === e.agent && s.st !== "done");
+      if (s) { s.st = "done"; s.entry = e; } else steps.push({ id: AGENTS[e.agent]?.ini || "•", agent: e.agent, title: `${AGENTS[e.agent]?.label || e.agent}: ${e.title}`, st: "done", entry: e, ts: e.ts });
+    } else if (e.type === "gate") {
+      const s = [...steps].reverse().find(s => s.agent === "auditor" && s.st !== "done");
+      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${Math.round((e.confidence || 0) * 100)}%`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
+      if (s) Object.assign(s, item); else steps.push(item);
+    }
+  }
+  let marked = false;
+  for (const s of steps) if (s.st === "next" && !marked) { s.st = "now"; marked = true; }
+  return steps;
+}
+
+function renderExecucoes() {
+  const active = activeDemand();
+  const pipe = active ? demandSteps(active) : pipelineStatus();
+  const now = pipe.find(p => p.st === "now");
+  const anyRunning = state.runs.some(r => r.status === "trabalhando");
+  const g = active ? ([...state.log].reverse().find(e => e.type === "gate" && e.demand === active.d.id) || null) : latestGate();
+  const human = g && humanFor(g.gate, active?.d.id, g.ts);
+  const conf = g?.confidence != null ? Math.round(g.confidence * 100) : null;
+  const evs = g?.evidences || [];
+  const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
+  return `
+  <div class="title-row">
+    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.d.title.replace(/^Demanda: /, "") : (now ? now.title : "Squad concluída"))}</h1>
+    <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div>${active ? controlsHtml(active) : ""}</div>
+    <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
+  </div>
+  ${renderSquadStrip()}
+  <div class="grid2">
+    <section class="card">
+      <h3>Linha do tempo</h3>
+      <ol class="tl">${pipe.map((p, i) => `
+        <li><div class="step ${p.st}">${p.id}</div>
+          <div><b>${esc(p.title)}</b><p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
+          <span class="when">${p.st === "done" ? (p.ts ? hhmm(p.ts) : "concluído") : p.st === "fail" ? "devolvido" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}
+      </ol>${active ? "" : ""}
+      ${g ? `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
+        <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
+        <div class="bar"><div style="width:${conf ?? 0}%"></div></div>
+        <p>Risco ${esc(g.risk || "—")}. ${esc((g.open_risks || []).join(" ") || g.rationale || "")}</p></div>`
+      : `<div class="reco"><small>RECOMENDAÇÃO DO AUDITOR</small><h2>Aguardando o primeiro gate</h2><p class="muted" style="margin:0">O Auditor avalia cada passagem entre agentes com base em requisitos, testes e riscos abertos.</p></div>`}
+    </section>
+    <section class="card">
+      <h3>Evidências usadas</h3>
+      ${evs.length ? evs.map(e => `<div class="ev"><span>${esc(e.name)}</span><span class="s ${e.status}">${statusLabel[e.status] || esc(e.status)}</span></div>`).join("") : `<p class="muted">Nenhuma evidência avaliada ainda.</p>`}
+      <hr>
+      <h3>Intervenção humana</h3>
+      ${!g ? `<p class="muted">Disponível quando o Auditor emitir um parecer.</p>` : `
+        <p class="${humanRequired ? "warn-msg" : "muted"}">${humanRequired ? "<b>Obrigatória</b> neste gate (confiança &lt; 70%, risco alto ou 3º ciclo)." : "Não obrigatória. Você pode aceitar a recomendação ou alterar o próximo passo."}</p>
+        <textarea id="note" rows="2" placeholder="Observação para o Orquestrador (opcional)"></textarea>
+        <div class="actions">
+          ${g.recommendation === "APPROVE"
+            ? `<button class="btn primary" data-human="APPROVE" ${human ? "disabled" : ""}>Enviar para ${esc(AGENTS[g.to]?.label || "próxima etapa")}</button><button class="btn" data-human="RETURN" ${human ? "disabled" : ""}>Devolver</button>`
+            : `<button class="btn primary" data-human="APPROVE" ${human ? "disabled" : ""}>Aceitar devolução · corrigir e reauditar</button><button class="btn" data-human="OVERRIDE" ${human ? "disabled" : ""} style="color:var(--amber);border-color:var(--amber)">Seguir mesmo assim</button>`}
+        </div>
+        ${human ? `<p class="ok-msg">Decisão registrada (${hhmm(human.ts)}): ${{ APPROVE: g.recommendation === "APPROVE" ? `${esc(AGENTS[g.to]?.label || "próxima etapa")} assumirá a próxima etapa.` : "o Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.", RETURN: "etapa devolvida ao agente de origem.", OVERRIDE: "você assumiu o risco; o Orquestrador libera a demanda e registra a decisão." }[human.recommendation]}</p>` : ""}
+        ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}`}
+    </section>
+  </div>`;
+}
+
+function feedHtml(runs) {
+  if (!runs?.length) return `<p class="muted">Este agente ainda não recebeu nenhuma tarefa.</p>`;
+  return runs.slice().reverse().map(r => `
+    ${r.status === "trabalhando" ? `<div class="live-now"><span class="pulse"></span><div><span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600">Executando agora</span>
+      <b>${r.current ? `${esc(r.current.tool)} · ${esc(r.current.summary)}` : "Pensando / escrevendo a próxima ação"}</b>
+      <span class="muted">${r.current ? since(r.current.ts) : since(r.updated)} · sessão iniciada ${hhmm(r.started)} · ${r.toolCount} ações</span></div></div>` : ""}
+    <div style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.description || "Sessão")}</b>
+        <span class="tag">${esc(r.status)}</span><span class="tag">${esc(r.model || "")}</span><span class="tag">${r.toolCount} ações</span>
+        <span class="muted" style="font-size:12px">início ${hhmm(r.started)} · última ${hhmm(r.updated)}</span></div>
+      ${r.files.length ? `<div class="files">${r.files.map(f => `<code>${esc(f)}</code>`).join("")}</div>` : ""}
+      <ul class="feed">${r.activity.slice().reverse().map(a => `<li class="${a.kind === "tool" && a.pending && r.status === "trabalhando" ? "live" : ""}"><time>${hhmm(a.ts)}</time><div>${a.kind === "tool"
+        ? `<span class="tool ${a.error ? "err" : ""}">${esc(a.tool)}</span>${esc(a.summary)}${a.pending && r.status === "trabalhando" ? ` <span class="muted">· em execução ${since(a.ts)}</span>` : (a.error ? ` <span class="fail">· erro</span>` : "")}${a.detail ? `<details><summary>detalhe</summary><pre>${esc(a.detail)}</pre></details>` : ""}`
+        : `<span class="txt">${esc(a.summary)}</span>`}</div></li>`).join("")}</ul>
+    </div>`).join("");
+}
+
+function renderAgentes() {
+  const byAgent = runsByAgent();
+  return `<h1>Agentes</h1><div class="sub">O que cada agente está fazendo agora — lido ao vivo das sessões do Claude Code.</div>
+  <div class="agents-grid">${Object.keys(AGENTS).filter(a => a !== "humano").map(a => `
+    <section class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">${av(a)}
+      <div><b>${AGENTS[a].label}</b><div class="muted" style="font-size:12px">${AGENTS[a].role}</div></div>
+      <span class="dot ${agentStatus(byAgent[a])}"></span></div>${feedHtml(byAgent[a])}</section>`).join("")}</div>`;
+}
+
+const ROUTES = { padrao: "Padrão · Arquiteto → G1 → implementação → G2 → QA → G3", direta: "Direta · implementação → G2 → QA → G3 (mudança pequena, sem contrato novo)" };
+const TARGETS = { auto: "Orquestrador decide", backend: "Backend", frontend: "Frontend", devops: "DevOps", observabilidade: "Observabilidade" };
+function demandInfo(d, index) {
+  const related = state.log.filter(e => e.demand === d.id);
+  const start = related.find(e => e.type === "start");
+  const work = related.filter(e => e.agent !== "humano");
+  const gates = work.filter(e => e.type === "gate");
+  const done = gates.some(g => g.gate === "G3" && g.recommendation === "APPROVE");
+  const returned = gates.some(g => g.recommendation === "RETURN") && !done;
+  const controls = related.filter(e => e.type === "control");
+  const lastCtl = controls.at(-1);
+  const canceled = controls.some(c => c.action === "cancel");
+  const paused = lastCtl?.action === "pause";
+  const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || "normal";
+  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id] };
+}
+function controlsHtml(info) {
+  if (["Registrada", "Concluída", "Cancelada"].includes(info.status)) return "";
+  const id = info.d.id;
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+    ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
+    <label class="muted" style="font-size:12px" for="cp-${id}">Prioridade</label>
+    <select id="cp-${id}" data-ctlpr="${id}" style="padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${["alta", "normal", "baixa"].map(p => `<option value="${p}" ${p === info.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
+    <button class="btn" data-ctl="cancel" data-id="${id}" style="height:36px;color:var(--red);border-color:var(--red);margin-left:auto">Cancelar demanda</button>
+  </div>`;
+}
+function renderDemandas() {
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
+  const cards = demands.map((d, i) => ({ d, ...demandInfo(d, i) })).reverse();
+  const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+  return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
+  <div class="grid2">
+    <section class="card"><h3>Nova demanda</h3>
+      <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
+      <input id="dem-title" placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
+      <label for="dem-detail" class="muted" style="font-size:12px;font-weight:500">Descrição, critérios de aceite, restrições</label>
+      <textarea id="dem-detail" rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
+      <div class="actions"><button class="btn primary" data-demand="1">Registrar demanda</button></div>
+      ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}
+      <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (no card ao lado) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
+    </section>
+    <section class="card"><h3>Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
+      ${cards.length ? cards.map(info => { const { d, code, status, start, gates, last, issue, priority } = info; return `
+      <div style="padding:12px 0;border-bottom:1px solid var(--line2)">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(d.title.replace(/^Demanda: /, ""))}</b><span class="${cls(status)}" style="font-size:12px;font-weight:600;white-space:nowrap">${esc(status)}</span></div>
+        <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.detail || "")}</div>
+        <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <span class="tag">${hhmm(d.ts)}</span>
+          ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
+          ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
+          ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
+        </div>
+        ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
+        ${status === "Registrada" ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:10px;align-items:end">
+          <div><label class="muted" style="font-size:11px" for="pr-${d.id}">Prioridade</label><select id="pr-${d.id}" data-pr="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff"><option value="alta">Alta</option><option value="normal" selected>Normal</option><option value="baixa">Baixa</option></select></div>
+          <div><label class="muted" style="font-size:11px" for="rt-${d.id}">Rota</label><select id="rt-${d.id}" data-rt="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <div><label class="muted" style="font-size:11px" for="tg-${d.id}">Agente</label><select id="tg-${d.id}" data-tg="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <button class="btn primary" data-start="${d.id}" style="flex-grow:0;height:40px">Iniciar</button>
+        </div>` : controlsHtml(info)}
+      </div>`; }).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
+    </section>
+  </div>`;
+}
+
+function renderDecisoes() {
+  return `<h1>Decisões</h1><div class="sub">Memória episódica da squad — <code>docs/squad/memory/decisions.jsonl</code> (append-only).</div>
+  <div class="tbl"><table><thead><tr><th>Hora</th><th>Agente</th><th>Tipo</th><th>Registro</th><th>Para</th></tr></thead><tbody>
+  ${state.log.slice().reverse().map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td>
+    <td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}${(e.evidences || []).length ? `<div>${e.evidences.map(v => `<span class="${v.status}">● </span>${esc(v.name)}`).join(" &nbsp; ")}</div>` : ""}</td>
+    <td>${esc(AGENTS[e.to]?.label || e.to || "")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+function renderEvidencias() {
+  const gates = state.gates;
+  return `<h1>Evidências</h1><div class="sub">Pareceres do Auditor (<code>docs/squad/gates/</code>) e briefs de passagem de contexto.</div>
+  ${gates.length ? gates.slice().reverse().map(g => `<section class="card" style="margin-top:18px"><h3>${esc(g.gate)} · ${esc(g.recommendation)} · ${Math.round((g.confidence || 0) * 100)}% · risco ${esc(g.risk)}</h3>
+    ${(g.evidences || []).map(e => `<div class="ev"><span>${esc(e.name)} <span class="muted" style="font-size:12px">${esc(e.source || "")}</span></span><span class="s ${e.status}">${statusLabel[e.status] || esc(e.status)}</span></div>`).join("")}
+    <p class="muted">${esc(g.rationale || "")}</p></section>`).join("") : `<p class="muted" style="margin-top:18px">Nenhum gate avaliado ainda.</p>`}
+  <h3 style="margin-top:26px">Handoffs</h3>
+  ${Object.entries(state.handoffs).map(([n, t]) => `<details class="card" style="margin-top:10px"><summary><b>${esc(n)}</b></summary><pre>${esc(t)}</pre></details>`).join("") || `<p class="muted">Nenhum handoff ainda.</p>`}`;
+}
+
+async function renderPoliticas() {
+  policy ||= await fetch("/api/policy").then(r => r.json());
+  return `<h1>Políticas</h1><div class="sub">Gates de qualidade, limites de autonomia e hierarquia de verdade da squad.</div>
+  <div class="grid2"><section class="card"><h3>Gates (docs/squad/gates.md)</h3><pre>${esc(policy.gates)}</pre></section>
+  <section class="card"><h3>Constituição (CLAUDE.md)</h3><pre>${esc(policy.constituicao)}</pre></section></div>`;
+}
+
+function renderDrawer() {
+  const d = $("#drawer");
+  if (!drawerAgent) { d.hidden = true; return; }
+  const runs = runsByAgent()[drawerAgent];
+  const scroll = d.scrollTop;
+  const opened = new Set([...d.querySelectorAll("details[open]")].map(el => el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80)));
+  d.innerHTML = `<div class="head">${av(drawerAgent)}<div><b style="font-size:17px">${AGENTS[drawerAgent].label}</b><div class="muted">${AGENTS[drawerAgent].role} · ${agentStatus(runs)}</div></div>
+    <button class="btn close" id="closeDrawer">Fechar</button></div><hr>${feedHtml(runs)}`;
+  d.hidden = false; d.scrollTop = scroll;
+  d.querySelectorAll("details").forEach(el => { if (opened.has(el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80))) el.open = true; });
+}
+
+async function render() {
+  if (!state) return;
+  $("#c-dec").textContent = state.log.length;
+  $("#c-ag").textContent = state.runs.filter(r => r.status === "trabalhando").length || "";
+  $("#c-dem").textContent = state.log.filter(e => e.type === "task" && e.agent === "humano").length || "";
+  const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias, demandas: renderDemandas, observabilidade: renderObservabilidade }[view];
+  const draft = { t: $("#dem-title")?.value, d: $("#dem-detail")?.value };
+  const note = $("#note")?.value;
+  const focused = document.activeElement?.id === "note";
+  $("#main").innerHTML = html ? html() : await renderPoliticas();
+  if ($("#note") && note) { $("#note").value = note; if (focused) $("#note").focus(); }
+  if ($("#dem-title") && (draft.t || draft.d)) { $("#dem-title").value = draft.t || ""; $("#dem-detail").value = draft.d || ""; }
+  renderDrawer();
+}
+
+// Enquanto o usuário digita num campo do painel, o polling não redesenha a tela (senão o campo perde o foco).
+const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
+// ---- Notificações: só o que merece atenção (ação necessária / novidade); o resto fica no log.
+const notifStore = { get(k, d) { try { return JSON.parse(localStorage.getItem("sc.notif." + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("sc.notif." + k, JSON.stringify(v)); } catch (e) {} } };
+let notifOpen = false, toastCursor = notifStore.get("toastCursor", null), lastSeen = notifStore.get("lastSeen", null);
+function demandCode(id) { const ds = state.log.filter(e => e.type === "task" && e.agent === "humano"); const i = ds.findIndex(d => d.id === id); return i >= 0 ? `D${i + 1}` : null; }
+function classify(e) {
+  const code = e.demand ? demandCode(e.demand) : null;
+  const pre = code ? `${code} · ` : "";
+  if (e.type === "gate") {
+    const conf = Math.round((e.confidence || 0) * 100);
+    const acao = e.recommendation === "RETURN" || (e.confidence != null && e.confidence < 0.7) || e.risk === "alto";
+    return { level: acao ? "acao" : "novidade", title: `${pre}Auditor ${e.recommendation === "APPROVE" ? "aprovou" : "devolveu"} ${e.gate} · ${conf}%`, body: acao ? "Intervenção humana necessária." : (e.detail || ""), view: "execucoes" };
+  }
+  if (e.type === "handoff") return { level: "novidade", title: `${pre}${AGENTS[e.agent]?.label || e.agent} → ${AGENTS[e.to]?.label || "squad"}`, body: e.title, view: "execucoes" };
+  if (e.type === "defect") return { level: "acao", title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, view: "evidencias" };
+  if (e.type === "start") return { level: "novidade", title: `${pre}Demanda iniciada`, body: e.title.replace(/^Iniciar: /, ""), view: "demandas" };
+  if (e.type === "control") return { level: "novidade", title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", view: "demandas" };
+  return null;
+}
+function notifications() { return state.log.map(e => { const c = classify(e); return c ? { ...c, id: e.id, ts: e.ts } : null; }).filter(Boolean).slice(-30).reverse(); }
+function renderBell() {
+  const items = notifications();
+  const unread = items.filter(n => !lastSeen || n.ts > lastSeen);
+  const badge = $("#bell-badge");
+  badge.hidden = unread.length === 0; badge.textContent = unread.length; badge.classList.toggle("acao", unread.some(n => n.level === "acao"));
+  document.title = (unread.length ? `(${unread.length}) ` : "") + `Squad Control · ${product?.name || ""}`.replace(/ · $/, "");
+  const panel = $("#notif-panel");
+  panel.hidden = !notifOpen;
+  if (notifOpen) panel.innerHTML = `<h4>Notificações <span>${unread.length ? unread.length + " novas" : "tudo lido"}</span></h4>` +
+    (items.length ? items.map(n => `<div class="notif ${(!lastSeen || n.ts > lastSeen) ? "unread" : ""}" data-goto="${n.view}"><time>${hhmm(n.ts)}</time><div><span class="lvl ${n.level}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small>${esc((n.body || "").slice(0, 140))}</small></div></div>`).join("") : `<div class="notif" style="cursor:default"><time></time><small>Nenhuma notificação ainda.</small></div>`);
+}
+function toast(n) {
+  const box = $("#toasts");
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = document.createElement("div");
+  el.className = `toast ${n.level}`;
+  el.innerHTML = `<div><span class="lvl" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:${n.level === "acao" ? "var(--red)" : "var(--accent)"}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small class="muted">${esc((n.body || "").slice(0, 120))}</small></div><div class="t-actions"><button class="primary" data-goto="${n.view}">Ver</button><button data-dismiss="1" aria-label="Fechar">×</button></div>`;
+  box.appendChild(el);
+  if (n.level !== "acao") setTimeout(() => el.remove(), 6000);
+  if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+    try { new Notification(n.title, { body: n.body || "", tag: n.id }); } catch (e) {}
+  }
+}
+function processNotifications() {
+  const items = notifications().slice().reverse();
+  if (toastCursor === null) { toastCursor = items.at(-1)?.ts || new Date().toISOString(); notifStore.set("toastCursor", toastCursor); renderBell(); return; }
+  for (const n of items) if (n.ts > toastCursor) toast(n);
+  const newest = items.at(-1)?.ts; if (newest && newest > toastCursor) { toastCursor = newest; notifStore.set("toastCursor", toastCursor); }
+  renderBell();
+}
+async function refresh() {
+  try { state = await fetch("/api/state").then(r => r.json()); if (!editing() && view !== "observabilidade") render(); processNotifications(); }
+  catch (e) { $("#main").innerHTML = `<p class="warn-msg">Servidor indisponível. Rode <code>make squad</code>.</p>`; }
+}
+
+document.addEventListener("click", async ev => {
+  if (ev.target.closest("#bell")) {
+    notifOpen = !notifOpen;
+    if (notifOpen) { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
+    else { lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); }
+    return renderBell();
+  }
+  if (!ev.target.closest("#notif-panel") && notifOpen) { notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); renderBell(); }
+  const go = ev.target.closest("[data-goto]");
+  if (go) { const t = go.closest(".toast"); if (t) t.remove(); view = go.dataset.goto; notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen);
+    document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.view === view)); renderBell(); return render(); }
+  if (ev.target.closest("[data-dismiss]")) { ev.target.closest(".toast").remove(); return; }
+  const nav = ev.target.closest("[data-view],[data-tab]");
+  if (nav) {
+    view = nav.dataset.view || nav.dataset.tab;
+    document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.view === view));
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "execucoes" && !["politicas", "demandas", "observabilidade"].includes(view))));
+    return render();
+  }
+  const ag = ev.target.closest("[data-agent]");
+  if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
+  if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  const ctl = ev.target.closest("[data-ctl]");
+  if (ctl) {
+    const id = ctl.dataset.id, action = ctl.dataset.ctl;
+    if (action === "cancel" && !ctl.dataset.confirm) { ctl.dataset.confirm = "1"; ctl.textContent = "Confirmar cancelamento"; return; }
+    const res = await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, priority: $(`[data-ctlpr="${id}"]`)?.value }) });
+    flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : "Falha ao registrar o controle.";
+    return refresh();
+  }
+  const st = ev.target.closest("[data-start]");
+  if (st) {
+    const id = st.dataset.start;
+    const res = await fetch("/api/demand/start", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, priority: $(`[data-pr="${id}"]`)?.value, route: $(`[data-rt="${id}"]`)?.value, target: $(`[data-tg="${id}"]`)?.value }) });
+    flash = res.ok ? "Demanda iniciada e colocada na fila do Orquestrador." : "Falha ao iniciar a demanda.";
+    return refresh();
+  }
+  const ob = ev.target.closest("[data-obs]");
+  if (ob) { obsTool = ob.dataset.obs; return render(); }
+  if (ev.target.closest("[data-demand]")) {
+    const title = $("#dem-title")?.value.trim(); if (!title) { flash = "Informe um título para a demanda."; return render(); }
+    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "" }) });
+    flash = res.ok ? "Demanda registrada: já está no log e vira issue no GitHub. Defina prioridade e rota no card e clique em Iniciar." : "Falha ao registrar a demanda.";
+    if (res.ok) { $("#dem-title").value = ""; $("#dem-detail").value = ""; }
+    return refresh();
+  }
+  const h = ev.target.closest("[data-human]");
+  if (h) {
+    const g = latestGate();
+    const res = await fetch("/api/human", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: h.dataset.human, gate: g?.gate, demand: activeDemand()?.d.id || null, note: $("#note")?.value || "" }) });
+    flash = res.ok ? "Decisão enviada ao Orquestrador." : "Falha ao registrar a decisão.";
+    refresh();
+  }
+});
+document.addEventListener("change", async ev => { if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && drawerAgent) { drawerAgent = null; renderDrawer(); } });
+fetch("/api/project").then(r => r.json()).then(p => {
+  project = p;
+  product = (p.products || []).find(x => x.id === p.current) || (p.products || [])[0];
+  if (!product) return;
+  $("#project-name").textContent = `${product.name} · Orquestrador + Auditor`;
+  document.title = `Squad Control · ${product.name}`;
+  $("#project-links").innerHTML = (product.links || []).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
+}).catch(() => {});
+
+function renderObservabilidade() {
+  const products = project?.products || [];
+  const url = product?.observability?.[obsTool];
+  return `<h1>Observabilidade</h1><div class="sub">Escolha o produto e a ferramenta. O Auditor usa traces e métricas como evidência nos gates.</div>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:18px">
+    <label for="obs-product" class="muted" style="font-size:12px;font-weight:500">Produto</label>
+    <select id="obs-product" style="padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${products.map(p => `<option value="${esc(p.id)}" ${p.id === product?.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
+    <div class="tabs" style="margin-left:8px"><button data-obs="grafana" class="${obsTool === "grafana" ? "on" : ""}" style="height:40px">Grafana · métricas</button><button data-obs="jaeger" class="${obsTool === "jaeger" ? "on" : ""}" style="height:40px">Jaeger · traces</button></div>
+    ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="margin-left:auto;font-size:13px">Abrir em nova aba</a>` : ""}
+  </div>
+  ${url ? `<iframe src="${esc(url)}" title="${esc(obsTool)} · ${esc(product.name)}" style="width:100%;height:calc(100vh - 260px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:#fff"></iframe>`
+        : `<p class="muted" style="margin-top:18px">Este produto não tem ${esc(obsTool)} configurado em docs/squad/project.json.</p>`}`;
+}
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
