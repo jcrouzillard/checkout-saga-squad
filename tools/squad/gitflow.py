@@ -131,17 +131,53 @@ def pr_number(url: str) -> int:
     return int(url.rstrip("/").split("/")[-1])
 
 
+def import_memory(branch: str):
+    """Na develop: acrescenta ao log os eventos que só existem na branch (append-only, deduplicado por id)."""
+    theirs = sh("git", "show", f"{branch}:{LOG.relative_to(ROOT).as_posix()}", check=False)
+    have = {e.get("id") for e in events()}
+    new = [l for l in theirs.splitlines() if l.strip() and json.loads(l).get("id") not in have]
+    if new:
+        with LOG.open("a", encoding="utf-8") as f:
+            f.write("\n".join(new) + "\n")
+
+
+def align_memory(branch: str):
+    """Leva a develop para dentro da branch em revisão com a memória IGUAL à da develop. Assim o PR não mexe no
+    log e o merge humano no GitHub não conflita com o que a squad segue registrando na develop (defeito a66b91c8a0d6)."""
+    switch(branch)
+    out = subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "develop"], cwd=ROOT, capture_output=True, text=True)
+    for path in STATE:  # um por vez: um caminho ausente não pode impedir os outros
+        sh("git", "checkout", "develop", "--", path, check=False)
+    unmerged = [f for f in sh("git", "diff", "--name-only", "--diff-filter=U").splitlines() if not f.startswith(STATE)]
+    if unmerged:
+        sh("git", "merge", "--abort", check=False)
+        switch("develop")
+        sys.exit("conflito de código entre a feature e a develop; resolva antes de revisar:\n" + "\n".join(unmerged))
+    if out.returncode == 0 or sh("git", "status", "--porcelain"):
+        sh("git", "add", "-A", "--", *STATE)
+        sh("git", "commit", "-q", "--no-edit", "-m", f"Sincroniza a develop e a memória da squad antes da revisão{TRAILER}", check=False)
+    sh("git", "push", "-q", "origin", branch)
+    switch("develop")
+
+
 def open_review(base: str, head: str, title: str, body: str, demand: str | None = None, release: str | None = None) -> str:
     """Abre (ou reutiliza) o PR, VOLTA para a develop e só então registra UM `review` — no log que o plantão lê
     (devolução do G2-D8: gravado na feature branch, o evento sumia ao voltar para a develop). Ninguém da squad faz merge."""
     url = pr(base, head, title, body)
     switch("develop")
     sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop", check=False)
+    if head.startswith("feature/"):
+        import_memory(head)
     already = [e for e in events() if e.get("type") == "review" and e.get("url") == url]
     if not already:
         event("review", f"PR #{pr_number(url)} aberto para revisão humana: {title}", demand=demand, release=release,
               pr=pr_number(url), url=url, branch=head)
     snapshot_state()
+    # Defeito a66b91c8a0d6 (D8): a develop com o `review` precisa chegar à origin já, senão o merge humano no
+    # GitHub diverge dela e o próximo pull entra em conflito no log.
+    sh("git", "push", "-q", "origin", "develop", check=False)
+    if head.startswith("feature/"):
+        align_memory(head)
     return url
 
 
@@ -206,11 +242,16 @@ def review_sync(a):
     if info["state"] == "MERGED":
         commit = (info.get("mergeCommit") or {}).get("oid", "")[:12]
         who = (info.get("mergedBy") or {}).get("login", "humano")
+        # Primeiro traz o merge humano, depois registra `delivered` e publica (defeito a66b91c8a0d6).
+        if current() == "develop":
+            sync_develop()
         event("delivered", f"Entregue: PR #{rv['pr']} integrado por {who}", demand=a.demand, release=a.release,
               pr=rv["pr"], url=rv["url"], merge_commit=commit)
-        sh("git", "fetch", "-q", "origin")
         if current() == "develop":
-            sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
+            snapshot_state()
+            sh("git", "push", "-q", "origin", "develop", check=False)
+        else:
+            sh("git", "fetch", "-q", "origin")
         if rv.get("branch", "").startswith("feature/"):
             sh("git", "branch", "-q", "-D", rv["branch"], check=False)
         print(f"entregue ({commit})")

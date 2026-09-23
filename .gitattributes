@@ -1,0 +1,2 @@
+# Log append-only da squad: linhas de ramos diferentes se somam (defeito a66b91c8a0d6, D8)
+docs/squad/memory/decisions.jsonl merge=union
