@@ -293,6 +293,15 @@ Timeout **não significa falha**: o participante pode ter executado e a resposta
 - Alternativa **não adotada** (decisão de negócio futura): manter o pedido "pago, aguardando envio" e reprocessar
   manualmente; rejeitada por reter o valor do cliente sem prazo.
 
+### 5.2.1 Resultado esperado de `TIMEOUT` em estoque e envio (confirmação D6, sem mudança de contrato)
+- `simulate.inventory=TIMEOUT`: reserva real, sem resposta → após os retries, `inventory.release` (`noop=false`) →
+  `order.cancel (STEP_TIMEOUT)`. Histórico: `INVENTORY TIMED_OUT` → `INVENTORY COMPENSATED` → `ORDER CANCELED`.
+  Nenhum pagamento nem envio é criado.
+- `simulate.shipping=TIMEOUT`: envio real, sem resposta → `shipment.cancel` → `payment.refund` → `inventory.release`
+  → `order.cancel (STEP_TIMEOUT)`. Histórico: `SHIPPING TIMED_OUT` → `SHIPPING COMPENSATED` → `PAYMENT COMPENSATED`
+  → `INVENTORY COMPENSATED` → `ORDER CANCELED`; shipment `CANCELED`, payment `REFUNDED`, reserva `RELEASED`.
+- Verificação automatizada: `docs/architecture/testes.md` §4.
+
 ### 5.3 Falha de compensação
 Compensações e `order.confirm/cancel` **nunca desistem**: retry infinito com backoff exponencial limitado a
 `SAGA_COMPENSATION_BACKOFF_MAX_MS`; a partir de `SAGA_COMPENSATION_ALERT_AFTER` tentativas, log ERROR
