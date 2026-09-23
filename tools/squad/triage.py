@@ -27,6 +27,9 @@ def main():
     d = next((r for r in rows if r.get("id") == a.demand and r.get("type") == "task"), None)
     if not d:
         sys.exit(f"demanda {a.demand} não encontrada")
+    if any(r.get("type") == "control" and r.get("action") == "cancel" and r.get("demand") == a.demand for r in rows):
+        print("demanda cancelada: triagem não executada")
+        return
     subprocess.run([sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", "arquiteto", "--type", "progress",
                     "--demand", a.demand, "--runner", a.runner, "--title", "Triagem: validando a clareza da demanda"],
                    cwd=ROOT, capture_output=True)
@@ -52,6 +55,10 @@ def main():
     if failed:
         result = {"status": "perguntas", "questions": [{"dimension": "objetivo",
                   "text": "A validação automática não conseguiu analisar a demanda; descreva o resultado esperado e como verificar que está pronto."}]}
+    rows = [json.loads(l) for l in LOG.read_text(encoding="utf-8").splitlines() if l.strip()]
+    if any(r.get("type") == "control" and r.get("action") == "cancel" and r.get("demand") == a.demand for r in rows):
+        print("demanda cancelada durante a triagem: validação descartada")
+        return
     qs = [q for q in result.get("questions", []) if (q.get("text") or "").strip()][:5]
     status = "ok" if result.get("status") == "ok" or not qs else "perguntas"
     args = [sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", "arquiteto", "--type", "validation",
