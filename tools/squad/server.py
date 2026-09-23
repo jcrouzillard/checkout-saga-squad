@@ -2,6 +2,7 @@
 """Servidor do painel Squad Control (somente stdlib).
 
 - Serve `squad-control/index.html` (painel genérico da squad; o produto gerenciado vem de docs/squad/project.json).
+- GET  /api/usage  -> consumo da IA (Claude Code via tee de statusline, Codex via rollouts) — D11/ADR-014
 - GET  /api/state  -> log de decisões + pareceres do Auditor + atividade ao vivo de cada agente
                       (lida das transcrições dos subagentes do Claude Code).
 - POST /api/human  -> registra a decisão humana (aceitar/devolver) no log compartilhado;
@@ -519,6 +520,187 @@ def collect_handoffs() -> dict:
     return {p.name: p.read_text(encoding="utf-8") for p in sorted(HANDOFFS_DIR.glob("*.md"))}
 
 
+# ---------------------------------------------------------------- consumo da IA (D11, ADR-014)
+# Só fonte real: Codex pelos rollouts ($CODEX_HOME/sessions), Claude Code pelo snapshot do tee de statusline.
+USAGE_FRESH_S = 15 * 60
+CODEX_TAIL_BYTES = 512 * 1024
+CODEX_DAY_DIRS = 3      # pastas de data mais recentes consideradas (não varre a árvore toda)
+CODEX_MAX_FILES = 5
+_codex_cache: dict = {}  # (caminho, mtime, tamanho) -> última rate_limits válida
+
+
+def claude_snapshot_path() -> pathlib.Path:
+    return DATA_ROOT / ".squad/usage/claude.json"
+
+
+def codex_sessions_dir() -> pathlib.Path:
+    home = os.environ.get("CODEX_HOME")
+    return (pathlib.Path(home).expanduser() if home else pathlib.Path.home() / ".codex") / "sessions"
+
+
+def _iso_z(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_time(value) -> datetime | None:
+    """Aceita epoch (s) ou ISO-8601; devolve datetime UTC."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(float(value), timezone.utc)
+        if isinstance(value, str) and value:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return None
+    return None
+
+
+def _usage_window(pct, resets, minutes) -> dict | None:
+    if isinstance(pct, bool) or not isinstance(pct, (int, float)):
+        return None
+    used = float(pct)
+    r = _parse_time(resets)
+    return {"usedPercent": used, "remainingPercent": max(0.0, 100.0 - used),
+            "resetsAt": _iso_z(r) if r else None,
+            "windowMinutes": int(minutes) if isinstance(minutes, (int, float)) and not isinstance(minutes, bool) else None}
+
+
+def _usage_provider(pid: str, label: str, source: str, collected: datetime | None,
+                    five: dict | None, week: dict | None, reason_none: str | None = None, **extra) -> dict:
+    base = {"id": pid, "label": label, "source": source, **extra}
+    if collected is None or (five is None and week is None):
+        return {**base, "status": "none", "available": False, "collectedAt": None,
+                "reason": reason_none or "Sem fonte real", "fiveHour": None, "week": None}
+    now = datetime.now(timezone.utc)
+    reason = None
+    for name, w in (("Janela de 5 h", five), ("Janela semanal", week)):
+        r = _parse_time(w and w.get("resetsAt"))
+        if r and r < now:
+            loc = r.astimezone()
+            when = loc.strftime("%H:%M") if loc.date() == now.astimezone().date() else loc.strftime("%d/%m %H:%M")
+            reason = f"{name} renovada às {when}"
+            break
+    if reason is None and (now - collected).total_seconds() > USAGE_FRESH_S:
+        reason = "Coleta com mais de 15 min"
+    return {**base, "status": "stale" if reason else "fresh", "available": reason is None,
+            "collectedAt": _iso_z(collected), "reason": reason, "fiveHour": five, "week": week}
+
+
+def usage_claude() -> dict:
+    args = ("claude", "Claude Code", "statusline")
+    snap = claude_snapshot_path()
+    if not snap.exists():
+        return _usage_provider(*args, None, None, None, "Statusline não instalada")
+    try:
+        d = json.loads(snap.read_text(encoding="utf-8"))
+        f, w = d.get("fiveHour") or {}, d.get("sevenDay") or {}
+        five = _usage_window(f.get("usedPercent"), f.get("resetsAt"), 300)
+        week = _usage_window(w.get("usedPercent"), w.get("resetsAt"), 10080)
+        return _usage_provider(*args, _parse_time(d.get("collectedAt")), five, week, "Snapshot sem rate_limits")
+    except Exception:
+        return _usage_provider(*args, None, None, None, "Snapshot ilegível")
+
+
+def _codex_recent_files(base: pathlib.Path) -> list[tuple[pathlib.Path, float, int]]:
+    """Lista só as CODEX_DAY_DIRS pastas AAAA/MM/DD mais recentes e devolve os rollouts de maior mtime."""
+    def subdirs(p: pathlib.Path) -> list[pathlib.Path]:
+        return sorted((c for c in p.iterdir() if c.is_dir() and c.name.isdigit()), key=lambda c: c.name, reverse=True)
+    days: list[pathlib.Path] = []
+    for y in subdirs(base):
+        for m in subdirs(y):
+            for d in subdirs(m):
+                days.append(d)
+                if len(days) >= CODEX_DAY_DIRS:
+                    break
+            if len(days) >= CODEX_DAY_DIRS:
+                break
+        if len(days) >= CODEX_DAY_DIRS:
+            break
+    files = []
+    for d in days:
+        for f in d.glob("rollout-*.jsonl"):
+            try:
+                st = f.stat()
+                files.append((st.st_mtime, st.st_size, f))
+            except OSError:
+                continue
+    files.sort(key=lambda t: t[0], reverse=True)
+    return [(f, mt, sz) for mt, sz, f in files[:CODEX_MAX_FILES]]
+
+
+def _codex_last_rate_limits(path: pathlib.Path, mtime: float, size: int) -> dict | None:
+    key = (str(path), mtime, size)
+    if key in _codex_cache:
+        return _codex_cache[key]
+    found = None
+    with path.open("rb") as fh:
+        start = max(0, size - CODEX_TAIL_BYTES)
+        fh.seek(start)
+        chunk = fh.read()
+    lines = chunk.split(b"\n")
+    if start > 0:
+        lines = lines[1:]  # primeira linha pode estar cortada
+    for raw in reversed(lines):
+        if b"token_count" not in raw or b"rate_limits" not in raw:
+            continue
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            continue
+        p = ev.get("payload") or {}
+        rl = p.get("rate_limits") if p.get("type") == "token_count" else None
+        if not isinstance(rl, dict) or rl.get("limit_id") not in (None, "codex"):
+            continue
+        ts = _parse_time(ev.get("timestamp"))
+        if ts is None:
+            continue
+        found = {"ts": ts, "rl": rl}
+        break
+    for k in [k for k in _codex_cache if k[0] == str(path)]:
+        _codex_cache.pop(k, None)
+    _codex_cache[key] = found
+    return found
+
+
+def usage_codex() -> dict:
+    args = ("codex", "Codex", "codex-rollout")
+    try:
+        base = codex_sessions_dir()
+        if not base.is_dir():
+            return _usage_provider(*args, None, None, None, "Sem sessões do Codex")
+        best = None
+        for f, mt, sz in _codex_recent_files(base):
+            try:
+                hit = _codex_last_rate_limits(f, mt, sz)
+            except OSError:
+                continue
+            if hit and (best is None or hit["ts"] > best["ts"]):
+                best = hit
+        if best is None:
+            return _usage_provider(*args, None, None, None, "Nenhum rate_limits nas sessões recentes do Codex")
+        rl = best["rl"]
+        pri, sec = rl.get("primary") or {}, rl.get("secondary") or {}
+        five = _usage_window(pri.get("used_percent"), pri.get("resets_at"), pri.get("window_minutes"))
+        week = _usage_window(sec.get("used_percent"), sec.get("resets_at"), sec.get("window_minutes"))
+        plan = rl.get("plan_type") if isinstance(rl.get("plan_type"), str) else None
+        return _usage_provider(*args, best["ts"], five, week, "rate_limits sem janelas", plan=plan)
+    except Exception:
+        return _usage_provider(*args, None, None, None, "Falha ao ler as sessões do Codex")
+
+
+def collect_usage() -> dict:
+    providers = []
+    for fn, pid, label, src in ((usage_claude, "claude", "Claude Code", "statusline"),
+                                (usage_codex, "codex", "Codex", "codex-rollout")):
+        try:
+            providers.append(fn())
+        except Exception:  # nunca derruba /api/state nem o outro provedor
+            providers.append(_usage_provider(pid, label, src, None, None, None, "Falha na leitura"))
+    return {"providers": providers}
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(UI_DIR), **kw)
@@ -545,7 +727,10 @@ class Handler(SimpleHTTPRequestHandler):
                 "runs": runs,
                 "handoffs": collect_handoffs(),
                 "github": github_issues(),
+                "usage": collect_usage(),
             })
+        if self.path.startswith("/api/usage"):
+            return self._json({"usage": collect_usage()})
         if self.path.startswith("/api/project"):
             # Portas locais podem variar (.env do compose): placeholders {{VAR}} são resolvidos aqui.
             pj = ROOT / "docs/squad/project.json"
