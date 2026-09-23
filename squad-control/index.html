@@ -134,6 +134,11 @@
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); background: #fff; border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgba(28,28,30,.08); padding: 24px 28px; overflow: auto; z-index: 10; }
   .drawer .head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .drawer .head .av { width: 32px; height: 32px; font-size: 13px; }
+  /* D3: emoji no avatar com caixa fixa — tamanho não varia entre sistemas/fontes de emoji. */
+  .av.emo { width: 22px; height: 22px; min-width: 22px; max-width: 22px; min-height: 22px; max-height: 22px; overflow: hidden;
+            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 13px; line-height: 1; font-weight: 400; }
+  .av.emo span { display: block; line-height: 1; }
+  .drawer .head .av.emo { width: 32px; height: 32px; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; font-size: 18px; }
   .drawer .close { margin-left: auto; flex-grow: 0; }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
 </style>
@@ -171,15 +176,15 @@
 
 <script>
 const AGENTS = {
-  orquestrador:    { label: "Orquestrador",    ini: "O", color: "#1F3A5F", role: "Delegação, coordenação e consolidação" },
-  arquiteto:       { label: "Arquiteto",       ini: "A", color: "#1F3A5F", role: "Bounded contexts, Saga e contratos" },
-  devops:          { label: "DevOps",          ini: "D", color: "#1F3A5F", role: "Docker, compose e CI" },
-  observabilidade: { label: "Observabilidade", ini: "Ob", color: "#1F3A5F", role: "Logs, traces, métricas e dashboards" },
-  backend:         { label: "Backend",         ini: "B", color: "#1F3A5F", role: "Serviços, APIs, mensageria e persistência" },
-  frontend:        { label: "Frontend",        ini: "F", color: "#1F3A5F", role: "Interface do produto (Console de Checkout)" },
-  qa:              { label: "QA",              ini: "Q", color: "#1F3A5F", role: "Testes e cenários de falha" },
-  auditor:             { label: "Auditor",             ini: "Au", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
-  humano:          { label: "Humano",          ini: "H", color: "#1F3A5F", role: "Intervém quando necessário" },
+  orquestrador:    { label: "Orquestrador",    ini: "O", emoji: "🎼", color: "#1F3A5F", role: "Delegação, coordenação e consolidação" },
+  arquiteto:       { label: "Arquiteto",       ini: "A", emoji: "📐", color: "#1F3A5F", role: "Bounded contexts, Saga e contratos" },
+  devops:          { label: "DevOps",          ini: "D", emoji: "⚙️", color: "#1F3A5F", role: "Docker, compose e CI" },
+  observabilidade: { label: "Observabilidade", ini: "Ob", emoji: "🔭", color: "#1F3A5F", role: "Logs, traces, métricas e dashboards" },
+  backend:         { label: "Backend",         ini: "B", emoji: "🧩", color: "#1F3A5F", role: "Serviços, APIs, mensageria e persistência" },
+  frontend:        { label: "Frontend",        ini: "F", emoji: "🎨", color: "#1F3A5F", role: "Interface do produto (Console de Checkout)" },
+  qa:              { label: "QA",              ini: "Q", emoji: "🧪", color: "#1F3A5F", role: "Testes e cenários de falha" },
+  auditor:             { label: "Auditor",             ini: "Au", emoji: "🛡️", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
+  humano:          { label: "Humano",          ini: "H", emoji: "👤", color: "#1F3A5F", role: "Intervém quando necessário" },
 };
 // Pipeline da squad (docs/squad/orquestrador.md)
 const PIPELINE = [
@@ -196,7 +201,10 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const since = ts => { if (!ts) return ""; const s = Math.max(0, Math.round((Date.now() - new Date(ts)) / 1000)); return s < 60 ? `há ${s} s` : s < 3600 ? `há ${Math.floor(s / 60)} min ${s % 60} s` : `há ${Math.floor(s / 3600)} h`; };
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
-const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" }; return `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini}</div>`; };
+// Avatar: emoji fixo por papel (D3); papel desconhecido cai nas iniciais / "?". O emoji é decorativo (aria-hidden): o nome segue em texto.
+const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" };
+  return m.emoji ? `<div class="av emo" style="background:#E8EDF3;color:${m.color}"><span aria-hidden="true">${m.emoji}</span></div>`
+                 : `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini || "?"}</div>`; };
 const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
 
 function runsByAgent() {

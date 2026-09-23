@@ -51,7 +51,7 @@ def current() -> str:
     return sh("git", "rev-parse", "--abbrev-ref", "HEAD")
 
 
-STATE = ("docs/squad/memory/",)  # memória viva da squad (log, sync): muda o tempo todo e é commitada automaticamente
+STATE = ("docs/squad/memory/", "docs/squad/inbox/")  # memória viva da squad (log, sync): muda o tempo todo e é commitada automaticamente
 
 
 def snapshot_state():

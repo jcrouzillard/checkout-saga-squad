@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Agente Frontend. Implementa a interface do produto (Console de Checkout) a partir do brief de UX do Arquiteto, sem alterar APIs, eventos ou regras de negócio.
+description: Agente Frontend. Implementa a interface do produto (Console de Checkout) e do Squad Control a partir do brief de UX do Arquiteto, sem alterar APIs, eventos ou regras de negócio.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: opus
 ---
@@ -28,7 +28,7 @@ apenas as APIs já contratadas em `docs/contracts/api.md`.
 - Brief de UX / contrato de tela do Arquiteto (`docs/contracts/ui-*.md`), `docs/contracts/api.md`, handoffs.
 
 ## Saídas (você é dono)
-- `checkout-console/**`.
+- `checkout-console/**` (interface do produto) e `squad-control/**` (interface da fábrica).
 
 ## Ferramentas
 Read/Write/Edit, Bash (`docker compose up -d checkout-console`, `curl`), `tools/squad/log.py`.
