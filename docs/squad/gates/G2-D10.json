@@ -1,0 +1,38 @@
+{
+  "gate": "G2",
+  "demand": "f2324e0f25de",
+  "from": "devops+orquestrador",
+  "to": "qa",
+  "cycle": 1,
+  "commit": "7477c04",
+  "base": "ab9059d",
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Escopo do diff ab9059d..HEAD", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff --stat: docker-compose.yml (c52c73c, DevOps), README.md (7477c04, Orquestrador), docs/squad/gates/G1-D10.json (Auditor). Nenhum arquivo em services/**, contratos ou infra/observability/** alterado; ownership single-writer respeitado. Handoffs dbb80a08e960 e 892b7c335df5 presentes no log"},
+    {"name": "docker compose config -q válido; todos os serviços com healthcheck", "status": "pass", "weight": 2, "blocking": true,
+     "source": "docker compose config -q (worktree, .env GRAFANA_PORT=3001) = OK; config --format json: 11/11 serviços com healthcheck (checkout-console, grafana, jaeger, prometheus agora incluídos)"},
+    {"name": "depends_on sem ciclos", "status": "pass", "weight": 2, "blocking": true,
+     "source": "graphlib.TopologicalSorter sobre depends_on: ordem prometheus, jaeger, kafka, postgres -> grafana, 5 serviços -> checkout-console; todas as condições service_healthy (5 serviços -> jaeger/kafka/postgres; grafana -> prometheus; console -> order-service)"},
+    {"name": "CA4 comandos de healthcheck funcionam nos containers atuais", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docker exec wget -q -O /dev/null: checkout-saga-jaeger-1 http://127.0.0.1:14269/ rc=0; prometheus-1 http://127.0.0.1:9090/-/healthy rc=0; grafana-1 http://127.0.0.1:3000/api/health rc=0; checkout-console-1 http://127.0.0.1/ rc=0 (controle: http://localhost/ no console rc=1, connection refused — confirma a escolha de 127.0.0.1). Valores do compose idênticos à tabela CA4 do contrato, interval 10s/timeout 5s/retries 10/start_period 10s"},
+    {"name": "CA2 auto-create desligado", "status": "pass", "weight": 2, "blocking": true,
+     "source": "docker-compose.yml kafka: KAFKA_AUTO_CREATE_TOPICS_ENABLE \"false\" (efeito no broker só após recriação — verificação ao vivo é do QA)"},
+    {"name": "CA3 (parte DevOps) variável MDC no bloco comum", "status": "pass", "weight": 1, "blocking": false,
+     "source": "x-service.environment (&service-env-base): OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED \"true\" -> herdada pelos 5 serviços"},
+    {"name": "CA5 README preciso", "status": "pass", "weight": 2, "blocking": true,
+     "source": "README §Fábrica × produto: 'make squad' = Makefile alvo squad -> python3 tools/squad/server.py (porta 7070, server.py --port 7070 / $SQUAD_PORT); compose contém os 5 serviços, kafka, postgres, jaeger/prometheus/grafana e checkout-console (sem squad-control) — confere; motivos alinhados ao CA5"},
+    {"name": "Build/testes (mvn package)", "status": "validate", "weight": 0, "blocking": false,
+     "source": "Não reexecutado: nenhum arquivo de código ou pom.xml mudou desde o G1 (ab9059d). Cobertura fica no CA6 (mvn -B verify) pelo QA"}
+  ],
+  "open_risks": [
+    "CA3 parte Observabilidade pendente: docs/observability.md ainda não aponta onde a variável está nem anexa a linha real de log (trace_id, span_id, orderId, sagaId) nem o trace no Jaeger. Depende do up --build desta branch; deve ser feito antes do G3 (bloqueante no G3).",
+    "CA2 só foi verificado estaticamente; com auto-create=false, a criação dos tópicos pelo KafkaAdmin no startup passa a ser crítica. QA deve validar com down -v (volume limpo) e conferir auto.create.topics.enable=false, 9 .DLT e 3 partições.",
+    "Stack em execução ainda é a anterior (grafana/jaeger/prometheus/console sem healthcheck no ps); os healthchecks só valem após recriar os containers.",
+    "jaeger passa a ser service_healthy para os 5 serviços: se o Jaeger demorar, o startup atrasa até ~110s (start_period + retries*interval) — aceitável, mas QA deve observar o tempo total de up."
+  ],
+  "human_required": false,
+  "rationale": "O diff após o G1 contém apenas as mudanças planejadas para DevOps (CA2, CA3-env, CA4) e Orquestrador (CA5), cada uma no arquivo do seu dono. O compose é válido, todos os 11 serviços têm healthcheck, o grafo de depends_on é acíclico e os 4 novos comandos de healthcheck foram executados com sucesso nos containers atuais (e o controle com localhost falha no nginx, como previsto). O README descreve corretamente make squad/porta 7070 e o conteúdo do compose. Critérios de código do G2 não se aplicam (sem mudança de código). Ressalva principal: a parte de Observabilidade do CA3 ainda falta e deve ser concluída em paralelo ao QA, antes do G3."
+}
