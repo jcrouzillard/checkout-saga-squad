@@ -1,0 +1,26 @@
+{
+  "gate": "G2",
+  "demand": "d91b7a8b31d9",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 1.0,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Correção 1: fila respeita repriorização", "status": "pass", "weight": 2, "blocking": true,
+     "source": "878569e pending.py: prioridade = último control reprioritize da demanda, senão a do inbox. Cópia descartável própria (:7073, log vazio): fila inicial X alta, A normal, B baixa; após repriorizar A→baixa e B→alta via /api/demand/control (201), pending.py → '1/3 X · alta, 2/3 B · alta, 3/3 A · baixa' (empate resolvido por startedAt). Painel e plantão usam agora a mesma regra (contrato §2.6)"},
+    {"name": "Correção 2: start herda a prioridade editada", "status": "pass", "weight": 1, "blocking": false,
+     "source": "server.py: priority = data.priority ou a prioridade efetiva (demand = effective_demand(rows, demand), task + edits) ou 'normal'. Teste: backlog normal editado para alta, start sem priority → start e inbox 'alta'; start com priority explícita 'baixa' sobre item 'alta' → 'baixa' (a escolha do humano prevalece)"},
+    {"name": "Integração do 1º ciclo", "status": "pass", "weight": 3, "blocking": true,
+     "source": "G2-D5.json (ciclo 1): backlog sem validação, edit 201/400/404/409, mover para a fila 201 com fromBacklog e estado editado, 2º start 409, D4 intacta. O diff 878569e só toca pending.py (5 linhas) e server.py (1 linha), sem afetar esses caminhos"},
+    {"name": "Campos do painel e escopo", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Inalterados desde o ciclo 1: painel com when/backlog/edit.changes/fromBacklog/priority, backlog sem 'Em validação'; diff restrito a tools/squad e squad-control (+ docs da demanda)"}
+  ],
+  "open_risks": [
+    "O repriorizar não reescreve o priority do arquivo do inbox: a ordem correta depende de o plantão seguir o pending.py (como manda o plantao.md), e não de ler o JSON diretamente.",
+    "Não verificados ao vivo: github_sync (label backlog, comentário de edit, remoção da label ao mover) e o painel em navegador (edição inline, teclado, CA3/CA8): ficam para o QA."
+  ],
+  "human_required": false,
+  "rationale": "2º ciclo. As duas devoluções do 1º ciclo foram corrigidas no commit 878569e e confirmadas em cópia descartável própria na porta 7073, sem log real nem GitHub. A fila agora segue a última repriorização (B repriorizada para alta passou à frente de A rebaixada), igual ao painel. Mover para a fila sem prioridade herda a prioridade editada, e a prioridade explícita continua prevalecendo. O restante da integração do 1º ciclo segue válido, porque o diff é mínimo. Servidor parado. Confiança = 8/8 = 1.00."
+}
