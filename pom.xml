@@ -32,6 +32,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Alinhado ao OpenTelemetry Java Agent v2.8.0 (bridge da API 1.42) -->
         <opentelemetry.version>1.42.1</opentelemetry.version>
+        <!-- D6: 1.20.6 (BOM do Boot 3.4.5) usa API Docker antiga, recusada pelo Docker 29 (exige >= 1.44).
+             1.21.4 = última 1.x (2.x renomeia os artefatos para testcontainers-*). -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencyManagement>
