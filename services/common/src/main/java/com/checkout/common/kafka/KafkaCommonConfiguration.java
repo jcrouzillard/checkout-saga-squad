@@ -36,7 +36,10 @@ public class KafkaCommonConfiguration {
     @Bean
     @ConditionalOnProperty(name = "checkout.kafka.create-topics", havingValue = "true", matchIfMissing = true)
     public KafkaAdmin.NewTopics checkoutTopics() {
+        // Também os <tópico>.DLT com o MESMO nº de partições: o DeadLetterPublishingRecoverer publica na mesma
+        // partição da mensagem original; um DLT auto-criado com 1 partição (default do broker) falharia.
         return new KafkaAdmin.NewTopics(Topics.ALL.stream()
+                .flatMap(t -> java.util.stream.Stream.of(t, t + Topics.DLT_SUFFIX))
                 .map(t -> TopicBuilder.name(t).partitions(Topics.PARTITIONS).replicas(1).build())
                 .toArray(NewTopic[]::new));
     }
