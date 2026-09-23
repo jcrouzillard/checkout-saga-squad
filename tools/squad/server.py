@@ -88,7 +88,28 @@ def resolve_agent(meta: dict, first_prompt: str) -> str:
     return "outro"
 
 
-def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=False) -> dict | None:
+HEREDOC_WRITE = re.compile(r"(?:cat|tee)\s*>{1,2}\s*['\"]?([\w./-]+\.\w+)")
+_completed_cache: dict[str, tuple[float, set[str]]] = {}
+
+
+def completed_agent_ids(base: pathlib.Path) -> set[str]:
+    """IDs de subagentes cuja notificação de término já chegou à sessão do Orquestrador."""
+    done: set[str] = set()
+    for main in base.glob("*.jsonl"):
+        mtime = main.stat().st_mtime
+        cached = _completed_cache.get(str(main))
+        if cached and cached[0] == mtime:
+            done |= cached[1]
+            continue
+        text = main.read_text(encoding="utf-8", errors="ignore")
+        ids = set(re.findall(r"<task-id>(\w+)</task-id>\\n<tool-use-id>[^<]*</tool-use-id>\\n<output-file>[^<]*</output-file>\\n<status>completed</status>", text))
+        _completed_cache[str(main)] = (mtime, ids)
+        done |= ids
+    return done
+
+
+def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=False,
+              completed: set[str] | None = None) -> dict | None:
     rows = read_jsonl(path)
     if not rows:
         return None
@@ -113,8 +134,10 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
                     continue
                 tool_count += 1
                 item = {"ts": ts, "kind": "tool", "tool": name, "summary": summarize_tool(name, inp)}
-                if name in ("Write", "Edit"):
-                    f = rel(inp.get("file_path", ""))
+                written = [rel(inp.get("file_path", ""))] if name in ("Write", "Edit") else []
+                if name == "Bash":
+                    written = [w for w in HEREDOC_WRITE.findall(inp.get("command", "")) if not w.startswith("/dev/")]
+                for f in written:
                     if f not in files:
                         files.append(f)
                 pending[c.get("id")] = item
@@ -134,12 +157,15 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
     ended_turn = last.get("type") == "assistant" and isinstance(last_content, list) and all(
         x.get("type") != "tool_use" for x in last_content)
     recent = (time.time() - updated) < RUNNING_WINDOW_S
+    run_id = path.stem.replace("agent-", "")
     if delegations_only:
         status = "coordenando"
-    elif ended_turn and (time.time() - updated) > 10:
+    elif completed is not None and run_id in completed and ended_turn:
         status = "concluído"
+    elif recent or not ended_turn:
+        status = "trabalhando"
     else:
-        status = "trabalhando" if recent or not ended_turn else "aguardando"
+        status = "trabalhando" if (time.time() - updated) < 900 else "parado"
     return {
         "id": path.stem.replace("agent-", ""),
         "agent": agent or resolve_agent(meta, first_prompt),
@@ -157,8 +183,9 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
 def collect_runs() -> list[dict]:
     base = transcripts_root()
     runs = []
+    completed = completed_agent_ids(base)
     for path in sorted(base.glob("*/subagents/agent-*.jsonl")):
-        run = parse_run(path)
+        run = parse_run(path, completed=completed)
         if run:
             runs.append(run)
     # Sessão principal = Orquestrador (apenas delegações)

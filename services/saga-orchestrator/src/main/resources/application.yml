@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: saga-orchestrator
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/saga}
+    username: ${SPRING_DATASOURCE_USERNAME:checkout}
+    password: ${SPRING_DATASOURCE_PASSWORD:checkout}
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+server:
+  port: ${SERVER_PORT:8080}
+
+# api.md §5
+saga:
+  step-timeout-ms: ${SAGA_STEP_TIMEOUT_MS:5000}
+  step-max-retries: ${SAGA_STEP_MAX_RETRIES:2}
+  retry-backoff-ms: ${SAGA_RETRY_BACKOFF_MS:1000}
+  compensation-backoff-max-ms: ${SAGA_COMPENSATION_BACKOFF_MAX_MS:30000}
+  compensation-alert-after: ${SAGA_COMPENSATION_ALERT_AFTER:5}
+  timeout-scan-interval-ms: ${SAGA_TIMEOUT_SCAN_INTERVAL_MS:1000}
