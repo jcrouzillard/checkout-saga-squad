@@ -39,6 +39,20 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 | Frontend          | `.claude/agents/frontend.md`            | `checkout-console/**` (interface do produto)                    |
 | Auditor (Gatekeeper)  | `.claude/agents/auditor.md`                 | `docs/squad/gates/**` (somente leitura no resto)               |
 
+## Fluxo de branches (Git Flow) — obrigatório
+| Branch | Origem | Destino | Quem | Regra |
+|---|---|---|---|---|
+| `main` | — | — | ninguém commita direto | só recebe `release/*` e `hotfix/*` por PR; cada merge gera tag `vX.Y.Z` |
+| `develop` | `main` | — | integração | recebe features por PR; é a branch padrão do repositório |
+| `feature/<código>-<slug>` | `develop` | `develop` (PR) | agente/Orquestrador | uma por demanda (`feature/D3-cupom-desconto`); merge **só após G3 APPROVE** |
+| `release/<x.y.z>` | `develop` | `main` + back-merge em `develop` | Orquestrador | com aprovação humana; fixa a versão do pom e o CHANGELOG |
+| `hotfix/<x.y.z>-<slug>` | `main` | `main` + `develop` | Orquestrador | correção urgente em produção, mesmos gates |
+
+- Use sempre `python3 tools/squad/gitflow.py` (feature-start/finish, release-start/finish, hotfix-start/finish):
+  ele aplica as regras acima e **bloqueia o merge em develop sem G3 aprovado** pelo Auditor.
+- Commits pequenos, em português, um por passo do protocolo (contrato, implementação, testes, parecer).
+- O `--demand <id>` de cada evento do log liga demanda → branch → PR → release (rastreabilidade).
+
 ## Hierarquia de verdade (resolução de conflitos)
 1. Requisitos do desafio (`docs/desafio.md`).
 2. ADRs aceitos (`docs/adr/`) e contratos (`docs/contracts/`) — o **Arquiteto** é a autoridade.
@@ -58,7 +72,8 @@ Ao terminar sua tarefa, todo agente:
 3. O próximo agente só começa após o **Auditor** avaliar o gate correspondente (`docs/squad/gates.md`).
 
 ## Limites de autonomia
-- Nenhum agente faz `git push`, altera credenciais ou remove dados fora do seu diretório.
+- Subagentes não fazem `git push` nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.
+- Nenhum agente altera credenciais ou remove dados fora do seu diretório.
 - Mudança de contrato de evento/API → exige ADR do Arquiteto.
 - Gate com confiança < 70% ou risco "alto" → intervenção humana **obrigatória**; caso contrário é opcional.
 - Máximo de 2 ciclos de autocorreção por gate; no 3º, escala para o humano.

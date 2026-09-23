@@ -177,6 +177,11 @@ vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto*
 (`checkout-console`) no compose, ao lado dos serviços. A área **Observabilidade** do Squad Control escolhe o produto e
 embute o Grafana e o Jaeger dele (o Auditor usa traces e métricas como evidência nos gates).
 
+## 6b. Fluxo de branches (Git Flow)
+`main` (produção, tags `vX.Y.Z`) ← `release/*` ← `develop` (integração, branch padrão) ← `feature/<demanda>`.
+O merge de uma feature em `develop` exige o **G3 aprovado pelo Auditor**; `tools/squad/gitflow.py` aplica as regras.
+Detalhes e diagrama: [`docs/squad/git-flow.md`](docs/squad/git-flow.md) · histórico: [`CHANGELOG.md`](CHANGELOG.md).
+
 ## 7. Evidências
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
 - Pareceres do Auditor: [`docs/squad/gates/`](docs/squad/gates/)
