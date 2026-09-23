@@ -110,3 +110,5 @@ para múltiplas réplicas (ver `change-request` do Backend ao DevOps, id `b164b0
 5. **409 em `Idempotency-Key` repetida com corpo diferente**: mencionado como verificação "bônus" em
    `scenarios.md` §7, não incluído como assert obrigatório em `scenario_idempotency` (o requisito do
    `.claude/agents/qa.md` cobre apenas "mesmo `Idempotency-Key` duas vezes → um único pedido").
+| Emoji por papel nos cards dos agentes (demanda D3, Squad Control) | `squad-control/index.html` (`docs/contracts/ui-squad-control-agentes.md`) | `tests/ui/checklist-squad-control-d3.md` + capturas 1440/390 | ✅ G3 88% |
+| Tipo da demanda + validação agêntica (demanda D4, Squad Control) | `tools/squad/{server,triage,pending}.py`, `squad-control/index.html` (`docs/contracts/ui-demandas-v2.md`, ADR-008) | `tests/ui/checklist-demandas-v2.md` (API, 4 triagens reais 10–21 s, capturas) | ✅ G3 80% |
