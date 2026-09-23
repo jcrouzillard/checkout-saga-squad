@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start"}
 
 
 def main() -> None:
@@ -28,6 +28,8 @@ def main() -> None:
     p.add_argument("--recommendation", choices=["APPROVE", "RETURN"])
     p.add_argument("--confidence", type=float)
     p.add_argument("--risk", choices=["baixo", "moderado", "alto"])
+    p.add_argument("--demand", help="id do evento da demanda a que este evento pertence")
+    p.add_argument("--priority", choices=["alta", "normal", "baixa"])
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
     a = p.parse_args()
@@ -49,6 +51,8 @@ def main() -> None:
         "recommendation": a.recommendation,
         "confidence": a.confidence,
         "risk": a.risk,
+        "demand": a.demand,
+        "priority": a.priority,
         "refs": a.ref,
         "evidences": evidences,
     }

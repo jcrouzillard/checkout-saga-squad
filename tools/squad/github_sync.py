@@ -209,12 +209,32 @@ class Sync:
     def on_decision(self, e):
         self.comment(self.diary(), self.body(e, "Decisão"))
 
+    def on_start(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        self.comment(issue, self.body(e, f"Demanda iniciada pelo humano · prioridade {e.get('priority', 'normal')} · rota {e.get('route', 'padrao')}"))
+        self.set_field(issue, "Status", "Em andamento")
+        label = f"prioridade:{e.get('priority', 'normal')}"
+        subprocess.run(["gh", "label", "create", label, "--color", "1F3A5F", "-R", REPO, "-f"], capture_output=True)
+        subprocess.run(["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", label], capture_output=True)
+
+    def on_demand_event(self, e):
+        """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue or e["type"] in ("start", "task") and e["agent"] == "humano":
+            return
+        self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
+        if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
+            self.set_field(issue, "Status", "Concluído")
+            self.close(issue)
+
     def run_once(self) -> int:
         done = set(self.s["processed"])
         events = [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
         handlers = {"task": self.on_task, "handoff": self.on_handoff, "evidence": self.on_evidence,
                     "gate": self.on_gate, "human": self.on_human, "defect": self.on_ticket,
-                    "change-request": self.on_ticket, "decision": self.on_decision}
+                    "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start}
         n = 0
         for e in events:
             if e["id"] in done:
@@ -223,6 +243,8 @@ class Sync:
             if h:
                 print(f"{e['type']:<14} {e['agent']:<15} {e['title'][:70]}")
                 h(e)
+            if e.get("demand"):
+                self.on_demand_event(e)
             self.s["processed"].append(e["id"])
             self.save()  # salva a cada evento: uma falha no meio não duplica issues
             n += 1

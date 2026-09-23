@@ -212,6 +212,17 @@ def collect_gates() -> list[dict]:
     return sorted(gates, key=lambda g: g["mtime"])
 
 
+def github_issues() -> dict:
+    """id do evento -> {number, url} das issues criadas pelo github_sync (para links no painel)."""
+    st = ROOT / "docs/squad/memory/github-sync.json"
+    try:
+        data = json.loads(st.read_text(encoding="utf-8"))
+        return {k: {"number": v["number"], "url": v["url"], "closed": v.get("closed", False)}
+                for k, v in data.get("issues", {}).items()}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def collect_handoffs() -> dict:
     return {p.name: p.read_text(encoding="utf-8") for p in sorted(HANDOFFS_DIR.glob("*.md"))}
 
@@ -240,6 +251,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "gates": collect_gates(),
                 "runs": collect_runs(),
                 "handoffs": collect_handoffs(),
+                "github": github_issues(),
             })
         if self.path.startswith("/api/project"):
             # Portas locais podem variar (.env do compose): placeholders {{VAR}} são resolvidos aqui.
@@ -269,6 +281,25 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/demand/start"):
+            # Gatilho: o humano inicia a demanda. Vira evento `start` no log e um arquivo na fila docs/squad/inbox/,
+            # que a sessão do Orquestrador (em plantão) consome.
+            data = json.loads(raw or b"{}")
+            demand = next((e for e in read_jsonl(LOG) if e.get("id") == data.get("id") and e.get("type") == "task"
+                           and e.get("agent") == "humano"), None)
+            if not demand:
+                return self._json({"error": "demanda não encontrada"}, 404)
+            entry = self._append_log({"agent": "humano", "type": "start", "to": "orquestrador", "demand": demand["id"],
+                                      "title": f"Iniciar: {demand['title'].replace('Demanda: ', '')}",
+                                      "detail": data.get("note", ""), "priority": data.get("priority", "normal"),
+                                      "route": data.get("route", "padrao"), "target": data.get("target", "auto")})
+            inbox = ROOT / "docs/squad/inbox"
+            inbox.mkdir(parents=True, exist_ok=True)
+            (inbox / f"{demand['id']}.json").write_text(json.dumps({
+                "demand": demand["id"], "title": demand["title"].replace("Demanda: ", ""), "detail": demand.get("detail", ""),
+                "priority": entry["priority"], "route": entry["route"], "target": entry["target"],
+                "note": entry.get("detail", ""), "startedAt": entry["ts"]}, ensure_ascii=False, indent=2))
+            return self._json(entry, 201)
         if self.path.startswith("/api/demand"):
             # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
             data = json.loads(raw or b"{}")

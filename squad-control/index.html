@@ -292,25 +292,53 @@ function renderAgentes() {
       <span class="dot ${agentStatus(byAgent[a])}"></span></div>${feedHtml(byAgent[a])}</section>`).join("")}</div>`;
 }
 
+const ROUTES = { padrao: "Padrão · Arquiteto → G1 → implementação → G2 → QA → G3", direta: "Direta · implementação → G2 → QA → G3 (mudança pequena, sem contrato novo)" };
+const TARGETS = { auto: "Orquestrador decide", backend: "Backend", frontend: "Frontend", devops: "DevOps", observabilidade: "Observabilidade" };
+function demandInfo(d, index) {
+  const related = state.log.filter(e => e.demand === d.id);
+  const start = related.find(e => e.type === "start");
+  const work = related.filter(e => e.agent !== "humano");
+  const gates = work.filter(e => e.type === "gate");
+  const done = gates.some(g => g.gate === "G3" && g.recommendation === "APPROVE");
+  const returned = gates.some(g => g.recommendation === "RETURN") && !done;
+  const status = done ? "Concluída" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, last: work.at(-1), issue: state.github?.[d.id] };
+}
 function renderDemandas() {
-  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano").reverse();
-  const after = d => state.log.filter(e => e.ts > d.ts && e.type !== "human");
-  return `<h1>Demandas para a squad</h1><div class="sub">Uma demanda entra no log da squad, vira issue no GitHub e é delegada pelo Orquestrador: Arquiteto → G1 → Backend → G2 → QA → G3.</div>
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
+  const cards = demands.map((d, i) => ({ d, ...demandInfo(d, i) })).reverse();
+  const cls = s => s.startsWith("Concluída") ? "pass" : s.startsWith("Devolvida") ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+  return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
   <div class="grid2">
     <section class="card"><h3>Nova demanda</h3>
       <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
       <input id="dem-title" placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
       <label for="dem-detail" class="muted" style="font-size:12px;font-weight:500">Descrição, critérios de aceite, restrições</label>
       <textarea id="dem-detail" rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
-      <div class="actions"><button class="btn primary" data-demand="1">Enviar para a squad</button></div>
+      <div class="actions"><button class="btn primary" data-demand="1">Registrar demanda</button></div>
       ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}
-      <p class="muted" style="font-size:12px;margin-top:14px">Quem executa é a sessão do Orquestrador no Claude Code; o painel registra, acompanha e permite intervir nos gates.</p>
+      <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (no card ao lado) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>
-    <section class="card"><h3>Demandas registradas</h3>
-      ${demands.length ? demands.map(d => { const ev = after(d); const gates = ev.filter(e => e.type === "gate"); const last = ev.at(-1);
-        return `<div style="padding:10px 0;border-bottom:1px solid var(--line2)"><b>${esc(d.title.replace(/^Demanda: /, ""))}</b><div class="muted" style="font-size:13px">${esc(d.detail || "")}</div>
-        <div style="font-size:12px;margin-top:6px"><span class="tag">${hhmm(d.ts)}</span> ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join(" ")} ${last ? `<span class="muted">· último: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</span>` : `<span class="muted">· aguardando o Orquestrador</span>`}</div></div>`; }).join("")
-      : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
+    <section class="card"><h3>Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
+      ${cards.length ? cards.map(({ d, code, status, start, gates, last, issue }) => `
+      <div style="padding:12px 0;border-bottom:1px solid var(--line2)">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(d.title.replace(/^Demanda: /, ""))}</b><span class="${cls(status)}" style="font-size:12px;font-weight:600;white-space:nowrap">${esc(status)}</span></div>
+        <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.detail || "")}</div>
+        <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          <span class="tag">${hhmm(d.ts)}</span>
+          ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
+          ${start ? `<span class="tag">prioridade ${esc(start.priority || "normal")}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
+          ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
+        </div>
+        ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
+        ${status === "Registrada" ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:10px;align-items:end">
+          <div><label class="muted" style="font-size:11px" for="pr-${d.id}">Prioridade</label><select id="pr-${d.id}" data-pr="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff"><option value="alta">Alta</option><option value="normal" selected>Normal</option><option value="baixa">Baixa</option></select></div>
+          <div><label class="muted" style="font-size:11px" for="rt-${d.id}">Rota</label><select id="rt-${d.id}" data-rt="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <div><label class="muted" style="font-size:11px" for="tg-${d.id}">Agente</label><select id="tg-${d.id}" data-tg="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+          <button class="btn primary" data-start="${d.id}" style="flex-grow:0;height:40px">Iniciar</button>
+        </div>` : ""}
+      </div>`).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
     </section>
   </div>`;
 }
@@ -383,12 +411,20 @@ document.addEventListener("click", async ev => {
   const ag = ev.target.closest("[data-agent]");
   if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
   if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  const st = ev.target.closest("[data-start]");
+  if (st) {
+    const id = st.dataset.start;
+    const res = await fetch("/api/demand/start", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, priority: $(`[data-pr="${id}"]`)?.value, route: $(`[data-rt="${id}"]`)?.value, target: $(`[data-tg="${id}"]`)?.value }) });
+    flash = res.ok ? "Demanda iniciada e colocada na fila do Orquestrador." : "Falha ao iniciar a demanda.";
+    return refresh();
+  }
   const ob = ev.target.closest("[data-obs]");
   if (ob) { obsTool = ob.dataset.obs; return render(); }
   if (ev.target.closest("[data-demand]")) {
     const title = $("#dem-title")?.value.trim(); if (!title) { flash = "Informe um título para a demanda."; return render(); }
     const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "" }) });
-    flash = res.ok ? "Demanda registrada no log da squad e enviada ao Orquestrador." : "Falha ao registrar a demanda.";
+    flash = res.ok ? "Demanda registrada: já está no log e vira issue no GitHub. Defina prioridade e rota no card e clique em Iniciar." : "Falha ao registrar a demanda.";
     if (res.ok) { $("#dem-title").value = ""; $("#dem-detail").value = ""; }
     return refresh();
   }

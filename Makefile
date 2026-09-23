@@ -42,3 +42,6 @@ squad:
 
 github-sync: ## Espelha o log da squad em Issues + GitHub Project (kanban)
 	python3 tools/squad/github_sync.py --watch 20
+
+squad-inbox: ## Lista as demandas iniciadas aguardando o Orquestrador
+	@/bin/ls -1 docs/squad/inbox/*.json 2>/dev/null || echo "fila vazia"
