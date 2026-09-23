@@ -1,0 +1,14 @@
+{
+  "demand": "f2324e0f25de",
+  "title": "alinhar documentação, código e infraestrutura",
+  "detail": "avaliação encontrou pequenas divergências entre documentação e código, e alguns acabamentos de infraestrutura. Pela hierarquia de verdade, cada divergência precisa ser resolvida: ou o documento é corrigido (com ADR, se for o caso), ou o código é.\n\nCritérios de aceite:\n1. docs/architecture/saga.md refletindo o comportamento real:\n   - o scheduler busca em duas fases, com SKIP LOCKED e lock otimista;\n   - a carência que o orquestrador aplica aos prazos vencidos ao retomar depois de reiniciar;\n   - a contagem do TIMEOUT_ONCE.\n     Se o Arquiteto concluir que o código está errado, o Backend corrige.\n2. Tópicos .DLT criados explicitamente, sem depender de criação automática.\n3. OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED=true no compose, como pede docs/observability.md, e evidência de um log JSON real com trace_id, orderId e sagaId.\n4. Healthcheck em Jaeger, Prometheus, Grafana e checkout-console.\n5. Registrar no README a decisão sobre o Squad Control subir fora do compose, que é a separação entre a fábrica (a squad) e o produto (o checkout).\n6. docker compose up --build e o e2e completo passando depois das mudanças.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T21:44:26+00:00",
+  "kind": "produto",
+  "clarifications": [],
+  "override": false,
+  "fromBacklog": false
+}
