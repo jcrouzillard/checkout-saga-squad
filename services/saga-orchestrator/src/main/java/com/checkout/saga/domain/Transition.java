@@ -22,6 +22,7 @@ public final class Transition {
         record Retry(Step step) implements Metric {}
         record StepDuration(Step step, String result, Duration duration) implements Metric {}
         record CompensationStuck(Step step) implements Metric {}
+        record Resumed() implements Metric {}
     }
 
     public static final String COMMAND_SENT = "COMMAND_SENT";
@@ -31,6 +32,7 @@ public final class Transition {
     public static final String COMPENSATION_STARTED = "COMPENSATION_STARTED";
     public static final String IGNORED_LATE_REPLY = "IGNORED_LATE_REPLY";
     public static final String COMPENSATION_STUCK = "COMPENSATION_STUCK";
+    public static final String RESUMED_AFTER_RESTART = "RESUMED_AFTER_RESTART";
 
     public final List<Command> commands = new ArrayList<>();
     public final List<StepEvent> stepEvents = new ArrayList<>();

@@ -80,6 +80,13 @@ public class SagaRepository {
                 .param("id", sagaId).param("now", Timestamp.from(now)).query(this::map).optional();
     }
 
+    /** Sagas com comando em voo cujo deadline vence antes de {@code threshold} (carência do startup). */
+    public List<SagaInstance> lockResumable(Instant threshold) {
+        return jdbc.sql("SELECT " + COLUMNS + " FROM saga_instance WHERE " + NOT_TERMINAL
+                        + " AND deadline_at IS NOT NULL AND deadline_at < :t ORDER BY created_at FOR UPDATE SKIP LOCKED")
+                .param("t", Timestamp.from(threshold)).query(this::map).list();
+    }
+
     public long countInFlight() {
         return jdbc.sql("SELECT count(*) FROM saga_instance WHERE " + NOT_TERMINAL).query(Long.class).single();
     }

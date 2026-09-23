@@ -1,6 +1,7 @@
 package com.checkout.saga.app;
 
 import com.checkout.common.observability.TraceContext;
+import com.checkout.saga.domain.SagaSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -26,12 +27,17 @@ public class SagaTimeoutScheduler {
     private final SagaService service;
     private final SagaMetrics metrics;
     private final Clock clock;
+    private final SagaSettings settings;
+    /** Carência do startup executada? (antes da 1ª varredura, para que nenhum deadline vencido na queda seja cobrado). */
+    private volatile boolean resumed;
 
-    public SagaTimeoutScheduler(SagaRepository repo, SagaService service, SagaMetrics metrics, Clock clock) {
+    public SagaTimeoutScheduler(SagaRepository repo, SagaService service, SagaMetrics metrics, Clock clock,
+                                SagaSettings settings) {
         this.repo = repo;
         this.service = service;
         this.metrics = metrics;
         this.clock = clock;
+        this.settings = settings;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -49,6 +55,12 @@ public class SagaTimeoutScheduler {
     @Scheduled(fixedDelayString = "${saga.timeout-scan-interval-ms:1000}")
     public void scan() {
         try {
+            if (!resumed) {
+                int n = service.resumeAfterRestart(settings.stepTimeoutMs());
+                resumed = true;
+                log.info("Carência pós-reinício aplicada: {} saga(s) com deadline re-armado (+{} ms, sem consumir tentativa)",
+                        n, settings.stepTimeoutMs());
+            }
             List<SagaRepository.Due> due = repo.findDue(Instant.now(clock), BATCH);
             for (SagaRepository.Due d : due) {
                 try {

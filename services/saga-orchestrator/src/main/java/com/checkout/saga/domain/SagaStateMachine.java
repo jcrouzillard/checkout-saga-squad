@@ -172,6 +172,32 @@ public class SagaStateMachine {
         return t;
     }
 
+    // ------------------------------------------------------------------ retomada após reinício
+
+    /**
+     * Carência no startup: o tempo em que o coordenador ficou fora não é cobrado dos participantes. Sagas com comando
+     * em voo cujo deadline venceu (ou venceria antes de um prazo completo) ganham {@code deadline_at = now + timeout},
+     * SEM consumir tentativa e sem reenviar comando. Sagas aguardando retry (next_retry_at) e terminais não mudam.
+     */
+    public Transition resumeAfterRestart(SagaInstance s) {
+        Transition t = new Transition();
+        if (s.status == null || s.status.isTerminal() || s.deadlineAt == null) {
+            return t;
+        }
+        Instant now = now();
+        Instant rearmed = now.plusMillis(settings.stepTimeoutMs());
+        if (!s.deadlineAt.isBefore(rearmed)) {
+            return t;
+        }
+        Instant previous = s.deadlineAt;
+        s.deadlineAt = rearmed;
+        t.stateChanged = true;
+        t.logs.add(new Transition.LogEntry(s.status.step(), Transition.RESUMED_AFTER_RESTART, s.lastCommandType,
+                s.lastCommandId, s.attempt, "deadline " + previous + " -> " + rearmed + " (tentativa mantida)"));
+        t.metrics.add(new Metric.Resumed());
+        return t;
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void enter(Transition t, SagaInstance s, SagaStatus next, UUID causationId, Instant now) {

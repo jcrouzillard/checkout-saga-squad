@@ -7,6 +7,13 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:checkout}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      properties:
+        # Static membership: um restart dentro do session timeout recupera as mesmas partições sem rebalance
+        # (evita a espera de 45 s após SIGKILL). Default fixo = 1 réplica; com várias réplicas defina um id por réplica.
+        group.instance.id: ${KAFKA_GROUP_INSTANCE_ID:saga-orchestrator-1}
+        session.timeout.ms: ${KAFKA_SESSION_TIMEOUT_MS:15000}
+        heartbeat.interval.ms: ${KAFKA_HEARTBEAT_INTERVAL_MS:3000}
 server:
   port: ${SERVER_PORT:8080}
 

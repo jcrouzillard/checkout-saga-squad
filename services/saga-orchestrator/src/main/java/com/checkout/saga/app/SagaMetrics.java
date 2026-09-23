@@ -34,6 +34,7 @@ public class SagaMetrics {
             Counter.builder("saga.timeouts").tag("step", s.name()).register(registry);
             Counter.builder("saga.retries").tag("step", s.name()).register(registry);
         });
+        Counter.builder("saga.resumed").register(registry);
         Gauge.builder("saga.in.flight", inFlight, AtomicLong::get).register(registry);
     }
 
@@ -54,6 +55,7 @@ public class SagaMetrics {
                             .register(registry).record(d.duration());
                 }
             }
+            case Metric.Resumed r -> registry.counter("saga.resumed").increment();
             case Metric.CompensationStuck c ->
                     registry.counter("saga.compensation.stuck", "step", c.step().name()).increment();
         }

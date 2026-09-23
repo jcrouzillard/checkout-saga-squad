@@ -32,3 +32,14 @@ coluna `outbox.trace_parent` (saga.md); tag `outcome` COMPLETED→CONFIRMED; cre
 - `saga.step-changed` não é emitido para `order.confirm/cancel` (o order-service grava ORDER CONFIRMED/CANCELED localmente).
 - Relay: ordem garantida com 1 instância por serviço; sem limpeza de `outbox`/`processed_messages` (fora de escopo).
 - Formato `10.00` do dinheiro validado em `GET /orders`; nos comandos Kafka depende do ObjectMapper customizado (validar no e2e).
+
+## Correção pós-e2e (ciclo 1) — reinício do coordenador terminava CANCELED
+- Causa: após SIGKILL, o membro antigo ficava no grupo até `session.timeout.ms` (45 s); os deadlines de 5 s venciam 3× → compensação.
+- Static membership (`saga-orchestrator/application.yml`): `group.instance.id=${KAFKA_GROUP_INSTANCE_ID:saga-orchestrator-1}`,
+  `session.timeout.ms=15000`, `heartbeat.interval.ms=3000` (envs `KAFKA_SESSION_TIMEOUT_MS`/`KAFKA_HEARTBEAT_INTERVAL_MS`).
+  Default fixo pressupõe 1 réplica; para escalar, um id por réplica (change-request ao DevOps).
+- Carência no startup: antes da 1ª varredura do scheduler, sagas com deadline vencido (ou < 1 prazo restante) ganham
+  `deadline_at = now + SAGA_STEP_TIMEOUT_MS` sem consumir tentativa/reenviar; `saga_step_log` `RESUMED_AFTER_RESTART`,
+  log INFO e métrica extra `saga_resumed_total` (`SagaStateMachine.resumeAfterRestart` + 4 testes unitários; 20 no total).
+- Evidência: `coordinator_restart` verde (step log: RESUMED_AFTER_RESTART → payment.authorized aceito 91 ms depois, tentativa 1);
+  suíte completa 7/7.

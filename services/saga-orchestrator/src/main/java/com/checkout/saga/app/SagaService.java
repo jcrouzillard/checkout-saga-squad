@@ -142,6 +142,28 @@ public class SagaService {
         }
     }
 
+    /** Carência no startup (ver {@link SagaStateMachine#resumeAfterRestart}). Retorna quantas sagas foram re-armadas. */
+    @Transactional
+    public int resumeAfterRestart(long stepTimeoutMs) {
+        Instant now = Instant.now(clock);
+        int n = 0;
+        for (SagaInstance s : repo.lockResumable(now.plusMillis(stepTimeoutMs))) {
+            try (var mdc = SagaMdc.of(s.orderId, s.sagaId)) {
+                Transition t = machine.resumeAfterRestart(s);
+                if (!t.stateChanged) {
+                    continue;
+                }
+                s.updatedAt = now;
+                repo.update(s);
+                apply(s, t, s.lastCommandId, now);
+                n++;
+                log.info("RESUMED_AFTER_RESTART estado={} comando={} tentativa={} novo deadline={}", s.status,
+                        s.lastCommandType, s.attempt, s.deadlineAt);
+            }
+        }
+        return n;
+    }
+
     private void apply(SagaInstance s, Transition t, UUID causationId, Instant now) {
         for (Transition.LogEntry l : t.logs) {
             repo.insertLog(s.sagaId, l, now);

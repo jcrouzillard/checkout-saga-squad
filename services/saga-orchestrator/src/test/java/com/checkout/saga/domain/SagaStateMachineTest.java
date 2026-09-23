@@ -427,6 +427,81 @@ class SagaStateMachineTest {
                 .isEqualTo(30_000);
     }
 
+    // ------------------------------------------------------------------ carência pós-reinício
+
+    @Test
+    void resumeAfterRestartRearmsExpiredDeadlineWithoutConsumingAttempt() {
+        SagaInstance s = newSaga("PHYSICAL", null);
+        machine.start(s, UUID.randomUUID());
+        machine.onReply(s, reply(s, Types.INVENTORY_RESERVED, Map.of()));
+        UUID authorizeId = s.lastCommandId;
+
+        clock.advance(20_000); // coordenador fora por 20 s: deadline de 5 s venceu na queda
+        Transition t = machine.resumeAfterRestart(s);
+        assertThat(t.stateChanged).isTrue();
+        assertThat(t.hasLog(Transition.RESUMED_AFTER_RESTART)).isTrue();
+        assertThat(t.metrics).contains(new Metric.Resumed());
+        assertThat(t.commands).isEmpty();
+        assertThat(t.stepEvents).isEmpty();
+        assertThat(s.attempt).isEqualTo(1);
+        assertThat(s.lastCommandId).isEqualTo(authorizeId);
+        assertThat(s.status).isEqualTo(SagaStatus.AUTHORIZING_PAYMENT);
+        assertThat(s.deadlineAt).isEqualTo(clock.now.plusMillis(5000));
+
+        // o scheduler não cobra timeout durante a carência
+        clock.advance(4999);
+        assertThat(machine.onTick(s).hasLog(Transition.TIMEOUT)).isFalse();
+
+        // a resposta ao comando original (mesmo causationId) é aceita
+        Transition r = machine.onReply(s, reply(s, Types.PAYMENT_AUTHORIZED, Map.of("paymentId", UUID.randomUUID().toString())));
+        assertThat(r.accepted).isTrue();
+        assertThat(s.status).isEqualTo(SagaStatus.CREATING_SHIPMENT);
+    }
+
+    @Test
+    void resumeAfterRestartExtendsDeadlineAboutToExpire() {
+        SagaInstance s = newSaga("PHYSICAL", null);
+        machine.start(s, UUID.randomUUID());
+        clock.advance(4000); // restam 1 s
+        Transition t = machine.resumeAfterRestart(s);
+        assertThat(t.stateChanged).isTrue();
+        assertThat(s.deadlineAt).isEqualTo(clock.now.plusMillis(5000));
+    }
+
+    @Test
+    void resumeAfterRestartKeepsAttemptCountOnRetriedStep() {
+        SagaInstance s = newSaga("PHYSICAL", null);
+        machine.start(s, UUID.randomUUID());
+        clock.advance(5001);
+        machine.onTick(s);
+        clock.advance(1000);
+        machine.onTick(s); // tentativa 2 em voo
+        clock.advance(30_000);
+        machine.resumeAfterRestart(s);
+        assertThat(s.attempt).isEqualTo(2);
+        assertThat(s.deadlineAt).isEqualTo(clock.now.plusMillis(5000));
+    }
+
+    @Test
+    void resumeAfterRestartIgnoresTerminalPendingRetryAndFreshDeadlines() {
+        SagaInstance waitingRetry = newSaga("PHYSICAL", null);
+        machine.start(waitingRetry, UUID.randomUUID());
+        clock.advance(5001);
+        machine.onTick(waitingRetry); // deadline_at = null, next_retry_at agendado
+        assertThat(machine.resumeAfterRestart(waitingRetry).stateChanged).isFalse();
+
+        SagaInstance fresh = newSaga("PHYSICAL", null);
+        machine.start(fresh, UUID.randomUUID()); // deadline = now + 5 s (prazo completo)
+        assertThat(machine.resumeAfterRestart(fresh).stateChanged).isFalse();
+
+        SagaInstance done = newSaga("DIGITAL", null);
+        machine.start(done, UUID.randomUUID());
+        machine.onReply(done, reply(done, Types.INVENTORY_REJECTED, Map.of("reason", "OUT_OF_STOCK")));
+        machine.onReply(done, reply(done, Types.ORDER_CANCELED, Map.of()));
+        clock.advance(60_000);
+        assertThat(machine.resumeAfterRestart(done).stateChanged).isFalse();
+    }
+
     @Test
     void outcomeTagMapsCompletedToConfirmed() {
         assertThat(SagaStatus.COMPLETED.outcome()).isEqualTo("CONFIRMED");
