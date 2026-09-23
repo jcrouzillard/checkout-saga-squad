@@ -29,6 +29,10 @@ Abas abertas: Squad Control · GitHub (Issues/Project) · Jaeger :16686 · Grafa
    - Paralelismo real: Arquiteto ∥ DevOps ∥ Observabilidade; Backend dividido em core ∥ participantes; QA test-first.
 
 ## 3. Demo da Saga (6 min)
+Comece pelo **Console de Checkout** (http://localhost:7070/checkout.html): crie um pedido físico sem falha e veja a
+Saga andar ao vivo; depois um com "Pagamento recusado" e mostre a compensação e o estoque restaurado. A lista
+"Pedidos do cliente" vem do `GET /orders?customerId=`, entregue pela própria squad (demanda D1).
+Em seguida, no terminal:
 ```bash
 bash tests/e2e/run.sh happy_path_physical     # CONFIRMED + trace no Jaeger (link impresso)
 bash tests/e2e/run.sh payment_failure         # libera estoque → CANCELED
@@ -46,6 +50,12 @@ bash tests/e2e/run.sh coordinator_restart     # kill -9 no orquestrador no meio 
   **A compensação estava correta; o problema era o timeout cobrado pela indisponibilidade do próprio coordenador.**
 - A squad seguiu o protocolo: QA registrou o `defect`, o Backend corrigiu (static membership + carência de deadlines
   no startup) e a revalidação deu **7/7**. Depois o Jev aprovou o G2. Tudo está no log e nas issues.
+
+## 4b. Uma demanda nova passando pela squad (2 min)
+Aba **Demandas** do Squad Control: mostre a D1 registrada ("Listar os pedidos de um cliente") e a trilha completa:
+Arquiteto (contrato + ADR-006) → Jev G1 (89%) → Backend + QA em paralelo → e2e 8/8 → Jev G2/G3. No GitHub, a
+mesma trilha aparece como issues e comentários. Ponto a frisar: **quem executa é a sessão do Orquestrador no Claude
+Code**; o painel é o cockpit humano.
 
 ## 5. Pergunta da seção 12 e próximos passos (2 min)
 `docs/architecture/README.md` §6. A solução já nasce distribuída; para produção faltariam:

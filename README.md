@@ -72,6 +72,7 @@ docker compose ps                 # aguarde todos "healthy"
 | Grafana (dashboard "Checkout Saga") | http://localhost:3000 (porta configurável: `GRAFANA_PORT=3001` no `.env`) |
 | Prometheus | http://localhost:9090 |
 | **Squad Control** (painel da squad) | `make squad` → http://localhost:7070 |
+| **Console de Checkout** (criar pedidos com injeção de falha e ver a Saga ao vivo) | http://localhost:7070/checkout.html |
 
 Pedido de exemplo:
 ```bash
@@ -157,11 +158,20 @@ entradas, saídas, critérios de gate e limites.
 confiança, evidências, botões de intervenção humana (gravados no log) e o **feed ao vivo de cada agente**, lido das
 transcrições das sessões do Claude Code.
 
+**Como uma demanda entra na squad.** Na aba *Demandas* do Squad Control (ou por uma issue no GitHub), o humano
+descreve o que quer e os critérios de aceite. A demanda vira um evento `task` no log e uma issue; o Orquestrador a
+lê e a conduz pelo mesmo protocolo: Arquiteto (contrato/ADR) → G1 → Backend → G2 → QA → G3. Quem executa é a
+sessão do Claude Code em que roda o Orquestrador; o painel registra, acompanha e permite intervir nos gates.
+
+**Exemplo real (D1).** A demanda *"Listar os pedidos de um cliente"* foi registrada pelo painel e entregue pela
+squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` no order-service, cenário e2e
+`customer_orders` e pareceres do Jev em `docs/squad/gates/*-D1.json`. O Console de Checkout consome esse endpoint.
+
 ## 7. Evidências
 - Log de execução da squad: [`docs/squad/memory/decisions.jsonl`](docs/squad/memory/decisions.jsonl)
 - Pareceres do Jev: [`docs/squad/gates/`](docs/squad/gates/)
 - Handoffs entre agentes: [`docs/squad/memory/handoffs/`](docs/squad/memory/handoffs/)
-- Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **7/7** (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
+- Relatório do último e2e: [`tests/e2e/last-report.json`](tests/e2e/last-report.json) — **8/8** (7 cenários originais + `customer_orders` da demanda D1) (1ª execução integrada 6/7 → defeito → autocorreção → 7/7; ver [`tests/TRACEABILITY.md`](tests/TRACEABILITY.md))
 - Board da squad no GitHub: issues por agente + Project (kanban) espelhando o log (`make github-sync`)
 - Histórico git: cada fase é um commit do Orquestrador
 
@@ -174,7 +184,7 @@ services/              common + saga-orchestrator + order/inventory/payment/ship
 infra/                 postgres (init), observability (prometheus, grafana)
 tests/                 e2e, rastreabilidade
 tools/squad/           log da memória compartilhada + servidor do Squad Control
-squad-control/         painel web da squad
+squad-control/         painel web da squad (index.html) e Console de Checkout (checkout.html)
 ```
 
 ## 9. Limitações conhecidas e evolução
