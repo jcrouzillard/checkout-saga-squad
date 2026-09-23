@@ -219,8 +219,8 @@ squad-control/         painel web da squad (genérico; o projeto gerenciado vem 
 Todas vêm dos riscos em aberto dos pareceres do Auditor (`docs/squad/gates/`):
 - **Uma réplica do orquestrador**: o `group.instance.id` é fixo (`saga-orchestrator-1`, sobrescrevível via
   `KAFKA_GROUP_INSTANCE_ID`). Com N réplicas, cada uma precisa de um id próprio (ex.: nome do pod de um StatefulSet).
-- **Testes de integração no ambiente local**: os `*IT` (Testcontainers) estão escritos e compilam, mas o Kafka do
-  Testcontainers ficou instável com o OrbStack nesta máquina; no CI (runner com Docker) rodam no `mvn -B verify`.
+- **Testes de integração (`*IT`, Testcontainers)**: rodam no `mvn -B verify` e exigem Docker disponível. O CI executa
+  `mvn -B verify`, mas a execução dos `*IT` no CI ainda não foi comprovada nesta entrega (o Auditor registrou o ponto).
 - **Ordem do outbox** garantida com 1 instância por serviço; para escalar o relay: particionamento por `orderId`
   ou CDC (Debezium).
 - Limpeza de `outbox`/`processed_messages`, DLQ com reprocessamento e schema registry ficam como evolução
