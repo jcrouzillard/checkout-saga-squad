@@ -51,7 +51,18 @@ def current() -> str:
     return sh("git", "rev-parse", "--abbrev-ref", "HEAD")
 
 
+STATE = ("docs/squad/memory/",)  # memória viva da squad (log, sync): muda o tempo todo e é commitada automaticamente
+
+
+def snapshot_state():
+    changed = [l[3:] for l in sh("git", "status", "--porcelain").splitlines() if l[3:].startswith(STATE)]
+    if changed:
+        sh("git", "add", "--", *changed)
+        sh("git", "commit", "-q", "-m", f"Sincronização da memória da squad{TRAILER}")
+
+
 def clean_tree():
+    snapshot_state()
     if sh("git", "status", "--porcelain"):
         sys.exit("há alterações não commitadas; faça commit antes de trocar de branch")
 
@@ -108,6 +119,8 @@ def feature_finish(a):
     sh("git", "switch", "-q", "develop")
     sh("git", "pull", "-q", "--ff-only", "origin", "develop")
     log(f"{branch} integrada em develop via PR", demand=a.demand, ref=url, branch="develop")
+    snapshot_state()
+    sh("git", "push", "-q", "origin", "develop")
     print(url)
 
 
@@ -173,6 +186,8 @@ def release_finish(a, kind="release"):
     sh("git", "push", "-q", "origin", "--delete", branch, check=False)
     sh("git", "branch", "-q", "-D", branch, check=False)
     log(f"{kind.capitalize()} {a.version} publicada: {tag} em main, back-merge em develop ({nxt})", ref=url, branch="main")
+    snapshot_state()
+    sh("git", "push", "-q", "origin", "develop")
     print(url)
 
 
