@@ -440,7 +440,8 @@ class Handler(SimpleHTTPRequestHandler):
                                       "override": True if data.get("override") else None,
                                       "fromBacklog": True if from_backlog else None,
                                       "title": f"Iniciar: {demand['title'].replace('Demanda: ', '')}",
-                                      "detail": data.get("note", ""), "priority": data.get("priority", "normal"),
+                                      "detail": data.get("note", ""),
+                                      "priority": data.get("priority") or demand.get("priority") or "normal",
                                       "route": data.get("route", "padrao"), "target": data.get("target", "auto")})
             inbox = ROOT / "docs/squad/inbox"
             inbox.mkdir(parents=True, exist_ok=True)

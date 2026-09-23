@@ -24,7 +24,11 @@ for f in (ROOT / "docs/squad/inbox").glob("*.json"):
         item = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         item = {}
-    queue.append((RANK.get(item.get("priority", "normal"), 1), item.get("startedAt", ""), f.name, item.get("priority", "normal")))
+    # prioridade efetiva = última repriorização humana da demanda, senão a do início (contrato D5 §2.6)
+    repri = [r for r in rows if r.get("type") == "control" and r.get("action") == "reprioritize"
+             and r.get("demand") == item.get("demand") and r.get("priority")]
+    pri = repri[-1]["priority"] if repri else item.get("priority", "normal")
+    queue.append((RANK.get(pri, 1), item.get("startedAt", ""), f.name, pri))
 queue.sort()
 for i, (_, _, name, pri) in enumerate(queue, 1):
     pending.append(f"fila {i}/{len(queue)}: {name} · {pri}")
