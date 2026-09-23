@@ -1,0 +1,10 @@
+{
+  "demand": "1cc732c62a2d",
+  "title": "Melhorias na criação ou geração de demanda",
+  "detail": "Aqui nessa área de governança, nas demandas para Squad, a gente tem, na nova demanda, a opção de colocar o título e a descrição. Vamos melhorar esse formulário. Vai ter título e descrição, mas tem que ter algo relacionado ao tipo: - ou estou querendo alterar algo no produto, que é só o console de checkout, que é o checkout - ou algo que eu estou querendo melhorar na operação, na governança Para saber onde vai, acho que isso é importante. Gostaria também de ter uma validação agêntica quando eu registro a demanda. Então, se eu registrei a demanda, há uma validação e vêm alguns tipos de questionamentos ou coisas que não ficaram claras para a pessoa trabalhar.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T16:56:30+00:00"
+}
