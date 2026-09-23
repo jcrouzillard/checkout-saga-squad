@@ -40,6 +40,7 @@ UI_DIR = ROOT / "squad-control"
 AGENT_ALIASES = {
     "arquiteto": "arquiteto", "backend": "backend", "devops": "devops",
     "observabilidade": "observabilidade", "qa": "qa", "auditor": "auditor",
+    "jev": "auditor",  # nome antigo do gatekeeper nas transcrições já gravadas
 }
 RUNNING_WINDOW_S = 45
 
