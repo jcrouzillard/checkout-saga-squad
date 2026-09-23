@@ -68,11 +68,21 @@ def clean_tree():
         sys.exit("há alterações não commitadas; faça commit antes de trocar de branch:\n" + "\n".join(dirty))
 
 
+def switch(*args: str):
+    """Troca de branch à prova da memória viva (log/sync escrevem a qualquer momento)."""
+    for _ in range(3):
+        snapshot_state()
+        out = subprocess.run(["git", "switch", "-q", *args], cwd=ROOT, capture_output=True, text=True)
+        if out.returncode == 0:
+            return
+    sys.exit(f"falhou: git switch {' '.join(args)}\n{out.stderr.strip()}")
+
+
 def sync_develop():
     """develop local = develop remota + memória da squad commitada."""
     sh("git", "fetch", "-q", "origin")
     if current() != "develop":
-        sh("git", "switch", "-q", "develop")
+        switch("develop")
     sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
     snapshot_state()
     sh("git", "push", "-q", "origin", "develop")
@@ -103,7 +113,7 @@ def feature_start(a):
     slug = re.sub(r"[^a-z0-9]+", "-", a.slug.lower()).strip("-")
     branch = f"feature/{a.code}-{slug}"
     sync_develop()
-    sh("git", "switch", "-q", "-c", branch)
+    switch("-c", branch)
     log(f"Branch {branch} criada a partir de develop", demand=a.demand, branch=branch)
     print(branch)
 
@@ -125,7 +135,7 @@ def feature_finish(a):
         f"{gate.get('detail', '')}\n\n" if gate else "") + "Gerado por `tools/squad/gitflow.py`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
     url = pr("develop", branch, a.title or branch.replace("feature/", "").replace("-", " "), body)
     sh("gh", "pr", "merge", url, "--merge", "--delete-branch")
-    sh("git", "switch", "-q", "develop")
+    switch("develop")
     sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
     log(f"{branch} integrada em develop via PR", demand=a.demand, ref=url, branch="develop")
     snapshot_state()
@@ -157,10 +167,10 @@ def release_start(a, source="develop", kind="release"):
     branch = f"{kind}/{a.version}" + (f"-{a.slug}" if getattr(a, "slug", None) else "")
     if source == "develop":
         sync_develop()
-        sh("git", "switch", "-q", "-c", branch)
+        switch("-c", branch)
     else:
         sh("git", "fetch", "-q", "origin")
-        sh("git", "switch", "-q", "-c", branch, f"origin/{source}")
+        switch("-c", branch, f"origin/{source}")
     set_version(a.version)
     if CHANGELOG.exists() and f"## [{a.version}]" not in CHANGELOG.read_text():
         text = CHANGELOG.read_text()
@@ -187,7 +197,7 @@ def release_finish(a, kind="release"):
     sh("gh", "release", "create", tag, "-R", REPO, "--target", "main", "--title", f"{tag}",
        "--notes", f"## [{a.version}]{notes}")
     # back-merge em develop + próxima versão de desenvolvimento
-    sh("git", "switch", "-q", "develop")
+    switch("develop")
     sh("git", "pull", "-q", "--rebase", "--autostash", "origin", "develop")
     sh("git", "merge", "-q", "--no-ff", branch, "-m", f"Back-merge de {branch} em develop{TRAILER}")
     major, minor, _ = (int(x) for x in a.version.split("."))
