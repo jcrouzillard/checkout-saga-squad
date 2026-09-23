@@ -337,7 +337,8 @@ class Handler(SimpleHTTPRequestHandler):
             data = json.loads(raw or b"{}")
             rows = read_jsonl(LOG)
             demand = next((e for e in rows if e.get("id") == data.get("id") and e.get("type") == "task"), None)
-            val = next((e for e in rows if e.get("id") == data.get("validation") and e.get("type") == "validation"), None)
+            val = next((e for e in rows if e.get("id") == data.get("validation") and e.get("type") == "validation"
+                        and e.get("demand") == data.get("id")), None)  # a validação precisa ser desta demanda
             if not demand or not val:
                 return self._json({"error": "demanda ou validação não encontrada"}, 404)
             answers = [a for a in (data.get("answers") or []) if (a.get("text") or "").strip()]

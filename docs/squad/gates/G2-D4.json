@@ -1,0 +1,31 @@
+{
+  "gate": "G2",
+  "demand": "1cc732c62a2d",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.95,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Integração ponta a ponta (servidor isolado :7071)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Worktree plankton-d4, server.py --port 7071, ciclo completo via curl. POST /api/demand sem kind → 400 'tipo obrigatório: produto | operacao' (kind inválido também 400); com kind=operacao → 201, task com kind. pending.py → 'validação: 4c606f512608'. start → 409 'demanda aguardando validação'; override sem nota → 400. triage.py --runner claude → validation 456a83cd472f status=perguntas, 4 perguntas (objetivo/aceite/escopo/restricoes) em 21 s (task 17:05:03Z → validation 17:05:24Z; meta < 60 s). pending.py deixa de listar a demanda. clarify: validação inexistente → 404, respostas vazias → 400, válido → 201. start → 201; inbox com kind=operacao, override=false e 4 clarifications (pergunta, dimensão, resposta)"},
+    {"name": "Aderência ao contrato §4 (servidor e painel)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "log.py: TYPES += validation/clarification, --status/--question 'dim::texto' (ids q1..qn)/--suggested-kind/--kind. O painel consome exatamente os campos gravados: d.kind, val.status ('ok'/'perguntas'), val.questions[].id/dimension/text, val.suggestedKind, clar.validation/answers[].id/text; envia {title, detail, kind}, {id, validation, answers[{id,text}]} e {…, override, note}. Estados Em validação/atrasada (3 min)/Com perguntas/pronta e mensagens 400/409 tratadas. github_sync: label tipo:<kind>, handlers on_validation (label validacao:<status>) e on_clarification, ambos excluídos do comentário genérico. plantao.md: item 0 (validações) e roteamento por tipo 'com os mesmos gates'. py_compile de tools/squad/*.py ok"},
+    {"name": "Triagem sem escrita", "status": "pass", "weight": 2, "blocking": true,
+     "source": "run_agent.py --read-only: claude só com --allowedTools Read Glob Grep (codex -s read-only). Quem grava o evento é triage.py, não o agente. git status --untracked-files=all igual antes e depois da triagem (só docs/squad/memory/decisions.jsonl; .squad/ é ignorado pelo .gitignore). Isso fecha a ressalva do G1-D4 de 'somente leitura só por prompt'"},
+    {"name": "Escopo", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff origin/develop --stat: docs/adr/008, docs/contracts/ui-demandas-v2.md, docs/squad/gates/G1-D4.json, docs/squad/prompts/{plantao,triagem}.md, squad-control/index.html, tools/squad/{github_sync,log,pending,run_agent,server,triage}.py. Nada em services/, checkout-console/, infra nem compose; donos conforme AGENTS.md (Orquestrador: tools/squad e docs/squad; Frontend: squad-control)"},
+    {"name": "Sem regressão para demandas antigas", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Demanda sem kind (via log.py): start → 201 sem validação; pending.py só a lista como 'fila:' (não 'validação:'). No painel, validationInfo() retorna null sem kind e demandInfo mantém a regra antiga"},
+    {"name": "Painel no navegador (estados, CA10)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Verificado só no código (labels nas respostas, announce/aria-live, motivo do Iniciar); sem execução em navegador nesta avaliação, a cargo do QA"}
+  ],
+  "open_risks": [
+    "Defeito menor: POST /api/demand/clarify aceita uma validation de OUTRA demanda (retornou 201 no teste). Não libera o Iniciar da demanda errada, porque o start confere a validação da própria demanda, mas grava clarification incoerente; checar val['demand'] == demand['id'] e responder 404.",
+    "Fallback de triage.py: se o runner falhar ou não devolver JSON, grava 'perguntas' com uma pergunta genérica em vez de sinalizar erro; o QA deve cobrir esse caminho, e o ideal é registrar o motivo (progress/defect).",
+    "Latência medida (21 s) foi com triage.py chamado à mão; a meta < 60 s ponta a ponta depende do vigia/plantão ativo, e o QA deve medir com o vigia (CA3)."
+  ],
+  "human_required": false,
+  "rationale": "Esta foi a primeira verificação de integração real: servidor isolado na porta 7071 e ciclo completo registrar → pending → 409 → triagem com agente real → clarify → start. Todos os códigos HTTP seguem o contrato, a triagem gravou 4 perguntas por dimensão em 21 s sem alterar arquivos, o inbox carrega kind e clarifications, e demandas antigas não regrediram. Os nomes de campos do painel batem com os gravados pelo servidor e pelo log.py. As ressalvas do G1-D4 foram tratadas (ferramentas somente leitura, filtro do pending, gates da rota operação). Resta um defeito menor no clarify (validação de outra demanda aceita) e a UI não foi exercitada em navegador. Limpeza feita: servidor parado, docs/squad/memory restaurado, inbox/*.json e .squad removidos. Confiança = 10.5/11 = 0.95."
+}

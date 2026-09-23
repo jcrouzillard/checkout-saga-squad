@@ -48,14 +48,18 @@ def main():
                 continue
             if isinstance(obj, dict) and "status" in obj:
                 result = obj
-    if result is None:
+    failed = result is None
+    if failed:
         result = {"status": "perguntas", "questions": [{"dimension": "objetivo",
                   "text": "A validação automática não conseguiu analisar a demanda; descreva o resultado esperado e como verificar que está pronto."}]}
     qs = [q for q in result.get("questions", []) if (q.get("text") or "").strip()][:5]
     status = "ok" if result.get("status") == "ok" or not qs else "perguntas"
     args = [sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", "arquiteto", "--type", "validation",
             "--demand", a.demand, "--to", "humano", "--status", status, "--runner", a.runner,
-            "--title", "Validação: pronta para iniciar" if status == "ok" else f"Validação: {len(qs)} pergunta(s)"]
+            "--title", ("Validação automática falhou: responda a pergunta ou inicie com override" if failed
+                        else "Validação: pronta para iniciar" if status == "ok" else f"Validação: {len(qs)} pergunta(s)")]
+    if failed:
+        args += ["--detail", "O agente de triagem não devolveu um resultado válido; veja .squad/runs/ (saída do runner)."]
     for q in (qs if status == "perguntas" else []):
         dim = q.get("dimension") if q.get("dimension") in DIMS else "escopo"
         args += ["--question", f"{dim}::{q['text'].strip()}"]
