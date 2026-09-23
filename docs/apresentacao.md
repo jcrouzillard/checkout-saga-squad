@@ -61,7 +61,7 @@ repositório. A memória tem três camadas:
 Por isso o modelo independe de fornecedor: quem ocupar um papel só precisa ler e escrever os mesmos arquivos.
 
 **Mostrar:**
-- `docs/squad/memory/decisions.jsonl` (115 eventos);
+- `docs/squad/memory/decisions.jsonl` (mais de 150 eventos, crescendo a cada demanda);
 - `docs/squad/memory/handoffs/` (8 briefs);
 - Squad Control, área **Decisões**: o mesmo log em tabela.
 
@@ -139,7 +139,7 @@ São as próximas demandas, e a própria squad vai executá-las pelo mesmo proto
 | Onde está o histórico? | Aba **Decisões** (log completo) e o sino de notificações | `docs/squad/memory/decisions.jsonl` (append-only, via `tools/squad/log.py`); `git log` |
 | Onde estão as regras de cada agente (os MDs)? | Aba **Agentes** (feed ao vivo) | `.claude/agents/<papel>.md` (prompt + regras); Orquestrador em `docs/squad/orquestrador.md` |
 | Onde estão as regras comuns da squad? | Aba **Políticas** | `AGENTS.md` (constituição); `CLAUDE.md` só importa |
-| Onde estão os gates e os pareceres? | Aba **Execuções** (recomendação atual) e aba **Evidências** | Regras em `docs/squad/gates.md`; pareceres em `docs/squad/gates/*.json` (13) |
+| Onde estão os gates e os pareceres? | Aba **Execuções** (recomendação atual) e aba **Evidências** | Regras em `docs/squad/gates.md`; pareceres em `docs/squad/gates/*.json` (20 até agora) |
 | Como o contexto passa de um agente a outro? | Aba **Evidências** → Handoffs | `docs/squad/memory/handoffs/*.md` (8) |
 | O que cada agente fez de fato? | Aba **Agentes** | Transcrições do Claude Code (`~/.claude/projects/…`) e `.squad/runs/` para outros fornecedores |
 | Onde o humano intervém? | Botões de **Intervenção humana** (Execuções) e controles em **Demandas** | Eventos `human`/`control` em `decisions.jsonl` |
@@ -150,7 +150,7 @@ São as próximas demandas, e a própria squad vai executá-las pelo mesmo proto
 | Pergunta | Onde |
 |---|---|
 | Contratos de eventos e de API | `docs/contracts/events.md`, `docs/contracts/api.md` |
-| Decisões de arquitetura | `docs/adr/001` a `007` |
+| Decisões de arquitetura | `docs/adr/001` a `009` |
 | Máquina de estados e compensações | `docs/architecture/saga.md` (§1 estados, §5 falhas) |
 | Três visões (negócio, técnica, agêntica) | `docs/architecture/README.md` §1 a §3 |
 | Rastreabilidade requisito → teste | `tests/TRACEABILITY.md`; `tests/e2e/scenarios.md`; `tests/e2e/last-report.json` |
