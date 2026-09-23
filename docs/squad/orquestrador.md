@@ -14,6 +14,7 @@ contexto isolado — a única ponte entre eles é o repositório (memória compa
 ## Fluxo de execução
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
     H([Humano]) -- objetivo + ADR-000 --> O[Orquestrador]
     O -- F1 --> A[Arquiteto]

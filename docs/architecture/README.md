@@ -16,6 +16,7 @@ Bounded contexts (seção 10 do desafio: Pedido, Estoque, Pagamento, Envio e Sag
 | **Saga** (`saga-orchestrator`) | Coordenar o processo, decidir desfecho e compensações | `SagaInstance` | — (processo de negócio) |
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
     C([Cliente]) -->|POST /orders| PED[Pedido]
     PED -->|order.created| SAGA{{Saga de Checkout}}
@@ -35,6 +36,7 @@ reversa; o cliente sempre enxerga um estado terminal (`CONFIRMED`/`CANCELED` com
 ## 2. Visão técnica
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TB
     subgraph Cliente
       U([curl / testes e2e])
@@ -88,6 +90,7 @@ A solução é construída por uma squad de agentes Claude Code (subagentes em `
 Orquestrador (`docs/squad/orquestrador.md`) sob as regras de `CLAUDE.md`.
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart TB
     H([Humano]) -->|objetivo, ADR-000, aprovações| ORQ[Orquestrador<br/>sessão principal Claude Code]
     ORQ -->|F1 delega| ARQ[Arquiteto]

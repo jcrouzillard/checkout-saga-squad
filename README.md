@@ -21,6 +21,7 @@ humana opcional, tudo auditável no painel **Squad Control**.
 ## 1. Visão geral
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 flowchart LR
     C([Cliente]) -- POST /orders --> O[order-service :8081]
     O -- order.created --> K[(Kafka)]

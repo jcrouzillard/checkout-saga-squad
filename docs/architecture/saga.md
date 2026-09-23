@@ -11,6 +11,7 @@ Toda transição é **uma transação**: atualiza `saga_instance` + grava `saga_
 comando e o `saga.step-changed` + registra `processed_messages` da mensagem recebida.
 
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 stateDiagram-v2
     [*] --> RESERVING_INVENTORY: order.created / inventory.reserve
 
@@ -139,6 +140,7 @@ para que retries e compensações fiquem no mesmo trace. MDC com `orderId`, `sag
 
 ### 4.1 Caminho feliz (PHYSICAL)
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     actor C as Cliente
@@ -166,6 +168,7 @@ Em `DIGITAL`, após `payment.authorized` o orquestrador envia direto `order.conf
 
 ### 4.2 Falha no pagamento
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     participant O as order-service
@@ -187,6 +190,7 @@ sequenceDiagram
 
 ### 4.3 Falha no envio
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     participant O as order-service
@@ -212,6 +216,7 @@ sequenceDiagram
 
 ### 4.4 Timeout em uma etapa (pagamento, `simulate.payment=TIMEOUT`)
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     participant S as saga-orchestrator
@@ -239,6 +244,7 @@ Com `TIMEOUT_ONCE`, a tentativa 2 recebe resposta e a saga segue normalmente (re
 
 ### 4.5 Reinício do coordenador
 ```mermaid
+%%{init: {'theme':'neutral'}}%%
 sequenceDiagram
     autonumber
     participant S as saga-orchestrator
