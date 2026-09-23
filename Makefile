@@ -54,3 +54,9 @@ feature-finish: ## make feature-finish DEMAND=<id>
 
 release: ## make release VERSION=1.1.0 (release-start + release-finish)
 	python3 tools/squad/gitflow.py release-start $(VERSION) && python3 tools/squad/gitflow.py release-finish $(VERSION)
+
+plantao: ## Plantão do Orquestrador fora da sessão (SQUAD_RUNNER=claude|codex)
+	tools/squad/plantao.sh
+
+run-agent: ## make run-agent ROLE=qa TASK="..." [RUNNER=codex]
+	SQUAD_RUNNER=$(or $(RUNNER),claude) python3 tools/squad/run_agent.py $(ROLE) "$(TASK)"

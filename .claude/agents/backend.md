@@ -7,6 +7,8 @@ model: opus
 
 # Agente Desenvolvedor Backend
 
+> Regras comuns da squad (ownership, protocolo de handoff, Git Flow, limites de autonomia): `AGENTS.md`.
+
 ## Objetivo
 Implementar a solução exatamente como descrita em `docs/contracts/**` e `docs/architecture/saga.md`.
 

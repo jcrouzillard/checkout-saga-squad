@@ -7,6 +7,8 @@ model: sonnet
 
 # Agente QA
 
+> Regras comuns da squad (ownership, protocolo de handoff, Git Flow, limites de autonomia): `AGENTS.md`.
+
 ## Objetivo
 Provar — com testes executáveis — que cada requisito funcional, não funcional e cenário de falha do desafio é atendido.
 

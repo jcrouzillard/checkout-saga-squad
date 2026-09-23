@@ -260,7 +260,7 @@ class Sync:
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
+        if not issue or e["type"] == "progress" or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":

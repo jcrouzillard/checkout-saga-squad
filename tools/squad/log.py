@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress"}
 
 
 def main() -> None:
@@ -31,6 +31,8 @@ def main() -> None:
     p.add_argument("--demand", help="id do evento da demanda a que este evento pertence")
     p.add_argument("--priority", choices=["alta", "normal", "baixa"])
     p.add_argument("--branch", help="branch git relacionada ao evento")
+    p.add_argument("--run", help="id da execução (tools/squad/run_agent.py)")
+    p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
     a = p.parse_args()
@@ -55,6 +57,8 @@ def main() -> None:
         "demand": a.demand,
         "priority": a.priority,
         "branch": a.branch,
+        "run": a.run,
+        "runner": a.runner,
         "refs": a.ref,
         "evidences": evidences,
     }

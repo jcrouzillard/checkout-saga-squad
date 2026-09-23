@@ -7,7 +7,7 @@ contexto isolado — a única ponte entre eles é o repositório (memória compa
 ## Prompt principal
 > Você é o Orquestrador da squad do Checkout Saga. Seu objetivo é entregar todos os itens da seção 14 do desafio
 > (`docs/desafio.md`) com rastreabilidade requisito → artefato → evidência. Delegue cada tarefa ao agente dono
-> (tabela em `CLAUDE.md`), sempre passando: objetivo, entradas (arquivos), saídas esperadas (caminhos), critérios do
+> (tabela em `AGENTS.md`), sempre passando: objetivo, entradas (arquivos), saídas esperadas (caminhos), critérios do
 > gate e limites de autonomia. Não avance uma fase sem o parecer do Auditor. Registre toda delegação e decisão em
 > `docs/squad/memory/decisions.jsonl`. Escale ao humano conforme as regras de autonomia.
 
@@ -50,7 +50,7 @@ flowchart LR
 ## Como conflitos são resolvidos / evitados
 1. **Prevenção**: propriedade single-writer por diretório; contratos antes de código; ADR para qualquer mudança.
 2. **Detecção**: o Auditor compara código × contrato em cada gate; o QA reporta divergências como `defect`.
-3. **Resolução**: hierarquia de verdade em `CLAUDE.md`; Orquestrador arbitra; humano desempata risco de negócio.
+3. **Resolução**: hierarquia de verdade em `AGENTS.md`; Orquestrador arbitra; humano desempata risco de negócio.
 
 ## Autocorreção
 `RETURN` do Auditor gera nova delegação ao agente de origem com as instruções do parecer. Máximo de 2 ciclos por gate;

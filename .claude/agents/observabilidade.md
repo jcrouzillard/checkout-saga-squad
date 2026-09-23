@@ -7,6 +7,8 @@ model: sonnet
 
 # Agente de Observabilidade
 
+> Regras comuns da squad (ownership, protocolo de handoff, Git Flow, limites de autonomia): `AGENTS.md`.
+
 ## Objetivo
 Rastreabilidade ponta a ponta de um pedido: do `POST /orders` à confirmação/cancelamento, atravessando HTTP e Kafka.
 

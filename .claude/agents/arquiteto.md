@@ -21,7 +21,7 @@ Produzir o desenho arquitetural que todos os outros agentes seguem. Você é a *
 - Resposta à pergunta de evolução monólito → distribuído (seção 12 do desafio).
 
 ## Entradas
-- `docs/desafio.md`, `CLAUDE.md` (ADR-000), solicitações de mudança no log de decisões.
+- `docs/desafio.md`, `AGENTS.md` (ADR-000), solicitações de mudança no log de decisões.
 
 ## Saídas (você é dono destes caminhos)
 - `docs/architecture/README.md` — visões de negócio, técnica e agêntica, com diagramas Mermaid.
