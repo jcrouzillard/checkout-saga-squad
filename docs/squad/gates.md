@@ -10,7 +10,9 @@ Peso entre parênteses. **B** = bloqueante (falhou → `RETURN`).
 - (1) ADRs para Saga orquestrada, outbox, database-per-service, broker.
 - (1) Resposta à pergunta de evolução (seção 12).
 
-## G2 · Backend (+ DevOps + Observabilidade) → QA
+## G2 · Backend (+ DevOps + Observabilidade) ou Frontend → QA
+- Para entregas de **Frontend** (`checkout-console/`): (B, 3) página servida pelo container e fluxo de pedido funcionando contra o ambiente real; (B, 2) nenhuma chamada fora de `docs/contracts/api.md`; (2) acessibilidade básica (rótulos, foco, contraste) e responsividade; (1) aderência ao brief de UX do Arquiteto.
+
 - (B, 3) `mvn -q package -DskipTests` passa; testes unitários da Saga passam.
 - (B, 2) `docker compose config -q` válido; todos os serviços com healthcheck.
 - (B, 2) Código aderente ao contrato (nomes de tópicos/campos iguais aos de `docs/contracts/events.md`).

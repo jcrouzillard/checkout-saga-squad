@@ -36,6 +36,7 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 | DevOps            | `.claude/agents/devops.md`              | `Dockerfile`, `docker-compose.yml`, `infra/**` (exceto observability), `.github/**`, `Makefile` |
 | Observabilidade   | `.claude/agents/observabilidade.md`     | `infra/observability/**`, `docs/observability.md`               |
 | QA                | `.claude/agents/qa.md`                  | `services/*/src/test/**`, `tests/**`                            |
+| Frontend          | `.claude/agents/frontend.md`            | `checkout-console/**` (interface do produto)                    |
 | Auditor (Gatekeeper)  | `.claude/agents/auditor.md`                 | `docs/squad/gates/**` (somente leitura no resto)               |
 
 ## Hierarquia de verdade (resolução de conflitos)
