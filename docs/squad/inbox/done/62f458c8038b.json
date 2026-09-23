@@ -1,0 +1,10 @@
+{
+  "demand": "62f458c8038b",
+  "title": "Melhoria visual onde aparece o quadrinho dos agentes na tela de execuções",
+  "detail": "Eu só quero que inclua uns emojis para cada quadrinho, por exemplo, o Orquestrador: um emoji de um rostinho de orquestrador, ou o que você achar melhor, só para ficar mais visual, um pouco mais leve. Não pode quebrar nenhuma regra existente e não pode quebrar nada do que já funciona.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T16:48:35+00:00"
+}
