@@ -1,0 +1,29 @@
+{
+  "gate": "G3",
+  "demand": "d91b7a8b31d9",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.94,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Checklist CA1–CA8", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-backlog-d5.md (handoff fbf2ff930000): 7 ✅ e CA7 ⚠️. Backlog sem validação e fora do pending; imediata segue D4; backlog ordenado por prioridade + criação; edit 201/400/404/409; mover para a fila 201 com fromBacklog e estado editado, 2º start 409; fila alta, alta, baixa com empate por startedAt; controles pause/resume intactos. Coincide com minhas integrações independentes do G2 (ciclos 1 e 2, este com repriorização)"},
+    {"name": "Teste isolado e branch limpa", "status": "pass", "weight": 2, "blocking": true,
+     "source": "QA usou cópia descartável (/tmp/d5qa, porta 7075). Log real: 0 eventos com backlog:true e nenhuma task/edit humana depois de 17:30Z (só a própria D5, 17:25Z). git ls-files docs/squad/inbox sem arquivos fora de done/; git diff develop --stat -- docs/squad/inbox vazio; diretório inbox só com done/"},
+    {"name": "Respostas do humano atendidas", "status": "pass", "weight": 2, "blocking": true,
+     "source": "clarification ee06042cf2f9: (1) backlog pré-início escolhido na criação → rádio 'Quando iniciar' (captura), com 'Iniciar agora' padrão; (2) backlog não vai ao Arquiteto → CA1 sem validation/progress; (3) ordenação por prioridade → CA3 e nota no painel; (4) edição no backlog → CA4 com edição inline (captura); (5) Orquestrador pega a fila e ignora o backlog → CA6 e pending.py (fila por prioridade → início, com repriorização conferida no G2-D5-2)"},
+    {"name": "Capturas 1440 e 390 px", "status": "pass", "weight": 1, "blocking": false,
+     "source": "backlog-d5-1440-edit.png: 'Fila (3)' com 1º/2º/3º e tags de prioridade, 'Backlog (2)' com tag textual 'Backlog', nota de ordenação, edição inline com labels, fieldset Tipo, Prioridade, Salvar/Cancelar. backlog-d5-390.png: coluna única com o formulário e 'Quando iniciar'; menu superior cortado a 390 px (anterior, já registrado)"},
+    {"name": "Sincronização com o GitHub (CA7)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Só pelo código (github_sync.py: label backlog e Status Backlog na criação, on_edit com gh issue edit + comentário, remoção da label no start fromBacklog); não exercitado contra o GitHub real para não criar issues de teste"}
+  ],
+  "open_risks": [
+    "CA7 (label backlog, comentário por edição, remoção da label ao mover) só verificado no código: conferir na 1ª demanda real guardada no backlog após o merge.",
+    "A repriorização de item já na fila não reescreve o JSON do inbox: o plantão precisa seguir a ordem do pending.py (como manda o plantao.md).",
+    "Evolução pedida pelo humano: 'validar com o Arquiteto' sob demanda no backlog (registrado no contrato §2.7/ADR-009)."
+  ],
+  "human_required": false,
+  "rationale": "A D5 passou por G1 (1.00), G2 (devolvido no ciclo 1 por ignorar a repriorização, aprovado no ciclo 2 com 1.00) e agora G3. O QA confirmou 7 dos 8 critérios em cópia descartável, e o log real e a branch estão limpos de dados de teste. As 5 respostas do humano estão atendidas: backlog escolhido na criação, sem validação, ordenado por prioridade, editável, e ignorado pelo Orquestrador, que consome a fila em ordem. Só a sincronização com o GitHub (CA7) ficou verificada no código. Confiança = (3+2+2+1+0.5)/9 = 0.94."
+}

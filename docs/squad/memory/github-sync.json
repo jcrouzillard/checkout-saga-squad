@@ -152,7 +152,8 @@
   "0296ca036754",
   "e9b7815970da",
   "92913e512075",
-  "fbf2ff930000"
+  "fbf2ff930000",
+  "d126af991a0d"
  ],
  "issues": {
   "_diario": {
@@ -680,6 +681,17 @@
    "status": "Gate (Auditor)",
    "phase": null,
    "handed": true,
+   "closed": false,
+   "kind": "task"
+  },
+  "d126af991a0d": {
+   "number": 55,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/55",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8Yqm8",
+   "agent": "auditor",
+   "status": "Em andamento",
+   "phase": "G3",
+   "handed": false,
    "closed": false,
    "kind": "task"
   }
