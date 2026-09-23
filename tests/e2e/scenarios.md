@@ -1,6 +1,6 @@
 # Cenários e2e — roteiro para demo ao vivo
 
-> Automatizado em `tests/e2e/run.sh` (7 cenários, um por função). Este documento traz o `curl`
+> Automatizado em `tests/e2e/run.sh` (8 cenários, um por função). Este documento traz o `curl`
 > manual equivalente de cada cenário — útil para apresentar a demo sem depender do script, ou
 > para investigar uma falha reportada pelo script. URLs assumem `docker compose up --build` com
 > as portas padrão (`docs/contracts/api.md` §5 para as demais variáveis de ambiente).
@@ -218,6 +218,37 @@ corpo **diferente** deve retornar `409 Conflict`.
 **O que mostrar na demo**: as duas respostas HTTP lado a lado (`202` vs `200` +
 `Idempotent-Replayed: true`, mesmo `orderId`) e `GET /inventory/stock/{sku}` mostrando que só
 caiu uma unidade apesar das duas chamadas.
+
+## 8. D1: listar pedidos de um cliente (`GET /orders?customerId=&limit=`, ADR-006)
+
+```bash
+CUST="c-demo-d1-$(uuidgen)"
+
+# 3 pedidos do mesmo cliente: DIGITAL feliz, PHYSICAL feliz, PHYSICAL com payment DECLINE.
+curl -s -X POST http://localhost:8081/orders -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" -d "{\"customerId\":\"$CUST\",\"items\":[{\"sku\":\"SKU-EBOOK-001\",\"quantity\":1,\"unitPrice\":39.90}],\"deliveryType\":\"DIGITAL\",\"shippingAddress\":null,\"simulate\":null}" | jq .orderId
+
+curl -s -X POST http://localhost:8081/orders -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" -d "{\"customerId\":\"$CUST\",\"items\":[{\"sku\":\"SKU-BOOK-001\",\"quantity\":1,\"unitPrice\":49.90}],\"deliveryType\":\"PHYSICAL\",\"shippingAddress\":{\"street\":\"Av. Paulista\",\"number\":\"1000\",\"complement\":null,\"city\":\"Sao Paulo\",\"state\":\"SP\",\"zipCode\":\"01310-100\",\"country\":\"BR\"},\"simulate\":null}" | jq .orderId
+
+curl -s -X POST http://localhost:8081/orders -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" -d "{\"customerId\":\"$CUST\",\"items\":[{\"sku\":\"SKU-BOOK-001\",\"quantity\":1,\"unitPrice\":49.90}],\"deliveryType\":\"PHYSICAL\",\"shippingAddress\":{\"street\":\"Av. Paulista\",\"number\":\"1000\",\"complement\":null,\"city\":\"Sao Paulo\",\"state\":\"SP\",\"zipCode\":\"01310-100\",\"country\":\"BR\"},\"simulate\":{\"payment\":\"DECLINE\"}}" | jq .orderId
+
+# poll os 3 até estado terminal (CONFIRMED, CONFIRMED, CANCELED), depois:
+curl -s "http://localhost:8081/orders?customerId=$CUST" | jq .                       # 3 itens, mais recente -> mais antigo
+curl -s "http://localhost:8081/orders?customerId=$CUST&limit=2" | jq .               # só os 2 mais recentes
+curl -i "http://localhost:8081/orders?customerId=cliente-sem-pedidos-$(uuidgen)"     # 200, []
+curl -i "http://localhost:8081/orders"                                              # 400 (sem customerId)
+```
+
+**Esperado**: `GET /orders?customerId=` retorna array com os 3 pedidos ordenados por
+`createdAt desc` (desempate `orderId desc`), cada item com `orderId`, `status`, `totalAmount`,
+`deliveryType`, `createdAt`, `cancellationReason` (`null` exceto no `CANCELED`); `limit=2` retorna
+só os 2 mais recentes na mesma ordem; cliente sem pedidos retorna `200` com `[]` (nunca `404`);
+requisição sem `customerId` retorna `400` (problem+json, `docs/contracts/api.md` §1).
+
+**O que mostrar na demo**: `GET /orders?customerId={id}` com os 3 pedidos na ordem correta
+(mais recente primeiro) lado a lado com `limit=2`, e o `400` da chamada sem `customerId`.
 
 ## Diagnóstico complementar (todos os cenários)
 

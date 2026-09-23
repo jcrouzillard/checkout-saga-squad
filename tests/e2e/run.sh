@@ -7,7 +7,7 @@
 # docs/architecture/saga.md), não do código do Backend (test-first, ver F2).
 #
 # Uso:
-#   bash tests/e2e/run.sh                 # roda os 7 cenários
+#   bash tests/e2e/run.sh                 # roda os 8 cenários
 #   bash tests/e2e/run.sh payment_failure  # roda só um cenário
 #   SKIP_RESTART=1 bash tests/e2e/run.sh   # pula o cenário 6 (reinício do coordenador)
 #
@@ -124,6 +124,48 @@ sys.exit(1)
   fi
 }
 
+# json_array_length JSON → tamanho de um array JSON top-level (0 se não for array/erro).
+json_array_length() {
+  local json="$1"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq 'if type == "array" then length else 0 end' 2>/dev/null
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print(0)
+    sys.exit(0)
+print(len(data) if isinstance(data, list) else 0)
+' 2>/dev/null
+  fi
+}
+
+# json_array_field JSON INDEX FIELD → valor de um campo do elemento INDEX de um
+# array JSON top-level ("" se ausente/null/fora do índice).
+json_array_field() {
+  local json="$1" index="$2" field="$3"
+  if $HAS_JQ; then
+    printf '%s' "$json" | jq -r --argjson i "$index" --arg field "$field" '.[$i][$field] // empty' 2>/dev/null
+  else
+    printf '%s' "$json" | python3 -c '
+import sys, json
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("")
+    sys.exit(0)
+idx, field = int(sys.argv[1]), sys.argv[2]
+try:
+    v = data[idx].get(field)
+except Exception:
+    v = None
+print("" if v is None else v)
+' "$index" "$field" 2>/dev/null
+  fi
+}
+
 # history_count JSON STEP STATUS → quantas entradas de .history casam step+status.
 history_count() {
   local json="$1" step="$2" status="$3"
@@ -180,16 +222,20 @@ get_header() {
   done
 }
 
-# order_payload SKU QTY UNIT_PRICE DELIVERY_TYPE SIMULATE_JSON → corpo do POST /orders.
+# order_payload SKU QTY UNIT_PRICE DELIVERY_TYPE SIMULATE_JSON [CUSTOMER_ID] → corpo do POST /orders.
+# CUSTOMER_ID é opcional; se omitido, gera um customerId aleatório (comportamento anterior).
 order_payload() {
-  local sku="$1" qty="$2" price="$3" delivery="$4" simulate="$5"
+  local sku="$1" qty="$2" price="$3" delivery="$4" simulate="$5" customer="${6:-}"
   local address_json="null"
   if [ "$delivery" = "PHYSICAL" ]; then
     address_json='{"street":"Av. Paulista","number":"1000","complement":null,"city":"Sao Paulo","state":"SP","zipCode":"01310-100","country":"BR"}'
   fi
+  if [ -z "$customer" ]; then
+    customer="qa-e2e-$(gen_uuid)"
+  fi
   cat <<EOF
 {
-  "customerId": "qa-e2e-$(gen_uuid)",
+  "customerId": "$customer",
   "items": [ { "sku": "$sku", "quantity": $qty, "unitPrice": $price } ],
   "deliveryType": "$delivery",
   "shippingAddress": $address_json,
@@ -594,6 +640,123 @@ scenario_idempotency() {
   return 0
 }
 
+# 8. D1: listar pedidos de um cliente (GET /orders?customerId=&limit=, ADR-006).
+scenario_customer_orders() {
+  local cust_id order1 order2 order3 payload count
+  cust_id="qa-e2e-cust-$(gen_uuid)"
+
+  # Pedido 1: DIGITAL feliz.
+  payload="$(order_payload "SKU-EBOOK-001" 1 39.90 "DIGITAL" 'null' "$cust_id")"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $(gen_uuid)" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="pedido 1 (DIGITAL) POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order1="$(json_get "$RESP_BODY" "orderId")"
+  if ! wait_for_status "$order1" "CONFIRMED" 60; then
+    SCENARIO_DETAIL="pedido 1 (DIGITAL) não atingiu CONFIRMED em 60s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+
+  # Pedido 2: PHYSICAL feliz.
+  payload="$(order_payload "SKU-BOOK-001" 1 49.90 "PHYSICAL" 'null' "$cust_id")"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $(gen_uuid)" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="pedido 2 (PHYSICAL) POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order2="$(json_get "$RESP_BODY" "orderId")"
+  if ! wait_for_status "$order2" "CONFIRMED" 60; then
+    SCENARIO_DETAIL="pedido 2 (PHYSICAL) não atingiu CONFIRMED em 60s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+
+  # Pedido 3: PHYSICAL com payment=DECLINE (cancelado).
+  payload="$(order_payload "SKU-BOOK-001" 1 49.90 "PHYSICAL" '{"payment":"DECLINE"}' "$cust_id")"
+  http_request POST "$ORDER_URL/orders" -H "Content-Type: application/json" -H "Idempotency-Key: $(gen_uuid)" -d "$payload"
+  if [ "$HTTP_STATUS" != "202" ]; then
+    SCENARIO_DETAIL="pedido 3 (DECLINE) POST /orders retornou $HTTP_STATUS (esperado 202): $RESP_BODY"
+    return 1
+  fi
+  order3="$(json_get "$RESP_BODY" "orderId")"
+  if ! wait_for_status "$order3" "CANCELED" 30; then
+    SCENARIO_DETAIL="pedido 3 (DECLINE) não atingiu CANCELED em 30s (status atual: $(json_get "$LAST_ORDER_JSON" "status"))"
+    return 1
+  fi
+  SCENARIO_ORDER_ID="$order3"
+
+  # GET /orders?customerId= sem limit → exatamente os 3, mais recente primeiro.
+  http_request GET "$ORDER_URL/orders?customerId=$cust_id"
+  if [ "$HTTP_STATUS" != "200" ]; then
+    SCENARIO_DETAIL="GET /orders?customerId=$cust_id retornou $HTTP_STATUS (esperado 200)"
+    return 1
+  fi
+  count="$(json_array_length "$RESP_BODY")"
+  if [ "$count" != "3" ]; then
+    SCENARIO_DETAIL="GET /orders?customerId= retornou $count pedidos (esperado 3)"
+    return 1
+  fi
+  if [ "$(json_array_field "$RESP_BODY" 0 orderId)" != "$order3" ] || \
+     [ "$(json_array_field "$RESP_BODY" 1 orderId)" != "$order2" ] || \
+     [ "$(json_array_field "$RESP_BODY" 2 orderId)" != "$order1" ]; then
+    SCENARIO_DETAIL="ordem incorreta (esperado mais recente->mais antigo: $order3,$order2,$order1; obtido: $(json_array_field "$RESP_BODY" 0 orderId),$(json_array_field "$RESP_BODY" 1 orderId),$(json_array_field "$RESP_BODY" 2 orderId))"
+    return 1
+  fi
+  # Campos do contrato no elemento mais recente (pedido 3, CANCELED).
+  if [ -z "$(json_array_field "$RESP_BODY" 0 orderId)" ] || \
+     [ "$(json_array_field "$RESP_BODY" 0 status)" != "CANCELED" ] || \
+     [ -z "$(json_array_field "$RESP_BODY" 0 totalAmount)" ] || \
+     [ "$(json_array_field "$RESP_BODY" 0 deliveryType)" != "PHYSICAL" ] || \
+     [ -z "$(json_array_field "$RESP_BODY" 0 createdAt)" ] || \
+     [ "$(json_array_field "$RESP_BODY" 0 cancellationReason)" != "PAYMENT_DECLINED" ]; then
+    SCENARIO_DETAIL="campos do contrato ausentes/incorretos no pedido mais recente"
+    return 1
+  fi
+  # cancellationReason deve ser null (vazio) num pedido CONFIRMED (índice 1, pedido 2).
+  if [ -n "$(json_array_field "$RESP_BODY" 1 cancellationReason)" ]; then
+    SCENARIO_DETAIL="cancellationReason não é null no pedido CONFIRMED (índice 1)"
+    return 1
+  fi
+
+  # limit=2 → só os 2 mais recentes, mesma ordem.
+  http_request GET "$ORDER_URL/orders?customerId=$cust_id&limit=2"
+  if [ "$HTTP_STATUS" != "200" ]; then
+    SCENARIO_DETAIL="GET /orders?customerId=&limit=2 retornou $HTTP_STATUS (esperado 200)"
+    return 1
+  fi
+  count="$(json_array_length "$RESP_BODY")"
+  if [ "$count" != "2" ]; then
+    SCENARIO_DETAIL="limit=2 retornou $count pedidos (esperado 2)"
+    return 1
+  fi
+  if [ "$(json_array_field "$RESP_BODY" 0 orderId)" != "$order3" ] || [ "$(json_array_field "$RESP_BODY" 1 orderId)" != "$order2" ]; then
+    SCENARIO_DETAIL="limit=2 não retornou os 2 pedidos mais recentes na ordem esperada"
+    return 1
+  fi
+
+  # Cliente inexistente → [] (nunca 404).
+  http_request GET "$ORDER_URL/orders?customerId=qa-e2e-cust-inexistente-$(gen_uuid)"
+  if [ "$HTTP_STATUS" != "200" ]; then
+    SCENARIO_DETAIL="GET /orders?customerId=<inexistente> retornou $HTTP_STATUS (esperado 200)"
+    return 1
+  fi
+  count="$(json_array_length "$RESP_BODY")"
+  if [ "$count" != "0" ]; then
+    SCENARIO_DETAIL="cliente inexistente retornou $count pedidos (esperado [] / 0)"
+    return 1
+  fi
+
+  # Sem customerId → 400.
+  http_request GET "$ORDER_URL/orders"
+  if [ "$HTTP_STATUS" != "400" ]; then
+    SCENARIO_DETAIL="GET /orders sem customerId retornou $HTTP_STATUS (esperado 400)"
+    return 1
+  fi
+
+  SCENARIO_DETAIL="3 pedidos do cliente $cust_id listados na ordem correta (mais recente->mais antigo); limit=2 ok; cliente inexistente=[]; sem customerId=400"
+  return 0
+}
+
 # --------------------------------------------------------------------------
 # Runner
 # --------------------------------------------------------------------------
@@ -681,7 +844,7 @@ print_summary() {
 
 main() {
   local filter="${1:-}"
-  local keys=(happy_path_physical happy_path_digital payment_failure shipping_failure timeout_step coordinator_restart idempotency)
+  local keys=(happy_path_physical happy_path_digital payment_failure shipping_failure timeout_step coordinator_restart idempotency customer_orders)
   local k found
 
   if [ -n "$filter" ]; then

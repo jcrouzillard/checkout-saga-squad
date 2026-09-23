@@ -43,3 +43,11 @@ coluna `outbox.trace_parent` (saga.md); tag `outcome` COMPLETED→CONFIRMED; cre
   log INFO e métrica extra `saga_resumed_total` (`SagaStateMachine.resumeAfterRestart` + 4 testes unitários; 20 no total).
 - Evidência: `coordinator_restart` verde (step log: RESUMED_AFTER_RESTART → payment.authorized aceito 91 ms depois, tentativa 1);
   suíte completa 7/7.
+
+## D1 — `GET /orders?customerId=&limit=` (ADR-006)
+- `OrderController.listByCustomer` + `OrderRepository.findByCustomer` (só database `orders`; `created_at desc, order_id desc`);
+  migração `V2__idx_orders_customer_created.sql`. `cancellationReason` só em `CANCELED`. Sem mudanças em common/Saga/eventos.
+- 400 problem+json: `customerId` ausente/vazio/>100 **ou com espaços nas pontas (sem trim)**; `limit` não inteiro ou fora de 1–200 (default 50).
+- Testes: `order-service/src/test/.../OrderListByCustomerTest` (6: ordem, `[]`, limit default/explícito, 400s).
+- Compose: `console-teste` → 1 pedido; inexistente → `[]` 200; ausente → 400; ` console-teste` e `limit=201` → 400;
+  2 pedidos de `d1-backend-check` retornam do mais recente ao mais antigo. Cenário e2e criar+listar: pendente do QA.

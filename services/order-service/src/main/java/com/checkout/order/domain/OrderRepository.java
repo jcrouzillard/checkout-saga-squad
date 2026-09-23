@@ -15,6 +15,10 @@ import java.util.UUID;
 @Repository
 public class OrderRepository {
 
+    /** Linha de GET /orders?customerId= (D1). */
+    public record OrderSummary(UUID orderId, String status, java.math.BigDecimal totalAmount, String deliveryType,
+                               Instant createdAt, String cancellationReason) {}
+
     public record HistoryEntry(String step, String status, int attempt, String detail, Instant at) {}
 
     private static final String COLUMNS = """
@@ -31,6 +35,24 @@ public class OrderRepository {
     public Optional<OrderRecord> findById(UUID orderId) {
         return jdbc.sql("SELECT " + COLUMNS + " FROM orders WHERE order_id = :id").param("id", orderId)
                 .query(OrderRepository::map).optional();
+    }
+
+    /** D1 (ADR-006): pedidos do cliente, mais recentes primeiro; usa idx_orders_customer_created. */
+    public List<OrderSummary> findByCustomer(String customerId, int limit) {
+        return jdbc.sql("""
+                SELECT order_id, status, total_amount, delivery_type, created_at, cancellation_reason
+                FROM orders WHERE customer_id = :customerId
+                ORDER BY created_at DESC, order_id DESC LIMIT :limit
+                """)
+                .param("customerId", customerId).param("limit", limit)
+                .query((rs, n) -> {
+                    String status = rs.getString("status");
+                    return new OrderSummary(rs.getObject("order_id", UUID.class), status,
+                            rs.getBigDecimal("total_amount"), rs.getString("delivery_type"),
+                            rs.getTimestamp("created_at").toInstant(),
+                            OrderRecord.CANCELED.equals(status) ? rs.getString("cancellation_reason") : null);
+                })
+                .list();
     }
 
     public Optional<OrderRecord> lockById(UUID orderId) {

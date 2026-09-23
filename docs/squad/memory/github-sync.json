@@ -37,7 +37,16 @@
   "b3687c905abd",
   "e4c966e5655f",
   "ce710d091eee",
-  "e8118d177178"
+  "e8118d177178",
+  "13e55010e3f5",
+  "59e6b62f03d3",
+  "1de7dab88d4c",
+  "f234df66939a",
+  "aaad3b0f5ce4",
+  "7bac3a6658ce",
+  "42eff02f02d4",
+  "0fdb6e52c297",
+  "1be6a99e6934"
  ],
  "issues": {
   "_diario": {
@@ -95,10 +104,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/6",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8Vuh8",
    "agent": "arquiteto",
-   "status": "Backlog",
+   "status": "Concluído",
    "phase": null,
-   "handed": false,
-   "closed": false
+   "handed": true,
+   "closed": true
   },
   "9da0069a951d": {
    "number": 7,
@@ -155,9 +164,9 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/12",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8V4nA",
    "agent": "backend",
-   "status": "Backlog",
+   "status": "Gate (Jev)",
    "phase": null,
-   "handed": false,
+   "handed": true,
    "closed": false
   },
   "b164b075d5cf": {
@@ -189,6 +198,46 @@
    "phase": "G3",
    "handed": false,
    "closed": true
+  },
+  "13e55010e3f5": {
+   "number": 16,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/16",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8WiGA",
+   "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false
+  },
+  "59e6b62f03d3": {
+   "number": 17,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/17",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8WiOo",
+   "agent": "arquiteto",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false
+  },
+  "7bac3a6658ce": {
+   "number": 18,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/18",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8WjtE",
+   "agent": "backend",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false
+  },
+  "42eff02f02d4": {
+   "number": 19,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/19",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8Wjzs",
+   "agent": "qa",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false
   }
  },
  "project": {
@@ -233,7 +282,7 @@
   }
  },
  "gates": {
-  "G1": "70b58f50fd01",
+  "G1": "aaad3b0f5ce4",
   "G2": "a65c00cca4e3",
   "G3": "e4c966e5655f"
  }

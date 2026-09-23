@@ -17,11 +17,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,6 +64,39 @@ public class OrderController {
             return ResponseEntity.ok().header("Idempotent-Replayed", "true").location(URI.create(self)).body(resp);
         }
         return ResponseEntity.status(HttpStatus.ACCEPTED).location(URI.create(self)).body(resp);
+    }
+
+    public static final int DEFAULT_LIMIT = 50;
+    public static final int MAX_LIMIT = 200;
+
+    /** D1 (api.md §1, ADR-006): lista os pedidos de um cliente; só lê o database orders. */
+    @GetMapping
+    public List<OrderRepository.OrderSummary> listByCustomer(@RequestParam(required = false) String customerId,
+                                                             @RequestParam(required = false) String limit) {
+        List<ApiException.FieldError> errors = new ArrayList<>();
+        // Sem trim: espaços nas pontas são rejeitados (parecer G1-D1).
+        if (customerId == null || customerId.isEmpty() || customerId.length() > 100) {
+            errors.add(new ApiException.FieldError("customerId", "obrigatório (1–100 caracteres)"));
+        } else if (!customerId.equals(customerId.strip())) {
+            errors.add(new ApiException.FieldError("customerId", "não pode ter espaços nas pontas"));
+        }
+        int n = DEFAULT_LIMIT;
+        if (limit != null) {
+            try {
+                n = Integer.parseInt(limit);
+            } catch (NumberFormatException e) {
+                n = -1;
+            }
+            if (n < 1 || n > MAX_LIMIT) {
+                errors.add(new ApiException.FieldError("limit", "inteiro entre 1 e " + MAX_LIMIT));
+            }
+        }
+        if (!errors.isEmpty()) {
+            String detail = errors.get(0).field().equals("customerId") ? "customerId é obrigatório e deve ter 1–100 "
+                    + "caracteres sem espaços nas pontas" : "limit deve ser um inteiro entre 1 e " + MAX_LIMIT;
+            throw ApiException.badRequest(detail, errors);
+        }
+        return repo.findByCustomer(customerId, n);
     }
 
     @GetMapping("/{orderId}")

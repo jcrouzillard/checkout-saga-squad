@@ -33,3 +33,9 @@
 - Cenário TIMEOUT leva ≈ 20 s com defaults (5 s × 3 tentativas + backoff); QA deve usar poll com timeout ≥ 45 s.
 - `SLOW` implementado com sleep no consumidor bloqueia a partição — aceitável na demo; manter `SIMULATE_SLOW_MS` < `SAGA_STEP_TIMEOUT_MS`.
 - Limpeza de `outbox`/`processed_messages` fora do escopo (documentado como evolução).
+
+## D1 — Listar pedidos de um cliente (ADR-006)
+- Contrato: `docs/contracts/api.md` §1 `GET /orders?customerId=&limit=` — array JSON (`[]` se vazio), `createdAt desc, orderId desc`, `limit` default 50 / máx. 200, `400` problem+json para `customerId` ausente/vazio/>100 ou `limit` inválido.
+- Campos: `orderId`, `status`, `totalAmount`, `deliveryType`, `createdAt`, `cancellationReason` (`null` exceto em `CANCELED`).
+- Só lê o database `orders`; nova migração Flyway com índice `(customer_id, created_at DESC)`. Não mexe em eventos, Saga nem outros serviços.
+- Sem paginação por cursor (evolução).

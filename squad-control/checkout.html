@@ -93,7 +93,8 @@
         <button class="btn primary" type="submit" id="send">Criar pedido</button>
         <div id="error" hidden class="err"></div>
       </form>
-      <h2 style="margin-top: 28px">Pedidos desta sessão</h2>
+      <h2 style="margin-top: 28px">Pedidos do cliente <code id="recent-customer"></code></h2>
+      <div class="hint" id="recent-source"></div>
       <ul class="recent" id="recent"></ul>
     </section>
 
@@ -150,7 +151,7 @@ async function follow() {
     if (!r.ok) return;
     const stock = current.sku ? await api(`inventory/inventory/stock/${current.sku}`) : null;
     renderOrder(r.body, stock?.ok ? stock.body : null);
-    if (r.body.status !== "PENDING") { clearInterval(timer); refreshStock(); }
+    if (r.body.status !== "PENDING") { clearInterval(timer); refreshStock(); renderRecent(); }
   };
   await tick(); timer = setInterval(tick, 1000);
 }
@@ -182,12 +183,22 @@ function renderOrder(o, stock) {
     <h2 style="margin-top:24px">Equivalente em curl</h2><pre>${esc(current.curl || "")}</pre>`;
 }
 
-function renderRecent() {
+async function renderRecent() {
+  const customer = $("#customer").value.trim();
+  $("#recent-customer").textContent = customer;
+  const r = customer ? await api(`order/orders?customerId=${encodeURIComponent(customer)}&limit=12`) : { ok: false };
+  if (r.ok && Array.isArray(r.body)) {
+    $("#recent-source").textContent = "Fonte: GET /orders?customerId= (demanda D1 entregue pela squad)";
+    $("#recent").innerHTML = r.body.map(o => `<li data-id="${esc(o.orderId)}"><span class="mono">${hhmmss(o.createdAt)}</span><span><span class="status ${esc(o.status)}" style="padding:1px 6px">${esc(o.status)}</span> ${esc(o.deliveryType)} · R$ ${Number(o.totalAmount).toFixed(2).replace(".", ",")}${o.cancellationReason ? " · " + esc(o.cancellationReason) : ""}</span><code>${esc(o.orderId.slice(0, 8))}</code></li>`).join("") || `<li class="empty" style="cursor:default">Este cliente ainda não tem pedidos.</li>`;
+    return;
+  }
+  $("#recent-source").textContent = "Fonte: histórico local do navegador (endpoint de listagem indisponível)";
   $("#recent").innerHTML = recent.map(r => `<li data-id="${esc(r.orderId)}"><span class="mono">${hhmmss(r.at)}</span><span>${esc(r.fault)}</span><code>${esc(r.orderId.slice(0, 8))}</code></li>`).join("") || `<li class="empty" style="cursor:default">Nenhum pedido ainda.</li>`;
 }
+$("#customer").addEventListener("change", renderRecent);
 $("#recent").addEventListener("click", ev => {
   const li = ev.target.closest("[data-id]"); if (!li) return;
-  current = recent.find(r => r.orderId === li.dataset.id); stockBefore = null; follow();
+  current = recent.find(r => r.orderId === li.dataset.id) || { orderId: li.dataset.id, sku: skuInfo().sku, fault: "", curl: "" }; stockBefore = null; follow();
 });
 renderRecent(); refreshStock();
 </script>

@@ -70,6 +70,35 @@ Concorrência: `UNIQUE(idempotency_key)`; em violação de unicidade, reler e ap
 `status`: `PENDING | CONFIRMED | CANCELED` (terminal = `CONFIRMED`/`CANCELED`; clientes/testes fazem *poll* até terminal).
 `history` ordenado por `at`, originado de `saga.step-changed` + transições locais. `404` se não existir (problem+json).
 
+### `GET /orders?customerId={customerId}&limit={limit}` (D1, ADR-006)
+Lista os pedidos de um cliente. Leitura **somente no database `orders`** do próprio order-service (não chama a
+Saga nem outros serviços; não publica eventos).
+
+Parâmetros de query:
+| Parâmetro | Obrigatório | Regra |
+|-----------|-------------|-------|
+| `customerId` | sim | string 1–100 chars (sem espaços nas pontas); comparação exata |
+| `limit` | não | int 1–200, default `50` |
+
+Ordenação: `createdAt desc` (desempate por `orderId desc`, para resultado determinístico).
+**Sem paginação por cursor nesta versão** (evolução: `cursor` opaco baseado em `(createdAt, orderId)`).
+
+`200 OK` — array JSON (vazio `[]` se o cliente não tiver pedidos; nunca `404`):
+```json
+[
+  { "orderId": "uuid", "status": "CANCELED", "totalAmount": 99.80, "deliveryType": "PHYSICAL",
+    "createdAt": "2026-09-23T14:05:12.100Z", "cancellationReason": "PAYMENT_DECLINED" },
+  { "orderId": "uuid", "status": "CONFIRMED", "totalAmount": 49.90, "deliveryType": "DIGITAL",
+    "createdAt": "2026-09-23T13:58:01.000Z", "cancellationReason": null }
+]
+```
+`cancellationReason` é `null` exceto em `CANCELED`. `status` ∈ `PENDING | CONFIRMED | CANCELED`.
+
+Erros (`400 Bad Request`, problem+json): `customerId` ausente, vazio ou > 100 chars; `limit` não inteiro ou fora de 1–200.
+Exemplo: `{ "title": "Bad Request", "status": 400, "detail": "customerId é obrigatório", "instance": "/orders", "errors": [ { "field": "customerId", "message": "obrigatório (1–100 caracteres)" } ] }`.
+
+Persistência: índice `CREATE INDEX idx_orders_customer_created ON orders (customer_id, created_at DESC)` (nova migração Flyway).
+
 ## 2. saga-orchestrator (porta 8080) — diagnóstico
 
 ### `GET /sagas/{sagaId}` e `GET /sagas?orderId={orderId}`

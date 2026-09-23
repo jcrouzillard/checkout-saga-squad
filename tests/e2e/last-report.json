@@ -1,9 +1,10 @@
 [
-  {"scenario":"happy_path_physical","status":"PASS","durationSeconds":1,"orderId":"4d1751a2-7f92-4b76-b38c-a2c555c056d6","detail":"CONFIRMED, shipment CREATED, tracking presente"},
-  {"scenario":"happy_path_digital","status":"PASS","durationSeconds":2,"orderId":"40048f28-662f-438f-9276-dcb30f61bc70","detail":"CONFIRMED sem shipment.created (DIGITAL)"},
-  {"scenario":"payment_failure","status":"PASS","durationSeconds":2,"orderId":"7053ce5d-6bdb-4623-895e-6ead619bde32","detail":"CANCELED (PAYMENT_DECLINED), reserva RELEASED, estoque restaurado (991)"},
-  {"scenario":"shipping_failure","status":"PASS","durationSeconds":2,"orderId":"0be75a35-5a7b-4206-bc19-f24ea6e7c7d2","detail":"CANCELED (SHIPMENT_FAILED), payment REFUNDED, reserva RELEASED, estoque restaurado (991)"},
-  {"scenario":"timeout_step","status":"PASS","durationSeconds":20,"orderId":"e63ee138-a2c9-404d-b0b7-f19eec24d8d8","detail":"retries esgotados (TIMED_OUT) -> CANCELED (STEP_TIMEOUT), refund+release aplicados"},
-  {"scenario":"coordinator_restart","status":"PASS","durationSeconds":10,"orderId":"447ae841-0c0f-496f-ba75-9e760b722e6e","detail":"saga retomou após restart do coordenador; 1 única autorização de pagamento"},
-  {"scenario":"idempotency","status":"PASS","durationSeconds":1,"orderId":"184b8df4-f265-4a39-96ab-43a4bfcc30cf","detail":"mesmo orderId nas duas chamadas (184b8df4-f265-4a39-96ab-43a4bfcc30cf); Idempotent-Replayed=true; estoque reduzido uma única vez (990 -> 989)"}
+  {"scenario":"happy_path_physical","status":"PASS","durationSeconds":3,"orderId":"fd4ec698-a161-49c4-83da-fbc34dbcfa93","detail":"CONFIRMED, shipment CREATED, tracking presente"},
+  {"scenario":"happy_path_digital","status":"PASS","durationSeconds":1,"orderId":"2b879925-2463-4060-bc3d-879e500b72ef","detail":"CONFIRMED sem shipment.created (DIGITAL)"},
+  {"scenario":"payment_failure","status":"PASS","durationSeconds":1,"orderId":"079a0e51-759e-4c8b-8fa1-0e24b3ac72fc","detail":"CANCELED (PAYMENT_DECLINED), reserva RELEASED, estoque restaurado (988)"},
+  {"scenario":"shipping_failure","status":"PASS","durationSeconds":2,"orderId":"9132cef0-c888-44ff-bca3-4b2514c12d77","detail":"CANCELED (SHIPMENT_FAILED), payment REFUNDED, reserva RELEASED, estoque restaurado (988)"},
+  {"scenario":"timeout_step","status":"PASS","durationSeconds":21,"orderId":"a45d2911-a2a5-46b5-8584-ee9f947fef6e","detail":"retries esgotados (TIMED_OUT) -> CANCELED (STEP_TIMEOUT), refund+release aplicados"},
+  {"scenario":"coordinator_restart","status":"PASS","durationSeconds":10,"orderId":"52301656-f771-4af4-8ade-5b04995d115e","detail":"saga retomou após restart do coordenador; 1 única autorização de pagamento"},
+  {"scenario":"idempotency","status":"PASS","durationSeconds":1,"orderId":"2dcd0d70-a91a-4177-9c84-28ac25754856","detail":"mesmo orderId nas duas chamadas (2dcd0d70-a91a-4177-9c84-28ac25754856); Idempotent-Replayed=true; estoque reduzido uma única vez (987 -> 986)"},
+  {"scenario":"customer_orders","status":"PASS","durationSeconds":5,"orderId":"402a68a9-0753-4d90-be23-ad73daf5093f","detail":"3 pedidos do cliente qa-e2e-cust-79c9dc3a-0079-4050-b58c-a088eaed1172 listados na ordem correta (mais recente->mais antigo); limit=2 ok; cliente inexistente=[]; sem customerId=400"}
 ]
