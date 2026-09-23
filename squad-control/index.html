@@ -171,6 +171,11 @@
   .bl-edit label.f { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 8px 0 4px; }
   .bl-edit input[type=text], .bl-edit select { width: 100%; padding: 8px 10px; border: 1px solid #C9C9C5; border-radius: 2px; font: inherit; background: #fff; }
   .tag.backlog { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  /* D9 (ADR-012): selo do modelo "<ID> · <Fornecedor>" — quebra em telas estreitas em vez de transbordar. */
+  .mchip { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; line-height: 1.5; padding: 0 6px; border: 1px solid #C9D3E0; background: var(--accent-soft); color: var(--accent); overflow-wrap: anywhere; max-width: 100%; }
+  .mchip.none { border-color: var(--line); background: var(--panel2); color: var(--muted); font-family: inherit; }
+  .mrow { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin-top: 3px; font-size: 12px; min-width: 0; }
+  .mrow .lbl { color: var(--muted); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav { border-right: none; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; } nav h6 { width: 100%; } .grid2 { grid-template-columns: 1fr; } .squad { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agents-grid { grid-template-columns: 1fr; } }
 </style>
@@ -243,6 +248,51 @@ const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" };
   return m.emoji ? `<div class="av emo" style="background:#E8EDF3;color:${m.color}"><span aria-hidden="true">${m.emoji}</span></div>`
                  : `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini || "?"}</div>`; };
 const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
+
+// D9 (ADR-012, contrato ui-modelo-por-agente §6): selo "<ID> · <Fornecedor>" ou "não registrado".
+// Alias (opus/sonnet) e nome do runner (claude/codex) não são ID de modelo: servidores antigos os mandavam em runs[].model.
+const MODEL_NOT_ID = new Set(["opus", "sonnet", "haiku", "fable", "claude", "codex", "inherit", "<synthetic>"]);
+const MODEL_SOURCE = { logged: "registrado no log pelo agente", run: "herdado da execução (run)", transcript: "reconstruído da transcrição (heurística agente + título + 120 s)", none: "não registrado", "n/a": "não se aplica" };
+const modelId = (m, runner) => { const v = typeof m === "string" ? m.trim() : ""; return v && !MODEL_NOT_ID.has(v.toLowerCase()) && v !== runner ? v : null; };
+// Fornecedor: o do servidor vence (null = não identificável → "fornecedor desconhecido"); só quando o campo não vem
+// (IDs extras de models[] ou servidor antigo) deriva pelo prefixo (§3).
+function providerOf(id) {
+  const n = String(id || "").toLowerCase().replace(/\[.*?\]$/, "").replace(/^(us|eu|apac)\./, "");
+  if (/^(claude-|anthropic\.)/.test(n)) return "Anthropic";
+  if (/^(gpt-|o1|o3|o4|codex-|openai\/)/.test(n)) return "OpenAI";
+  return null;
+}
+const providerLabel = p => { const v = typeof p === "string" ? p.trim() : ""; return v && !/^(desconhecido|unknown|none|null)$/i.test(v) ? v : "fornecedor desconhecido"; };
+function modelChip(model, provider, source, runner) {
+  const id = modelId(model, runner);
+  const origin = MODEL_SOURCE[source] || (source ? String(source) : "");
+  if (!id) return `<span class="mchip none" title="Modelo: não registrado${origin && source !== "none" ? ` · origem: ${esc(origin)}` : ""}">não registrado</span>`;
+  return `<span class="mchip" title="Modelo usado · origem: ${esc(origin || "não informada")}">${esc(id)} · ${esc(providerLabel(provider === undefined ? providerOf(id) : provider))}</span>`;
+}
+// Execução: um selo por ID distinto (models[]); o fornecedor do servidor vale para o modelo principal.
+function runModelChips(r) {
+  const main = modelId(r.model, r.runner);
+  const ids = [...new Set([main, ...(Array.isArray(r.models) ? r.models : [])].map(m => modelId(m, r.runner)).filter(Boolean))];
+  if (!ids.length) return modelChip(null, null, "none");
+  return ids.map(id => modelChip(id, id === main ? r.modelProvider : providerOf(id), "run", r.runner)).join("");
+}
+// Evento: humano e eventos do servidor (modelSource "n/a") não têm selo.
+const eventHasModel = e => !!e && e.agent && e.agent !== "humano" && e.modelSource !== "n/a";
+const eventModelChip = e => eventHasModel(e) ? modelChip(e.model, e.modelProvider, e.modelSource || (modelId(e.model) ? "logged" : "none")) : "";
+// Resumo da demanda: pares distintos agente → modelo, das runs com demand === id e dos eventos da demanda.
+function demandModelsHtml(id) {
+  const pairs = new Map();
+  const add = (agent, model, provider, source) => { const m = modelId(model); if (!agent || !m) return; const k = agent + "\u0000" + m; if (!pairs.has(k)) pairs.set(k, { agent, m, provider, source }); };
+  for (const r of state.runs || []) if (r.demand && r.demand === id) {
+    add(r.agent, r.model, r.modelProvider, "run");
+    for (const m of Array.isArray(r.models) ? r.models : []) add(r.agent, m, modelId(m) === modelId(r.model) ? r.modelProvider : providerOf(m), "run");
+  }
+  for (const e of state.log) if (e.demand === id && eventHasModel(e)) add(e.agent, e.model, e.modelProvider, e.modelSource);
+  const items = [...pairs.values()].sort((a, b) => (AGENTS[a.agent]?.label || a.agent).localeCompare(AGENTS[b.agent]?.label || b.agent));
+  return `<div class="mrow"><span class="lbl">Modelos:</span>${items.length
+    ? items.map(x => `<span><span class="lbl">${esc(AGENTS[x.agent]?.label || x.agent)}:</span> ${modelChip(x.m, x.provider, x.source)}</span>`).join("")
+    : modelChip(null, null, "none")}</div>`;
+}
 
 function runsByAgent() {
   const map = {};
@@ -342,7 +392,7 @@ function renderExecucoes() {
   const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
   return `
   <div class="title-row">
-    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.eff.title : (now ? now.title : "Squad concluída"))}</h1>${active ? reviewHtml(active) : ""}
+    <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.eff.title : (now ? now.title : "Squad concluída"))}</h1>${active ? demandModelsHtml(active.d.id) : ""}${active ? reviewHtml(active) : ""}
     <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div>${active ? controlsHtml(active) : ""}</div>
     <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
   </div>
@@ -352,7 +402,7 @@ function renderExecucoes() {
       <h3>Linha do tempo</h3>
       <ol class="tl">${pipe.map((p, i) => `
         <li><div class="step ${p.st}">${p.id}</div>
-          <div><b>${esc(p.title)}</b><p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
+          <div><b>${esc(p.title)}</b>${p.entry?.type && eventHasModel(p.entry) ? `<div class="mrow">${eventModelChip(p.entry)}</div>` : ""}<p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — clique no agente acima para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
           <span class="when">${p.st === "done" ? (p.ts ? hhmm(p.ts) : "concluído") : p.st === "fail" ? "devolvido" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}
       </ol>${active ? "" : ""}
       ${g ? `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
@@ -388,7 +438,7 @@ function feedHtml(runs) {
       <span class="muted">${r.current ? since(r.current.ts) : since(r.updated)} · sessão iniciada ${hhmm(r.started)} · ${r.toolCount} ações</span></div></div>` : ""}
     <div style="margin-bottom:18px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.description || "Sessão")}</b>
-        <span class="tag">${esc(r.status)}</span><span class="tag">${esc(r.model || "")}</span><span class="tag">${r.toolCount} ações</span>
+        <span class="tag">${esc(r.status)}</span>${runModelChips(r)}<span class="tag">${r.toolCount} ações</span>
         <span class="muted" style="font-size:12px">início ${hhmm(r.started)} · última ${hhmm(r.updated)}</span></div>
       ${r.files.length ? `<div class="files">${r.files.map(f => `<code>${esc(f)}</code>`).join("")}</div>` : ""}
       <ul class="feed">${r.activity.slice().reverse().map(a => `<li class="${a.kind === "tool" && a.pending && r.status === "trabalhando" ? "live" : ""}"><time>${hhmm(a.ts)}</time><div>${a.kind === "tool"
@@ -551,6 +601,7 @@ function renderDemandas() {
           ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
           ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
         </div>
+        ${start || info.work.length ? demandModelsHtml(d.id) : ""}
         ${reviewHtml(info)}
         ${info.canceled ? `<div class="fail" style="font-size:12px;margin-top:6px">Cancelada${info.cancelNote ? ` · motivo: ${esc(info.cancelNote)}` : " · sem motivo informado"}</div>` : ""}
         ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
@@ -651,7 +702,7 @@ function applyOverride(id) {
 function renderDecisoes() {
   return `<h1>Decisões</h1><div class="sub">Memória episódica da squad — <code>docs/squad/memory/decisions.jsonl</code> (append-only).</div>
   <div class="tbl"><table><thead><tr><th>Hora</th><th>Agente</th><th>Tipo</th><th>Registro</th><th>Para</th></tr></thead><tbody>
-  ${state.log.slice().reverse().map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td>
+  ${state.log.slice().reverse().map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td>
     <td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}${(e.evidences || []).length ? `<div>${e.evidences.map(v => `<span class="${v.status}">● </span>${esc(v.name)}`).join(" &nbsp; ")}</div>` : ""}</td>
     <td>${esc(AGENTS[e.to]?.label || e.to || "")}</td></tr>`).join("")}</tbody></table></div>`;
 }

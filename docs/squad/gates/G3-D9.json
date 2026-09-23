@@ -1,0 +1,34 @@
+{
+  "gate": "G3",
+  "demand": "174084ec85d0",
+  "from": "qa",
+  "to": "humano (revisão do PR)",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Pedido do humano atendido (3 lugares, ID exato + fornecedor, retroativo/'não registrado')", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/174084ec85d0.json (respostas: A+B+C; 'ID exato para saber o fornecedor'; retroativo se der, senão 'não registrado', foco daqui para frente) x capturas tests/ui/d9-execucoes-1440.png (linha 'Modelos:' no resumo da demanda + selo em cada evento da linha do tempo), d9-gaveta-auditor-390.png (selo 'claude-opus-5-5 · Anthropic' no cartão da execução), d9-decisoes-1440.png (selo por evento e 'não registrado' em eventos de script)"},
+    {"name": "/api/state real (verificação própria do Auditor)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "server.py do worktree na porta 7094 com SQUAD_ROOT_DATA=cópia principal: 32 runs, 280 eventos; nenhum run com model em {claude,codex,opus,sonnet,<synthetic>,''}; runs: claude-opus-5-5/Anthropic 26, claude-sonnet-5/Anthropic 5, gpt-5.6-sol/OpenAI 1; modelSource transcript 208, run 15, none 28, n/a 29; 0 eventos do humano com modelo; eventos da D9 (orquestrador, arquiteto, auditor G1/G2, frontend, qa) todos com claude-opus-5-5 · Anthropic. Servidor derrubado após a checagem"},
+    {"name": "Checklist QA CA1–CA11 com runs reais claude e codex", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-modelo-por-agente-d9.md: CA2 run codex real (gpt-5.6-sol/OpenAI do cabeçalho do .log), CA3 run claude real (claude-opus-5-5 = message.model da transcrição), CA5 amostra 10/10 da heurística de transcrição, CA10 0 erros de JS. Conferido provider_of (claude-opus-5-5[1m]/us.anthropic.*→Anthropic, gpt-5.6-sol/o3→OpenAI, llama-3/claude→None) e py_compile de log/run_agent/server"},
+    {"name": "Escopo e contratos do checkout intactos", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff develop...HEAD: só tools/squad/{log,run_agent,server}.py, squad-control/index.html, contrato/ADR-012 do Arquiteto, gates G1/G2 e tests/ui/*d9*; 0 linhas em services/** e docs/contracts/events.md; worktree limpo"},
+    {"name": "Rastreabilidade (G1, G2, handoffs, checklist, capturas)", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Log: task 91bda6405a13 → ADR-012 15541b78bfb8 → handoff arquiteto 4aed122febc3 → G1 3efe6d660a1e → handoffs orquestrador 905874e47d69 / frontend cff466d14560 → G2 1bd798e1a19e (+ aceite humano cb07af762dcf) → defeito 58982755ed98 → handoff QA 7cc8624793c8; commits D9 um por passo (32ac074..13a020f); gates G1-D9/G2-D9 no worktree"},
+    {"name": "Responsividade 390 px", "status": "validate", "weight": 1, "blocking": false,
+     "source": "scrollWidth 524 > 390 a 390 px, idêntico na develop (defeito 58982755ed98, pré-existente, severidade baixa); selos .mchip quebram linha e não contribuem (d9-gaveta-auditor-390.png legível)"}
+  ],
+  "open_risks": [
+    "Defeito pré-existente 58982755ed98: rolagem horizontal a 390 px (barra .tabs e <pre> da gaveta) — não causado pela D9; tratar em demanda do Frontend.",
+    "Cosmético: resumo 'Modelos:' mostra a chave crua 'outro' para subagente genérico do Orquestrador; sugerido rótulo legível.",
+    "run_agent.py grava modelRequested (alias do frontmatter) mas não repassa o alias ao 'claude -p' — comportamento anterior à D9; o registro mostra o modelo que realmente rodou. Decisão do Orquestrador/humano se o alias deve ser aplicado.",
+    "Selo quebra em 3 linhas na coluna Agente da tabela Decisões a 1440 px (legível; ajuste de largura sugerido).",
+    "Atribuição retroativa por transcrição é heurística (agente+título±120 s); amostra 10/10 correta, origem exposta no title do selo.",
+    "Briefs .md em docs/squad/memory/handoffs/ não foram escritos para a D9 (handoffs só no log, como nas demandas recentes)."
+  ],
+  "human_required": false,
+  "rationale": "O pedido do humano (modelo nos 3 lugares, ID exato com fornecedor, retroativo quando possível e 'não registrado' caso contrário) está atendido e visível nas capturas e na API real, verificada de forma independente. Runs reais claude e codex gravam o modelo efetivo. Mudança aditiva e restrita ao ferramental da squad. Pendências são cosméticas ou pré-existentes. Confiança = (3+3+3+2+2+0.5)/14 = 0.96, descontada para 0.90 pelos pontos cosméticos e pela heurística retroativa."
+}

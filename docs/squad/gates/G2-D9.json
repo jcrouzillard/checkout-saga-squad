@@ -1,0 +1,33 @@
+{
+  "gate": "G2",
+  "demand": "174084ec85d0",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Escopo (CA11)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff --stat cf405d2..HEAD: só tools/squad/{log,run_agent,server}.py e squad-control/index.html (370+/26-); nada em services/** nem docs/contracts/events.md; worktree limpo"},
+    {"name": "Ressalvas 1–6 do G1", "status": "pass", "weight": 3, "blocking": true,
+     "source": "(1) log.py aceita SQUAD_LOG — testado em scratchpad; (2) server.py SQUAD_ROOT_DATA/RUNS_DIR e transcripts_root() pelo DATA_ROOT; (3) codex_header() lê só o 1º bloco entre '--------'; (4) scan_transcript com cache (path,mtime), logpy_calls via shlex + fallback regex, ignora <synthetic>; (5) run_agent passa --model nos eventos Iniciado/Finalizado quando conhecido, mantém --runner, exporta SQUAD_RUN/SQUAD_MODEL ao filho; (6) modelSource no title do selo (MODEL_SOURCE em index.html)"},
+    {"name": "Compatibilidade do log.py", "status": "pass", "weight": 2, "blocking": true,
+     "source": "SQUAD_LOG=scratchpad/t.jsonl: chamada antiga (--agent --type --to --title --evidence --run --runner) grava igual + model:null; SQUAD_RUN/SQUAD_MODEL herdados; --model explícito gravado. Campo só adicionado"},
+    {"name": "run_agent --dry-run claude e codex", "status": "pass", "weight": 2, "blocking": true,
+     "source": "claude: --session-id <uuid>, modelRequested 'opus' (alias só em modelRequested, sem SQUAD_MODEL); codex sem --model: comando inalterado; codex --model gpt-5.6-sol: '-m gpt-5.6-sol' antes do prompt, SQUAD_MODEL exportado; claude --model claude-opus-5-5: '--model' no fim"},
+    {"name": "/api/state com dados reais (CA1–CA6)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "server do worktree porta 7092 com SQUAD_ROOT_DATA=cópia principal: 30 runs, nenhum model em {claude,codex,opus,sonnet,<synthetic>,''}; 20260923163500-auditor-9a491c → gpt-5.6-sol/OpenAI (runner codex); 277 eventos: transcript 205, run 15, n/a 29 (humano), none 28; eventos da D9 todos com claude-opus-5-5/Anthropic exceto 'Validação: 3 pergunta(s)' (none). Tempo: 1º GET 0,49 s, seguinte 0,20 s (cache ativo). Chaves antigas de runs[]/log[] preservadas"},
+    {"name": "UI (CA7–CA10)", "status": "validate", "weight": 2, "blocking": false,
+     "source": "index.html: selos em cartão de execução (runModelChips), resumo da demanda (demandModelsHtml em Execuções e Demandas), linha do tempo e tabela Decisões (eventModelChip); 'não registrado' quando sem ID; .mchip com overflow-wrap:anywhere. Não verificado em navegador: 390 px e ausência de erro de JS (sem node para syntax check)"}
+  ],
+  "open_risks": [
+    "CA10 não verificado em navegador: layout a 390 px e console sem erros de JS — QA deve abrir o painel (DevTools, 390 px) nas abas Execuções, Demandas e Decisões.",
+    "Atribuição por transcrição (205 de 277 eventos) é heurística (agente+título±120 s): QA deve amostrar eventos e conferir contra a transcrição; 28 eventos ficam 'não registrado' (ex.: 'Validação: 3 pergunta(s)' do arquiteto em triagem).",
+    "run_agent.py importa server.py (acoplamento): quebra de import no server derruba a delegação; e claude_transcript() usa ROOT, não DATA_ROOT (ok em produção, onde coincidem).",
+    "Divergência menor: normalize_model do servidor remove prefixo 'global.', providerOf do front não (só afeta fallback).",
+    "Execução real (não dry-run) de run_agent com claude e codex ainda não observada gravando model/modelProvider no .json do run."
+  ],
+  "human_required": false,
+  "rationale": "Implementação aditiva e restrita ao ferramental da squad; as seis ressalvas do G1 estão atendidas no código; log.py continua aceitando as chamadas atuais; dry-run correto para claude e codex; /api/state com dados reais não expõe runner/alias/<synthetic> como modelo, identifica o run Codex como gpt-5.6-sol/OpenAI e responde em < 0,5 s. Pendente apenas verificação visual (390 px, console) e amostragem da heurística, que cabem ao QA. Confiança = (2+3+2+2+3+1)/14 = 0.93, descontada para 0.88 pela falta de validação em navegador e de execução real do run_agent."
+}

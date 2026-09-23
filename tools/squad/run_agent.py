@@ -10,6 +10,10 @@
 - Cada execução grava `.squad/runs/<id>.json` (metadados) e `.squad/runs/<id>.log` (saída ao vivo), lidos pelo
   Squad Control, e registra `progress` no log da squad no início e no fim.
 - A execução é bloqueante: o Orquestrador de qualquer fornecedor delega chamando este script.
+- Modelo (ADR-012): `--model <id>` (ou `SQUAD_MODEL`) vira `-m` no codex / `--model` no claude. O modelo GRAVADO no
+  run é o efetivo: cabeçalho `model:`/`provider:` da saída do codex; `message.model` da transcrição do `claude -p`
+  (identificada por `--session-id`). O alias do frontmatter (ex.: `opus`) só vai em `modelRequested`.
+  O filho recebe `SQUAD_RUN` (e `SQUAD_MODEL`, se o ID já é conhecido) para os eventos herdarem run/modelo.
 """
 import argparse
 import json
@@ -23,6 +27,21 @@ from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 RUNS = ROOT / ".squad/runs"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from server import codex_header, provider_of, scan_transcript, model_fields  # noqa: E402
+
+ALIASES = {"opus", "sonnet", "haiku", "fable", "inherit", "default", "best", "opusplan"}
+
+
+def is_exact_id(model: str | None) -> bool:
+    """Alias (opus, sonnet...) não é ID exato e nunca é gravado em `model`."""
+    return bool(model) and model.lower() not in ALIASES
+
+
+def claude_transcript(session_id: str) -> pathlib.Path:
+    base = os.environ.get("SQUAD_TRANSCRIPTS")
+    slug = re.sub(r"[^A-Za-z0-9]", "-", str(ROOT))
+    return (pathlib.Path(base) if base else pathlib.Path.home() / ".claude/projects" / slug) / f"{session_id}.jsonl"
 
 READ_ONLY = {
     "claude": lambda prompt: ["claude", "-p", prompt, "--allowedTools", "Read", "Glob", "Grep"],
@@ -37,22 +56,49 @@ RUNNERS = {
 }
 
 
-def role_prompt(role: str) -> str:
+def role_file(role: str) -> pathlib.Path:
     path = ROOT / ("docs/squad/orquestrador.md" if role == "orquestrador" else f".claude/agents/{role}.md")
     if not path.exists():
         sys.exit(f"papel desconhecido: {role} ({path} não existe)")
-    text = path.read_text(encoding="utf-8")
+    return path
+
+
+def role_prompt(role: str) -> str:
+    text = role_file(role).read_text(encoding="utf-8")
     return re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S).strip()  # remove o frontmatter do Claude Code
 
 
-def log(role: str, title: str, run_id: str, runner: str, demand: str | None, detail: str = ""):
+def role_model_alias(role: str) -> str | None:
+    m = re.match(r"\A---\n(.*?)\n---\n", role_file(role).read_text(encoding="utf-8"), flags=re.S)
+    mm = re.search(r"^model:\s*(\S+)", m.group(1), flags=re.M) if m else None
+    return mm.group(1) if mm else None
+
+
+def effective_model(runner: str, out_path: pathlib.Path, session_id: str | None) -> dict:
+    """Modelo que de fato rodou: cabeçalho do codex ou transcrição do claude -p."""
+    if runner == "codex" and out_path.exists():
+        head = codex_header(out_path.read_text(encoding="utf-8", errors="ignore")[:20000])
+        if head.get("model"):
+            return {"model": head["model"], "modelProvider": provider_of(head["model"], head.get("provider"), runner)}
+    if runner == "claude" and session_id:
+        f = model_fields(scan_transcript(claude_transcript(session_id))["models"], "anthropic")
+        if f["model"]:
+            return {"model": f["model"], "modelProvider": f["modelProvider"]}
+    return {}
+
+
+def log(role: str, title: str, run_id: str, runner: str, demand: str | None, detail: str = "",
+        model: str | None = None):
     args = [sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", role, "--type", "progress",
             "--title", title, "--run", run_id, "--runner", runner]
     if demand:
         args += ["--demand", demand]
+    if model:
+        args += ["--model", model]
     if detail:
         args += ["--detail", detail]
-    subprocess.run(args, cwd=ROOT, capture_output=True)
+    env = {k: v for k, v in os.environ.items() if k not in ("SQUAD_MODEL", "SQUAD_RUN")}
+    subprocess.run(args, cwd=ROOT, capture_output=True, env=env)
 
 
 def main():
@@ -61,6 +107,8 @@ def main():
     p.add_argument("task", help="texto da tarefa ou @arquivo")
     p.add_argument("--runner", default=os.environ.get("SQUAD_RUNNER", "claude"), choices=sorted(RUNNERS))
     p.add_argument("--demand")
+    p.add_argument("--model", default=os.environ.get("SQUAD_MODEL") or None,
+                   help="modelo pedido ao fornecedor (-m no codex, --model no claude); padrão: $SQUAD_MODEL")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--read-only", action="store_true", help="sem escrita nem shell (ex.: triagem de demandas)")
     a = p.parse_args()
@@ -82,8 +130,18 @@ def main():
     if a.read_only:
         prompt = prompt.replace("- Registre marcos do seu trabalho", "- Modo SOMENTE LEITURA: não escreva arquivos nem rode comandos; ignore a linha abaixo sobre registrar marcos.\n- (Não) Registre marcos do seu trabalho")
     cmd = (READ_ONLY if a.read_only else RUNNERS)[a.runner](prompt)
+    session_id = None
+    if a.runner == "claude":
+        session_id = str(uuid.uuid4())
+        cmd += ["--session-id", session_id] + (["--model", a.model] if a.model else [])
+    elif a.model:
+        cmd = cmd[:-1] + ["-m", a.model, cmd[-1]]  # prompt continua sendo o último argumento
+    requested = a.model or (role_model_alias(a.role) if a.runner == "claude" else None)
+    known_model = a.model if is_exact_id(a.model) else None
     if a.dry_run:
         print(json.dumps({"runner": a.runner, "cmd": cmd[:-1] if a.runner == "codex" else cmd[:2] + ["<prompt>"] + cmd[3:],
+                          "sessionId": session_id, "modelRequested": requested,
+                          "env": {"SQUAD_RUN": run_id, **({"SQUAD_MODEL": known_model} if known_model else {})},
                           "prompt": prompt}, ensure_ascii=False, indent=2))
         return
 
@@ -92,17 +150,29 @@ def main():
     meta = {"id": run_id, "agent": a.role, "runner": a.runner, "demand": a.demand,
             "description": f"{a.role.capitalize()} · {task.strip().splitlines()[0][:80]}",
             "started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "status": "trabalhando"}
-    log(a.role, f"Iniciado via {a.runner}: {task.strip().splitlines()[0][:100]}", run_id, a.runner, a.demand)
+    if requested:
+        meta["modelRequested"] = requested
+    if session_id:
+        meta["sessionId"] = session_id
+    log(a.role, f"Iniciado via {a.runner}: {task.strip().splitlines()[0][:100]}", run_id, a.runner, a.demand,
+        model=known_model)
+    child_env = {**os.environ, "SQUAD_RUN": run_id}
+    child_env.pop("SQUAD_MODEL", None)
+    if known_model:
+        child_env["SQUAD_MODEL"] = known_model
     with out_path.open("w", encoding="utf-8") as out:
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True)
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
+                                env=child_env)
         meta["pid"] = proc.pid
         meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
         code = proc.wait()
     meta.update({"status": "concluído" if code == 0 else "falhou", "exitCode": code,
                  "ended": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+    meta.update(effective_model(a.runner, out_path, session_id))
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     tail = out_path.read_text(encoding="utf-8", errors="ignore").strip().splitlines()[-15:]
-    log(a.role, f"Finalizado via {a.runner} (código {code})", run_id, a.runner, a.demand, "\n".join(tail)[-1500:])
+    log(a.role, f"Finalizado via {a.runner} (código {code})", run_id, a.runner, a.demand, "\n".join(tail)[-1500:],
+        model=meta.get("model"))
     print(out_path.read_text(encoding="utf-8", errors="ignore")[-4000:])
     sys.exit(code)
 
