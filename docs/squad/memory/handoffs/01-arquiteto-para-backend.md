@@ -39,3 +39,8 @@
 - Campos: `orderId`, `status`, `totalAmount`, `deliveryType`, `createdAt`, `cancellationReason` (`null` exceto em `CANCELED`).
 - Só lê o database `orders`; nova migração Flyway com índice `(customer_id, created_at DESC)`. Não mexe em eventos, Saga nem outros serviços.
 - Sem paginação por cursor (evolução).
+
+## D2 — Visual do Console de Checkout (demanda 48b6ace91207, ADR-007) → Frontend
+- Contrato: `docs/contracts/ui-checkout-console.md` (escopo, mapeamento `history[]` → estado visual, CA1–CA12, wireframe, plano de QA).
+- Somente apresentação: nenhuma API/campo/regra nova; `POST /orders` com payload equivalente ao atual (CA12).
+- Defeitos da versão atual a corrigir: falha de rede no POST deixa o botão desabilitado (sem `catch`); sem `aria-live`; sem explicação do cenário antes de enviar.

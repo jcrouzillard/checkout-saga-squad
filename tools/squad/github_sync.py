@@ -34,8 +34,8 @@ OWNER = os.environ.get("SQUAD_GH_OWNER", REPO.split("/")[0])
 PROJECT = os.environ.get("SQUAD_GH_PROJECT", "1")
 
 LABEL = {"orquestrador": "Orquestrador", "arquiteto": "Arquiteto", "backend": "Backend", "devops": "DevOps",
-         "observabilidade": "Observabilidade", "qa": "QA", "auditor": "Auditor", "humano": "Humano"}
-GATE_COVERS = {"G1": ["arquiteto"], "G2": ["backend", "devops", "observabilidade"], "G3": ["qa"]}
+         "observabilidade": "Observabilidade", "qa": "QA", "auditor": "Auditor", "frontend": "Frontend", "humano": "Humano"}
+GATE_COVERS = {"G1": ["arquiteto"], "G2": ["backend", "devops", "observabilidade", "frontend"], "G3": ["qa"]}
 STATUS_ICON = {"pass": "✅", "fail": "❌", "validate": "🟡"}
 
 

@@ -46,7 +46,7 @@
   .card { background: var(--panel); border-top: 1px solid var(--text); padding: 12px 0 0; }
   .grid2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; margin-top: 24px; }
   h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
-  .squad { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--line); }
+  .squad { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--line); }
   .agent { padding: 10px 12px; cursor: pointer; min-width: 0; border-left: 1px solid var(--line); background: #fff; }
   .agent:first-child { border-left: none; }
   .agent:hover { background: var(--accent-soft); }
@@ -141,6 +141,7 @@ const AGENTS = {
   devops:          { label: "DevOps",          ini: "D", color: "#1F3A5F", role: "Docker, compose e CI" },
   observabilidade: { label: "Observabilidade", ini: "Ob", color: "#1F3A5F", role: "Logs, traces, métricas e dashboards" },
   backend:         { label: "Backend",         ini: "B", color: "#1F3A5F", role: "Serviços, APIs, mensageria e persistência" },
+  frontend:        { label: "Frontend",        ini: "F", color: "#1F3A5F", role: "Interface do produto (Console de Checkout)" },
   qa:              { label: "QA",              ini: "Q", color: "#1F3A5F", role: "Testes e cenários de falha" },
   auditor:             { label: "Auditor",             ini: "Au", color: "#1F3A5F", role: "Gatekeeper: avalia cada passagem" },
   humano:          { label: "Humano",          ini: "H", color: "#1F3A5F", role: "Intervém quando necessário" },
@@ -213,7 +214,7 @@ function pipelineStatus() {
 
 function renderSquadStrip() {
   const byAgent = runsByAgent();
-  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "qa", "auditor"].map(a => {
+  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "frontend", "qa", "auditor"].map(a => {
     const runs = byAgent[a], st = agentStatus(runs);
     return `<div class="agent" data-agent="${a}" title="Ver o que ${AGENTS[a].label} está fazendo">
       <div class="top">${av(a)}<span class="name">${AGENTS[a].label}</span><span class="dot ${st}" title="${st}"></span></div>
