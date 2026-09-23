@@ -1,0 +1,40 @@
+{
+  "demand": "1ac2708028fd",
+  "title": "Evidências na demanda.",
+  "detail": "Ao criar uma demanda, deveria ter, na caixa de descrição, a opção de colocar evidência, texto, imagem, dar um link para uma imagem também e até talvez anexar um documento. Preciso dessa possibilidade e de uma proposta para isso.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-23T22:55:52+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Qual é a entrega: só a proposta (um ADR/brief para você aprovar antes de implementar) ou a proposta mais a implementação no Squad Control nesta mesma demanda?",
+      "dimension": "objetivo",
+      "answer": "Só uma proposta, uma ADR mesmo."
+    },
+    {
+      "question": "Quais tipos de evidência entram nesta demanda: texto, imagem enviada, link para imagem e documento? Se entrar documento, quais formatos (PDF, DOCX, TXT, MD...) e qual o tamanho máximo por arquivo?",
+      "dimension": "escopo",
+      "answer": "Vamos trabalhar sem tamanho máximo por arquivo, ou você sugere um que seja interessante? Não pode ser pequeno. Os formatos: vamos colocar só os mais comuns, né?\n- PDF\n- TXT\n- Markdown\n- imagens, também os mais comuns de imagem"
+    },
+    {
+      "question": "Onde os arquivos enviados devem ficar? Hoje a demanda vive no log append-only (decisions.jsonl) e vira issue no GitHub. As opções são: commitados no repositório (por exemplo, docs/squad/inbox/anexos/), só anexados à issue do GitHub, ou nas duas coisas. E pode haver dado sensível que não deva ir para o git?",
+      "dimension": "restricoes",
+      "answer": "Com anexar somente na issue"
+    },
+    {
+      "question": "Os agentes precisam consumir as evidências, isto é, o Arquiteto na triagem e o agente executor recebem e leem as imagens e os documentos? Ou basta que as evidências fiquem guardadas e visíveis no card da demanda e na issue?",
+      "dimension": "aceite",
+      "answer": "Se as evidências ficarem somente na Issue e os agentes puderem acessar elas, já está de bom tamanho."
+    },
+    {
+      "question": "Dá para anexar evidência também ao editar um item do Backlog e ao responder às perguntas da validação, ou só na criação da demanda?",
+      "dimension": "escopo",
+      "answer": "Enquanto se ela entrar no backlog e a evidência e as imagens não dão para editar, dá para incluir mais, acho que isso."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
