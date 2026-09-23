@@ -282,6 +282,17 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/demand/control"):
+            # Controle humano sobre uma demanda em andamento: pausar, retomar, repriorizar, cancelar.
+            data = json.loads(raw or b"{}")
+            action = data.get("action")
+            if action not in ("pause", "resume", "reprioritize", "cancel"):
+                return self._json({"error": "ação inválida"}, 400)
+            titles = {"pause": "Pausar", "resume": "Retomar", "reprioritize": "Repriorizar", "cancel": "Cancelar"}
+            entry = self._append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": data.get("id"),
+                                      "action": action, "priority": data.get("priority"),
+                                      "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
+            return self._json(entry, 201)
         if self.path.startswith("/api/demand/start"):
             # Gatilho: o humano inicia a demanda. Vira evento `start` no log e um arquivo na fila docs/squad/inbox/,
             # que a sessão do Orquestrador (em plantão) consome.

@@ -65,7 +65,8 @@
   "da8b1eba81e0",
   "d2469ecdff03",
   "6b7e68353402",
-  "aef9d68fbaae"
+  "aef9d68fbaae",
+  "75d340044873"
  ],
  "issues": {
   "_diario": {
@@ -337,9 +338,9 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/25",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8XWh0",
    "agent": "frontend",
-   "status": "Em andamento",
+   "status": "Gate (Auditor)",
    "phase": null,
-   "handed": false,
+   "handed": true,
    "closed": false,
    "kind": "task"
   }

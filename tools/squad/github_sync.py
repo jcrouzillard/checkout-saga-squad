@@ -234,10 +234,31 @@ class Sync:
         subprocess.run(["gh", "label", "create", label, "--color", "1F3A5F", "-R", REPO, "-f"], capture_output=True)
         subprocess.run(["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", label], capture_output=True)
 
+    def on_control(self, e):
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        self.comment(issue, self.body(e, f"Controle humano · {e.get('action')}" + (f" · prioridade {e['priority']}" if e.get("priority") else "")))
+        if e.get("action") == "pause":
+            self.set_field(issue, "Status", "Intervenção humana")
+        elif e.get("action") == "resume":
+            self.set_field(issue, "Status", "Em andamento")
+        elif e.get("action") == "cancel":
+            self.set_field(issue, "Status", "Backlog")
+            self.close(issue)
+        elif e.get("action") == "reprioritize" and e.get("priority"):
+            label = f"prioridade:{e['priority']}"
+            subprocess.run(["gh", "label", "create", label, "--color", "1F3A5F", "-R", REPO, "-f"], capture_output=True)
+            args = ["gh", "issue", "edit", str(issue["number"]), "-R", REPO, "--add-label", label]
+            for other in ("prioridade:alta", "prioridade:normal", "prioridade:baixa"):
+                if other != label:
+                    args += ["--remove-label", other]
+            subprocess.run(args, capture_output=True)
+
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] in ("start", "task") and e["agent"] == "humano":
+        if not issue or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
@@ -249,7 +270,7 @@ class Sync:
         events = [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
         handlers = {"task": self.on_task, "handoff": self.on_handoff, "evidence": self.on_evidence,
                     "gate": self.on_gate, "human": self.on_human, "defect": self.on_ticket,
-                    "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start}
+                    "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control}
         n = 0
         for e in events:
             if e["id"] in done:

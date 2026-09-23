@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl"
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control"}
 
 
 def main() -> None:

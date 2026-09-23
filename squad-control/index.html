@@ -50,9 +50,9 @@
   .agent { padding: 10px 12px; cursor: pointer; min-width: 0; border-left: 1px solid var(--line); background: #fff; }
   .agent:first-child { border-left: none; }
   .agent:hover { background: var(--accent-soft); }
-  .agent .top { display: flex; align-items: center; gap: 8px; }
+  .agent .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .av { width: 22px; height: 22px; display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
-  .agent .name { font-weight: 600; font-size: 13px; }
+  .agent .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .agent .now { color: var(--muted); font-size: 12px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dot { width: 7px; height: 7px; margin-left: auto; flex: none; background: #A7A8AC; }
   .dot.trabalhando, .dot.coordenando { background: var(--green); animation: blink 1.6s infinite; }
@@ -227,7 +227,7 @@ function renderSquadStrip() {
 function activeDemand() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
   const infos = demands.map((d, i) => ({ d, ...demandInfo(d, i) }));
-  return infos.filter(x => x.status !== "Registrada" && x.status !== "Concluída").at(-1) || null;
+  return infos.filter(x => !["Registrada", "Concluída", "Cancelada"].includes(x.status)).at(-1) || null;
 }
 // Linha do tempo de uma demanda, montada a partir dos eventos (task → handoff → gate), na ordem em que aconteceram.
 function demandSteps(active) {
@@ -263,7 +263,7 @@ function renderExecucoes() {
   return `
   <div class="title-row">
     <div>${active ? `<div class="mono muted" style="font-size:12px;letter-spacing:.06em">${esc(active.code)} · ${esc(active.status.toUpperCase())}</div>` : ""}<h1>${esc(active ? active.d.title.replace(/^Demanda: /, "") : (now ? now.title : "Squad concluída"))}</h1>
-    <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div></div>
+    <div class="sub">${active ? esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.") : "Acompanhe a passagem entre agentes e intervenha somente quando necessário."}</div>${active ? controlsHtml(active) : ""}</div>
     <span class="pill ${anyRunning ? "run" : "idle"}">${anyRunning ? "Em execução" : "Aguardando"}</span>
   </div>
   ${renderSquadStrip()}
@@ -331,13 +331,28 @@ function demandInfo(d, index) {
   const gates = work.filter(e => e.type === "gate");
   const done = gates.some(g => g.gate === "G3" && g.recommendation === "APPROVE");
   const returned = gates.some(g => g.recommendation === "RETURN") && !done;
-  const status = done ? "Concluída" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, last: work.at(-1), issue: state.github?.[d.id] };
+  const controls = related.filter(e => e.type === "control");
+  const lastCtl = controls.at(-1);
+  const canceled = controls.some(c => c.action === "cancel");
+  const paused = lastCtl?.action === "pause";
+  const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || "normal";
+  const status = canceled ? "Cancelada" : done ? "Concluída" : paused ? "Pausada" : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : "Registrada";
+  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id] };
+}
+function controlsHtml(info) {
+  if (["Registrada", "Concluída", "Cancelada"].includes(info.status)) return "";
+  const id = info.d.id;
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+    ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
+    <label class="muted" style="font-size:12px" for="cp-${id}">Prioridade</label>
+    <select id="cp-${id}" data-ctlpr="${id}" style="padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${["alta", "normal", "baixa"].map(p => `<option value="${p}" ${p === info.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
+    <button class="btn" data-ctl="cancel" data-id="${id}" style="height:36px;color:var(--red);border-color:var(--red);margin-left:auto">Cancelar demanda</button>
+  </div>`;
 }
 function renderDemandas() {
   const demands = state.log.filter(e => e.type === "task" && e.agent === "humano");
   const cards = demands.map((d, i) => ({ d, ...demandInfo(d, i) })).reverse();
-  const cls = s => s.startsWith("Concluída") ? "pass" : s.startsWith("Devolvida") ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+  const cls = s => s.startsWith("Concluída") ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
   return `<h1>Demandas para a squad</h1><div class="sub">Registrada → Iniciada → Em andamento → Concluída. Ao registrar, vira issue no GitHub; ao iniciar, entra na fila que o Orquestrador (em plantão) consome e delega pelo protocolo.</div>
   <div class="grid2">
     <section class="card"><h3>Nova demanda</h3>
@@ -350,14 +365,14 @@ function renderDemandas() {
       <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (no card ao lado) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>
     <section class="card"><h3>Demandas registradas <span class="muted" style="font-weight:400">(${cards.length})</span></h3>
-      ${cards.length ? cards.map(({ d, code, status, start, gates, last, issue }) => `
+      ${cards.length ? cards.map(info => { const { d, code, status, start, gates, last, issue, priority } = info; return `
       <div style="padding:12px 0;border-bottom:1px solid var(--line2)">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(d.title.replace(/^Demanda: /, ""))}</b><span class="${cls(status)}" style="font-size:12px;font-weight:600;white-space:nowrap">${esc(status)}</span></div>
         <div class="muted" style="font-size:13px;margin-top:4px">${esc(d.detail || "")}</div>
         <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
           <span class="tag">${hhmm(d.ts)}</span>
           ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
-          ${start ? `<span class="tag">prioridade ${esc(start.priority || "normal")}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
+          ${start ? `<span class="tag">prioridade ${esc(priority)}</span><span class="tag">rota ${esc(start.route || "padrao")}</span>` : ""}
           ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}
         </div>
         ${last ? `<div class="muted" style="font-size:12px;margin-top:6px">último passo: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</div>` : ""}
@@ -367,8 +382,8 @@ function renderDemandas() {
           <div><label class="muted" style="font-size:11px" for="rt-${d.id}">Rota</label><select id="rt-${d.id}" data-rt="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(ROUTES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
           <div><label class="muted" style="font-size:11px" for="tg-${d.id}">Agente</label><select id="tg-${d.id}" data-tg="${d.id}" style="width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(TARGETS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
           <button class="btn primary" data-start="${d.id}" style="flex-grow:0;height:40px">Iniciar</button>
-        </div>` : ""}
-      </div>`).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
+        </div>` : controlsHtml(info)}
+      </div>`; }).join("") : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
     </section>
   </div>`;
 }
@@ -441,6 +456,14 @@ document.addEventListener("click", async ev => {
   const ag = ev.target.closest("[data-agent]");
   if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
   if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  const ctl = ev.target.closest("[data-ctl]");
+  if (ctl) {
+    const id = ctl.dataset.id, action = ctl.dataset.ctl;
+    if (action === "cancel" && !ctl.dataset.confirm) { ctl.dataset.confirm = "1"; ctl.textContent = "Confirmar cancelamento"; return; }
+    const res = await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, priority: $(`[data-ctlpr="${id}"]`)?.value }) });
+    flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : "Falha ao registrar o controle.";
+    return refresh();
+  }
   const st = ev.target.closest("[data-start]");
   if (st) {
     const id = st.dataset.start;
@@ -467,7 +490,7 @@ document.addEventListener("click", async ev => {
     refresh();
   }
 });
-document.addEventListener("change", ev => { if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
+document.addEventListener("change", async ev => { if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { product = project.products.find(p => p.id === ev.target.value); render(); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && drawerAgent) { drawerAgent = null; renderDrawer(); } });
 fetch("/api/project").then(r => r.json()).then(p => {
   project = p;
