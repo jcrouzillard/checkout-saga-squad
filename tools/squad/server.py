@@ -16,9 +16,20 @@ import os
 import pathlib
 import re
 import time
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+# Console de Checkout: o navegador fala só com este servidor, que repassa às APIs reais (evita CORS nos serviços).
+SERVICES = {
+    "order": os.environ.get("ORDER_URL", "http://localhost:8081"),
+    "saga": os.environ.get("SAGA_URL", "http://localhost:8080"),
+    "inventory": os.environ.get("INVENTORY_URL", "http://localhost:8082"),
+    "payment": os.environ.get("PAYMENT_URL", "http://localhost:8083"),
+    "shipping": os.environ.get("SHIPPING_URL", "http://localhost:8084"),
+}
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LOG = ROOT / "docs/squad/memory/decisions.jsonl"
@@ -230,7 +241,33 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _proxy(self, method: str, body: bytes | None = None):
+        """/api/checkout/<serviço>/<caminho> -> http://<serviço>/<caminho>, repassando status e corpo."""
+        _, _, _, service, *rest = self.path.split("/", 4) + [""]
+        base = SERVICES.get(service)
+        if not base:
+            return self._json({"error": f"serviço desconhecido: {service}"}, 404)
+        req = urllib.request.Request(f"{base}/{rest[0]}", data=body, method=method)
+        for h in ("Content-Type", "Idempotency-Key", "X-Correlation-Id"):
+            if self.headers.get(h):
+                req.add_header(h, self.headers[h])
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data, status = resp.read(), resp.status
+        except urllib.error.HTTPError as e:
+            data, status = e.read(), e.code
+        except (urllib.error.URLError, TimeoutError) as e:
+            return self._json({"error": f"serviço indisponível: {e}"}, 502)
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
+        if self.path.startswith("/api/checkout/"):
+            return self._proxy("GET")
         if self.path.startswith("/api/state"):
             return self._json({
                 "now": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -246,10 +283,30 @@ class Handler(SimpleHTTPRequestHandler):
             })
         return super().do_GET()
 
+    def _append_log(self, entry: dict) -> dict:
+        entry = {"id": uuid.uuid4().hex[:12], "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **entry}
+        entry = {k: v for k, v in entry.items() if v not in (None, "")}
+        with LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return entry
+
     def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/checkout/"):
+            return self._proxy("POST", raw)
+        if self.path.startswith("/api/demand"):
+            # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
+            data = json.loads(raw or b"{}")
+            title = (data.get("title") or "").strip()
+            if not title:
+                return self._json({"error": "título obrigatório"}, 400)
+            entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
+                                      "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
+                                      "priority": data.get("priority", "normal")})
+            return self._json(entry, 201)
         if not self.path.startswith("/api/human"):
             return self._json({"error": "not found"}, 404)
-        data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        data = json.loads(raw or b"{}")
         action = data.get("action")
         if action not in ("APPROVE", "RETURN"):
             return self._json({"error": "action deve ser APPROVE ou RETURN"}, 400)

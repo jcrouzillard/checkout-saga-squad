@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console de Checkout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#FFFFFF; --panel2:#F6F6F4; --line:#DCDCD8; --line2:#ECECE8; --text:#1C1C1E; --muted:#4A4B50; --dim:#7A7B80;
+          --accent:#1F3A5F; --accent-soft:#F3F5F8; --green:#2F6B45; --green-soft:#EAF2EC; --amber:#8A5A12; --amber-soft:#FBF7EF; --red:#9B2C2C; --red-soft:#F7E9E9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .app { max-width: 1440px; margin: 0 auto; min-height: 100vh; }
+  header { display: flex; align-items: stretch; justify-content: space-between; padding: 0 28px; height: 56px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .logo { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .brand b { font-size: 15px; }
+  .brand span { color: var(--muted); padding-left: 14px; border-left: 1px solid var(--line); }
+  .tabs { display: flex; gap: 28px; }
+  .tabs a { display: flex; align-items: center; border-bottom: 2px solid transparent; color: var(--muted); text-decoration: none; }
+  .tabs a.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+  .strip { display: flex; justify-content: space-between; padding: 7px 28px; background: var(--panel2); border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--dim); }
+  main { padding: 28px 32px; display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 32px; }
+  h1 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; padding-bottom: 8px; border-top: 1px solid var(--text); padding-top: 10px; }
+  .sub { color: var(--muted); margin-bottom: 20px; }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 12px 0 4px; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #C9C9C5; border-radius: 2px; background: #fff; color: var(--text); font: inherit; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn { height: 44px; padding: 0 20px; border: 1px solid var(--text); border-radius: 2px; background: #fff; color: var(--text); font: inherit; font-weight: 500; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; width: 100%; margin-top: 16px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .status { display: inline-block; padding: 4px 10px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .PENDING { background: var(--amber-soft); color: var(--amber); } .CONFIRMED { background: var(--green-soft); color: var(--green); } .CANCELED { background: var(--red-soft); color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line2); vertical-align: top; }
+  thead th { border-top: 1px solid var(--text); color: var(--dim); font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .SUCCEEDED, .CREATED { color: var(--green); font-weight: 600; } .FAILED, .TIMED_OUT { color: var(--red); font-weight: 600; }
+  .COMPENSATED, .COMPENSATING, .RETRYING { color: var(--amber); font-weight: 600; } .STARTED { color: var(--muted); }
+  .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--text); border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .facts div { padding: 10px 14px 10px 0; } .facts div + div { border-left: 1px solid var(--line); padding-left: 14px; }
+  .facts small { display: block; font-size: 12px; color: var(--dim); } .facts b { font-size: 18px; font-weight: 500; }
+  .links a { color: var(--accent); margin-right: 18px; }
+  pre { background: var(--panel2); border: 1px solid var(--line); padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
+  .recent li { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line2); cursor: pointer; }
+  .recent { list-style: none; padding: 0; margin: 0; }
+  .empty { color: var(--dim); padding: 24px 0; }
+  .err { background: var(--red-soft); color: var(--red); padding: 10px 12px; margin-top: 12px; font-size: 13px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><div class="logo">CS</div><b>Checkout Saga</b><span>Console de pedidos</span></div>
+    <nav class="tabs"><a href="/checkout.html" class="on">Checkout</a><a href="/">Squad Control</a></nav>
+  </header>
+  <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
+  <main>
+    <section>
+      <h1>Novo pedido</h1>
+      <div class="sub">Chama o <code>POST /orders</code> real e acompanha a Saga até o desfecho.</div>
+      <form id="f">
+        <label for="customer">Cliente</label><input id="customer" value="c-demo">
+        <div class="row">
+          <div><label for="sku">Produto (SKU)</label>
+            <select id="sku">
+              <option value="SKU-BOOK-001|49.90|PHYSICAL">SKU-BOOK-001 · livro · R$ 49,90</option>
+              <option value="SKU-PHONE-001|2499.00|PHYSICAL">SKU-PHONE-001 · celular · R$ 2.499,00</option>
+              <option value="SKU-EBOOK-001|29.90|DIGITAL">SKU-EBOOK-001 · e-book · R$ 29,90</option>
+              <option value="SKU-COURSE-001|199.00|DIGITAL">SKU-COURSE-001 · curso · R$ 199,00</option>
+              <option value="SKU-LIMITED-001|999.00|PHYSICAL">SKU-LIMITED-001 · edição limitada (estoque 1)</option>
+            </select></div>
+          <div><label for="qty">Quantidade</label><input id="qty" type="number" min="1" max="1000" value="1"></div>
+        </div>
+        <div class="hint" id="stock">Estoque: —</div>
+        <label for="delivery">Entrega</label>
+        <select id="delivery"><option value="PHYSICAL">Física (gera envio)</option><option value="DIGITAL">Digital (sem envio)</option></select>
+        <label for="fault">Cenário de falha (injeção via <code>simulate</code>)</label>
+        <select id="fault">
+          <option value="">Nenhum · caminho feliz</option>
+          <option value='{"payment":"DECLINE"}'>Pagamento recusado → libera estoque, cancela</option>
+          <option value='{"shipping":"FAIL"}'>Falha no envio → estorna, libera, cancela</option>
+          <option value='{"payment":"TIMEOUT"}'>Timeout no pagamento → 3 tentativas, depois compensa (~20 s)</option>
+          <option value='{"payment":"TIMEOUT_ONCE"}'>Timeout só na 1ª tentativa → retry com o mesmo messageId</option>
+          <option value='{"inventory":"OUT_OF_STOCK"}'>Sem estoque → cancela sem cobrar</option>
+          <option value='{"payment":"SLOW"}'>Pagamento lento → use para derrubar o coordenador (make kill-orchestrator)</option>
+        </select>
+        <button class="btn primary" type="submit" id="send">Criar pedido</button>
+        <div id="error" hidden class="err"></div>
+      </form>
+      <h2 style="margin-top: 28px">Pedidos desta sessão</h2>
+      <ul class="recent" id="recent"></ul>
+    </section>
+
+    <section id="result">
+      <div class="empty">Crie um pedido para acompanhar a Saga aqui.</div>
+    </section>
+  </main>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const hhmmss = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+const api = (p, opt) => fetch("/api/checkout/" + p, opt).then(async r => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) }));
+let recent = [], current = null, timer = null, stockBefore = null;
+try { recent = JSON.parse(localStorage.getItem("checkout.recent") || "[]"); } catch (e) {}
+
+function skuInfo() { const [sku, price, kind] = $("#sku").value.split("|"); return { sku, price: Number(price), kind }; }
+async function refreshStock() {
+  const { sku } = skuInfo();
+  const r = await api(`inventory/inventory/stock/${sku}`);
+  $("#stock").textContent = r.ok ? `Estoque de ${sku}: ${r.body.available} disponíveis · ${r.body.reserved} reservados` : "Estoque: serviço indisponível";
+  return r.ok ? r.body : null;
+}
+$("#sku").addEventListener("change", () => { $("#delivery").value = skuInfo().kind; refreshStock(); });
+
+$("#f").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  $("#error").hidden = true; $("#send").disabled = true;
+  const { sku, price } = skuInfo();
+  const delivery = $("#delivery").value;
+  const body = { customerId: $("#customer").value, deliveryType: delivery,
+    items: [{ sku, quantity: Number($("#qty").value), unitPrice: price }] };
+  if (delivery === "PHYSICAL") body.shippingAddress = { street: "Av. Paulista", number: "1000", complement: null, city: "São Paulo", state: "SP", zipCode: "01310-100", country: "BR" };
+  if ($("#fault").value) body.simulate = JSON.parse($("#fault").value);
+  stockBefore = await refreshStock();
+  const key = crypto.randomUUID();
+  const r = await api("order/orders", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key }, body: JSON.stringify(body) });
+  $("#send").disabled = false;
+  if (!r.ok) { $("#error").hidden = false; $("#error").textContent = `${r.status} · ${r.body.detail || r.body.title || r.body.error || "erro"}`; return; }
+  current = { orderId: r.body.orderId, sagaId: r.body.sagaId, sku, fault: $("#fault").selectedOptions[0].textContent, curl: curlFor(body, key), at: new Date().toISOString() };
+  recent.unshift(current); recent = recent.slice(0, 12);
+  try { localStorage.setItem("checkout.recent", JSON.stringify(recent)); } catch (e) {}
+  renderRecent(); follow();
+});
+
+function curlFor(body, key) {
+  return `curl -s -X POST localhost:8081/orders \\\n  -H 'Content-Type: application/json' -H 'Idempotency-Key: ${key}' \\\n  -d '${JSON.stringify(body)}'`;
+}
+
+async function follow() {
+  clearInterval(timer);
+  const tick = async () => {
+    const r = await api(`order/orders/${current.orderId}`);
+    if (!r.ok) return;
+    const stock = current.sku ? await api(`inventory/inventory/stock/${current.sku}`) : null;
+    renderOrder(r.body, stock?.ok ? stock.body : null);
+    if (r.body.status !== "PENDING") { clearInterval(timer); refreshStock(); }
+  };
+  await tick(); timer = setInterval(tick, 1000);
+}
+
+function renderOrder(o, stock) {
+  const jaeger = `http://localhost:16686/search?service=saga-orchestrator&tags=${encodeURIComponent(JSON.stringify({ orderId: o.orderId }))}`;
+  $("#result").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+      <div><h1>Pedido <code style="font-size:16px">${esc(o.orderId.slice(0, 8))}</code></h1>
+        <div class="sub" style="margin:0">${esc(current.fault || "")}</div></div>
+      <span class="status ${esc(o.status)}">${esc(o.status)}${o.cancellationReason ? " · " + esc(o.cancellationReason) : ""}</span>
+    </div>
+    <div class="facts">
+      <div><small>Total</small><b>R$ ${Number(o.totalAmount).toFixed(2).replace(".", ",")}</b></div>
+      <div><small>Entrega</small><b>${o.deliveryType === "PHYSICAL" ? (o.trackingCode ? "Rastreio " + esc(o.trackingCode) : "Física") : "Digital"}</b></div>
+      <div><small>Pagamento</small><b>${o.paymentId ? "Autorizado" : "—"}</b></div>
+      <div><small>Estoque ${esc(current.sku)}</small><b>${stock ? esc(stock.available) : "—"}${stockBefore && stock ? ` <span style="font-size:12px;color:var(--dim)">(antes ${esc(stockBefore.available)})</span>` : ""}</b></div>
+    </div>
+    <h2>Etapas da Saga</h2>
+    <table><thead><tr><th>Hora</th><th>Etapa</th><th>Status</th><th>Tentativa</th><th>Detalhe</th></tr></thead><tbody>
+      ${(o.history || []).map(h => `<tr><td class="mono">${hhmmss(h.at)}</td><td>${esc(h.step)}</td><td class="${esc(h.status)}">${esc(h.status)}</td><td>${esc(h.attempt)}</td><td class="mono" style="color:var(--muted)">${esc(h.detail || "")}</td></tr>`).join("")}
+      ${o.status === "PENDING" ? `<tr><td colspan="5" style="color:var(--dim)">Saga em andamento…</td></tr>` : ""}
+    </tbody></table>
+    <div class="links" style="margin-top:16px">
+      <a href="${jaeger}" target="_blank" rel="noopener">Trace no Jaeger</a>
+      <a href="/api/checkout/order/orders/${esc(o.orderId)}" target="_blank" rel="noopener">GET /orders/{id}</a>
+      <a href="/api/checkout/saga/sagas/${esc(o.sagaId)}" target="_blank" rel="noopener">Diagnóstico da saga</a>
+    </div>
+    <h2 style="margin-top:24px">Equivalente em curl</h2><pre>${esc(current.curl || "")}</pre>`;
+}
+
+function renderRecent() {
+  $("#recent").innerHTML = recent.map(r => `<li data-id="${esc(r.orderId)}"><span class="mono">${hhmmss(r.at)}</span><span>${esc(r.fault)}</span><code>${esc(r.orderId.slice(0, 8))}</code></li>`).join("") || `<li class="empty" style="cursor:default">Nenhum pedido ainda.</li>`;
+}
+$("#recent").addEventListener("click", ev => {
+  const li = ev.target.closest("[data-id]"); if (!li) return;
+  current = recent.find(r => r.orderId === li.dataset.id); stockBefore = null; follow();
+});
+renderRecent(); refreshStock();
+</script>
+</body>
+</html>

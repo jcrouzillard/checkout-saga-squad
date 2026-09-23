@@ -112,7 +112,7 @@
 <div class="app"><div class="frame">
   <header>
     <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span>Checkout Saga · Orquestrador + Jev</span></div>
-    <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button></div>
+    <div class="tabs"><button data-tab="execucoes" class="on">Execução</button><button data-tab="politicas">Política</button><button data-tab="demandas">Demandas</button></div>
   </header>
   <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
   <div class="layout">
@@ -124,6 +124,9 @@
       <h6>GOVERNANÇA</h6>
       <a data-view="politicas">Políticas</a>
       <a data-view="agentes">Agentes <span class="count" id="c-ag"></span></a>
+      <a data-view="demandas">Demandas <span class="count" id="c-dem"></span></a>
+      <h6>PRODUTO</h6>
+      <a href="/checkout.html">Console de Checkout</a>
     </nav>
     <main id="main"></main>
   </div>
@@ -288,6 +291,29 @@ function renderAgentes() {
       <span class="dot ${agentStatus(byAgent[a])}"></span></div>${feedHtml(byAgent[a])}</section>`).join("")}</div>`;
 }
 
+function renderDemandas() {
+  const demands = state.log.filter(e => e.type === "task" && e.agent === "humano").reverse();
+  const after = d => state.log.filter(e => e.ts > d.ts && e.type !== "human");
+  return `<h1>Demandas para a squad</h1><div class="sub">Uma demanda entra no log da squad, vira issue no GitHub e é delegada pelo Orquestrador: Arquiteto → G1 → Backend → G2 → QA → G3.</div>
+  <div class="grid2">
+    <section class="card"><h3>Nova demanda</h3>
+      <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
+      <input id="dem-title" placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
+      <label for="dem-detail" class="muted" style="font-size:12px;font-weight:500">Descrição, critérios de aceite, restrições</label>
+      <textarea id="dem-detail" rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
+      <div class="actions"><button class="btn primary" data-demand="1">Enviar para a squad</button></div>
+      ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}
+      <p class="muted" style="font-size:12px;margin-top:14px">Quem executa é a sessão do Orquestrador no Claude Code; o painel registra, acompanha e permite intervir nos gates.</p>
+    </section>
+    <section class="card"><h3>Demandas registradas</h3>
+      ${demands.length ? demands.map(d => { const ev = after(d); const gates = ev.filter(e => e.type === "gate"); const last = ev.at(-1);
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--line2)"><b>${esc(d.title.replace(/^Demanda: /, ""))}</b><div class="muted" style="font-size:13px">${esc(d.detail || "")}</div>
+        <div style="font-size:12px;margin-top:6px"><span class="tag">${hhmm(d.ts)}</span> ${gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join(" ")} ${last ? `<span class="muted">· último: ${esc(AGENTS[last.agent]?.label || last.agent)} — ${esc(last.title)}</span>` : `<span class="muted">· aguardando o Orquestrador</span>`}</div></div>`; }).join("")
+      : `<p class="muted">Nenhuma demanda registrada pelo painel ainda.</p>`}
+    </section>
+  </div>`;
+}
+
 function renderDecisoes() {
   return `<h1>Decisões</h1><div class="sub">Memória episódica da squad — <code>docs/squad/memory/decisions.jsonl</code> (append-only).</div>
   <div class="tbl"><table><thead><tr><th>Hora</th><th>Agente</th><th>Tipo</th><th>Registro</th><th>Para</th></tr></thead><tbody>
@@ -327,11 +353,14 @@ async function render() {
   if (!state) return;
   $("#c-dec").textContent = state.log.length;
   $("#c-ag").textContent = state.runs.filter(r => r.status === "trabalhando").length || "";
-  const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias }[view];
+  $("#c-dem").textContent = state.log.filter(e => e.type === "task" && e.agent === "humano").length || "";
+  const html = { execucoes: renderExecucoes, agentes: renderAgentes, decisoes: renderDecisoes, evidencias: renderEvidencias, demandas: renderDemandas }[view];
+  const draft = { t: $("#dem-title")?.value, d: $("#dem-detail")?.value };
   const note = $("#note")?.value;
   const focused = document.activeElement?.id === "note";
   $("#main").innerHTML = html ? html() : await renderPoliticas();
   if ($("#note") && note) { $("#note").value = note; if (focused) $("#note").focus(); }
+  if ($("#dem-title") && (draft.t || draft.d)) { $("#dem-title").value = draft.t || ""; $("#dem-detail").value = draft.d || ""; }
   renderDrawer();
 }
 
@@ -345,12 +374,19 @@ document.addEventListener("click", async ev => {
   if (nav) {
     view = nav.dataset.view || nav.dataset.tab;
     document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.view === view));
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "execucoes" && view !== "politicas")));
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === view || (b.dataset.tab === "execucoes" && !["politicas", "demandas"].includes(view))));
     return render();
   }
   const ag = ev.target.closest("[data-agent]");
   if (ag) { drawerAgent = ag.dataset.agent; return renderDrawer(); }
   if (ev.target.id === "closeDrawer") { drawerAgent = null; return renderDrawer(); }
+  if (ev.target.closest("[data-demand]")) {
+    const title = $("#dem-title")?.value.trim(); if (!title) { flash = "Informe um título para a demanda."; return render(); }
+    const res = await fetch("/api/demand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, detail: $("#dem-detail")?.value || "" }) });
+    flash = res.ok ? "Demanda registrada no log da squad e enviada ao Orquestrador." : "Falha ao registrar a demanda.";
+    if (res.ok) { $("#dem-title").value = ""; $("#dem-detail").value = ""; }
+    return refresh();
+  }
   const h = ev.target.closest("[data-human]");
   if (h) {
     const g = latestGate();
