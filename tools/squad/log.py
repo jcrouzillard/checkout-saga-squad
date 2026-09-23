@@ -30,6 +30,7 @@ def main() -> None:
     p.add_argument("--risk", choices=["baixo", "moderado", "alto"])
     p.add_argument("--demand", help="id do evento da demanda a que este evento pertence")
     p.add_argument("--priority", choices=["alta", "normal", "baixa"])
+    p.add_argument("--branch", help="branch git relacionada ao evento")
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
     a = p.parse_args()
@@ -53,6 +54,7 @@ def main() -> None:
         "risk": a.risk,
         "demand": a.demand,
         "priority": a.priority,
+        "branch": a.branch,
         "refs": a.ref,
         "evidences": evidences,
     }

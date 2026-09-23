@@ -45,3 +45,12 @@ github-sync: ## Espelha o log da squad em Issues + GitHub Project (kanban)
 
 squad-inbox: ## Lista as demandas iniciadas aguardando o Orquestrador
 	@/bin/ls -1 docs/squad/inbox/*.json 2>/dev/null || echo "fila vazia"
+
+feature-start: ## make feature-start CODE=D3 SLUG=cupom DEMAND=<id>
+	python3 tools/squad/gitflow.py feature-start $(CODE) $(SLUG) $(if $(DEMAND),--demand $(DEMAND))
+
+feature-finish: ## make feature-finish DEMAND=<id>
+	python3 tools/squad/gitflow.py feature-finish $(if $(DEMAND),--demand $(DEMAND))
+
+release: ## make release VERSION=1.1.0 (release-start + release-finish)
+	python3 tools/squad/gitflow.py release-start $(VERSION) && python3 tools/squad/gitflow.py release-finish $(VERSION)
