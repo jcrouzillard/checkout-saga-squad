@@ -20,7 +20,7 @@ reproduza build + testes.
 - `.github/workflows/ci.yml` com build, testes unitários e e2e em compose.
 
 ## Entradas
-- `CLAUDE.md` (portas e bancos), `docs/contracts/api.md` (variáveis de ambiente), handoff do Arquiteto.
+- `AGENTS.md` (portas e bancos), `docs/contracts/api.md` (variáveis de ambiente), handoff do Arquiteto.
 
 ## Saídas (você é dono)
 - `Dockerfile`, `docker-compose.yml`, `infra/postgres/**`, `infra/kafka/**`, `Makefile`, `.github/**`, `.dockerignore`.

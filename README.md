@@ -125,8 +125,8 @@ com definição versionada em [`.claude/agents/`](.claude/agents/).
 | **Auditor** (agente extra) | gatekeeper independente: avalia cada passagem com evidências e confiança | [`.claude/agents/auditor.md`](.claude/agents/auditor.md) |
 
 **Estrutura dos agentes.** Cada definição traz prompt, objetivo, responsabilidades, entradas, saídas, ferramentas,
-regras de decisão e interação com os demais. As regras comuns ficam em [`CLAUDE.md`](CLAUDE.md), a constituição
-carregada por todos.
+regras de decisão e interação com os demais. As regras comuns ficam em [`AGENTS.md`](AGENTS.md), a constituição
+carregada por todos (o `CLAUDE.md` apenas a importa).
 
 **Comunicação.** Nunca é direta entre agentes: segue o padrão *blackboard*, em que o Orquestrador delega e os agentes
 leem e escrevem artefatos no repositório. Por isso o protocolo **independe de fornecedor**: Copilot Coding Agent ou
@@ -176,6 +176,12 @@ squad: contrato em `docs/contracts/api.md`, ADR-006, `GET /orders?customerId=` n
 vêm de `docs/squad/project.json`. O Console de Checkout faz parte do **produto** e sobe como container próprio
 (`checkout-console`) no compose, ao lado dos serviços. A área **Observabilidade** do Squad Control escolhe o produto e
 embute o Grafana e o Jaeger dele (o Auditor usa traces e métricas como evidência nos gates).
+
+## 6a. Portabilidade entre fornecedores (Claude Code, Codex, …)
+As regras ficam em `AGENTS.md` (lido pelo Codex, Copilot e Devin; importado pelo `CLAUDE.md`). Qualquer papel roda
+com qualquer fornecedor: `SQUAD_RUNNER=codex python3 tools/squad/run_agent.py <papel> "<tarefa>"`, e o plantão do
+Orquestrador com `tools/squad/plantao.sh`. Testado com o Codex (Auditor executado pelo `codex exec`).
+Detalhes: [`docs/squad/portabilidade.md`](docs/squad/portabilidade.md).
 
 ## 6b. Fluxo de branches (Git Flow)
 `main` (produção, tags `vX.Y.Z`) ← `release/*` ← `develop` (integração, branch padrão) ← `feature/<demanda>`.

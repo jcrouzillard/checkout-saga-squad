@@ -198,6 +198,7 @@ def collect_runs() -> list[dict]:
         run = parse_run(path, completed=completed)
         if run:
             runs.append(run)
+    runs.extend(collect_external_runs())
     # Sessão principal = Orquestrador (apenas delegações)
     for path in sorted(base.glob("*.jsonl")):
         if (base / path.stem / "subagents").exists():
@@ -205,6 +206,49 @@ def collect_runs() -> list[dict]:
             if run and run["toolCount"]:
                 runs.append(run)
     return runs
+
+
+def pid_alive(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def collect_external_runs() -> list[dict]:
+    """Execuções disparadas por tools/squad/run_agent.py (qualquer fornecedor): metadados + saída ao vivo + progress."""
+    runs_dir = ROOT / ".squad/runs"
+    progress = [e for e in read_jsonl(LOG) if e.get("type") == "progress" and e.get("run")]
+    out = []
+    for meta_path in sorted(runs_dir.glob("*.json")):
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        log_path = meta_path.with_suffix(".log")
+        status = meta.get("status", "trabalhando")
+        if status == "trabalhando" and not pid_alive(meta.get("pid")):
+            status = "interrompido"
+        activity = [{"ts": e["ts"], "kind": "tool", "tool": "progress", "summary": e["title"], "pending": False,
+                     "detail": e.get("detail", "")} for e in progress if e["run"] == meta["id"]]
+        mtime = log_path.stat().st_mtime if log_path.exists() else meta_path.stat().st_mtime
+        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()[-40:] if log_path.exists() else []
+        if lines:
+            activity.append({"ts": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
+                             "kind": "text", "summary": "\n".join(l for l in lines if l.strip())[-600:]})
+        current = None
+        if status == "trabalhando":
+            last = next((a for a in reversed(activity) if a["kind"] == "tool"), None)
+            current = {"tool": meta.get("runner", "runner"), "summary": (last or {}).get("summary", "em execução"),
+                       "ts": (last or {}).get("ts", meta.get("started"))}
+        out.append({"id": meta["id"], "agent": meta.get("agent", "outro"), "description": meta.get("description", ""),
+                    "model": meta.get("runner", ""), "runner": meta.get("runner"), "status": status,
+                    "started": meta.get("started"),
+                    "updated": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
+                    "toolCount": len([x for x in activity if x["kind"] == "tool"]), "current": current,
+                    "files": [], "activity": activity[-80:]})
+    return out
 
 
 def collect_gates() -> list[dict]:

@@ -7,6 +7,8 @@ model: opus
 
 # Agente Frontend
 
+> Regras comuns da squad (ownership, protocolo de handoff, Git Flow, limites de autonomia): `AGENTS.md`.
+
 ## Por que este agente existe (agente adicional justificado)
 O produto tem uma interface própria (`checkout-console/`), que não pertence a nenhum serviço de backend. Sem um
 dono, mudanças de UI cairiam no Backend (que não deve tocar apresentação) ou no Orquestrador (que não escreve
