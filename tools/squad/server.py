@@ -251,6 +251,21 @@ def collect_external_runs() -> list[dict]:
     return out
 
 
+def effective_demand(rows: list[dict], demand: dict) -> dict:
+    """task + eventos `edit` aplicados em ordem (D5)."""
+    eff = dict(demand)
+    for e in sorted((r for r in rows if r.get("type") == "edit" and r.get("demand") == demand["id"]), key=lambda r: r["ts"]):
+        for k, v in (e.get("changes") or {}).items():
+            eff[k] = f"Demanda: {v}" if k == "title" else v
+    return eff
+
+
+def in_backlog(rows: list[dict], demand: dict) -> bool:
+    return bool(demand.get("backlog")) and not any(
+        r.get("demand") == demand["id"] and (r.get("type") == "start" or (r.get("type") == "control" and r.get("action") == "cancel"))
+        for r in rows)
+
+
 def collect_gates() -> list[dict]:
     gates = []
     for p in sorted(GATES_DIR.glob("*.json")):
@@ -358,6 +373,40 @@ class Handler(SimpleHTTPRequestHandler):
                                       "action": action, "priority": data.get("priority"),
                                       "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
             return self._json(entry, 201)
+        if self.path.startswith("/api/demand/edit"):
+            data = json.loads(raw or b"{}")
+            rows = read_jsonl(LOG)
+            demand = next((e for e in rows if e.get("id") == data.get("id") and e.get("type") == "task"
+                           and e.get("agent") == "humano"), None)
+            if not demand:
+                return self._json({"error": "demanda não encontrada"}, 404)
+            if not in_backlog(rows, demand):
+                return self._json({"error": "só é possível editar demandas em backlog"}, 409)
+            eff = effective_demand(rows, demand)
+            changes = {}
+            if "title" in data:
+                t = (data.get("title") or "").strip()
+                if not 1 <= len(t) <= 200:
+                    return self._json({"error": "título deve ter de 1 a 200 caracteres"}, 400)
+                if f"Demanda: {t}" != eff["title"]:
+                    changes["title"] = t
+            if "detail" in data and (data.get("detail") or "").strip() != (eff.get("detail") or ""):
+                changes["detail"] = (data.get("detail") or "").strip()
+            if "kind" in data:
+                if data["kind"] not in ("produto", "operacao"):
+                    return self._json({"error": "tipo inválido: produto | operacao"}, 400)
+                if data["kind"] != eff.get("kind"):
+                    changes["kind"] = data["kind"]
+            if "priority" in data:
+                if data["priority"] not in ("alta", "normal", "baixa"):
+                    return self._json({"error": "prioridade inválida: alta | normal | baixa"}, 400)
+                if data["priority"] != eff.get("priority", "normal"):
+                    changes["priority"] = data["priority"]
+            if not changes:
+                return self._json({"error": "nenhuma mudança"}, 400)
+            entry = self._append_log({"agent": "humano", "type": "edit", "to": "orquestrador", "demand": demand["id"],
+                                      "title": "Demanda editada no backlog", "changes": changes})
+            return self._json(entry, 201)
         if self.path.startswith("/api/demand/start"):
             # Gatilho: o humano inicia a demanda. Vira evento `start` no log e um arquivo na fila docs/squad/inbox/,
             # que a sessão do Orquestrador (em plantão) consome.
@@ -367,8 +416,12 @@ class Handler(SimpleHTTPRequestHandler):
             if not demand:
                 return self._json({"error": "demanda não encontrada"}, 404)
             rows = read_jsonl(LOG)
+            if any(r.get("type") == "start" and r.get("demand") == demand["id"] for r in rows):
+                return self._json({"error": "demanda já iniciada"}, 409)
+            from_backlog = in_backlog(rows, demand)
+            demand = effective_demand(rows, demand)
             clarifications = []
-            if demand.get("kind"):  # demandas v2 (D4): Iniciar só após validação ok, respostas ou override com nota
+            if demand.get("kind") and not from_backlog:  # demandas v2 (D4); backlog não é validado (ADR-009): Iniciar só após validação ok, respostas ou override com nota
                 vals = [e for e in rows if e.get("type") == "validation" and e.get("demand") == demand["id"]]
                 last = vals[-1] if vals else None
                 answered = last and any(e.get("type") == "clarification" and e.get("validation") == last["id"] for e in rows)
@@ -385,6 +438,7 @@ class Handler(SimpleHTTPRequestHandler):
                                       for q in last.get("questions", [])]
             entry = self._append_log({"agent": "humano", "type": "start", "to": "orquestrador", "demand": demand["id"],
                                       "override": True if data.get("override") else None,
+                                      "fromBacklog": True if from_backlog else None,
                                       "title": f"Iniciar: {demand['title'].replace('Demanda: ', '')}",
                                       "detail": data.get("note", ""), "priority": data.get("priority", "normal"),
                                       "route": data.get("route", "padrao"), "target": data.get("target", "auto")})
@@ -394,7 +448,8 @@ class Handler(SimpleHTTPRequestHandler):
                 "demand": demand["id"], "title": demand["title"].replace("Demanda: ", ""), "detail": demand.get("detail", ""),
                 "priority": entry["priority"], "route": entry["route"], "target": entry["target"],
                 "note": entry.get("detail", ""), "startedAt": entry["ts"], "kind": demand.get("kind"),
-                "clarifications": clarifications, "override": bool(data.get("override"))}, ensure_ascii=False, indent=2))
+                "clarifications": clarifications, "override": bool(data.get("override")),
+                "fromBacklog": from_backlog}, ensure_ascii=False, indent=2))
             return self._json(entry, 201)
         if self.path.startswith("/api/demand"):
             # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
@@ -404,9 +459,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"error": "título obrigatório"}, 400)
             if data.get("kind") not in ("produto", "operacao"):
                 return self._json({"error": "tipo obrigatório: produto | operacao"}, 400)
+            when = data.get("when", "imediato")
+            if when not in ("imediato", "backlog"):
+                return self._json({"error": "quando iniciar: imediato | backlog"}, 400)
+            if data.get("priority", "normal") not in ("alta", "normal", "baixa"):
+                return self._json({"error": "prioridade inválida: alta | normal | baixa"}, 400)
             entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
                                       "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
-                                      "priority": data.get("priority", "normal"), "kind": data.get("kind")})
+                                      "priority": data.get("priority", "normal"), "kind": data.get("kind"),
+                                      "backlog": True if when == "backlog" else None})
             return self._json(entry, 201)
         if not self.path.startswith("/api/human"):
             return self._json({"error": "not found"}, 404)
