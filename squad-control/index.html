@@ -364,8 +364,10 @@ async function render() {
   renderDrawer();
 }
 
+// Enquanto o usuário digita num campo do painel, o polling não redesenha a tela (senão o campo perde o foco).
+const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
 async function refresh() {
-  try { state = await fetch("/api/state").then(r => r.json()); render(); }
+  try { state = await fetch("/api/state").then(r => r.json()); if (!editing()) render(); }
   catch (e) { $("#main").innerHTML = `<p class="warn-msg">Servidor indisponível. Rode <code>make squad</code>.</p>`; }
 }
 
