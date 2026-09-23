@@ -211,6 +211,8 @@ class Sync:
         targets = [i for a in GATE_COVERS.get(g, []) for i in self.issues_of(a)] or [self.diary()]
         for issue in targets[-3:]:
             self.comment(issue, self.body(e, f"Intervenção humana · {g or ''}"))
+            if e.get("recommendation") == "OVERRIDE":
+                self.set_field(issue, "Status", "Em andamento")
             if e.get("recommendation") == "RETURN":
                 self.reopen(issue)
                 issue["handed"] = False

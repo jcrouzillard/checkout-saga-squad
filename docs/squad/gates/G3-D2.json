@@ -1,0 +1,29 @@
+{
+  "gate": "G3",
+  "demand": "48b6ace91207",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.65,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Checklist de UI (CA1–CA12)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "tests/ui/checklist-console.md: 10 ✅ e 2 ⚠️ (CA7 aviso de 120 s e CA9 teclado, só por código); CA6 com a indisponibilidade real não observada. Fluxo pelo proxy (feliz e DECLINE) igual ao acesso direto; nenhum defeito de UI"},
+    {"name": "Capturas 1440 e 390 px", "status": "pass", "weight": 1, "blocking": false,
+     "source": "console-1440.png: passos com '1 Montar pedido' destacado, formulário + 'O que vai acontecer', Resumo e Linha do tempo em estado vazio explicativo, lista do cliente com status texto+cor, R$ e motivo. console-390.png: coluna única sem rolagem horizontal, alvos ≥ 44 px. Ressalvas: no 390 px o passo '3 Acompanhar' quebra de linha com o conector solto; nenhuma captura mostra a linha do tempo preenchida (CA2 visual não capturado)"},
+    {"name": "Matriz de rastreabilidade", "status": "pass", "weight": 2, "blocking": true,
+     "source": "tests/TRACEABILITY.md linha 24 'Melhorar o visual do checkout (demanda D2 …)' → contrato ui-checkout-console.md + checklist + capturas"},
+    {"name": "Suíte e2e (8 cenários)", "status": "validate", "weight": 3, "blocking": true,
+     "source": "tests/e2e/last-report.json 8/8 PASS, mas de 14:50:45Z, antes do commit 2d2da56 (15:04Z) que alterou services/; os containers de serviço não foram reconstruídos desde então (order-service up ~1 h), então a suíte não cobre o HEAD"},
+    {"name": "Regras de negócio e contratos preservados", "status": "fail", "weight": 2, "blocking": true,
+     "source": "git log --stat -3 -- services docs/contracts: api.md e events.md sem mudança desde o D1 e o console sem regra de negócio (CA12 ok). Porém o commit 2d2da56 ('Renomear o agente gatekeeper de Jev para Auditor') editou um comentário em services/common/src/main/resources/db/common/V0_1__outbox_and_processed_messages.sql, migração Flyway já aplicada: CRC32 do arquivo passou de 654970704 (igual ao flyway_schema_history 0.1 nos 5 databases) para 604054953. Sem configuração de flyway (validate-on-migrate padrão = true), qualquer rebuild/restart dos 5 serviços com o volume atual falha com 'Migration checksum mismatch'"}
+  ],
+  "open_risks": [
+    "DEFEITO (bloqueante): reverter a linha de comentário de V0_1__outbox_and_processed_messages.sql para o texto original ('parecer G1 do Jev'); migrações aplicadas são imutáveis. Depois, docker compose up -d --build dos 5 serviços e reexecutar tests/e2e/run.sh (8/8) no HEAD.",
+    "CA7 (aviso após 120 s) e CA9 (navegação só por teclado) não foram observados interativamente, e a quebra do passo 3 no 390 px é cosmética: aceitáveis como limitação, mas o QA deve registrar na próxima rodada.",
+    "Ressalva de higiene de commit do G2-D2 continua: a entrega do Frontend está no commit da49b89 misturada com squad-control/ e tools/."
+  ],
+  "human_required": true,
+  "rationale": "A entrega da D2 atende à demanda do humano. É mais intuitiva (passos, frase 'o que vai acontecer', linha do tempo com texto+ícone, erros claros) e mais fluida (feedback imediato, resumo, lista do cliente, responsiva), sem API ou regra de negócio nova e com o POST /orders idêntico. O checklist tem 10/12 ✅ e 2 ⚠️ não bloqueantes. Porém a verificação de 'nenhuma mudança em serviços' achou o commit 2d2da56, que alterou uma migração Flyway já aplicada (checksum 654970704 → 604054953): o próximo rebuild dos serviços falha na subida, e a suíte 8/8 é anterior a esse commit. RETURN com correção de 1 linha + rebuild + e2e. Confiança = (2+1+2+1.5+0)/10 = 0.65 < 0.70 → human_required."
+}

@@ -326,16 +326,19 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "not found"}, 404)
         data = json.loads(raw or b"{}")
         action = data.get("action")
-        if action not in ("APPROVE", "RETURN"):
-            return self._json({"error": "action deve ser APPROVE ou RETURN"}, 400)
+        if action not in ("APPROVE", "RETURN", "OVERRIDE"):
+            return self._json({"error": "action deve ser APPROVE, RETURN ou OVERRIDE"}, 400)
+        titles = {"APPROVE": "Humano aceitou a recomendação do Auditor", "RETURN": "Humano devolveu a etapa",
+                  "OVERRIDE": "Humano decidiu seguir apesar da devolução (assume o risco)"}
         entry = {
             "id": uuid.uuid4().hex[:12],
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "agent": "humano",
             "type": "human",
-            "title": data.get("title") or ("Humano aceitou a recomendação" if action == "APPROVE" else "Humano devolveu a etapa"),
+            "title": data.get("title") or titles[action],
             "detail": data.get("note", ""),
             "gate": data.get("gate"),
+            "demand": data.get("demand"),
             "recommendation": action,
         }
         entry = {k: v for k, v in entry.items() if v not in (None, "")}

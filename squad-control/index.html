@@ -187,7 +187,7 @@ function latestGate() {
   if (fromLog) return { gate: fromLog.gate, recommendation: fromLog.recommendation, confidence: fromLog.confidence, risk: fromLog.risk, evidences: fromLog.evidences, rationale: fromLog.detail, from: fromLog.agent, to: fromLog.to };
   return null;
 }
-function humanFor(gate) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate); }
+function humanFor(gate, demand, after) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate && (e.demand || null) === (demand || null) && (!after || e.ts > after)); }
 
 function pipelineStatus() {
   const byAgent = runsByAgent();
@@ -256,7 +256,7 @@ function renderExecucoes() {
   const now = pipe.find(p => p.st === "now");
   const anyRunning = state.runs.some(r => r.status === "trabalhando");
   const g = active ? ([...state.log].reverse().find(e => e.type === "gate" && e.demand === active.d.id) || null) : latestGate();
-  const human = g && humanFor(g.gate);
+  const human = g && humanFor(g.gate, active?.d.id, g.ts);
   const conf = g?.confidence != null ? Math.round(g.confidence * 100) : null;
   const evs = g?.evidences || [];
   const humanRequired = g && (g.human_required || (conf != null && conf < 70) || g.risk === "alto");
@@ -290,10 +290,11 @@ function renderExecucoes() {
         <p class="${humanRequired ? "warn-msg" : "muted"}">${humanRequired ? "<b>Obrigatória</b> neste gate (confiança &lt; 70%, risco alto ou 3º ciclo)." : "Não obrigatória. Você pode aceitar a recomendação ou alterar o próximo passo."}</p>
         <textarea id="note" rows="2" placeholder="Observação para o Orquestrador (opcional)"></textarea>
         <div class="actions">
-          <button class="btn primary" data-human="APPROVE" ${human ? "disabled" : ""}>${g.recommendation === "APPROVE" ? `Enviar para ${esc(AGENTS[g.to]?.label || "próxima etapa")}` : "Aceitar devolução"}</button>
-          <button class="btn" data-human="RETURN" ${human ? "disabled" : ""}>Devolver</button>
+          ${g.recommendation === "APPROVE"
+            ? `<button class="btn primary" data-human="APPROVE" ${human ? "disabled" : ""}>Enviar para ${esc(AGENTS[g.to]?.label || "próxima etapa")}</button><button class="btn" data-human="RETURN" ${human ? "disabled" : ""}>Devolver</button>`
+            : `<button class="btn primary" data-human="APPROVE" ${human ? "disabled" : ""}>Aceitar devolução · corrigir e reauditar</button><button class="btn" data-human="OVERRIDE" ${human ? "disabled" : ""} style="color:var(--amber);border-color:var(--amber)">Seguir mesmo assim</button>`}
         </div>
-        ${human ? `<p class="ok-msg">Decisão registrada: ${human.recommendation === "APPROVE" ? `${esc(AGENTS[g.to]?.label || "próxima etapa")} assumirá a próxima etapa.` : "etapa devolvida ao agente de origem."} <span class="muted">(${hhmm(human.ts)})</span></p>` : ""}
+        ${human ? `<p class="ok-msg">Decisão registrada (${hhmm(human.ts)}): ${{ APPROVE: g.recommendation === "APPROVE" ? `${esc(AGENTS[g.to]?.label || "próxima etapa")} assumirá a próxima etapa.` : "o Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.", RETURN: "etapa devolvida ao agente de origem.", OVERRIDE: "você assumiu o risco; o Orquestrador libera a demanda e registra a decisão." }[human.recommendation]}</p>` : ""}
         ${flash ? `<p class="ok-msg">${esc(flash)}</p>` : ""}`}
     </section>
   </div>`;
@@ -485,7 +486,7 @@ document.addEventListener("click", async ev => {
   if (h) {
     const g = latestGate();
     const res = await fetch("/api/human", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: h.dataset.human, gate: g?.gate, note: $("#note")?.value || "" }) });
+      body: JSON.stringify({ action: h.dataset.human, gate: g?.gate, demand: activeDemand()?.d.id || null, note: $("#note")?.value || "" }) });
     flash = res.ok ? "Decisão enviada ao Orquestrador." : "Falha ao registrar a decisão.";
     refresh();
   }
