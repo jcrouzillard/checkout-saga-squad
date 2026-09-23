@@ -48,7 +48,10 @@
   "0fdb6e52c297",
   "1be6a99e6934",
   "3023c5e8b9d4",
-  "4da2593d48c2"
+  "4da2593d48c2",
+  "51c45017dc4d",
+  "5e687ff55204",
+  "396e1d283656"
  ],
  "issues": {
   "_diario": {
@@ -59,7 +62,8 @@
    "status": "Em andamento",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": false,
+   "kind": "task"
   },
   "1da45e1d6c51": {
    "number": 2,
@@ -69,7 +73,8 @@
    "status": "Concluído",
    "phase": "F1",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "f9961019f919": {
    "number": 3,
@@ -79,7 +84,8 @@
    "status": "Concluído",
    "phase": "F2",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "0b85579ff134": {
    "number": 4,
@@ -89,7 +95,8 @@
    "status": "Concluído",
    "phase": "F2",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "3e40b176de88": {
    "number": 5,
@@ -99,7 +106,8 @@
    "status": "Concluído",
    "phase": "G1",
    "handed": false,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "3abf26db6626": {
    "number": 6,
@@ -109,7 +117,8 @@
    "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": true
+   "closed": false,
+   "kind": "ticket"
   },
   "9da0069a951d": {
    "number": 7,
@@ -119,7 +128,8 @@
    "status": "Concluído",
    "phase": "F2",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "ca4cb01f8e7a": {
    "number": 8,
@@ -129,7 +139,8 @@
    "status": "Concluído",
    "phase": "F2",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "45cb4e105ed3": {
    "number": 9,
@@ -139,7 +150,8 @@
    "status": "Concluído",
    "phase": "F2",
    "handed": true,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "093bef04b7b0": {
    "number": 10,
@@ -149,7 +161,8 @@
    "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": true
+   "closed": false,
+   "kind": "ticket"
   },
   "0e11824d8abb": {
    "number": 11,
@@ -159,27 +172,30 @@
    "status": "Em andamento",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": false,
+   "kind": "task"
   },
   "23d3ca1dd0de": {
    "number": 12,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/12",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8V4nA",
    "agent": "backend",
-   "status": "Gate (Jev)",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false
+   "closed": true,
+   "kind": "ticket"
   },
   "b164b075d5cf": {
    "number": 13,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/13",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8V6u8",
    "agent": "devops",
-   "status": "Gate (Jev)",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false
+   "closed": false,
+   "kind": "ticket"
   },
   "a0a574d3cee6": {
    "number": 14,
@@ -189,7 +205,8 @@
    "status": "Concluído",
    "phase": "G2",
    "handed": false,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "b3687c905abd": {
    "number": 15,
@@ -199,57 +216,63 @@
    "status": "Concluído",
    "phase": "G3",
    "handed": false,
-   "closed": true
+   "closed": true,
+   "kind": "task"
   },
   "13e55010e3f5": {
    "number": 16,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/16",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WiGA",
    "agent": "orquestrador",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": true,
+   "kind": "task"
   },
   "59e6b62f03d3": {
    "number": 17,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/17",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WiOo",
    "agent": "arquiteto",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": true,
+   "kind": "task"
   },
   "7bac3a6658ce": {
    "number": 18,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/18",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WjtE",
    "agent": "backend",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": true,
+   "kind": "task"
   },
   "42eff02f02d4": {
    "number": 19,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/19",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8Wjzs",
    "agent": "qa",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": true,
+   "kind": "task"
   },
   "4da2593d48c2": {
    "number": 20,
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/20",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8WncM",
    "agent": "jev",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": false,
-   "closed": false
+   "closed": true,
+   "kind": "task"
   }
  },
  "project": {
@@ -295,7 +318,7 @@
  },
  "gates": {
   "G1": "aaad3b0f5ce4",
-  "G2": "a65c00cca4e3",
-  "G3": "e4c966e5655f"
+  "G2": "51c45017dc4d",
+  "G3": "5e687ff55204"
  }
 }

@@ -88,7 +88,8 @@ class Sync:
         url = gh("issue", "create", "-R", REPO, "--title", title, "--body", body, "--label", ",".join(labels))
         item = gh("project", "item-add", PROJECT, "--owner", OWNER, "--url", url, "--format", "json", parse=True)
         issue = {"number": int(url.rstrip("/").split("/")[-1]), "url": url, "item": item["id"], "agent": agent,
-                 "status": None, "phase": phase, "handed": False, "closed": False}
+                 "status": None, "phase": phase, "handed": False, "closed": False,
+                 "kind": "ticket" if any(l in ("defect", "change-request") for l in labels) else "task"}
         self.s["issues"][key] = issue
         self.set_field(issue, "Status", status)
         self.set_field(issue, "Agente", LABEL.get(agent))
@@ -110,7 +111,9 @@ class Sync:
             issue["closed"] = False
 
     def issues_of(self, agent: str, **filters) -> list[dict]:
-        out = [i for k, i in self.s["issues"].items() if i["agent"] == agent and not k.startswith("_")]
+        """Issues de tarefa do agente (tickets de defect/change-request ficam fora: são anotações, não trabalho em curso)."""
+        out = [i for k, i in self.s["issues"].items()
+               if i["agent"] == agent and not k.startswith("_") and i.get("kind", "task") != "ticket"]
         return [i for i in out if all(i.get(k) == v for k, v in filters.items())]
 
     def diary(self) -> dict:
@@ -154,7 +157,7 @@ class Sync:
     def on_handoff(self, e):
         agent = e["agent"]
         open_ = self.issues_of(agent, handed=False, closed=False)
-        issue = open_[0] if open_ else self.create_issue(
+        issue = open_[-1] if open_ else self.create_issue(
             e["id"], e["title"], self.body(e, "Entrega registrada (sem delegação prévia no log)"), agent, [],
             "Em andamento", {"arquiteto": "F1", "devops": "F2", "observabilidade": "F2", "backend": "F2", "qa": "F3"}.get(agent))
         self.comment(issue, self.body(e, f"Handoff → {LABEL.get(e.get('to'), e.get('to', ''))}") + self.handoff_brief(agent))
