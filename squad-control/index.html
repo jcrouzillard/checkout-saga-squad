@@ -1078,9 +1078,11 @@ function stepperHtml(info) {
 const gateMsg = {};
 function recoHtml(g) {
   const conf = g?.confidence != null ? pct(g.confidence) : null;
+  // D14-QA-6: a largura usa o número (0–100); pct() já traz "%" e só serve ao texto.
+  const w = typeof g?.confidence === "number" && isFinite(g.confidence) ? Math.min(100, Math.max(0, g.confidence * 100)) : 0;
   return `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf} confiança</span>` : ""}</div>
     <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
-    <div class="bar"><div style="width:${conf ?? 0}%"></div></div>
+    <div class="bar"><div style="width:${w}%"></div></div>
     <p>Risco ${esc(g.risk || "—")}. ${esc((g.open_risks || []).join(" ") || g.rationale || g.detail || "")}</p></div>`;
 }
 function evidencesHtml(evs) {
