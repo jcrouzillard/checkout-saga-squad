@@ -1,0 +1,35 @@
+{
+  "demand": "1e3d3c894630",
+  "title": "Revisão tema UI Squad.",
+  "detail": "Precisamos revisar a UI de toda a Squad Control, só focada nisso. Eu acho que a usabilidade ainda está ruim. A gente tem que absorver e colocar as melhores práticas, focadas na usabilidade, para um sistema que vai ser de governança de equipe, agenteca, Squared, que vai ter sua auditoria.\n\nAcho que tem que ter mais visualização do que está acontecendo em tempo real, on-demand. Também precisa ter uma fácil visualização dos impedimentos ou dos blocos e também dos avisos.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-24T14:10:40+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Como vamos saber que a revisão está pronta? Proponho três critérios verificáveis: (1) impedimentos, bloqueios e avisos aparecem na primeira tela, sem precisar clicar; (2) o estado de cada agente e de cada demanda se atualiza sozinho em até N segundos (qual valor de N?); (3) uma lista de heurísticas de usabilidade, por exemplo as de Nielsen, conferida tela a tela. Você aprova esses critérios ou quer outros?",
+      "dimension": "aceite",
+      "answer": "Gostei dos três critérios. O valor do segundo, vou por 3 segundos."
+    },
+    {
+      "question": "O que conta como 'impedimento/bloqueio' e o que conta como 'aviso'? Sugiro: bloqueio = gate REJECT, intervenção humana obrigatória, 3º ciclo de autocorreção ou triagem com perguntas em aberto; aviso = gate com confiança abaixo de 70%, agente sem progresso há X minutos ou PR aguardando merge. Está correto? Falta ou sobra algum caso?",
+      "dimension": "objetivo",
+      "answer": "Está correto? Vamos com essa primeira versão, assim. Gostei."
+    },
+    {
+      "question": "A revisão fica só no `squad-control/index.html`, com layout, hierarquia visual e tema reorganizando os dados que já existem? Ou também pode incluir dados ou eventos novos em `tools/squad/**` e `decisions.jsonl`, que pertencem ao Orquestrador? O título fala em 'tema' e a descrição fala em usabilidade: a troca de tema visual (cores, modo claro/escuro) faz parte do escopo?",
+      "dimension": "escopo",
+      "answer": "Isso, a revisão, foca em reorganização, tá. Pode incluir, sim, eventos e dados novos, sim. Isso, o título fala em tema, é porque eu já quero incluir isso nessa demanda, tá? Então, você deve mudar a usabilidade e o tema junto. Se o tema sugerir que precisa mudar alguma coisa na usabilidade também, vou trazer isso como um plus. Pode mudar, sim."
+    },
+    {
+      "question": "O que não pode mudar? Por exemplo: continuar sem build e sem dependências externas (um único HTML estático); não alterar o formato do `decisions.jsonl` nem os comandos do `log.py` e do `gitflow.py`; manter as ações que o humano já faz pela UI, como registrar demanda e responder triagem. Confirma?",
+      "dimension": "restricoes",
+      "answer": "A única coisa, ou uma das únicas coisas, que não pode continuar é a falta de visibilidade do que está acontecendo em tempo real. Está muito raso o detalhamento de cada integrante da equipe. A gente precisa, quando olhar para um integrante da equipe, ver o que realmente está sendo feito e também se tem alguma espera de ação em algum dos subagentes ou dos integrantes. Fica mais implícito o que tem que ser feito para o humano."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
