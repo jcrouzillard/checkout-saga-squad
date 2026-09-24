@@ -4,6 +4,7 @@ Contrato: docs/contracts/ui-governanca-squad-control.md §5 (regras B1–B4, A1�
 Nada aqui grava no log: alertas e histórico são reconstruídos do `decisions.jsonl` + `docs/squad/gates/` a cada
 mudança desses arquivos (reprodutível para auditoria). Somente stdlib.
 """
+import math
 import os
 import re
 from datetime import datetime, timezone
@@ -69,7 +70,8 @@ def pct_text(conf) -> str | None:
     if p is None:
         return None
     if is_low(conf) and p >= round(LOW_CONFIDENCE * 100):
-        return f"{conf * 100:.1f}".replace(".", ",")
+        tenths = math.floor(conf * 1000 + 1e-9) / 10   # trunca (0,6996 -> 69,9), como o cliente: nunca "70,0% < 70%"
+        return f"{tenths:.1f}".replace(".", ",")
     return str(p)
 
 
