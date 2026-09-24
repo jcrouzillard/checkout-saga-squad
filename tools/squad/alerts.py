@@ -63,8 +63,9 @@ def pct(conf) -> int | None:
 
 
 def is_low(conf) -> bool:
-    p = pct(conf)
-    return p is not None and p < round(LOW_CONFIDENCE * 100)
+    """Confiança < 70% (AGENTS.md) pelo valor bruto: 0,695 (69,5%) é baixa. A folga de 1e-9 evita que um 0,7 vindo
+    de conta de ponto flutuante (0,69999999…) seja tratado como baixo."""
+    return isinstance(conf, (int, float)) and conf < LOW_CONFIDENCE - 1e-9
 
 
 def demand_codes(rows) -> dict:
