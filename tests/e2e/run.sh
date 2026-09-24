@@ -10,9 +10,17 @@
 #   bash tests/e2e/run.sh                 # roda os 12 cenários
 #   bash tests/e2e/run.sh payment_failure  # roda só um cenário
 #   SKIP_RESTART=1 bash tests/e2e/run.sh   # pula o cenário 6 (reinício do coordenador)
+#   make e2e-teste                         # contra o ambiente de teste (checkout-teste, D15)
 #
 # Variáveis de ambiente (todas com default de docker-compose.yml):
 #   ORDER_URL SAGA_URL INVENTORY_URL PAYMENT_URL SHIPPING_URL JAEGER_URL SKIP_RESTART
+#   E2E_COMPOSE_PROJECT   projeto compose do cenário de reinício (default checkout-saga);
+#                         TODO "docker compose" deste script leva "-p" com este valor (R6/D15).
+#   E2E_COMPOSE_ENV_FILE  se definido, vai como "--env-file" em todo "docker compose".
+#   E2E_ALLOW_PROD=1      fora do CI (CI vazio), o reinício no projeto checkout-saga (produtivo)
+#                         só roda com esta variável; sem ela o cenário 6 é pulado (contrato
+#                         docs/contracts/ambiente-de-teste.md §7, CA17).
+#   E2E_REPORT_FILE       caminho do relatório JSON (default tests/e2e/last-report.json).
 #
 # Requer: curl. Usa jq se disponível; senão cai para "python3 -c" (ver json_get/history_has).
 # Nunca usa sleep fixo longo para esperar estado: todo poll é feito em passos de 1s com timeout.
@@ -26,9 +34,13 @@ PAYMENT_URL="${PAYMENT_URL:-http://localhost:8083}"
 SHIPPING_URL="${SHIPPING_URL:-http://localhost:8084}"
 JAEGER_URL="${JAEGER_URL:-http://localhost:16686}"
 SKIP_RESTART="${SKIP_RESTART:-0}"
+E2E_COMPOSE_PROJECT="${E2E_COMPOSE_PROJECT:-checkout-saga}"
+E2E_COMPOSE_ENV_FILE="${E2E_COMPOSE_ENV_FILE:-}"
+E2E_ALLOW_PROD="${E2E_ALLOW_PROD:-0}"
+E2E_PROD_PROJECT="checkout-saga"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPORT_FILE="$SCRIPT_DIR/last-report.json"
+REPORT_FILE="${E2E_REPORT_FILE:-$SCRIPT_DIR/last-report.json}"
 
 if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
   C_GREEN="$(tput setaf 2)"; C_RED="$(tput setaf 1)"; C_YELLOW="$(tput setaf 3)"
@@ -500,6 +512,44 @@ wait_for_health() {
 }
 
 # --------------------------------------------------------------------------
+# docker compose seguro (R6/D15): único ponto do script que chama "docker compose".
+# Sempre com "-p <projeto>" (e "--env-file" se definido): nunca depende do diretório
+# nem do COMPOSE_PROJECT_NAME do shell para escolher o projeto.
+# --------------------------------------------------------------------------
+e2e_compose() {
+  local args=(compose -p "$E2E_COMPOSE_PROJECT")
+  if [ -n "$E2E_COMPOSE_ENV_FILE" ]; then
+    args+=(--env-file "$E2E_COMPOSE_ENV_FILE")
+  fi
+  docker "${args[@]}" "$@"
+}
+
+# restart_allowed → 0 se o cenário de reinício pode mexer no projeto resolvido; senão
+# preenche SCENARIO_DETAIL com o motivo e devolve 1 (o cenário vira SKIP).
+# Fora do CI, reiniciar o produtivo (checkout-saga) exige E2E_ALLOW_PROD=1.
+restart_allowed() {
+  if [ -z "$E2E_COMPOSE_PROJECT" ]; then
+    SCENARIO_DETAIL="E2E_COMPOSE_PROJECT vazio; reinício recusado (todo docker compose exige -p)"
+    return 1
+  fi
+  if [ "$E2E_COMPOSE_PROJECT" = "$E2E_PROD_PROJECT" ] && [ -z "${CI:-}" ] && [ "$E2E_ALLOW_PROD" != "1" ]; then
+    SCENARIO_DETAIL="pulado: reiniciaria o saga-orchestrator do produtivo ($E2E_PROD_PROJECT) fora do CI; use make e2e-teste (checkout-teste) ou E2E_ALLOW_PROD=1"
+    return 1
+  fi
+  return 0
+}
+
+# restart_coordinator → mata e religa o saga-orchestrator do projeto resolvido.
+# "kill" + "start" reaproveitam o mesmo container (não recriam, ao contrário de "up -d").
+restart_coordinator() {
+  echo "   ${C_YELLOW}matando saga-orchestrator (docker compose -p $E2E_COMPOSE_PROJECT kill)...${C_RESET}"
+  e2e_compose kill saga-orchestrator >/dev/null 2>&1
+  sleep 2
+  echo "   ${C_YELLOW}religando saga-orchestrator (docker compose -p $E2E_COMPOSE_PROJECT start)...${C_RESET}"
+  e2e_compose start saga-orchestrator >/dev/null 2>&1
+}
+
+# --------------------------------------------------------------------------
 # Cenários (nomes de function == chaves aceitas como argumento do script)
 # --------------------------------------------------------------------------
 
@@ -711,6 +761,10 @@ scenario_coordinator_restart() {
     SCENARIO_DETAIL="comando docker indisponível neste shell; pulado"
     return 0
   fi
+  if ! restart_allowed; then
+    SCENARIO_SKIP=1
+    return 0
+  fi
   local idem order_id auth_count pay_status
   idem="$(gen_uuid)"
   local payload
@@ -725,11 +779,7 @@ scenario_coordinator_restart() {
   order_id="$(json_get "$RESP_BODY" "orderId")"
   SCENARIO_ORDER_ID="$order_id"
   sleep 1
-  echo "   ${C_YELLOW}matando saga-orchestrator (docker compose kill)...${C_RESET}"
-  docker compose kill saga-orchestrator >/dev/null 2>&1
-  sleep 2
-  echo "   ${C_YELLOW}subindo saga-orchestrator novamente (docker compose up -d)...${C_RESET}"
-  docker compose up -d saga-orchestrator >/dev/null 2>&1
+  restart_coordinator
   if ! wait_for_health_single "$SAGA_URL" 60; then
     SCENARIO_DETAIL="saga-orchestrator não voltou saudável em 60s"
     return 1
@@ -1247,4 +1297,7 @@ main() {
   exit "$OVERALL_EXIT"
 }
 
-main "$@"
+# Executado (não "source"): roda a suíte. Com "source" só carrega as funções (testes do QA).
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi

@@ -7,6 +7,11 @@ pedido obsoleto, reset só com APAGAR, guard de portas (R8) e de imagens (R1), d
 fingerprint do produtivo, prod.py (só o alterado, nada para docs, R5 compose, rollback R3, B5 com migração R4,
 baseline R2, SQUAD_PROD_AUTOUPDATE=0) e CA16 (nenhum comando destrutivo gerado).
 
+Escrito pelo Orquestrador (F2/F5) e ADOTADO pelo QA no G3 da D15, que acrescentou: reset-data/down/publish/release com
+o lock tomado (nada executado, pedido fica pendente), cancel pela API (202, duplicate, 404, 400) e
+gitflow.after_review (prod.py só com delivered + develop + SQUAD_PROD_AUTOUPDATE != 0). O e2e seguro (R6) está em
+test_e2e_compose_seguro_d15.py e a prova CA1/CA4 em prova_produtivo_intacto.sh.
+
 Uso: python3 tests/squad/test_ambiente_teste_d15.py   (ou pytest)
 """
 import importlib
@@ -619,6 +624,184 @@ class TestProd(Base):
                     ["docker", "compose", "up", "-d"]):
             with self.assertRaises(RuntimeError):
                 prod.assert_safe(bad)
+
+
+# ====================================================================== QA (G2 prioridade 2): lock, cancel pela API, after_review
+class TestQaLock(Base):
+    """reset-data e down com o lock tomado: nada é executado; o pedido fica pendente até o próximo reconcile."""
+
+    def publicado(self):
+        self.review(DA, 11, SHA_A)
+        te.request(DA, "publish")
+        te.reconcile()
+        self.assertEqual(te.view(rows())["state"], "ocupado")
+        return len(self.fx.calls)
+
+    def test_reset_data_com_lock_tomado(self):
+        self.publicado()
+        te.request(None, "reset-data", "APAGAR")
+        n, n_reset = len(self.fx.calls), len(self.types("test-env-reset"))
+        with te.lock() as got:
+            self.assertTrue(got)
+            self.assertEqual(te.main(["reset-data"]), 3)
+            self.assertEqual(te.reconcile(), {"skipped": "lock", "actions": []})
+        self.assertFalse([c for c in self.fx.calls[n:] if c[:2] == ["docker", "compose"]])
+        self.assertEqual(len(self.types("test-env-reset")), n_reset)
+        self.assertTrue(te.derive(rows())["reset"])                      # continua pendente
+        te.reconcile()                                                   # lock livre: agora executa
+        self.assertEqual(len(self.types("test-env-reset")), n_reset + 1)
+        self.assertIn(te.compose_teste("down", "-v"), self.fx.calls[n:])
+
+    def test_down_com_lock_tomado(self):
+        n = self.publicado()
+        n_req = len(self.types("test-env-request"))
+        with te.lock() as got:
+            self.assertTrue(got)
+            self.assertEqual(te.main(["down"]), 3)
+        self.assertFalse([c for c in self.fx.calls[n:] if c[:2] == ["docker", "compose"]])
+        self.assertEqual(len(self.types("test-env-request")), n_req)     # nem grava pedido
+        self.assertFalse(te.view(rows(), health={}).get("stopped"))
+        self.assertEqual(te.main(["down"]), 0)                            # sem lock: down sem -v
+        self.assertEqual([c for c in self.fx.calls[n:] if "down" in c], [te.compose_teste("down")])
+
+    def test_publish_e_release_com_lock_tomado(self):
+        self.review(DA, 11, SHA_A)
+        te.request(DA, "publish")
+        with te.lock():
+            self.assertEqual(te.main(["publish", "--demand", DA]), 3)
+            self.assertEqual(te.main(["release", "--demand", DA, "--reason", "human"]), 3)
+        self.assertFalse(self.fx.compose_cmds())
+
+
+class TestQaCancelApi(Base):
+    """POST /api/test-env/request action=cancel (servidor com SQUAD_ROOT_DATA/SQUAD_LOG temporários, docker falso)."""
+
+    def test_cancel_pela_api(self):
+        self.review(DA, 11, SHA_A)
+        self.review(DB, 12, SHA_B)
+        te.request(DA, "publish")
+        te.reconcile()
+        te.request(DB, "publish")
+        self.assertEqual(te.view(rows())["queue"][0]["demand"], DB)
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+        def post(body):
+            req = urllib.request.Request(base + "/api/test-env/request", data=json.dumps(body).encode(),
+                                         headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(req) as r:
+                    return r.status, json.loads(r.read())
+            except urllib.error.HTTPError as e:
+                return e.code, json.loads(e.read())
+        try:
+            n_calls, n_spawn = len(self.fx.calls), len(server.TE_SPAWNED)
+            st, body = post({"demand": DB, "action": "cancel"})
+            self.assertEqual(st, 202, body)
+            self.assertIn("request", body)
+            self.assertEqual(server.TE_SPAWNED[n_spawn:], [["reconcile"]])
+            req = self.types("test-env-request")[-1]
+            self.assertEqual((req["agent"], req["action"], req["demand"]), ("humano", "cancel", DB))
+            self.assertEqual(te.view(rows())["queue"], [])
+            self.assertEqual(te.view(rows())["demand"], DA)                # ocupante não é afetado
+            st, body = post({"demand": DB, "action": "cancel"})            # repetido: idempotente, sem novo spawn
+            self.assertEqual((st, body.get("duplicate")), (202, True))
+            self.assertEqual(len(server.TE_SPAWNED), n_spawn + 1)
+            self.assertEqual(post({"demand": "naoexiste000", "action": "cancel"})[0], 404)
+            self.assertEqual(post({"action": "cancel"})[0], 400)
+            self.assertEqual(post({"demand": DB, "action": "explodir"})[0], 400)
+            self.assertFalse(self.fx.calls[n_calls:])                      # a API não executa docker
+        finally:
+            httpd.shutdown()
+
+
+class TestQaAfterReview(unittest.TestCase):
+    """gitflow.after_review: prod.py update --auto só com delivered, na develop e SQUAD_PROD_AUTOUPDATE != 0."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.gf = importlib.import_module("gitflow")
+
+    def setUp(self):
+        gf = self.gf
+        self.saved = (gf.ROOT, gf.current, gf.subprocess.Popen, os.environ.get("SQUAD_PROD_AUTOUPDATE"))
+        root = pathlib.Path(tempfile.mkdtemp(prefix="squad-d15-gf-"))
+        for f in ("docker-compose.yml", "tools/squad/prod.py", "tools/squad/testenv.py", "infra/teste/teste.env"):
+            (root / f).parent.mkdir(parents=True, exist_ok=True)
+            (root / f).write_text("")
+        self.root, self.popen, self.branch = root, [], "develop"
+        gf.ROOT = root
+        gf.current = lambda: self.branch
+
+        def fake_popen(cmd, **kw):
+            self.popen.append(cmd)
+
+            class P:
+                pid = 0
+            return P()
+        gf.subprocess.Popen = fake_popen
+        os.environ.pop("SQUAD_PROD_AUTOUPDATE", None)
+
+    def tearDown(self):
+        gf = self.gf
+        gf.ROOT, gf.current, gf.subprocess.Popen, auto = self.saved
+        if auto is None:
+            os.environ.pop("SQUAD_PROD_AUTOUPDATE", None)
+        else:
+            os.environ["SQUAD_PROD_AUTOUPDATE"] = auto
+
+    def call(self, delivered):
+        """Chama after_review. O Popen acontece ANTES do print final; o IndexError do print (defeito registrado
+        pelo QA, ver test_defeito_print_nao_quebra) é isolado aqui para que os casos abaixo verifiquem só O QUE é
+        disparado. Qualquer outra exceção falha o teste."""
+        try:
+            self.gf.after_review(delivered=delivered)
+        except IndexError:
+            pass
+
+    def script(self):
+        self.assertEqual(len(self.popen), 1, self.popen)
+        return self.popen[0][-1]
+
+    @unittest.expectedFailure
+    def test_defeito_print_nao_quebra(self):
+        """DEFEITO (QA, D15): gitflow.after_review faz c[3] em ['python3', 'tools/squad/testenv.py', 'reconcile']
+        (3 itens) -> IndexError depois do Popen; o review-sync termina com traceback em TODO merge/fechamento.
+        Quando o Orquestrador corrigir, este teste passa a 'unexpected success': remova o expectedFailure."""
+        self.gf.after_review(delivered=True)
+
+    def test_develop_delivered_chama_prod_e_reconcile(self):
+        self.call(True)
+        s = self.script()
+        self.assertIn("tools/squad/prod.py update --auto", s)
+        self.assertLess(s.index("prod.py"), s.index("testenv.py reconcile"))   # produtivo primeiro
+
+    def test_fora_da_develop_nao_chama_prod(self):
+        self.branch = "feature/D15-ambiente-de-teste"
+        self.call(True)
+        self.assertNotIn("prod.py", self.script())
+
+    def test_autoupdate_desligado_nao_chama_prod(self):
+        os.environ["SQUAD_PROD_AUTOUPDATE"] = "0"
+        self.call(True)
+        self.assertNotIn("prod.py", self.script())
+
+    def test_devolvida_nao_chama_prod(self):
+        self.call(False)
+        self.assertNotIn("prod.py", self.script())
+
+    def test_copia_sem_ambiente_nada_executado(self):
+        for f in ("infra/teste/teste.env", "docker-compose.yml"):
+            (self.root / f).unlink()
+        self.branch = "feature/x"
+        self.gf.after_review(delivered=True)
+        self.gf.after_review(delivered=False)
+        self.assertEqual(self.popen, [])
+        os.environ["SQUAD_PROD_AUTOUPDATE"] = "0"
+        self.branch = "develop"
+        self.gf.after_review(delivered=True)
+        self.assertEqual(self.popen, [])
 
 
 if __name__ == "__main__":
