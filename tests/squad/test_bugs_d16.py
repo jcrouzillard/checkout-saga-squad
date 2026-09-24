@@ -385,6 +385,22 @@ class T02Creation(unittest.TestCase):
         self.assertEqual(q["nature"], "bug")
         self.assertEqual(q["bug"]["evidences"][0]["file"], "01-erro-produto.log")
 
+    def test_kind_do_rascunho(self):
+        """Ressalva do G2: a criação usa o kind do rascunho; kind divergente no corpo -> 409, nada gravado."""
+        st, d, _ = draft(kind="operacao", files=[upload("erro.log", b"linha de erro de operacao\n")])
+        self.assertEqual(st, 201, d)
+        self.assertEqual(d["kind"], "operacao")
+        n, dirs = len(log_rows()), len(list((DATA / "docs/squad").glob("*/bugs/*/bug.json")))
+        st, e, _ = create_bug(d["draft"], kind="produto")
+        self.assertEqual((st, e["code"]), (409, "tipo_divergente"))
+        self.assertEqual(len(log_rows()), n)
+        self.assertEqual(len(list((DATA / "docs/squad").glob("*/bugs/*/bug.json"))), dirs)   # nada gravado
+        self.assertTrue((DATA / ".squad/bug-drafts" / d["draft"]).exists())       # rascunho preservado
+        st, e, _ = create_bug(d["draft"], kind="operacao")
+        self.assertEqual(st, 201, e)
+        self.assertEqual(e["kind"], "operacao")
+        self.assertTrue(e["bug"]["dir"].startswith("docs/squad/operacao/bugs/"), e["bug"])
+
     def test_segredo_no_titulo_bloqueia(self):
         st, d, _ = draft(files=[upload("a.log", b"x\n")])
         st, e, _ = create_bug(d["draft"], title="falha token=abcdef123")
@@ -426,6 +442,73 @@ class T03Mask(unittest.TestCase):
         self.assertNotIn("Rua X", out)
         self.assertNotIn("Joao Silva", out)
         json.loads(out)                                                             # continua JSON válido
+
+    def _mask_idem(self, text):
+        out, c = er.mask_text(text, b"k" * 32)
+        self.assertEqual(er.mask_text(out, b"k" * 32)[0], out, "máscara não é idempotente")
+        return out, c
+
+    def test_ca6_chaves_compostas_de_token(self):
+        """Devolução do G2: chaves compostas (camelCase, snake_case, kebab-case) em k=v, k: v, JSON e JSON escapado."""
+        cases = {
+            "accessToken=abc123": "abc123", "bearer_token=xyz789": "xyz789", '{"accessToken":"tok_abc"}': "tok_abc",
+            '"refreshToken": "ref_1"': "ref_1", "idToken=idt_1": "idt_1", "apiToken: apt_1": "apt_1",
+            "client_secret=cs_1": "cs_1", "clientSecret=cs_2": "cs_2", "x-api-key: xk_1": "xk_1",
+            "X-Api-Key=xk_2": "xk_2", "refresh-token=rt_1": "rt_1", "auth_token=at_1": "at_1",
+            "X-Auth-Token: xa_1": "xa_1", "spring.datasource.password=pw_1": "pw_1",
+            r'{"message":"body {\"accessToken\":\"tok_esc\",\"client_secret\":\"cs_esc\"}"}': "tok_esc",
+            "Cookie: JSESSIONID=sess_1; theme=dark": "sess_1", "Set-Cookie: SESSION=sess_2; Path=/": "sess_2",
+        }
+        for text, secret in cases.items():
+            out, c = self._mask_idem(text)
+            self.assertNotIn(secret, out, text)
+            self.assertIn("[MASCARADO:segredo]", out, text)
+            self.assertGreaterEqual(c["secret"], 1, text)
+        out, _ = self._mask_idem(r'{"message":"body {\"accessToken\":\"tok_esc\",\"client_secret\":\"cs_esc\"}"}')
+        self.assertNotIn("cs_esc", out)
+        json.loads(out)
+        # falsos positivos óbvios (sem valor) e ids de diagnóstico ficam
+        for text in ("tokenizer carregado", "passwordPolicy", "passwordPolicy habilitada",
+                     "traceId=4bf92f3577b34da6 orderId=7c1e9f0a sagaId=s-1"):
+            self.assertEqual(self._mask_idem(text)[0], text)
+        self.assertEqual(er.find_secrets("falha no login accessToken=abc123"), ["chave_valor"])
+
+    def test_ca6_record_address_sem_chave(self):
+        """toString do record com.checkout.shipping.domain.Address (street, number, complement, city, state, zipCode, country)."""
+        texts = [
+            "IllegalArgumentException: endereço inválido: Address[street=Av Paulista, number=1000, complement=Apto 12, "
+            "city=Sao Paulo, state=SP, zipCode=01310-100, country=BR]",
+            "com.checkout.shipping.domain.Address[street=Rua Augusta, number=500, complement=null, city=Sao Paulo, "
+            "state=SP, zipCode=01305000, country=BR]",
+            "ShippingAddress{street=Rua Oscar Freire, number=77, recipient=Maria Souza, zipCode=01426-001}",
+            "Address{street=Rua Haddock Lobo, number=595, complement=Casa 2, zipCode=01414-001}",
+        ]
+        for text in texts:
+            out, c = self._mask_idem(text)
+            for v in ("Paulista", "1000", "Apto 12", "01310-100", "Augusta", "01305000", "Oscar Freire", "Maria Souza",
+                      "01426-001", "Haddock", "595", "Casa 2", "01414-001"):
+                self.assertNotIn(v, out, text)
+            self.assertIn("ddress[MASCARADO:endereco]", out)
+            self.assertGreaterEqual(c["endereco"], 1)
+        # campos soltos de toString (sem o record inteiro)
+        out, _ = self._mask_idem("Delivery[street=Rua Z, complement=Fundos, recipient=Ana Lima, zipCode=04000-000]")
+        for v in ("Rua Z", "Fundos", "Ana Lima", "04000-000"):
+            self.assertNotIn(v, out)
+        self.assertEqual(self._mask_idem("getAddress() retornou null")[0], "getAddress() retornou null")
+
+    def test_ca6_cpf_separadores_opcionais(self):
+        for text in ("529.982.247-25", "52998224725", "529982247-25", "529 982 247 25", "529.982.24725"):
+            out, c = self._mask_idem(f"cpf {text} recusado")
+            self.assertEqual(out, "cpf [MASCARADO:cpf] recusado", text)
+            self.assertEqual(c["byType"]["cpf"], 1)
+        # dígito verificador inválido nas formas não canônicas: não é CPF (evita mascarar ids/números)
+        for text in ("52998224724", "529982247-24", "529 982 247 24", "12345678901"):
+            self.assertEqual(self._mask_idem(f"n {text} x")[0], f"n {text} x")
+
+    def test_ca6_grafana_variaveis_ms_e_s(self):
+        expr = "rate(x[$__range]) + $__range_s + ${__range_ms} + $__interval_ms + rate(y[$__interval])"
+        self.assertEqual(bugs.resolve_vars(expr, 0, 3600, 15),
+                         "rate(x[3600s]) + 3600 + 3600000 + 15000 + rate(y[15s])")
 
     def test_ca10_metadados_de_imagem(self):
         st, d, _ = draft(files=[upload("a.png", make_png()), upload("b.jpg", make_jpeg()), upload("c.webp", make_webp())])

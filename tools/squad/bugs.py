@@ -364,7 +364,10 @@ def step_for(start: float, end: float) -> int:
 def resolve_vars(expr: str, start: float, end: float, step: int) -> str:
     rng = f"{int(end - start)}s"
     rate = f"{max(step + 15, 60)}s"
-    for name, val in (("__range", rng), ("__rate_interval", rate), ("__interval", f"{step}s")):
+    secs = int(end - start)
+    # nomes mais longos primeiro: $__range_s/_ms e $__interval_ms não podem virar "$__range" + sufixo
+    for name, val in (("__range_ms", str(secs * 1000)), ("__range_s", str(secs)), ("__range", rng),
+                      ("__rate_interval", rate), ("__interval_ms", str(step * 1000)), ("__interval", f"{step}s")):
         expr = expr.replace("${" + name + "}", val).replace("$" + name, val)
     return expr
 

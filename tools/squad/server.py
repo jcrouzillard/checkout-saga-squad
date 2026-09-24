@@ -1103,7 +1103,10 @@ class Handler(SimpleHTTPRequestHandler):
                 consent = bugs.check_consent(bug.get("consent"))
                 er.check_submission([len(b) for _, b in blobs], global_total=store.total_size())
                 demand = uuid.uuid4().hex[:12]
-                kind = data["kind"]
+                kind = meta["kind"]          # o tipo vem do rascunho (o que o humano revisou na prévia)
+                if data.get("kind") != kind:
+                    return self._json({"error": f"o tipo informado ({data.get('kind')}) diverge do rascunho ({kind}): "
+                                                "gere a prévia de novo com o tipo correto", "code": "tipo_divergente"}, 409)
                 created = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 doc = {"demand": demand, "title": title, "kind": kind, "createdAt": created,
                        "severity": severity, "environment": "produtivo", "verifiedBy": meta["verifiedBy"],

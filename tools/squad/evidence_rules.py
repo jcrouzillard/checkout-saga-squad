@@ -156,8 +156,11 @@ SECRET_PATTERNS = [
     ("sk", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}")),
     ("slack", re.compile(r"\bxox[bap]-[\w-]+")),
     ("url_credencial", re.compile(r"(?<=://)(?!\[MASCARADO)[^/\s:@\"']+:[^/\s@\"']+(?=@)")),
+    ("cookie", re.compile(r"(?i)((?<![\w-])(?:set-)?cookie\\?\"?\s*[=:]\s*\\?\"?)(?!\[MASCARADO)([^\s\"\\][^\r\n\"\\]*)")),
+    # chaves compostas (accessToken, bearer_token, x-api-key, client_secret...): sem \b antes da palavra-chave
     ("chave_valor", re.compile(
-        r"(?i)(\\?\"?\b(?:password|passwd|senha|secret|token|api[_-]?key|client[_-]?secret|access[_-]?key)\w*\\?\"?"
+        r"(?i)(\\?\"?(?<![\w.-])[\w.-]{0,80}?(?:password|passwd|senha|secret|token|api[_-]?key|access[_-]?key|"
+        r"credential)[\w.-]{0,80}\\?\"?"
         r"\s*[=:]\s*\\?\"?)(?!\[MASCARADO)([^\s\"'\\,;&}]+)")),
 ]
 SECRET_MASK = "[MASCARADO:segredo]"
@@ -201,13 +204,20 @@ PII_PATTERNS = [
     # endereço de entrega inteiro (JSON, JSON escapado e toString Java) — ressalva 1
     ("endereco", re.compile("(" + Q + ADDRESS_KEYS + Q + r"\s*:\s*)\{[^{}]*\}")),
     ("endereco", re.compile(r"(\b" + ADDRESS_KEYS + r"\s*=\s*)\w*[\[{(][^\]})]*[\]})]")),
+    # toString de record/classe sem chave antes: Address[street=..., number=...], ShippingAddress{...}
+    ("endereco", re.compile(r"((?<![\w$])[\w$.]*[Aa]ddress)[\[{](?=[^\]{}\n]*=)[^\]{}\n]*[\]}]")),
+    ("endereco", re.compile(r"((?<![\w.])" + STREET_KEYS + r"=)[^,\]})\n]+")),
+    ("cep", re.compile(r"((?<![\w.])" + ZIP_KEYS + r"=)[\d.\s-]{5,10}(?=[,\]})\s]|$)")),
+    ("nome", re.compile(r"((?<![\w.])" + NAME_KEYS + r"=)[^,\]})\n]+")),
     ("endereco", re.compile("(" + Q + STREET_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
     ("cep", re.compile("(" + Q + ZIP_KEYS + Q + r"\s*:\s*)" + Q + r"?[\d.\s-]{5,10}" + Q + r"?")),
     ("nome", re.compile("(" + Q + NAME_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
     ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
     ("cnpj", re.compile(r"(?<![\w./-])\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}(?![\w-])")),
     ("cpf", re.compile(r"(?<![\w.-])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\w-])")),
-    ("cpf", re.compile(r"(?<![\w.-])\d{11}(?![\w-])"), _cpf_ok),
+    # separadores opcionais (529982247-25, 529 982 247 25, 52998224725): só com dígito verificador válido
+    ("cpf", re.compile(r"(?<![\w.-])\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}(?![\w-])"),
+     lambda v: _cpf_ok(re.sub(r"\D", "", v))),
     ("cartao", re.compile(r"(?<![\w-])[3-6]\d{3}(?:[ -]?\d){9,15}(?![\w-])"),
      lambda v: 13 <= len(re.sub(r"\D", "", v)) <= 19 and _luhn(re.sub(r"\D", "", v))),
     ("cep", re.compile(r"(?<![\w-])\d{5}-\d{3}(?![\w-])")),
@@ -257,7 +267,7 @@ def mask_text(text: str, key: bytes) -> tuple[str, dict]:
     for typ, rx in SECRET_PATTERNS:
         def rep(m, typ=typ):
             bump("secret", typ)
-            if typ in ("authorization", "chave_valor"):
+            if typ in ("authorization", "cookie", "chave_valor"):
                 return m.group(1) + SECRET_MASK
             return SECRET_MASK
         text = rx.sub(rep, text)
