@@ -1,5 +1,9 @@
+// D9 — selos de modelo por agente. D13 (efe387a35d71): migrado para a navegação por rotas de hash (menu único, sem .tabs):
+//   Execuções -> #execucoes (alias da última demanda ativa), Decisões -> #/auditoria/eventos, card da D10 -> página #/demandas/D10,
+//   gaveta -> ?agente=auditor. Executar: docker run ... -v "$PWD/tests/ui:/shots" ghcr.io/puppeteer/puppeteer:latest node /shots/d9-screenshots.js
 const puppeteer = require('puppeteer');
-const BASE = 'http://host.docker.internal:7093/';
+const BASE = process.env.BASE || 'http://host.docker.internal:7112/';
+const ROUTE = { execucoes: '#execucoes', demandas: '#/demandas?f=todas', decisoes: '#/auditoria/eventos', d10: '#/demandas/D10', gaveta: '#/demandas?f=todas&agente=auditor' };
 (async () => {
   const b = await puppeteer.launch({ args: ['--no-sandbox'] });
   const out = {};
@@ -9,9 +13,10 @@ const BASE = 'http://host.docker.internal:7093/';
     p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
     p.on('pageerror', e => errs.push('pageerror: ' + e.message));
     await p.setViewport({ width: w, height: w === 390 ? 844 : 1000 });
+    await p.setRequestInterception(true); p.on('request', r => r.method() === 'POST' ? r.abort() : r.continue());   // somente leitura
     await p.goto(BASE, { waitUntil: 'networkidle2' });
     await new Promise(r => setTimeout(r, 2500));
-    const clickView = async v => { await p.evaluate(v => { const el = document.querySelector(`nav a[data-view="${v}"]`) || document.querySelector(`[data-tab="${v}"]`); el && el.click(); }, v); await new Promise(r => setTimeout(r, 800)); };
+    const clickView = async v => { await p.evaluate(h => { location.hash = h; }, ROUTE[v]); await new Promise(r => setTimeout(r, 900)); };
     const measure = async name => p.evaluate(name => {
       const de = document.documentElement, main = document.querySelector('#main') || document.body;
       const txt = main.innerText;
@@ -26,10 +31,10 @@ const BASE = 'http://host.docker.internal:7093/';
     const res = [];
     await clickView('execucoes'); res.push(await measure('execucoes')); await shot('execucoes', true);
     await clickView('demandas'); res.push(await measure('demandas'));
-    // rolar ate o card da D9
-    await p.evaluate(() => { const b = [...document.querySelectorAll('#main b')].find(x => /modelo exato|modelo usado/i.test(x.textContent)); if (b) b.scrollIntoView({ block: 'start' }); });
-    await new Promise(r => setTimeout(r, 300)); await shot('demandas', false);
-    const d9 = await p.evaluate(() => { const b = [...document.querySelectorAll('#main b')].find(x => /modelo exato|modelo usado/i.test(x.textContent)); if (!b) return null; const card = b.closest('div[style*="padding:12px 0"]'); const row = card && [...card.querySelectorAll('.mrow')].find(r => r.textContent.startsWith('Modelos:')); return { title: b.textContent, modelos: row ? row.textContent : null }; });
+    await shot('demandas', false);
+    // D13: o antigo card da demanda "Modelo usado na demanda" (D10) virou a página da demanda
+    await clickView('d10');
+    const d9 = await p.evaluate(() => { const h = document.querySelector('#main h1'); const row = [...document.querySelectorAll('#main .mrow')].find(r => r.textContent.startsWith('Modelos:')); return h ? { title: h.textContent, modelos: row ? row.textContent : null } : null; });
     res.push({ name: 'd9card', d9 });
     await clickView('decisoes'); 
     const dec = await p.evaluate(() => { const rows = [...document.querySelectorAll('#main table tbody tr, #main table tr')].filter(r => r.querySelector('td'));
@@ -37,7 +42,7 @@ const BASE = 'http://host.docker.internal:7093/';
       return { rows: rows.length, hum, humChip, non, nonChip, agentsSample: [...new Set(rows.map(r => (r.children[1]?.childNodes[0]?.textContent || '')))].slice(0, 15) }; });
     res.push(Object.assign(await measure('decisoes'), { dec })); await shot('decisoes', false);
     // gaveta do auditor (cartões de execução)
-    await clickView('execucoes'); await p.evaluate(() => { const el = document.querySelector('[data-agent="auditor"]'); el && el.click(); }); await new Promise(r => setTimeout(r, 800));
+    await clickView('gaveta'); await new Promise(r => setTimeout(r, 800));
     const drawer = await p.evaluate(() => { const d = document.querySelector('#drawer'); return { hidden: d.hidden, chips: [...new Set([...d.querySelectorAll('.mchip')].map(c => c.textContent))], sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, dsw: d.scrollWidth, dcw: d.clientWidth, undef: /\bundefined\b/.test(d.innerText) }; });
     res.push({ name: 'drawer-auditor', drawer }); await shot('gaveta-auditor', false);
     out[w] = { res, errs };

@@ -1,15 +1,22 @@
 // D11 (642a73cb38e5) — faixa de consumo da IA no Squad Control. Executado em Docker:
+// D13 (efe387a35d71): migrado para a navegação por rotas de hash (menu único; sem .tabs). As telas antigas são
+//   abertas pelos aliases da §5 do contrato (#execucoes, #/decisoes, …) e o formulário fica em #/demandas/nova.
+//   Montagens usadas no D13: -v "$DATA:/work/data" -v "$CODEX_HOME_FIX:/work/codex" (FIX = server.py com SQUAD_ROOT_DATA=$DATA e
+//   CODEX_HOME=$CODEX_HOME_FIX; a pasta sessions/2026/09/23 precisa existir). REAL = dados reais, somente leitura.
 //   docker run --rm --add-host=host.docker.internal:host-gateway -e NODE_PATH=/home/pptruser/node_modules -v "$PWD/tests/ui:/shots" -v "$WORK:/work" \
 //     -w /home/pptruser ghcr.io/puppeteer/puppeteer:latest node /shots/d11-screenshots.js
 // REAL = servidor com os dados reais (Codex real, Claude sem statusline); FIX = servidor com SQUAD_ROOT_DATA e
 // CODEX_HOME de fixture em /work (snapshot do Claude e rollout do Codex escritos por este script).
 const puppeteer = require('puppeteer');
 const fs = require('fs');
-const REAL = process.env.REAL || 'http://host.docker.internal:7098/';
-const FIX = process.env.FIX || 'http://host.docker.internal:7099/';
+const REAL = process.env.REAL || 'http://host.docker.internal:7112/';
+const FIX = process.env.FIX || 'http://host.docker.internal:7113/';
 const SNAP = '/work/data/.squad/usage/claude.json';
 const ROLL = '/work/codex/sessions/2026/09/23/rollout-2026-09-23T00-00-00-qa-fixture.jsonl';
 const VIEWS = ['execucoes', 'decisoes', 'evidencias', 'politicas', 'agentes', 'demandas'];
+// D13: tela antiga -> rota nova (aliases do contrato ui-navegacao-squad-control §5)
+const ROUTE = { painel: '#/painel', execucoes: '#execucoes', decisoes: '#/decisoes', evidencias: '#/evidencias', politicas: '#/politicas',
+  agentes: '#/agentes', demandas: '#/demandas', nova: '#/demandas/nova', observabilidade: '#/observabilidade' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const iso = d => d.toISOString().replace(/\.\d+Z$/, 'Z');
 const epoch = ms => Math.floor(ms / 1000);
@@ -39,7 +46,7 @@ function codexRollout(p, s) {
     await p.setViewport({ width: w, height: h });
     return p;
   };
-  const go = async (p, v) => { await p.evaluate(v => { const el = document.querySelector(`nav a[data-view="${v}"]`); el && el.click(); }, v); await sleep(700); };
+  const go = async (p, v) => { await p.evaluate(h => { location.hash = h; }, ROUTE[v]); await sleep(900); };
   const strip = p => p.evaluate(() => {
     const el = document.querySelector('#ai-usage'); const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     const de = document.documentElement;
@@ -83,15 +90,15 @@ function codexRollout(p, s) {
       // cabeçalho/sino/abas usáveis a 390 px
       res.header = await p.evaluate(() => {
         const hit = el => { const r = el.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { in: r.left >= 0 && r.right <= innerWidth, h: Math.round(r.height), hit: !!t && (t === el || el.contains(t)) }; };
-        return { bell: hit(document.querySelector('#bell')), tabs: [...document.querySelectorAll('.tabs button')].map(b => ({ t: b.textContent, ...hit(b) })),
+        return { bell: hit(document.querySelector('#bell')), tabs: document.querySelectorAll('.tabs').length, menu: [...document.querySelectorAll('#menu a')].map(b => ({ t: b.textContent.trim(), ...hit(b) })),
           sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
       });
       await p.click('#bell'); await sleep(500);
       res.notif = await p.evaluate(() => { const n = document.querySelector('#notif-panel'); const r = n.getBoundingClientRect(); return { open: !n.hidden, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, sw: document.documentElement.scrollWidth }; });
       await p.screenshot({ path: `/shots/d11-real-sino-390.png` });
       await p.click('#bell'); await sleep(300);
-      await p.evaluate(() => document.querySelector('.tabs button[data-tab="demandas"]').click()); await sleep(700);
-      res.tabDemandas = await p.evaluate(() => document.querySelector('nav a.on')?.dataset.view);
+      await p.evaluate(() => document.querySelector('#menu a[data-nav="demandas"]').click()); await sleep(700);
+      res.tabDemandas = await p.evaluate(() => document.querySelector('#menu a[aria-current="page"]')?.dataset.nav);
     }
     out['real-' + w] = res;
     await p.close();
@@ -148,7 +155,7 @@ function codexRollout(p, s) {
     claudeSnap(30, 50); codexRollout(12, 30);
     const p = await newPage(w, h);
     await p.goto(FIX, { waitUntil: 'networkidle2' }); await sleep(1500);
-    await go(p, 'demandas');
+    await go(p, 'nova');
     await p.focus('#dem-title'); await p.keyboard.type('Titulo digitado pelo QA');
     await p.focus('#dem-detail'); await p.keyboard.type('Detalhe em edição — não pode sumir');
     const before = await strip(p);
