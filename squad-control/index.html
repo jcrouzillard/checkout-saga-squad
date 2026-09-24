@@ -1782,6 +1782,7 @@ const BUG_ERR = {
   alerta_nao_encontrado: "a regra de alerta não existe no Grafana do produtivo", evidencia_obrigatoria: "o bug precisa de ao menos uma evidência (log ou imagem)",
   evidencia_do_teste: "o log é do ambiente de teste; bugs só vêm do produtivo", confirmacao_obrigatoria: "marque as duas confirmações",
   rascunho_expirado: "o rascunho expirou (24 h); gere a prévia de novo", tipo_nao_permitido: "tipo de arquivo não permitido",
+  tipo_divergente: "o tipo do bug (Produto/Operação) diverge da prévia; gere a prévia de novo com o tipo escolhido",
   armazenamento_de_bugs_cheio: "o armazenamento de bugs no git está cheio (200 MB); fale com o responsável", natureza_invalida: "natureza inválida", bug_sem_natureza: "objeto bug sem nature: bug",
 };
 // Erros do servidor: { error: "<mensagem em português>", code: "<código>" } (evidence_rules.EvidenceError.payload).
@@ -1860,17 +1861,28 @@ function normDraft(j) {
     repo: o.repo && typeof o.repo === "object" ? o.repo : o.repoVisibility ? { visibility: String(o.repoVisibility) } : null };
 }
 const redHtml = r => { const e = Object.entries(r && typeof r === "object" ? r : {}).filter(([, n]) => Number(n) > 0);
-  return e.length ? `Mascarado: ${e.map(([k, n]) => `${esc(BUG_RED[k] || k)} ${Number(n)}`).join(" · ")}` : "Nada precisou ser mascarado"; };
+  return e.length ? `Mascarado: ${e.map(([k, n]) => `${esc(BUG_RED[k] || k)} ${Number(n)}`).join(" · ")}` : "Nenhum padrão conhecido encontrado — revise o conteúdo"; };
+const BUG_PREV_LINES = 200;
+const utf8Len = t => new TextEncoder().encode(t).length;
+// QA-D16-5: a prévia do servidor traz só as 200 primeiras linhas; truncada se o arquivo tem mais bytes que a prévia.
+const bugTrunc = ev => { const pv = Array.isArray(ev.preview) ? ev.preview.join("\n") : typeof ev.preview === "string" ? ev.preview : null;
+  if (pv == null || evIsImage(ev)) return false; const n = Number(ev.lines ?? ev.totalLines);
+  return Number.isFinite(n) && n > 0 ? n > BUG_PREV_LINES : pv.split("\n").length >= BUG_PREV_LINES && Number(ev.size) > utf8Len(pv) + 1; };
+const bugTotalLines = (ev, url) => { const n = Number(ev.lines ?? ev.totalLines); if (Number.isFinite(n) && n > 0) return n;
+  const t = logTexts[url]; return t && t.st === "ok" ? t.text.replace(/\n$/, "").split("\n").length : null; };
 const evIsImage = ev => ev.type === "image" || /^image\//.test(ev.mime || "") || /\.(png|jpe?g|webp)$/i.test(ev.file || "");
 const safeApiUrl = u => typeof u === "string" && /^\/api\/bug\/[^?#]*$/.test(u) && !u.includes("..") ? u : null;
 // Uma evidência: cabeçalho, contagens de máscara e o conteúdo (imagem como <img>; log como texto, preenchido por textContent).
-function evItemHtml(ev, { url, logKey, logText, detailsId, open }) {
+function evItemHtml(ev, { url, logKey, logText, detailsId, open, fullUrl }) {
   const img = evIsImage(ev), file = String(ev.file || "");
   if (!img && logText != null && !logTexts[logKey]) logTexts[logKey] = { st: "ok", text: logText };
-  const head = `<div class="eh"><span class="fn">${esc(file)}</span><span class="tag">${img ? "imagem" : "log"}</span>${ev.size ? `<span class="muted">${fmtSize(ev.size)}</span>` : ""}${ev.origin ? `<span class="muted">${esc(BUG_ORIGIN[ev.origin] || ev.origin)}</span>` : ""}${url ? extLink(url, "Abrir o arquivo") : ""}</div>`;
+  const head = `<div class="eh"><span class="fn">${esc(file)}</span><span class="tag">${img ? "imagem" : "log"}</span>${ev.size ? `<span class="muted">${fmtSize(ev.size)}</span>` : ""}${ev.origin ? `<span class="muted">${esc(BUG_ORIGIN[ev.origin] || ev.origin)}</span>` : ""}${url ? extLink(url, "Abrir o arquivo") : fullUrl ? extLink(fullUrl, "Abrir o arquivo inteiro (mascarado)") : ""}</div>`;
   const red = ev.redactions ? `<div class="red">${redHtml(ev.redactions)}</div>` : "";
+  const tr = !img && logText != null && fullUrl && bugTrunc(ev), tot = tr ? bugTotalLines(ev, fullUrl) : null;
+  const full = tr ? `<p class="notice" style="margin:6px 0 4px" data-bug-trunc="${esc(fullUrl)}">Mostrando ${BUG_PREV_LINES} de ${tot != null ? `${tot} linhas` : `mais linhas (${fmtSize(ev.size)})`}. O restante também vai para o git: leia o arquivo inteiro já mascarado antes de confirmar.</p>
+    <details id="${esc(detailsId)}-full" data-bug-log="${esc(fullUrl)}"><summary style="cursor:pointer;color:var(--accent);font-size:13px;min-height:24px">Ver o arquivo inteiro (mascarado, ${tot != null ? `${tot} linhas` : fmtSize(ev.size)})</summary><pre class="buglog" data-logkey="${esc(fullUrl)}" tabindex="0" aria-label="Conteúdo inteiro mascarado de ${esc(file)}"></pre></details>` : "";
   const body = img ? (url ? `<img class="evimg" src="${esc(url)}" alt="${esc(file)}" loading="lazy">` : "")
-    : logText != null ? `<pre class="buglog" data-logkey="${esc(logKey)}" tabindex="0" aria-label="Prévia mascarada de ${esc(file)}"></pre>`
+    : logText != null ? `<pre class="buglog" data-logkey="${esc(logKey)}" tabindex="0" aria-label="Prévia mascarada de ${esc(file)}"></pre>${full}`
     : url ? `<details id="${esc(detailsId)}" data-bug-log="${esc(url)}" ${open ? "open" : ""}><summary style="cursor:pointer;color:var(--accent);font-size:13px;min-height:24px">Ver o log (texto)</summary><pre class="buglog" data-logkey="${esc(url)}" tabindex="0" aria-label="Conteúdo de ${esc(file)}"></pre></details>` : "";
   return `<li>${head}${red}${body}</li>`;
 }
@@ -1919,13 +1931,14 @@ function bugComposerHtml(sc, opts = {}) {
     ${c.errors.length ? `<ul class="ferr" role="alert">${c.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
     <div class="actions"><button class="btn" type="button" data-bug-draft="${esc(sc)}" ${c.busy ? "disabled" : ""}>${c.busy ? "Gerando prévia…" : d ? "Gerar a prévia de novo" : "Gerar prévia mascarada"}</button></div>
     ${c.busy ? `<p class="muted" role="status" style="font-size:13px">Validando e mascarando no servidor…</p>` : ""}
-    ${d ? `<section class="bugprev" aria-labelledby="${ids.prev}"><h3 id="${ids.prev}" tabindex="-1">Prévia mascarada (rascunho, fora do git)</h3>${d.expiresAt ? `<p class="hint" style="margin:0 0 6px">O rascunho expira em ${esc(new Date(d.expiresAt).toLocaleString("pt-BR"))}.</p>` : ""}
+    ${d ? `<section class="bugprev" aria-labelledby="${ids.prev}"><h3 id="${ids.prev}" tabindex="-1">Prévia mascarada (rascunho, fora do git)</h3>
+      <p class="notice" style="margin:0 0 8px" id="${ids.p}-maskwarn"><b>A máscara é automática e reconhece apenas padrões conhecidos.</b> Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara.</p>${d.expiresAt ? `<p class="hint" style="margin:0 0 6px">O rascunho expira em ${esc(new Date(d.expiresAt).toLocaleString("pt-BR"))}.</p>` : ""}
       <p class="notice" id="${ids.p}-stale" ${stale ? "" : "hidden"}>O link, os arquivos ou o tipo mudaram depois desta prévia: gere a prévia de novo antes de ${sc === "new" ? "registrar" : "acrescentar"}.</p>
       ${bugExtractedHtml(d.extracted, d.source, d.verifiedBy)}
       ${d.warnings.length ? `<ul class="warnl">${d.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
       ${d.evidences.length ? `<ul class="evl" aria-label="Evidências do rascunho">${d.evidences.map((ev, i) => evItemHtml(ev, { url: evIsImage(ev) ? (safeApiUrl(ev.preview?.url) || safeApiUrl(ev.preview) || safeApiUrl(ev.url) || `/api/bug/draft/${encodeURIComponent(d.id)}/${encodeURIComponent(ev.file)}`) : null,
           logKey: `draft:${d.id}:${ev.file}`, logText: evIsImage(ev) ? null : Array.isArray(ev.preview) ? ev.preview.join("\n") : typeof ev.preview === "string" ? ev.preview : null,
-          detailsId: `${ids.p}-dl-${i}` })).join("")}</ul>` : `<p class="fail" style="font-size:13px">O rascunho não tem evidência: adicione um log ou uma imagem.</p>`}
+          detailsId: `${ids.p}-dl-${i}`, fullUrl: evIsImage(ev) ? null : `/api/bug/draft/${encodeURIComponent(d.id)}/${encodeURIComponent(ev.file)}` })).join("")}</ul>` : `<p class="fail" style="font-size:13px">O rascunho não tem evidência: adicione um log ou uma imagem.</p>`}
     </section>${bugConsentHtml(sc, d.repo)}` : ""}`;
 }
 // Motivo (em texto) de o botão final estar desabilitado; "" = pronto.
@@ -2047,7 +2060,10 @@ async function bugMakeDraft(sc) {
   c.busy = false;
   if (res && res.ok) { c.draft = normDraft(j); c.draftKey = key; bugClearConsent(sc);
     c.msg = c.draft.id ? null : { ok: false, text: "O servidor não devolveu o identificador do rascunho." };
-    announce(`Prévia gerada: ${c.draft.evidences.length} evidência${c.draft.evidences.length === 1 ? "" : "s"}. Revise e marque as confirmações.`);
+    // QA-D16-5: prévia truncada → busca o arquivo inteiro já mascarado (para "Mostrando 200 de N linhas" e o "Ver o arquivo inteiro").
+    const cut = c.draft.id ? c.draft.evidences.filter(bugTrunc).map(ev => `/api/bug/draft/${encodeURIComponent(c.draft.id)}/${encodeURIComponent(ev.file)}`) : [];
+    await Promise.all(cut.map(u => loadLog(u)));
+    announce(`Prévia gerada: ${c.draft.evidences.length} evidência${c.draft.evidences.length === 1 ? "" : "s"}.${cut.length ? ` ${cut.length} log(s) com prévia parcial (200 linhas): leia o arquivo inteiro.` : ""} A máscara só reconhece padrões conhecidos: leia o conteúdo e marque as confirmações.`);
     await render(); document.getElementById(ids.prev)?.focus(); return; }
   c.msg = { ok: false, text: res ? `Não foi possível gerar a prévia (${res.status}): ${bugErr(j)}.` : "Falha de rede ao gerar a prévia." };
   announce(c.msg.text); await render(); document.querySelector(`[data-bug-draft="${CSS.escape(sc)}"].btn:not(.sm)`)?.focus();
@@ -2080,7 +2096,10 @@ async function bugSubmit(btn) {
   }
   const code = res ? res.status : "sem conexão";
   if (res && ["rascunho_expirado", "rascunho_alterado"].includes(bugCode(j))) { c.draft = null; c.draftKey = null; bugClearConsent(sc); }
-  c.msg = { ok: false, text: res && res.status === 409 ? `Não foi possível acrescentar (409): ${bugErr(j) === "erro no servidor" ? "a demanda não é bug, foi entregue ou cancelada" : bugErr(j)}.` : `Não foi possível ${sc === "new" ? "registrar o bug" : "acrescentar a evidência"} (${code}): ${bugErr(j)}.` };
+  if (res && sc === "new" && bugCode(j) === "tipo_divergente") c.draftKey = null;   // força "gere a prévia de novo"
+  const e409 = bugErr(j), div = sc === "new" && bugCode(j) === "tipo_divergente";
+  const t409 = div ? (/prévia de novo/.test(e409) ? e409 : `${e409}; gere a prévia de novo`) : sc === "new" ? e409 : e409 === "erro no servidor" ? "a demanda não é bug, foi entregue ou cancelada" : e409;
+  c.msg = { ok: false, text: res && res.status === 409 ? `Não foi possível ${sc === "new" ? "registrar o bug" : "acrescentar a evidência"} (409): ${t409}.` : `Não foi possível ${sc === "new" ? "registrar o bug" : "acrescentar a evidência"} (${code}): ${bugErr(j)}.` };
   announce(c.msg.text); await render();
   updateBugButtons();
 }
