@@ -16,7 +16,7 @@ Branch `feature/D14-tema-e-usabilidade-do-squad-control`, 2026-09-24. Legenda: �
 |---|---|---|
 | S1 abrir/fechar B1–B4, A1–A3 | `test_alertas_d14.py` (revalidação: 20 OK) + `tests/squad/test_governanca_d14_qa.py` (revalidação: 19 = 18 OK + 1 falha esperada, D14-QA-5): B1 fecha com novo gate/OVERRIDE/cancelar/**delivered**; B2 fecha com decisão (APPROVE/**RETURN**); B3 com decisão/**cancelar**; B4 com clarification/override/cancelar, **`start` sem override não fecha**; A1 fecha com gate ≥ 70% e **cancelar**; A2 fecha com **nova atividade**; A3 com delivered/rejected/**cancelar** | ✓ |
 | S2 3º RETURN | B3 `owner: humano`, `returns` volta a 0 depois do `human`; RETURN em outra chave (G3) não soma | ✓ |
-| S3 62% B2 → A1 → fecha | ✓. **0,695** é baixa no servidor e no cliente (B2 aberto; 0,700 não abre nada). Revalidação: "B2 — confiança **69,5% < 70%**" e "G2 exige sua decisão · **69,5%**" no live e no modo sem F1; 62%, 70%, 90% seguem inteiros. Borda 0,6996 no servidor lê "70,0% < 70%" (D14-QA-5) | ✓ QA-1 · ~ QA-5 |
+| S3 62% B2 → A1 → fecha | ✓. **0,695** é baixa no servidor e no cliente (B2 aberto; 0,700 não abre nada). Revalidação: "B2 — confiança **69,5% < 70%**" e "G2 exige sua decisão · **69,5%**" no live e no modo sem F1; 62%, 70%, 90% seguem inteiros. Borda 0,6996 agora lê "69,9" no servidor, igual ao cliente | ✓ QA-1 · ✓ QA-5 |
 | S4 601 × 599 s | 601 s ⇒ A2 + `sem-progresso`; 599 s ⇒ nada; ferramenta pendente 200 s ⇒ `current.long` sem A2; **3601 s ⇒ sem A2 e não "trabalhando"** (STALLED_MAX_S); 3590 s ⇒ A2 | ✓ |
 | S4b precedência | run externa com pid morto há 11 min ⇒ um único A2 ("interrompido") e estado `interrompido` (não `sem-progresso`) | ✓ |
 | S4c G3 APPROVE sem PR | 62% sem decisão ⇒ B2 aberto com a demanda encerrada; decisão fecha o B2 e, na revalidação, **nada fica aberto** (A1 fecha com a demanda encerrada) | ✓ QA-2 |
@@ -83,8 +83,8 @@ já foi entregue). `d11-screenshots.js` mede `belowHeader` (top da faixa = `--hd
 | D14-QA-2 | Orquestrador | média | A1 do G3 ficava aberto numa demanda encerrada | **corrigido** (e33a092) |
 | D14-QA-3 | Orquestrador | média | `#ai-usage` só atualizava a cada 15 s | **corrigido** (e33a092: consumo na `version`) |
 | D14-QA-4 | Frontend | baixa | A 390 px a faixa flutuava a 94 px com conteúdo por cima | **corrigido** (608aeaf: `--hdr-stick: 0px`) |
-| D14-QA-5 | Orquestrador | baixa | `alerts.pct_text` usa `:.1f` (arredonda): 0,6996 lê "confiança 70,0% < 70%" no servidor, enquanto o front trunca e mostra "69,9%". Só afeta [0,6995; 0,7). Trocar por truncamento como no front. Teste: `test_pct_text_06996_nao_vira_70` (falha esperada) | aberto (novo) |
-| D14-QA-6 | Frontend | média | Regressão do 608aeaf: `recoHtml` usa o texto de `pct()` (que já traz "%") no estilo da barra: `style="width:62%%"` é CSS inválido e a barra "RECOMENDAÇÃO DO AUDITOR" fica **cheia (100%) para qualquer confiança** (62% e 69,5% medidos). Usar o número (`g.confidence * 100`) na largura. `d14-governanca.js` cenário `pct-reco`; `d14-reco-barra-1440.png` | aberto (novo) |
+| D14-QA-5 | Orquestrador | baixa | `alerts.pct_text` usa `:.1f` (arredonda): 0,6996 lê "confiança 70,0% < 70%" no servidor, enquanto o front trunca e mostra "69,9%". Só afeta [0,6995; 0,7). Trocar por truncamento como no front. Teste: `test_pct_text_06996_nao_vira_70` | **corrigido** (0e31c1c: trunca, 0,6996 → "69,9") |
+| D14-QA-6 | Frontend | média | Regressão do 608aeaf: `recoHtml` usa o texto de `pct()` (que já traz "%") no estilo da barra: `style="width:62%%"` é CSS inválido e a barra "RECOMENDAÇÃO DO AUDITOR" fica **cheia (100%) para qualquer confiança** (62% e 69,5% medidos). Usar o número (`g.confidence * 100`) na largura. `d14-governanca.js` cenário `pct-reco`; `d14-reco-barra-1440.png` | **corrigido** (66344b6: largura pelo número) |
 
 ## Revalidação (2026-09-24, após e33a092 e 608aeaf)
 Ambiente limpo em `$SCRATCH/rv14`: **7141** = cópia do log/gates/inbox/runs da cópia principal (só leitura, POSTs abortados);
@@ -107,3 +107,18 @@ Capturas regeneradas: `d14-*`, `d13-*`, `d11-*` e a nova `d14-reco-barra-1440.pn
 Veredito QA (revalidação): QA-1..QA-4 corrigidos e verificados; sem regressão nas suítes D11/D13/D14. Dois defeitos novos:
 D14-QA-6 (média, Frontend — barra de confiança sempre cheia, regressão do 608aeaf) e D14-QA-5 (baixa, Orquestrador — borda 0,6996).
 Nenhum é de segurança.
+
+## Checagem final (2026-09-24, após 0e31c1c e 66344b6)
+Ambiente: `$SCRATCH/rv14c`, **7151** = cópia nova do log/gates/inbox/runs da cópia principal + fixtures da D14 + transcrições
+sintéticas, com vigia de stop/start para CA-U3; derrubado ao final; 7070 intocado. O `d14-governanca.js` agora **resolve o código
+Dn de cada fixture pela ordem dos `task` do humano** (mesma regra de `demand_codes`), em vez de fixar D15/D17 nas rotas e na
+regra de 69,5% — a cópia do log pode ter mais ou menos demandas reais (resultado `codigos` na saída).
+
+| Defeito / suíte | Evidência | Status |
+|---|---|---|
+| QA-5 | `test_pct_text_06996_nao_vira_70` passa **sem** `expectedFailure` (`pct_text(0.6996)` ≠ "70"/"70,0"); 0,62/0,70/0,694/0,695 sem mudança | ✓ |
+| QA-6 | `pct-reco`: D15 `style="width:62%"`, largura medida **62,0%**, texto "62% confiança"; D17 `style="width:69.5%"`, largura **69,5%**, texto "69,5% confiança". `d14-reco-barra-1440.png` regenerada (barra parcial) | ✓ |
+| Python | `test_governanca_d14_qa.py` **19 OK** (sem falhas esperadas), `test_alertas_d14.py` **20 OK**, `test_entrega_por_pr.py` tudo OK | ✓ |
+| `d14-governanca.js` completo | 0 erros de console; CA-U1 1440/390 ✓; CA-U2 máx **1.620 ms** (43 `/api/live`, 31 `/api/state`) ✓; CA-U3 atrasado 5,64 s / sem conexão 15,27 s / volta 0,46 s ✓; sem F1 ✓ (regra "B2 — confiança 69,5% < 70%"); axe 32 páginas 0 violações, tema T2 ✓; T1–T6 iguais em 1440/390 (T2 1, T3 1, T4 2, T5 1, T6 3 cliques); `.sev`/`.state` sem cor pura ✓ | ✓ |
+
+Capturas `d14-*` regeneradas. Veredito QA final: D14-QA-1..QA-6 corrigidos e verificados; sem regressão; nenhum defeito aberto.

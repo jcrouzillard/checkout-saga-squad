@@ -102,11 +102,17 @@ async function scenario(name, fn) {
 }
 const ctl = async cmd => { try { fs.unlinkSync('/work/ctl/ack'); } catch (e) {} fs.writeFileSync('/work/ctl/cmd', cmd); for (let i = 0; i < 100; i++) { if (fs.existsSync('/work/ctl/ack')) return true; await sleep(100); } return false; };
 
-const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/auditoria/alertas', '#/demandas/nova', '#/auditoria/politicas'];
+// Código Dn de cada fixture resolvido pela ordem dos `task` do humano (mesma regra de demand_codes/demandCode):
+// a cópia do log pode ter mais ou menos demandas reais, então D15/D17 aqui são nomes de fixture, não códigos fixos.
+const C = {};
+const resolveCodes = () => { let n = 0; for (const e of readLog()) if (e.type === 'task' && e.agent === 'humano' && e.id) { n++; C[e.id] = `D${n}`; } };
+let ROUTES = [];
 
 (async () => {
   browser = await puppeteer.launch({ args: ['--no-sandbox'] });
-  seed(); await sleep(2500);
+  seed(); resolveCodes(); await sleep(2500);
+  ROUTES = ['#/painel', '#/demandas', `#/demandas/${C[D15]}`, '#/squad', '#/auditoria/alertas', '#/demandas/nova', '#/auditoria/politicas'];
+  R('codigos', { D15: C[D15], D16: C[D16], D17: C[D17], D18: C[D18], D19: C[D19] });
 
   // ===== CA-U1: primeira tela sem rolar/clicar (1440x900 e 390x844), a partir de qualquer rota =====
   for (const w of [1440, 390]) await scenario(`CA-U1-${w}`, async () => {
@@ -173,7 +179,7 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
   // ===== CA-U3: indicador e decisões com dado defasado (para e sobe o servidor FIX) =====
   await scenario('CA-U3', async () => {
     const p = await newPage(1440, { readOnly: true });
-    await go(p, '#/demandas/D15/gates'); await sleep(2000);
+    await go(p, `#/demandas/${C[D15]}/gates`); await sleep(2000);
     const st = () => p.evaluate(() => ({ live: document.querySelector('#live-ind').innerText.replace(/\s+/g, ' ').trim(), sr: document.querySelector('#live-sr').textContent,
       srvDown: !document.querySelector('#srv-down').hidden ? document.querySelector('#srv-down').innerText.trim() : null,
       btns: [...document.querySelectorAll('[data-human]')].map(b => ({ t: b.textContent.trim(), dis: b.disabled, title: b.title })),
@@ -203,12 +209,12 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
 
   // ===== Modo sem F1 (/api/live -> 404): mesmas contagens, sem undefined/NaN; texto da regra de 69,5% =====
   await scenario('sem-F1', async () => {
-    const snap = async p => p.evaluate(() => ({ ctrs: [...document.querySelectorAll('#ctrs a')].map(a => a.getAttribute('aria-label')), cpainel: document.querySelector('#c-painel').textContent,
+    const snap = async p => p.evaluate(c17 => ({ ctrs: [...document.querySelectorAll('#ctrs a')].map(a => a.getAttribute('aria-label')), cpainel: document.querySelector('#c-painel').textContent,
       bloq: [...document.querySelectorAll('#alertas ul[aria-labelledby="h-bloqueio"] > li')].map(l => l.querySelector('b')?.textContent),
       aviso: [...document.querySelectorAll('#alertas ul[aria-labelledby="h-aviso"] > li')].map(l => l.querySelector('b')?.textContent),
       states: [...document.querySelectorAll('#main [data-agent]')].map(a => a.dataset.agent + ':' + (a.querySelector('.state')?.textContent || '')),
-      rule0695: [...document.querySelectorAll('[data-alert]')].filter(l => /D17/.test(l.innerText)).map(l => l.querySelector('details p')?.textContent)[0] || null,
-      live: document.querySelector('#live-ind').innerText.replace(/\s+/g, ' ').trim(), liveTitle: document.querySelector('#live-ind').title }));
+      rule0695: [...document.querySelectorAll('[data-alert]')].filter(l => new RegExp(`\\b${c17}\\b`).test(l.innerText)).map(l => l.querySelector('details p')?.textContent)[0] || null,
+      live: document.querySelector('#live-ind').innerText.replace(/\s+/g, ' ').trim(), liveTitle: document.querySelector('#live-ind').title }), C[D17]);
     const res = {};
     for (const mode of ['live', 'noLive']) {
       const p = await newPage(1440, { readOnly: true, noLive: mode === 'noLive' });
@@ -222,7 +228,7 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
         if (/(?<!sem |0 )\bundefined\b|\bNaN\b|\[object Object\]/.test(t)) bad.push(h);
       }
       res[mode].undefinedIn = bad;
-      await go(p, '#/demandas/D17/gates'); await sleep(500);
+      await go(p, `#/demandas/${C[D17]}/gates`); await sleep(500);
       res[mode].gateText0695 = await p.evaluate(() => (document.querySelector('#main')?.innerText.match(/[^\n]*(69|70)[,.]?\d*%[^\n]*/g) || []).slice(0, 4));
       await p.evaluate(() => { location.hash = '#/painel'; }); await sleep(800);
       if (mode === 'noLive') await p.screenshot({ path: '/shots/d14-sem-f1-1440.png' });
@@ -238,10 +244,11 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
     const p = await newPage(1440, { readOnly: true });
     const res = {};
     for (const [code, expect] of [['D15', 62], ['D17', 69.5]]) {
-      await go(p, `#/demandas/${code}`); await sleep(1500);
+      const real = C[code === 'D15' ? D15 : D17];
+      await go(p, `#/demandas/${real}`); await sleep(1500);
       res[code] = await p.evaluate(() => { const r = document.querySelector('.reco'); const bar = r?.querySelector('.bar > div');
         return r && { conf: r.querySelector('.conf')?.textContent, style: bar.getAttribute('style'), ratio: bar.getBoundingClientRect().width / bar.parentElement.getBoundingClientRect().width }; });
-      res[code].barOk = !!res[code] && Math.abs(res[code].ratio * 100 - expect) <= 1;
+      res[code].route = real; res[code].barOk = !!res[code] && Math.abs(res[code].ratio * 100 - expect) <= 1;
       if (code === 'D15') { const el = await p.$('.reco'); if (el) await el.screenshot({ path: '/shots/d14-reco-barra-1440.png' }); }
     }
     R('pct-reco', { ok: res.D15.barOk && res.D17.barOk && /^69,5%/.test(res.D17.conf) && /^62%/.test(res.D15.conf), ...res });
@@ -332,7 +339,7 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
     const probe = async h => { await go(p, h); await sleep(500); return p.evaluate(() => ({ sev: document.querySelectorAll('#main .sev').length, state: document.querySelectorAll('#main .state').length, porque: document.querySelectorAll('#main details summary').length,
       visto: document.querySelectorAll('#main [data-seen]').length, crumbs: document.querySelectorAll('#main nav.crumbs li').length, h1: document.querySelector('#main h1')?.textContent.trim(), filtros: document.querySelectorAll('#main [data-filter]').length,
       legendaLink: !!document.querySelector('#main a[href*="politicas"]'), sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth })); };
-    T.probes = {}; for (const h of ['#/painel', '#/demandas/D15', '#/squad', '#/demandas', '#/auditoria/alertas', '#/demandas/nova']) T.probes[h] = await probe(h);
+    T.probes = {}; for (const h of ['#/painel', `#/demandas/${C[D15]}`, '#/squad', '#/demandas', '#/auditoria/alertas', '#/demandas/nova']) T.probes[h] = await probe(h);
     // CA-T3: escala de cinza — severidades/estados carregam ícone + palavra
     T.T3cor = await p.evaluate(() => ({ sevSemTexto: [...document.querySelectorAll('.sev')].filter(s => !s.textContent.trim() || !s.querySelector('svg')).length, stateSemIcone: [...document.querySelectorAll('.state')].filter(s => !s.querySelector('.ic') || !s.textContent.replace(/[●○▲■◷✓]/g, '').trim()).length }));
     R(`tarefas-${w}`, T);

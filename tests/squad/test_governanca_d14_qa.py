@@ -199,7 +199,6 @@ class Confianca(unittest.TestCase):
         self.assertEqual(al.pct_text(0.695), "69,5")
         self.assertIsNone(al.pct_text(None))
 
-    @unittest.expectedFailure   # DEFEITO D14-QA-5 (orquestrador): pct_text usa :.1f (arredonda) e 0,6996 lê "70,0% < 70%"; o front trunca (69,9%)
     def test_pct_text_06996_nao_vira_70(self):
         """Valor baixo que arredonda para 70,0 com 1 casa: o texto não pode ler '70,0% < 70%' (o front mostra 69,9%)."""
         txt = al.pct_text(0.6996)
