@@ -18,6 +18,7 @@ import json
 import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 from datetime import date
@@ -228,16 +229,24 @@ def feature_finish(a):
 
 
 def after_review(delivered: bool):
-    """D15 (ADR-018): libera o ambiente de teste (reconcile: delivered/review-rejected → test-env-released e publica o
-    próximo da fila) e, após o merge, atualiza o produtivo só nos serviços alterados (desligável com
-    SQUAD_PROD_AUTOUPDATE=0). Só age onde o ambiente existe (cópias sem compose/teste.env são ignoradas)."""
-    if (ROOT / "infra/teste/teste.env").exists() and (ROOT / "tools/squad/testenv.py").exists():
-        out = subprocess.run(["python3", "tools/squad/testenv.py", "reconcile"], cwd=ROOT, capture_output=True, text=True)
-        print((out.stdout or out.stderr).strip())
+    """D15 (ADR-018): após o merge, primeiro atualiza o produtivo só nos serviços alterados (desligável com
+    SQUAD_PROD_AUTOUPDATE=0) e só depois libera o ambiente de teste e publica o próximo da fila (reconcile). Roda em
+    segundo plano (log em .squad/after-review.log) para o review-sync não ficar preso a builds longos. Só age onde o
+    ambiente existe (cópias sem compose/teste.env são ignoradas)."""
+    steps = []
     if (delivered and current() == "develop" and os.environ.get("SQUAD_PROD_AUTOUPDATE", "1") != "0"
             and (ROOT / "docker-compose.yml").exists() and (ROOT / "tools/squad/prod.py").exists()):
-        out = subprocess.run(["python3", "tools/squad/prod.py", "update", "--auto"], cwd=ROOT, capture_output=True, text=True)
-        print((out.stdout + out.stderr).strip())
+        steps.append(["python3", "tools/squad/prod.py", "update", "--auto"])
+    if (ROOT / "infra/teste/teste.env").exists() and (ROOT / "tools/squad/testenv.py").exists():
+        steps.append(["python3", "tools/squad/testenv.py", "reconcile"])
+    if not steps:
+        return
+    (ROOT / ".squad").mkdir(exist_ok=True)
+    script = " ; ".join(" ".join(shlex.quote(x) for x in cmd) for cmd in steps)
+    with (ROOT / ".squad/after-review.log").open("a", encoding="utf-8") as log_file:
+        subprocess.Popen(["sh", "-c", script], cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    print("pós-revisão em segundo plano: " + " → ".join(c[2] + " " + c[3] for c in steps) + " (log em .squad/after-review.log)")
 
 
 def review_sync(a):

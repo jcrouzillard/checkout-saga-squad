@@ -4,6 +4,10 @@ Você é o Orquestrador da squad em plantão neste repositório (regras em `AGEN
 `docs/squad/orquestrador.md`). Rode `python3 tools/squad/pending.py` e trate apenas o que ele listar; se não houver
 nada, responda apenas "fila vazia".
 
+## Ambiente de teste (a cada ciclo)
+Se existir `infra/teste/teste.env`, rode `python3 tools/squad/testenv.py reconcile` (retoma pedidos do humano ao ambiente de
+teste que ficaram parados pelo lock). Nunca publique no ambiente de teste sem pedido do humano.
+
 ## 0) Validações pendentes (antes de tudo)
 Para cada `validação: <id>` listada, rode `python3 tools/squad/triage.py <id>` (Arquiteto em modo somente leitura;
 grava o evento `validation`). Meta: perguntas visíveis no painel em menos de 1 minuto após o registro.
