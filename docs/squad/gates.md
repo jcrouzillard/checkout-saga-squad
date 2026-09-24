@@ -9,6 +9,10 @@ Peso entre parênteses. **B** = bloqueante (falhou → `RETURN`).
 - (2) Idempotência, retries, timeouts e rastreabilidade descritos.
 - (1) ADRs para Saga orquestrada, outbox, database-per-service, broker.
 - (1) Resposta à pergunta de evolução (seção 12).
+- (B, 3) **Demanda de bug** (D16, ADR-019): teste falha antes da correção — existe o commit do teste que reproduz o
+  bug (evento `evidence reproducao=FAIL` do QA) **antes** de qualquer commit de correção; no commit do teste ele falha
+  pelo motivo do bug. Verificação sem trocar a branch: `git worktree add /tmp/g1-<id> <commit do teste>` e rodar o
+  teste lá. Sem isso → `RETURN`. Não se aplica a demandas comuns.
 
 ## G2 · Backend (+ DevOps + Observabilidade) ou Frontend → QA
 - Para entregas de **Frontend** (`checkout-console/`): (B, 3) página servida pelo container e fluxo de pedido funcionando contra o ambiente real; (B, 2) nenhuma chamada fora de `docs/contracts/api.md`; (2) acessibilidade básica (rótulos, foco, contraste) e responsividade; (1) aderência ao brief de UX do Arquiteto.
@@ -25,6 +29,9 @@ Peso entre parênteses. **B** = bloqueante (falhou → `RETURN`).
 - (B, 2) Matriz de rastreabilidade `tests/TRACEABILITY.md` cobre todos os requisitos.
 - (2) Trace ponta a ponta visível no Jaeger para um pedido.
 - (1) README explica como reproduzir cada falha.
+- (B, 3) **Demanda de bug** (D16, ADR-019): teste falha antes da correção — `git log --reverse` da branch mostra o
+  commit do teste antes do commit de correção; o teste **falha** no commit dele (rodado num `git worktree`
+  temporário, sem trocar a branch) e **passa** no *head*. Sem isso → `RETURN`. Não se aplica a demandas comuns.
 
 ## Cálculo de confiança
 `confiança = Σ pesos cumpridos com evidência / Σ pesos`. Critérios "validar" (evidência parcial) contam 50%.

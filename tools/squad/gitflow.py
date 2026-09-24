@@ -54,11 +54,18 @@ def current() -> str:
     return sh("git", "rev-parse", "--abbrev-ref", "HEAD")
 
 
-STATE = ("docs/squad/memory/", "docs/squad/inbox/")  # memória viva da squad (log, sync): muda o tempo todo e é commitada automaticamente
+# memória viva da squad (log, sync e — D16/ADR-019 — as pastas de bugs): muda o tempo todo e é commitada automaticamente
+STATE = ("docs/squad/memory/", "docs/squad/inbox/", "docs/squad/produto/bugs/", "docs/squad/operacao/bugs/")
+
+
+def porcelain() -> list[str]:
+    """`-uall`: arquivos novos aparecem um a um (sem isso uma pasta nova vem colapsada como `?? docs/squad/produto/`
+    e não casa com o prefixo de STATE — ressalva 3 do G1 da D16)."""
+    return sh("git", "status", "--porcelain", "-uall").splitlines()
 
 
 def snapshot_state():
-    changed = [l[3:] for l in sh("git", "status", "--porcelain").splitlines() if l[3:].startswith(STATE)]
+    changed = [l[3:] for l in porcelain() if l[3:].startswith(STATE)]
     if changed:
         sh("git", "add", "--", *changed)
         sh("git", "commit", "-q", "-m", f"Sincronização da memória da squad{TRAILER}")
@@ -66,7 +73,7 @@ def snapshot_state():
 
 def clean_tree():
     snapshot_state()
-    dirty = [l for l in sh("git", "status", "--porcelain").splitlines() if not l[3:].startswith(STATE)]
+    dirty = [l for l in porcelain() if not l[3:].startswith(STATE)]
     if dirty:
         sys.exit("há alterações não commitadas; faça commit antes de trocar de branch:\n" + "\n".join(dirty))
 
@@ -156,7 +163,8 @@ def align_memory(branch: str):
         switch("develop")
         sys.exit("conflito de código entre a feature e a develop; resolva antes de revisar:\n" + "\n".join(unmerged))
     if out.returncode == 0 or sh("git", "status", "--porcelain"):
-        sh("git", "add", "-A", "--", *STATE)
+        for path in STATE:  # um por vez: pasta de bugs ainda inexistente não pode falhar o add (D16)
+            sh("git", "add", "-A", "--", path, check=False)
         sh("git", "commit", "-q", "--no-edit", "-m", f"Sincroniza a develop e a memória da squad antes da revisão{TRAILER}", check=False)
     sh("git", "push", "-q", "origin", branch)
     switch("develop")

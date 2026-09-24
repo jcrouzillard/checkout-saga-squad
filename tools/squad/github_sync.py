@@ -175,8 +175,48 @@ class Sync:
         if e.get("backlog"):
             subprocess.run(["gh", "label", "create", "backlog", "--color", "9AA1B2", "-R", REPO, "-f"], capture_output=True)
             labels.append("backlog")
-        self.create_issue(e["id"], e["title"] if phase else f"{e['title']}", self.body(e, "Delegação do Orquestrador"),
+        body = self.body(e, "Delegação do Orquestrador")
+        if e.get("nature") == "bug":   # D16 (ADR-019 §11): tipo:bug SOMADA a tipo:<kind>, e severidade:<x>
+            bug = e.get("bug") or {}
+            sev = f"severidade:{bug.get('severity') or 'media'}"
+            subprocess.run(["gh", "label", "create", "tipo:bug", "--color", "B60205", "-R", REPO, "-f"], capture_output=True)
+            subprocess.run(["gh", "label", "create", sev, "--color", "D93F0B", "-R", REPO, "-f"], capture_output=True)
+            labels += ["tipo:bug", sev]
+            body = self.bug_section(bug, body)
+        self.create_issue(e["id"], e["title"] if phase else f"{e['title']}", body,
                           to, labels, "Backlog" if e.get("backlog") else "Em andamento", phase)
+
+    def evidence_rows(self, bug_dir: str, items: list[dict]) -> list[str]:
+        rows = []
+        for v in items:
+            path = f"{bug_dir}/evidencias/{v.get('file')}"
+            red = ", ".join(f"{k} {n}" for k, n in (v.get("redactions") or {}).items() if isinstance(n, int) and n) or "—"
+            rows.append(f"| [`{v.get('file')}`](https://github.com/{REPO}/blob/develop/{path}) | {v.get('type')} | "
+                        f"{v.get('origin')} | {v.get('size')} | {red} |")
+        return rows
+
+    def bug_section(self, bug: dict, body: str) -> str:
+        src = bug.get("source") or {}
+        lines = ["", "### Bug (produtivo)", f"- Severidade: **{bug.get('severity', 'media')}** · verificado por "
+                 f"`{bug.get('verifiedBy')}`" + (f" · origem: {src.get('type')} `{src.get('url')}`" if src else ""),
+                 f"- Pasta: {self.link(bug.get('dir', ''))}", "",
+                 "| Evidência | Tipo | Origem | Bytes | Máscaras |", "|---|---|---|---|---|",
+                 *self.evidence_rows(bug.get("dir", ""), bug.get("evidences") or [])]
+        marker = "\n\n<sub>evento"
+        i = body.rfind(marker)
+        return body[:i] + "\n".join(lines) + body[i:] if i >= 0 else body + "\n".join(lines)
+
+    def on_bug_evidence(self, e):
+        """D16: evidência acrescentada → comentário com as novas linhas da tabela (idempotente pelo id do evento)."""
+        issue = self.s["issues"].get(e.get("demand"))
+        if not issue:
+            return
+        task = next((x for x in [json.loads(l) for l in LOG.read_text(encoding="utf-8").splitlines() if l.strip()]
+                     if x.get("id") == e.get("demand")), {})
+        bug_dir = (task.get("bug") or {}).get("dir", "")
+        rows = self.evidence_rows(bug_dir, e.get("evidences") or [])
+        self.comment(issue, f"**Evidência acrescentada ao bug** · {e['ts']}\n\n| Evidência | Tipo | Origem | Bytes | Máscaras |\n"
+                            f"|---|---|---|---|---|\n" + "\n".join(rows) + f"\n\n<sub>evento `{e['id']}`</sub>")
 
     def on_edit(self, e):
         issue = self.s["issues"].get(e.get("demand"))
@@ -188,6 +228,7 @@ class Sync:
             args += ["--title", f"Demanda: {ch['title']}"]
         if "detail" in ch:
             args += ["--body", ch["detail"] or "(sem descrição)"]
+        # troca exclusiva de tipo:* só entre produto|operacao: tipo:bug (D16) nunca é removida aqui
         for field, prefix, values in (("kind", "tipo", ("produto", "operacao")), ("priority", "prioridade", ("alta", "normal", "baixa"))):
             if ch.get(field):
                 subprocess.run(["gh", "label", "create", f"{prefix}:{ch[field]}", "--color", "5A6B7F", "-R", REPO, "-f"], capture_output=True)
@@ -345,7 +386,7 @@ class Sync:
     def on_demand_event(self, e):
         """Qualquer evento que carregue `demand` também é comentado na issue da demanda; G3 APPROVE a conclui."""
         issue = self.s["issues"].get(e.get("demand"))
-        if not issue or e["type"] in ("progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
+        if not issue or e["type"] in ("progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected", "bug-evidence") or e["type"] in ("start", "task", "control") and e["agent"] == "humano":
             return
         self.comment(issue, self.body(e, f"{e['type']} · {LABEL.get(e['agent'], e['agent'])}"))
         if e["type"] == "gate" and e.get("gate") == "G3" and e.get("recommendation") == "APPROVE":
@@ -359,7 +400,7 @@ class Sync:
                     "change-request": self.on_ticket, "decision": self.on_decision, "start": self.on_start, "control": self.on_control,
                     "validation": self.on_validation, "clarification": self.on_clarification,
                     "edit": self.on_edit, "review": self.on_review, "delivered": self.on_delivered,
-                    "review-rejected": self.on_review_rejected}
+                    "review-rejected": self.on_review_rejected, "bug-evidence": self.on_bug_evidence}
         n = 0
         for e in events:
             if e["id"] in done:
