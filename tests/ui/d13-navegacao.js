@@ -5,6 +5,8 @@
 // REAL = servidor com os dados reais, SOMENTE LEITURA (todo POST é abortado pelo script).
 // FIX  = servidor com SQUAD_ROOT_DATA = cópia temporária ($DATA, montada em /work/data); o script acrescenta
 //        fixtures ao log dessa cópia e confere nele os eventos gravados pela UI (nunca no log real).
+// Autossuficiente: se a cópia não tiver as fixtures base (D14–D17), o script as cria; FIX_PID = pid vivo no host para o run
+//   do Backend na D14 (ex.: -e FIX_PID=<pid do servidor FIX>). ONLY=<regex> roda só os cenários escolhidos.
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const REAL = process.env.REAL || 'http://host.docker.internal:7112/';
@@ -82,6 +84,28 @@ async function scenario(name, fn) {
 // ---------------------------------------------------------------------------------------------
 (async () => {
   browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+
+  // ===== Fixtures base (script autossuficiente): D14/D15/D16 ativas, D17 backlog, Backend trabalhando na D14 =====
+  // Só na cópia temporária (/work/data). FIX_PID = pid vivo NO HOST (o servidor só testa kill(pid, 0)); sem ele, não há run.
+  if (!readLog().some(e => e.id === 'fx14aaaaaaaa')) {
+    const ago = m => iso(Date.now() - m * 60000), ev = [];
+    for (const [code, did, title, t0] of [['D14', 'fx14aaaaaaaa', 'QA fixture A — demanda ativa do meio', 60], ['D15', 'fx15bbbbbbbb', 'QA fixture B — segunda ativa', 50], ['D16', 'fx16cccccccc', 'QA fixture C — ultima ativa', 40]]) {
+      ev.push({ id: did, ts: ago(t0), agent: 'humano', type: 'task', to: 'orquestrador', title: `Demanda: ${title}`, detail: `Fixture do QA (${code}).`, priority: 'normal', kind: 'operacao' },
+        { id: did + '-v', ts: ago(t0 - 1), agent: 'arquiteto', type: 'validation', demand: did, status: 'ok', title: 'Validação ok', questions: [] },
+        { id: did + '-s', ts: ago(t0 - 2), agent: 'humano', type: 'start', to: 'orquestrador', demand: did, title: `Iniciar: ${title}`, priority: 'normal', route: 'padrao', target: 'auto' },
+        { id: did + '-t', ts: ago(t0 - 3), agent: 'orquestrador', type: 'task', to: 'backend', demand: did, title: `${code}: implementar fixture` },
+        { id: did + '-h', ts: ago(t0 - 5), agent: 'backend', type: 'handoff', to: 'auditor', demand: did, title: 'Implementação pronta', model: 'gpt-5-codex', modelProvider: 'OpenAI' });
+    }
+    ev.push({ id: 'fx17dddddddd', ts: ago(30), agent: 'humano', type: 'task', to: 'orquestrador', title: 'Demanda: QA fixture D — item de backlog', detail: 'Fixture de backlog.', priority: 'baixa', kind: 'produto', backlog: true });
+    append(ev);
+    if (process.env.FIX_PID) {
+      const dir = '/work/data/.squad/runs'; fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(`${dir}/20260924120000-backend-qa0001.json`, JSON.stringify({ id: '20260924120000-backend-qa0001', agent: 'backend', runner: 'codex', demand: 'fx14aaaaaaaa', description: 'Backend · implementar fixture da D14',
+        started: ago(20), status: 'trabalhando', pid: +process.env.FIX_PID, model: 'gpt-5-codex', modelProvider: 'OpenAI' }));
+      fs.writeFileSync(`${dir}/20260924120000-backend-qa0001.log`, 'editando services/order-service/src/main/java/...\nrodando mvn -q test\n');
+    }
+    await sleep(1500);
+  }
 
   // ===== CA-1..5, 11, 13-16: varredura de rotas (dados reais, somente leitura) + capturas =====
   const ROUTES = [
@@ -524,6 +548,78 @@ async function scenario(name, fn) {
     await go(p, FIX, '#/decisoes'); await go(p, FIX, '#/painel'); const n3 = await p.evaluate(() => document.querySelector('#main .notice')?.textContent || '');
     R('achados-1440', { secoes: r, aviso: { xyz: n1, depoisSquadBase: n2, depoisAliasEPainel: n3 } });
     await p._ctx.close();
+  });
+
+  // ===== Revalidação dos defeitos DEF-1..DEF-5 (commit 89e5834) + confirmação de cancelar no polling =====
+  await scenario('revalidacao-1440', async () => {
+    const r = {};
+    // DEF-1: validação atrasada só para demanda ainda não iniciada. Controle positivo: fx22 atrasada, sem start.
+    append([{ id: 'fx22late0000', ts: iso(Date.now() - 7 * 60000), agent: 'humano', type: 'task', to: 'orquestrador', title: 'Demanda: QA fixture H — atrasada sem início', detail: '', priority: 'normal', kind: 'operacao' }]);
+    const started = ['fx17dddddddd', 'fx18late0000'].map(id => ({ id, code: codeOf(id), start: !!readLog().find(e => e.type === 'start' && e.demand === id) }));
+    const cPos = codeOf('fx22late0000');
+    const p = await newPage(FIX, 1440);
+    await go(p, FIX, '#/painel'); await sleep(1500);
+    const precisa = await p.evaluate(() => [...document.querySelectorAll('#main section[aria-labelledby="h-precisa"] li')].map(li => li.textContent.replace(/\s+/g, ' ').trim().slice(0, 110)));
+    const bad = precisa.filter(t => started.some(s => s.code && new RegExp(`(^|\\D)${s.code}(?!\\d)`).test(t)) && /atrasada/i.test(t));
+    const pos = precisa.filter(t => new RegExp(`(^|\\D)${cPos}(?!\\d)`).test(t) && /atrasada/i.test(t));
+    r['DEF-1'] = { started, precisa, bad, positivo: { code: cPos, itens: pos }, ok: started.every(s => s.start) && !bad.length && pos.length === 1 };
+    // DEF-2: índice local marca a seção e #/…/registro abre o Registro.
+    const secs = {};
+    for (const [s, t] of [['execucao', 'Execução'], ['gates', 'Gates'], ['validacao', 'Validação'], ['registro', 'Registro']]) {
+      await go(p, FIX, `#/demandas/D16/${s}`); await sleep(300);
+      secs[s] = await p.evaluate(() => ({ toc: document.querySelector('.toc a[aria-current="location"]')?.textContent || null, regOpen: document.querySelector('#main details[id^="reg-"]')?.open }));
+      secs[s].ok = secs[s].toc === t && (s !== 'registro' || secs[s].regOpen === true);
+    }
+    await go(p, FIX, '#/demandas/D16'); const semSecao = await p.evaluate(() => document.querySelector('.toc a[aria-current]')?.textContent || null);
+    r['DEF-2'] = { secs, semSecao, ok: Object.values(secs).every(x => x.ok) && semSecao === null };
+    // DEF-4: aviso só no redirecionamento que o criou.
+    await go(p, FIX, '#/xyz'); const n1 = await p.evaluate(() => document.querySelector('#main .notice')?.textContent || '');
+    await go(p, FIX, '#/painel#squad-base'); const n2 = await p.evaluate(() => document.querySelector('#main .notice')?.textContent || '');
+    await go(p, FIX, '#/xyz'); await go(p, FIX, '#/demandas'); const n3 = await p.evaluate(() => document.querySelector('#main .notice')?.textContent || '');
+    await go(p, FIX, '#/abc'); const n4 = await p.evaluate(() => ({ hash: location.hash, notice: document.querySelector('#main .notice')?.textContent || '' }));
+    r['DEF-4'] = { xyz: n1, depoisSquadBase: n2, depoisDemandas: n3, segundoInvalido: n4, ok: /não encontrada/.test(n1) && !n2 && !n3 && /não encontrada/.test(n4.notice) && n4.hash === '#/painel' };
+    // DEF-5: cada ciclo de G2 da D14 mostra a decisão humana do seu ciclo.
+    await go(p, FIX, '#/demandas/D14/gates'); await sleep(500);
+    const cards = await p.evaluate(() => [...document.querySelectorAll('#sec-gates .card')].map(c => ({ head: c.querySelector('b')?.textContent.trim(), human: c.querySelector('.ok-msg')?.textContent.trim() || null })));
+    const g2 = cards.filter(c => /^G2/.test(c.head || ''));
+    const humans = readLog().filter(e => e.type === 'human' && e.gate === 'G2' && e.demand === D14).map(e => e.detail);
+    r['DEF-5'] = { g2, humans, ok: g2.length >= 2 && /QA T2 toast/.test(g2[0].human || '') && /QA T10/.test(g2[1].human || '') && !/QA T10/.test(g2[0].human || '') };
+    await p.screenshot({ path: '/shots/d13-demanda-gates-1440.png', fullPage: true });
+    await p._ctx.close();
+    // DEF-3: links de PR (reviewHtml) e issue do backlog com ↗ e "(abre em nova aba)" — dados reais, só leitura.
+    const q = await newPage(REAL, 1440, { readOnly: true });
+    const extOf = sel => q.evaluate(sel => [...document.querySelectorAll(sel)].filter(a => a.target === '_blank' && a.getClientRects().length).map(a => ({ t: a.textContent.trim().slice(0, 50),
+      arrow: getComputedStyle(a, '::after').content.includes('↗') || a.textContent.includes('↗'), sr: /abre em nova aba/.test(a.textContent) })), sel);
+    await go(q, REAL, '#/painel'); const entregues = await extOf('#main section[aria-labelledby="h-entregues"] a');
+    await go(q, REAL, '#/demandas/D11'); const cabecalho = await extOf('#main .pass a, #main .page-head a');
+    await go(q, REAL, '#/demandas?f=backlog'); const issues = await extOf('#main .bl-item a');
+    const q2 = await newPage(FIX, 1440, { readOnly: true });
+    // Issue do item de backlog: fixture de github-sync.json só na cópia temporária (fx20bl000000, backlog do extra-390).
+    const GS = '/work/data/docs/squad/memory/github-sync.json'; const gs = JSON.parse(fs.readFileSync(GS, 'utf8'));
+    gs.issues = gs.issues || {}; gs.issues.fx20bl000000 = { number: 920, url: 'https://github.com/x/y/issues/920', agent: 'orquestrador', status: 'Backlog', closed: false, kind: 'task' };
+    fs.writeFileSync(GS, JSON.stringify(gs)); await sleep(1500);
+    await go(q2, FIX, '#/demandas?f=backlog');
+    const issuesFix = await q2.evaluate(() => [...document.querySelectorAll('#main .bl-item a[target=_blank]')].map(a => ({ t: a.textContent.trim(), arrow: getComputedStyle(a, '::after').content.includes('↗') || a.textContent.includes('↗'), sr: /abre em nova aba/.test(a.textContent) })));
+    await go(q2, FIX, `#/demandas/${codeOf('fx19rej00000')}`);
+    const devolvida = await q2.evaluate(() => [...document.querySelectorAll('#main .qbox a[target=_blank]')].map(a => ({ t: a.textContent.trim(), arrow: getComputedStyle(a, '::after').content.includes('↗') || a.textContent.includes('↗'), sr: /abre em nova aba/.test(a.textContent) })));
+    await q2._ctx.close();
+    const all = [...entregues, ...cabecalho, ...issues, ...issuesFix, ...devolvida];
+    r['DEF-3'] = { entregues, cabecalho, issues, issuesFix, devolvida, posts: q._posts.length, ok: entregues.some(x => /PR #/.test(x.t)) && issuesFix.some(x => /issue #920/.test(x.t)) && all.every(x => x.arrow && x.sr) };
+    await q._ctx.close();
+    // Cancelar demanda: a confirmação sobrevive ao polling (evento novo no log força o redesenho).
+    const c = await newPage(FIX, 1440);
+    await go(c, FIX, '#/demandas/D14'); await sleep(800);
+    await clk(c, '#main [data-ctl="cancel"]', 'Cancelar demanda', 'Cancelar demanda (D14)');
+    const t0 = await c.evaluate(() => document.querySelector('#main [data-ctl="cancel"]')?.textContent.trim());
+    append([{ id: `qapoll${Date.now()}`, ts: iso(), agent: 'qa', type: 'progress', title: 'QA: evento durante a confirmação de cancelar', demand: D16 }]);
+    let polls = 0; c.on('request', x => { if (x.url().includes('/api/state')) polls++; });
+    await sleep(8000);
+    const t1 = await c.evaluate(() => ({ txt: document.querySelector('#main [data-ctl="cancel"]')?.textContent.trim(), confirm: document.querySelector('#main [data-ctl="cancel"]')?.dataset.confirm }));
+    await go(c, FIX, '#/demandas/D16'); await go(c, FIX, '#/demandas/D14'); await sleep(500);
+    const t2 = await c.evaluate(() => document.querySelector('#main [data-ctl="cancel"]')?.textContent.trim());
+    r['cancelar-polling'] = { antes: t0, depoisPolling: t1, polls, depoisDeNavegar: t2, posts: c._posts.length, ok: t0 === 'Confirmar cancelamento' && t1.txt === 'Confirmar cancelamento' && polls >= 2 && t2 === 'Cancelar demanda' && c._posts.length === 0 };
+    await c._ctx.close();
+    R('revalidacao-1440', r);
   });
 
   console.log(JSON.stringify(out, null, 1));
