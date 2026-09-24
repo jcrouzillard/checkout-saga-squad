@@ -4,26 +4,47 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Squad Control</title>
+<script>
+/* D14 §10.2: tema aplicado antes do primeiro desenho (sem flash). sc-theme = system | light | dark. */
+(function () {
+  var pref = "system"; try { pref = localStorage.getItem("sc-theme") || "system"; } catch (e) {}
+  var dark = pref === "dark" || (pref !== "light" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+  /* D14 (contrato ui-governanca §10): tema "Grafite" próprio — tokens claro/escuro com contraste AA medido.
+     Os nomes antigos (--panel, --green, --red…) viram apelidos dos tokens novos para não quebrar as regras da D3–D13. */
   :root {
-    --bg: #FFFFFF; --panel: #FFFFFF; --panel2: #F6F6F4; --line: #DCDCD8; --line2: #ECECE8; --text: #1C1C1E;
-    --muted: #4A4B50; --dim: #7A7B80; --accent: #1F3A5F; --accent-soft: #F3F5F8; --green: #2F6B45;
-    --green-soft: #EAF2EC; --amber: #8A5A12; --amber-soft: #FBF7EF; --red: #9B2C2C; --blue: #1F3A5F;
+    --bg: #F7F7F5; --surface: #FFFFFF; --raised: #F0F1F2; --text: #1B1D21; --muted: #4B5058; --dim: #646A73;
+    --line: #E3E4E6; --line-strong: #858B94; --accent: #0B5F6A; --accent-soft: #E6F1F2; --danger: #A4262C; --danger-soft: #FBEDED;
+    --warn: #8A5300; --warn-soft: #FDF3E3; --ok: #2E6B3F; --ok-soft: #EAF3EC; --on-accent: #FFFFFF;
+    --shadow: 0 8px 24px rgb(0 0 0 / .12); --hdr-h: 56px; --hdr-stick: var(--hdr-h);
+    color-scheme: light;
   }
+  :root[data-theme="dark"] {
+    --bg: #111316; --surface: #1A1D21; --raised: #22262B; --text: #E8EAED; --muted: #B4BAC2; --dim: #969DA6;
+    --line: #2C3036; --line-strong: #737A84; --accent: #5CC3CF; --accent-soft: #12343A; --danger: #FF8A85; --danger-soft: #3A1D1E;
+    --warn: #F2B24C; --warn-soft: #3A2C14; --ok: #6FCF8E; --ok-soft: #1B3223; --on-accent: #111316;
+    --shadow: 0 8px 24px rgb(0 0 0 / .4);
+    color-scheme: dark;
+  }
+  :root { --panel: var(--surface); --panel2: var(--raised); --line2: var(--line); --green: var(--ok); --green-soft: var(--ok-soft);
+    --amber: var(--warn); --amber-soft: var(--warn-soft); --red: var(--danger); --blue: var(--accent); }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  body { margin: 0; background: var(--bg); -webkit-font-smoothing: antialiased; color: var(--text); font: 14px/1.5 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
   code, time, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
   .app { max-width: 1440px; margin: 0 auto; }
   .frame { background: var(--panel); min-height: 100vh; }
-  header { display: flex; align-items: stretch; justify-content: space-between; padding: 0 28px; height: 56px; border-bottom: 1px solid var(--line); gap: 12px; }
+  header { display: flex; align-items: stretch; justify-content: space-between; padding: 0 24px; height: 56px; border-bottom: 1px solid var(--line); gap: 12px; position: sticky; top: 0; z-index: 8; background: var(--surface); }
   .brand { display: flex; gap: 14px; align-items: center; }
-  .logo { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .logo { width: 28px; height: 28px; border-radius: 4px; background: var(--text); color: var(--surface); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
   .brand b { font-size: 15px; font-weight: 600; }
   .brand span { color: var(--muted); font-size: 14px; padding-left: 14px; border-left: 1px solid var(--line); }
   /* D13 (ADR-016): link "Pular para o conteúdo", trilha, abas locais (segmentos), etapas, Próxima ação, avisos. */
-  .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--accent); color: #fff; padding: 10px 14px; font-weight: 600; text-decoration: none; }
+  .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--accent); color: var(--on-accent); padding: 10px 14px; font-weight: 600; text-decoration: none; }
   .skip:focus { top: 8px; }
   .crumbs { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .crumbs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
@@ -37,7 +58,7 @@
   .seg a[aria-current] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
   .seg a .n { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--dim); }
   .notice { margin: 0 0 16px; padding: 10px 14px; border-left: 3px solid var(--amber); background: var(--amber-soft); font-size: 13px; }
-  .notice.err { border-left-color: var(--red); background: #FBF3F3; }
+  .notice.err { border-left-color: var(--red); background: var(--danger-soft); }
   .btn.sm { height: 36px; padding: 0 14px; }
   a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
   a.btn.primary { flex-grow: 0; }
@@ -48,13 +69,13 @@
   .stepper li.stop { border-top-color: var(--red); color: var(--red); font-weight: 600; }
   .stepper-legend { display: none; font-size: 12px; color: var(--muted); margin-top: 6px; }
   .next-box { margin-top: 20px; background: var(--accent-soft); border-top: 2px solid var(--accent); padding: 14px 18px 16px; }
-  .next-box.urgent { border-top-color: var(--red); background: #FBF6F6; }
+  .next-box.urgent { border-top-color: var(--red); background: var(--danger-soft); }
   .next-box > small { letter-spacing: .1em; color: var(--muted); font-size: 11px; font-weight: 600; }
   .next-box h2 { margin: 4px 0 6px; font-size: 17px; font-weight: 600; }
-  .toc { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 22px 0 0; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; background: #fff; }
+  .toc { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 22px 0 0; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; background: var(--surface); }
   .toc a { color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
   .toc a[aria-current] { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 6px; }
-  .dsec { margin-top: 26px; scroll-margin-top: calc(var(--usage-h, 0px) + 56px); }
+  .dsec { margin-top: 26px; scroll-margin-top: calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px) + 56px); }
   .dsec > h2 { font-size: 16px; font-weight: 600; margin: 0 0 10px; padding-top: 12px; border-top: 1px solid var(--text); }
   .dsec > h2:focus { outline: none; } .dsec > h2:focus-visible { outline: 2px solid var(--accent); }
   .rows { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
@@ -69,10 +90,10 @@
   .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 16px; flex-wrap: wrap; }
   .filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; margin-top: 16px; }
   .filters label { display: block; font-size: 11px; color: var(--muted); font-weight: 500; }
-  .filters select { padding: 7px 8px; border: 1px solid #C9C9C5; border-radius: 2px; font: inherit; background: #fff; min-width: 140px; max-width: 100%; }
+  .filters select { padding: 7px 8px; border: 1px solid var(--line-strong); border-radius: 2px; font: inherit; background: var(--surface); min-width: 140px; max-width: 100%; }
   .strip { display: flex; justify-content: space-between; padding: 7px 28px; background: var(--panel2); border-bottom: 1px solid var(--line2); font-size: 12px; color: var(--dim); }
-  .btn { background: #fff; color: var(--text); border: 1px solid var(--text); border-radius: 2px; padding: 0 20px; height: 44px; font: inherit; font-weight: 500; cursor: pointer; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; flex-grow: 1; }
+  .btn { background: var(--surface); color: var(--text); border: 1px solid var(--text); border-radius: 2px; padding: 0 20px; height: 44px; font: inherit; font-weight: 500; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; flex-grow: 1; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: calc(100vh - 90px); }
   .side { background: var(--panel2); border-right: 1px solid var(--line); padding: 24px 0; min-width: 0; }
@@ -84,9 +105,9 @@
   #menu ul { list-style: none; margin: 0; padding: 0; }
   #menu a { display: flex; align-items: center; padding: 9px 24px 9px 27px; min-height: 40px; color: var(--muted); cursor: pointer; text-decoration: none; font-size: 14px; }
   #menu a:hover { color: var(--text); }
-  #menu a[aria-current="page"] { background: #fff; color: var(--text); font-weight: 600; border-left: 3px solid var(--accent); padding-left: 24px; }
+  #menu a[aria-current="page"] { background: var(--surface); color: var(--text); font-weight: 600; border-left: 3px solid var(--accent); padding-left: 24px; }
   #menu a .count { margin-left: auto; font-size: 12px; color: var(--dim); font-family: "IBM Plex Mono", monospace; }
-  #menu a .count.alert { color: #fff; background: var(--red); padding: 0 6px; font-weight: 600; }
+  #menu a .count.alert { color: var(--on-accent); background: var(--red); padding: 0 6px; font-weight: 600; }
   main { padding: 28px 32px; min-width: 0; }
   .title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
   h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
@@ -98,14 +119,14 @@
   .grid2 { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 28px; margin-top: 24px; }
   h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
   .squad { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--line); }
-  .agent { display: block; color: inherit; text-decoration: none; padding: 10px 12px; cursor: pointer; min-width: 0; border-left: 1px solid var(--line); background: #fff; }
+  .agent { display: block; color: inherit; text-decoration: none; padding: 10px 12px; cursor: pointer; min-width: 0; border-left: 1px solid var(--line); background: var(--surface); }
   .agent:first-child { border-left: none; }
   .agent:hover { background: var(--accent-soft); }
   .agent .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .av { width: 22px; height: 22px; display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
   .agent .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .agent .now { color: var(--muted); font-size: 12px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dot { width: 7px; height: 7px; margin-left: auto; flex: none; background: #A7A8AC; }
+  .dot { width: 7px; height: 7px; margin-left: auto; flex: none; background: var(--dim); }
   .dot.trabalhando, .dot.coordenando { background: var(--green); animation: blink 1.6s infinite; }
   .dot.concluído { background: var(--accent); }
   @keyframes blink { 50% { opacity: .35; } }
@@ -125,7 +146,7 @@
   .reco .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   .reco h2 { margin: 6px 0 10px; font-size: 18px; font-weight: 600; }
   .conf { color: var(--accent); font-weight: 600; font-size: 13px; }
-  .bar { height: 4px; background: #D5DCE5; overflow: hidden; }
+  .bar { height: 4px; background: var(--line); overflow: hidden; }
   .bar > div { height: 100%; background: var(--accent); transition: width .4s; }
   .reco p { color: var(--muted); margin: 10px 0 0; font-size: 13px; }
   .ev { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line2); }
@@ -137,7 +158,7 @@
   .ok-msg { color: var(--green); margin-top: 12px; font-size: 13px; }
   .warn-msg { color: var(--amber); }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  textarea { width: 100%; margin-top: 8px; background: #fff; color: var(--text); border: 1px solid #C9C9C5; border-radius: 2px; padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical; }
+  textarea { width: 100%; margin-top: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: 2px; padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical; }
   .feed { list-style: none; margin: 0; padding: 0; font-size: 13px; border-top: 1px solid var(--line); }
   .feed li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line2); }
   .feed time { color: var(--dim); font-size: 12px; }
@@ -164,27 +185,27 @@
   /* notificações */
   .bell { position: relative; background: none; border: none; cursor: pointer; padding: 0 4px; height: 56px; display: flex; align-items: center; color: var(--muted); }
   .bell:hover { color: var(--text); }
-  .bell .badge { position: absolute; top: 12px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; color: #fff; background: var(--accent); }
+  .bell .badge { position: absolute; top: 12px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; color: var(--on-accent); background: var(--accent); }
   .bell .badge.acao { background: var(--red); }
-  .notif-panel { position: absolute; top: 56px; right: 0; width: 400px; max-height: 480px; overflow: auto; background: #fff; border: 1px solid var(--line); box-shadow: 0 12px 32px rgba(28,28,30,.10); z-index: 20; }
+  .notif-panel { position: absolute; top: 56px; right: 0; width: 400px; max-height: 480px; overflow: auto; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 12px 32px rgb(0 0 0 / .12); z-index: 20; }
   .notif-panel h4 { margin: 0; padding: 12px 16px; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
   .notif-panel h4 span { font-weight: 400; color: var(--dim); font-size: 12px; }
   .notif { display: grid; grid-template-columns: minmax(48px, max-content) 1fr; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line2); cursor: pointer; font-size: 13px; }
   .notif:hover { background: var(--accent-soft); }
-  .notif.unread { background: #FBFBF9; }
+  .notif.unread { background: var(--raised); }
   .notif time { color: var(--dim); font-size: 12px; }
   .notif b { display: block; font-weight: 600; }
   .notif .lvl { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-weight: 600; color: var(--accent); }
   .notif .lvl.acao { color: var(--red); }
   .notif small { color: var(--muted); }
   .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 30; width: 380px; max-width: calc(100vw - 32px); }
-  .toast { background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: 0 8px 24px rgba(28,28,30,.12); padding: 12px 14px; font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+  .toast { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: 0 8px 24px rgb(0 0 0 / .12); padding: 12px 14px; font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
   .toast.acao { border-left-color: var(--red); }
   .toast b { display: block; font-weight: 600; }
   .toast .t-actions { display: flex; gap: 6px; }
   .toast button { background: none; border: 1px solid var(--line); border-radius: 2px; font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; color: var(--text); }
-  .toast button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); background: #fff; border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgba(28,28,30,.08); padding: 24px 28px; overflow: auto; z-index: 10; }
+  .toast button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(640px, 100%); background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgb(0 0 0 / .12); padding: 24px 28px; overflow: auto; z-index: 10; }
   .drawer .head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
   .drawer .head .av { width: 32px; height: 32px; font-size: 13px; }
   /* D3: emoji no avatar com caixa fixa — tamanho não varia entre sistemas/fontes de emoji. */
@@ -202,7 +223,7 @@
   .kind-opt input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); }
   .kind-opt small { display: block; color: var(--muted); font-size: 12px; }
   .qbox { margin-top: 10px; padding: 10px 12px; background: var(--panel2); border-left: 2px solid var(--line); font-size: 13px; }
-  .qbox.open { background: #FBF3F3; border-left-color: var(--red); }
+  .qbox.open { background: var(--danger-soft); border-left-color: var(--red); }
   .qbox ol { margin: 8px 0 0; padding-left: 18px; }
   .qbox li { margin-bottom: 10px; }
   .qbox label { display: block; font-weight: 500; }
@@ -222,10 +243,10 @@
   .bl-item { padding: 12px 0; border-bottom: 1px solid var(--line2); }
   .bl-edit { margin-top: 10px; padding: 10px 12px; background: var(--panel2); border-left: 2px solid var(--accent); }
   .bl-edit label.f { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 8px 0 4px; }
-  .bl-edit input[type=text], .bl-edit select { width: 100%; padding: 8px 10px; border: 1px solid #C9C9C5; border-radius: 2px; font: inherit; background: #fff; }
+  .bl-edit input[type=text], .bl-edit select { width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 2px; font: inherit; background: var(--surface); }
   .tag.backlog { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   /* D9 (ADR-012): selo do modelo "<ID> · <Fornecedor>" — quebra em telas estreitas em vez de transbordar. */
-  .mchip { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; line-height: 1.5; padding: 0 6px; border: 1px solid #C9D3E0; background: var(--accent-soft); color: var(--accent); overflow-wrap: anywhere; max-width: 100%; }
+  .mchip { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; line-height: 1.5; padding: 0 6px; border: 1px solid var(--line); background: var(--accent-soft); color: var(--accent); overflow-wrap: anywhere; max-width: 100%; }
   .mchip.none { border-color: var(--line); background: var(--panel2); color: var(--muted); font-family: inherit; }
   .mrow { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; margin-top: 3px; font-size: 12px; min-width: 0; }
   .mrow .lbl { color: var(--muted); }
@@ -233,7 +254,7 @@
   /* D11 (ADR-014): faixa de consumo da IA — fixa no topo de <main>, um bloco por provedor (nunca somados).
      Cada bloco = 3 linhas (cabeçalho, 5 h, semana), barra na mesma linha do texto: <= 72 px a partir de 600 px.
      O texto encurta por container query conforme a largura do bloco; o completo fica no title e no aria-valuetext. */
-  .ai-usage { position: sticky; top: 0; z-index: 5; margin: -28px -32px 22px; padding: 7px 32px; background: #fff; border-bottom: 1px solid var(--line);
+  .ai-usage { position: sticky; top: var(--hdr-stick, var(--hdr-h)); z-index: 5; margin: -28px -32px 22px; padding: 7px 32px; background: var(--surface); border-bottom: 1px solid var(--line);
               display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; font-size: 12px; line-height: 16px; }
   .u-prov { container-type: inline-size; min-width: 0; }
   .u-prov + .u-prov { border-left: 1px solid var(--line2); padding-left: 28px; }
@@ -247,7 +268,7 @@
   .u-win .u-txt { min-width: 0; overflow-wrap: anywhere; }
   .u-win .pct { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; }
   .u-win .rs { color: var(--dim); white-space: nowrap; }
-  .u-meter { height: 4px; background: #D5DCE5; overflow: hidden; }
+  .u-meter { height: 4px; background: var(--line); overflow: hidden; }
   .u-meter > div { height: 100%; background: var(--accent); }
   .u-lvl { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
   .u-win.warn .u-meter > div { background: var(--amber); } .u-win.warn .u-lvl { color: var(--amber); }
@@ -273,6 +294,8 @@
     .brand { min-height: 48px; } .brand span { display: none; }
     .bell { height: 48px; }
     header { position: relative; } .hdr-actions { position: static !important; }
+    /* D14-QA-4: cabeçalho não fixo abaixo de 600 px → a faixa de consumo (e o sumário da demanda) grudam no topo, não a --hdr-h. */
+    :root { --hdr-stick: 0px; }
     .notif-panel { top: 100%; left: 16px; right: 16px; width: auto; max-height: 70vh; }
     .strip { flex-wrap: wrap; gap: 2px 12px; padding: 7px 16px; }
     main { padding: 20px 16px; }
@@ -304,20 +327,162 @@
     .rows .act { justify-content: flex-start; }
     .agents-grid { grid-template-columns: minmax(0, 1fr); }
   }
+
+  /* ================= D14 (contrato ui-governanca-squad-control) ================= */
+  .frame { background: var(--bg); }
+  main, .layout { background: var(--surface); }
+  .btn { border-radius: 4px; border-color: var(--line-strong); background: var(--surface); }
+  .btn.primary { color: var(--on-accent); }
+  .btn.danger-outline { color: var(--danger); border-color: var(--danger); }
+  .btn.danger { color: var(--on-accent); background: var(--danger); border-color: var(--danger); }
+  input, select, textarea { color: var(--text); background: var(--surface); }
+  .card { border-top-color: var(--line-strong); }
+  .dsec > h2, hr, thead th { border-top-color: var(--line-strong); }
+  .num, time, .age { font-variant-numeric: tabular-nums; }
+  /* barra global (§6.1) */
+  .gbar { display: flex; align-items: center; gap: 8px 16px; min-width: 0; flex: 1 1 auto; justify-content: flex-end; font-size: 13px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--ok); font-weight: 500; }
+  .live .ic { font-size: 10px; }
+  .live.late { color: var(--warn); } .live.off { color: var(--danger); }
+  .live .age { color: var(--muted); font-weight: 400; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .ctrs { display: inline-flex; gap: 4px; flex-wrap: nowrap; }
+  .ctr { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 8px; border-radius: 4px; text-decoration: none; color: var(--muted); white-space: nowrap; font-weight: 500; }
+  .ctr:hover { background: var(--raised); }
+  .ctr b { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .ctr.on.bloq { color: var(--danger); background: var(--danger-soft); }
+  .ctr.on.aviso { color: var(--warn); background: var(--warn-soft); }
+  .ctr.on.voce { color: var(--accent); background: var(--accent-soft); }
+  .ctr svg, .sev svg, .state svg { flex: none; }
+  .theme-btn { background: none; border: 1px solid transparent; border-radius: 4px; color: var(--muted); font: inherit; font-size: 13px; min-height: 32px; padding: 0 8px; cursor: pointer; white-space: nowrap; }
+  .theme-btn:hover { background: var(--raised); color: var(--text); }
+  .hdr-actions { display: flex; align-items: center; gap: 8px; position: relative; }
+  .stale-bar { padding: 8px 24px; background: var(--danger-soft); color: var(--danger); font-size: 13px; border-bottom: 1px solid var(--line); }
+  .autoria { font-size: 12px; color: var(--dim); padding: 16px 24px; line-height: 1.5; }
+  .side .autoria { margin-top: 24px; border-top: 1px solid var(--line); }
+  .autoria-m { display: none; }
+  /* severidade e estado (§10.5) */
+  .sev { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+  .sev.bloqueio { color: var(--danger); } .sev.aviso { color: var(--warn); } .sev.info { color: var(--accent); }
+  .state { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+  .state .ic { font-size: 11px; line-height: 1; }
+  .state.trabalhando { color: var(--ok); } .state.sem-progresso, .state.aguardando { color: var(--warn); } .state.interrompido { color: var(--danger); }
+  .state.concluido { color: var(--accent); } .state.ocioso { color: var(--muted); }
+  .state.trabalhando .ic { animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .you { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--on-accent); }
+  /* Sua próxima ação (§6.2.1) */
+  .mynext { margin-top: 16px; border: 1px solid var(--danger); border-left-width: 4px; background: var(--danger-soft); border-radius: 4px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; }
+  .mynext.aviso { border-color: var(--warn); background: var(--warn-soft); }
+  .mynext.info { border-color: var(--accent); background: var(--accent-soft); }
+  .mynext small { display: block; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
+  .mynext h2 { font-size: 16px; margin: 2px 0; font-weight: 600; }
+  .mynext p { margin: 0; font-size: 13px; color: var(--muted); }
+  /* central (§6.2.2) */
+  .central { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; margin-top: 8px; }
+  .central h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  .alist { list-style: none; margin: 0; padding: 0; }
+  .alist > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 8px 12px; margin-top: 8px; border-left: 3px solid var(--line-strong); background: var(--raised); border-radius: 0 4px 4px 0; align-items: center; }
+  .alist > li.bloqueio { border-left-color: var(--danger); background: var(--danger-soft); }
+  .alist > li.aviso { border-left-color: var(--warn); background: var(--warn-soft); }
+  .alist > li.seen { opacity: .62; }
+  .alist > li.other { border-left-color: var(--accent); background: var(--accent-soft); }
+  .alist .t { min-width: 0; font-size: 13px; }
+  .alist .t a.ttl { color: var(--text); font-weight: 600; text-decoration: none; }
+  .alist .t a.ttl:hover { text-decoration: underline; }
+  .alist .who { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; }
+  .alist .act { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .alist details { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  .alist details summary { cursor: pointer; color: var(--accent); width: max-content; min-height: 24px; }
+  .alist .empty { background: none; border-left-color: var(--ok); color: var(--ok); font-weight: 500; }
+  .more { font-size: 13px; margin: 8px 0 0; }
+  .btn.xs { height: 32px; padding: 0 12px; font-size: 13px; }
+  .linkbtn { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; min-height: 24px; }
+  /* cartão do integrante (§7.1) */
+  .squad { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; border: none; }
+  .squad a.agent, .agents-grid a.agent { display: grid; grid-template-rows: repeat(5, auto); gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); text-decoration: none; min-width: 0; font-size: 12.5px; }
+  .squad a.agent:first-child { border-left: 3px solid var(--line); }
+  a.agent:hover { background: var(--raised); }
+  a.agent.blk, .squad a.agent.blk:first-child { border-left-color: var(--danger); }
+  a.agent.work, .squad a.agent.work:first-child { border-left-color: var(--ok); }
+  a.agent .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  a.agent .name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+  a.agent .top .state { margin-left: auto; }
+  a.agent .ln.two { display: flex; gap: 8px; min-width: 0; }
+  a.agent .ln.two .tk { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  a.agent .ln.two .age { margin-left: auto; flex: none; font-size: 11.5px; color: var(--dim); font-family: "IBM Plex Mono", monospace; }
+  a { color: var(--accent); }
+  a.agent .ln { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); min-height: 18px; }
+  a.agent .ln.wait { color: var(--muted); } a.agent .ln.wait.long { color: var(--warn); font-weight: 500; }
+  a.agent .ln.cur { color: var(--text); }
+  a.agent .ln.meta { color: var(--dim); font-size: 11.5px; }
+  .agents-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .agents-grid .card { max-height: none; overflow: visible; }
+  .agents-grid > section { min-width: 0; }
+  .squad-sum { font-size: 12.5px; color: var(--muted); font-weight: 400; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 24px; font-size: 13px; margin-top: 8px; }
+  .legend div { display: flex; gap: 8px; align-items: baseline; }
+  /* gaveta do integrante (§7.2) */
+  .drawer { background: var(--surface); box-shadow: var(--shadow); border-left-color: var(--line); padding: 0 24px 24px; top: var(--hdr-h); }
+  .drawer .head { position: sticky; top: 0; background: var(--surface); padding: 16px 0 8px; z-index: 1; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .drawer section { margin-top: 16px; }
+  .drawer section > h3 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .drawer .waitbox { padding: 10px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); border-radius: 0 4px 4px 0; font-size: 13px; }
+  .drawer .waitbox.none { border-left-color: var(--line-strong); background: var(--raised); color: var(--muted); }
+  .drawer .kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+  .drawer .kv dt { color: var(--muted); } .drawer .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .drawer .cmds { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+  .drawer .cmds li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .drawer .cmds code { display: block; font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .waits td, .waits th { font-size: 13px; }
+  /* toasts e sino com severidade */
+  .toast { background: var(--surface); border-color: var(--line); color: var(--text); }
+  .toast.bloqueio { border-left-color: var(--danger); } .toast.aviso { border-left-color: var(--warn); }
+  .notif .lvl.bloqueio { color: var(--danger); } .notif .lvl.aviso { color: var(--warn); }
+  .bell .badge.bloqueio { background: var(--danger); } .bell .badge.aviso { background: var(--warn); color: var(--on-accent); }
+  .notif-panel { background: var(--surface); box-shadow: var(--shadow); }
+  .toast-more { font-size: 12px; color: var(--muted); text-align: right; }
+  .dem-alerts { margin-top: 12px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media (max-width: 1100px) { .central { grid-template-columns: minmax(0, 1fr); } .squad, .agents-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 900px) {
+    .side .autoria { display: none; } .autoria-m { display: block; border-top: 1px solid var(--line); }
+    .squad, .agents-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ctr, .theme-btn { min-height: 44px; }
+  }
+  @media (max-width: 600px) {
+    header { padding: 0 12px; }
+    .gbar { order: 3; flex: 1 0 100%; justify-content: space-between; border-top: 1px solid var(--line); min-height: 44px; gap: 4px 8px; }
+    .ctr { padding: 0 6px; min-width: 44px; justify-content: center; }
+    .ctr .cw, .theme-btn .tw { display: none; }
+    .live .lw { display: none; }
+    .squad, .agents-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .squad a.agent, .agents-grid a.agent { grid-template-rows: auto; }
+    a.agent .ln.meta, a.agent .ln.empty { display: none; }
+    .mynext { grid-template-columns: minmax(0, 1fr); }
+    .mynext .btn { width: 100%; }
+    .alist > li { grid-template-columns: minmax(0, 1fr); }
+    .alist .act { justify-content: flex-start; }
+    .drawer { width: 100%; padding: 0 16px 16px; top: 0; z-index: 12; }
+  }
 </style>
 </head>
 <body>
 <a class="skip" id="skip" href="#/painel">Pular para o conteúdo</a>
 <div class="app"><div class="frame">
-  <header>
-    <div class="brand"><div class="logo">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
-    <div class="hdr-actions" style="display:flex;align-items:center;gap:20px;position:relative">
+  <header id="hdr">
+    <div class="brand"><div class="logo" aria-hidden="true">SC</div><b>Squad Control</b><span id="project-name">Orquestrador + Auditor</span></div>
+    <div class="gbar" id="gbar">
+      <span class="live" id="live-ind"><span class="ic" aria-hidden="true">●</span><span class="lt">Conectando…</span><span class="age" aria-hidden="true"></span></span>
+      <span class="sr-only" id="live-sr" role="status"></span>
+      <nav class="ctrs" id="ctrs" aria-label="Bloqueios e avisos"></nav>
+    </div>
+    <div class="hdr-actions">
+    <button class="theme-btn" id="theme-btn" type="button"><span aria-hidden="true">◐</span> <span class="tw" id="theme-lbl">Tema: Sistema</span></button>
     <button class="bell" id="bell" aria-label="Notificações" aria-expanded="false" aria-controls="notif-panel" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span class="badge" id="bell-badge" hidden></span></button>
     <div class="notif-panel" id="notif-panel" hidden></div>
     </div>
   </header>
   <div class="toasts" id="toasts"></div>
-  <div class="strip"><span>Desafio Técnico | Checkout Saga com Squad Agêntica</span><span>Julien Crouzillard · Software Engineer</span></div>
   <div class="layout">
     <div class="side">
       <nav id="menu" aria-label="Principal"><ul>
@@ -330,12 +495,15 @@
       <div class="nova"><a class="btn primary" href="#/demandas/nova">+ Nova demanda</a></div>
       <h6 id="plinks-h">LINKS DO PRODUTO</h6>
       <div class="plinks" id="project-links" role="group" aria-labelledby="plinks-h"></div>
+      <div class="autoria">Desafio Técnico | Checkout Saga com Squad Agêntica<br>Julien Crouzillard · Software Engineer</div>
     </div>
-    <main id="conteudo"><section id="ai-usage" class="ai-usage" aria-label="Consumo da IA (fonte real de cada provedor)" hidden></section><div id="srv-down" class="notice err" role="alert" hidden>Servidor indisponível. Rode <code>make squad</code>; o painel tenta de novo a cada 3 s.</div><div id="main"></div></main>
+    <main id="conteudo"><section id="ai-usage" class="ai-usage" aria-label="Consumo da IA (fonte real de cada provedor)" hidden></section><div id="srv-down" class="notice err" role="alert" hidden>Servidor indisponível. Rode <code>make squad</code>; o painel tenta de novo sozinho.</div><div id="main"></div></main>
   </div>
+  <footer class="autoria autoria-m">Desafio Técnico | Checkout Saga com Squad Agêntica · Julien Crouzillard · Software Engineer</footer>
 </div></div>
 <aside class="drawer" id="drawer" hidden></aside>
 <div id="sr-live" class="sr-only" role="status" aria-live="polite"></div>
+<div id="sr-alert" class="sr-only" aria-live="assertive"></div>
 
 <script>
 const AGENTS = {
@@ -372,8 +540,8 @@ const since = ts => { if (!ts) return ""; const s = Math.max(0, Math.round((Date
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
 // Avatar: emoji fixo por papel (D3); papel desconhecido cai nas iniciais / "?". O emoji é decorativo (aria-hidden): o nome segue em texto.
 const av = a => { const m = AGENTS[a] || { ini: "?", color: "#555" };
-  return m.emoji ? `<div class="av emo" style="background:#E8EDF3;color:${m.color}"><span aria-hidden="true">${m.emoji}</span></div>`
-                 : `<div class="av" style="background:#E8EDF3;color:${m.color}">${m.ini || "?"}</div>`; };
+  return m.emoji ? `<div class="av emo" style="background:var(--raised);color:var(--accent)"><span aria-hidden="true">${m.emoji}</span></div>`
+                 : `<div class="av" style="background:var(--raised);color:var(--accent)">${m.ini || "?"}</div>`; };
 const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
 
 // D9 (ADR-012, contrato ui-modelo-por-agente §6): selo "<ID> · <Fornecedor>" ou "não registrado".
@@ -432,11 +600,6 @@ function agentStatus(runs) {
   if (runs.some(r => r.status === "trabalhando" || r.status === "coordenando")) return runs.find(r => r.status !== "concluído").status;
   return runs.at(-1).status;
 }
-function lastAction(runs) {
-  const a = runs?.at(-1)?.activity?.at(-1);
-  if (!a) return "aguardando delegação";
-  return a.kind === "tool" ? `${a.tool} · ${a.summary}` : a.summary.split("\n")[0];
-}
 // D13 (X11): último gate de UMA demanda (null = squad base, gates sem demand). Nunca o gate global.
 function latestGateFor(demand) {
   const match = e => (e.demand || null) === (demand || null);
@@ -447,8 +610,7 @@ function latestGateFor(demand) {
   if (fromLog) return { gate: fromLog.gate, recommendation: fromLog.recommendation, confidence: fromLog.confidence, risk: fromLog.risk, evidences: fromLog.evidences, rationale: fromLog.detail, from: fromLog.agent, to: fromLog.to, ts: fromLog.ts, human_required: fromLog.human_required };
   return null;
 }
-// Mesma condição de intervenção obrigatória da UI anterior (l. 445): human_required, confiança < 70% ou risco alto.
-const gateNeedsHuman = g => !!g && (!!g.human_required || (g.confidence != null && Math.round(g.confidence * 100) < 70) || g.risk === "alto");
+// D14: a regra de "precisa do humano" é única — alerts[] do servidor (fallback: ruleNeedsHuman/deriveAlerts).
 // before (opcional): limite superior — a decisão de um ciclo de gate é a anterior ao próximo ciclo do mesmo gate.
 function humanFor(gate, demand, after, before) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate && (e.demand || null) === (demand || null) && (!after || e.ts > after) && (!before || e.ts < before)); }
 
@@ -476,14 +638,340 @@ function pipelineStatus() {
   });
 }
 
-function renderSquadStrip() {
-  const byAgent = runsByAgent();
-  return `<div class="squad">${["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "frontend", "qa", "auditor"].map(a => {
-    const runs = byAgent[a], st = agentStatus(runs);
-    return `<a class="agent" href="${esc(hrefWith({ agente: a }))}" title="Ver o que ${AGENTS[a].label} está fazendo">
-      <div class="top">${av(a)}<span class="name">${AGENTS[a].label}</span><span class="dot ${st}" title="${st}"></span></div>
-      <div class="now">${esc(st === "ocioso" ? "aguardando delegação" : lastAction(runs))}</div></a>`;
-  }).join("")}</div>`;
+// ================= D14 (ADR-017, contrato ui-governanca-squad-control): tempo real, alertas e integrantes =================
+// O servidor calcula alerts[]/agents[] (§5, §7, §9). Se o servidor ainda não os expõe (F1 ausente), a UI deriva o MESMO
+// esquema a partir de /api/state com as mesmas regras (fallback) — nunca exibe undefined.
+const ROLES = ["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "frontend", "qa", "auditor"];
+const TH_DEFAULT = { stalledSeconds: 600, longToolSeconds: 180, waitWarnSeconds: 600, lowConfidence: 0.7, maxAutoCycles: 2 };
+let live = null, liveSupported = null, lastOkAt = 0, skewMs = 0, lastStateAt = 0, lastVersion = null, pollTimer = null, liveKey = null;
+const nowMs = () => Date.now() + skewMs;
+const syncClock = iso => { const t = Date.parse(iso); if (!isNaN(t)) skewMs = t - Date.now(); };
+const ageS = ts => { const t = Date.parse(ts); return isNaN(t) ? null : Math.max(0, Math.round((nowMs() - t) / 1000)); };
+const fmtAge = s => s == null ? "" : s < 60 ? `${s} s` : s < 600 ? `${Math.floor(s / 60)} min ${s % 60} s` : s < 3600 ? `${Math.floor(s / 60)} min` : s < 86400 ? `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min` : `${Math.floor(s / 86400)} d`;
+const ago = ts => { const s = ageS(ts); return s == null ? "" : `há ${fmtAge(s)}`; };
+const fullTime = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleString("pt-BR"); };
+// Idade que anda sozinha (atualizada a cada 1 s pelo relógio local + deslocamento do servidor, §8.2).
+const ageSpan = (ts, pre = "há ") => ts && !isNaN(Date.parse(ts)) ? `<span class="age num" data-age="${esc(ts)}" data-pre="${esc(pre)}" title="${esc(fullTime(ts))}">${esc(pre)}${fmtAge(ageS(ts))}</span>` : "";
+const thresholds = () => ({ ...TH_DEFAULT, ...(live?.thresholds || state?.thresholds || {}) });
+const staleSeconds = () => lastOkAt ? (Date.now() - lastOkAt) / 1000 : Infinity;
+const isStale = () => !!state && staleSeconds() > 15;
+const SVG = (d, extra = "") => `<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d}${extra}</svg>`;
+const ICON = {
+  bloqueio: SVG(`<path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="currentColor"/>`, `<path d="M9 9l6 6M15 9l-6 6" style="stroke:var(--surface)" stroke-width="2.4" stroke-linecap="round"/>`),
+  aviso: SVG(`<path d="M12 2 1 21h22z" fill="currentColor"/>`, `<path d="M12 9v5M12 17.3v.4" style="stroke:var(--surface)" stroke-width="2.4" stroke-linecap="round"/>`),
+  info: SVG(`<circle cx="12" cy="12" r="10" fill="currentColor"/>`, `<path d="M12 11v6M12 7.3v.4" style="stroke:var(--surface)" stroke-width="2.4" stroke-linecap="round"/>`),
+};
+const SEV_LABEL = { bloqueio: "Bloqueio", aviso: "Aviso", info: "Informativo" };
+const sevHtml = sev => `<span class="sev ${esc(sev)}">${ICON[sev] || ICON.info}${SEV_LABEL[sev] || "Aviso"}</span>`;
+const STATES = { "sem-progresso": ["Sem progresso", "▲"], interrompido: ["Interrompido", "■"], trabalhando: ["Trabalhando", "●"], aguardando: ["Aguardando", "◷"], concluido: ["Concluiu", "✓"], ocioso: ["Livre", "○"] };
+const stateHtml = st => { const [l, i] = STATES[st] || STATES.ocioso; return `<span class="state ${esc(st in STATES ? st : "ocioso")}"><span class="ic" aria-hidden="true">${i}</span>${l}</span>`; };
+const who = o => o === "humano" ? "Você" : o === "squad" ? "Squad (informativo)" : o === "outro" ? "outro agente" : AGENTS[o]?.label || o || "—";
+const baseName = f => String(f || "").split("/").filter(Boolean).pop() || String(f || "");
+// §7.4: rótulos naturais de ferramenta.
+function toolLabel(tool, summary) {
+  const s = String(summary || "").split("\n")[0].trim();
+  switch (tool) {
+    case "Bash": return `Executando: ${s || "comando"}`;
+    case "Read": return `Lendo ${baseName(s)}`;
+    case "Edit": case "Write": case "MultiEdit": case "NotebookEdit": return `Editando ${baseName(s)}`;
+    case "Grep": case "Glob": return `Procurando ${s}`;
+    case "Agent": case "Task": return `Delegando a ${s}`;
+    case "progress": return `Marco: ${s}`;
+    case "WebFetch": case "WebSearch": return `Pesquisando ${s}`;
+    case "AskUserQuestion": return "Pergunta aberta para você no terminal";
+    default: return tool ? `${tool} · ${s}` : s;
+  }
+}
+// §9.5: comandos truncados em 200 caracteres e mascarados (o servidor também mascara; aqui é defesa extra).
+const maskCmd = c => String(c || "").replace(/(token|secret|password|passwd|api[_-]?key)=\S+/gi, "$1=***").replace(/gh[pousr]_[A-Za-z0-9]{20,}/g, "***")
+  .replace(/sk-[A-Za-z0-9-]{20,}/g, "***").replace(/Bearer \S+/g, "Bearer ***").slice(0, 200);
+const kindsOf = a => Array.isArray(a?.kinds) && a.kinds.length ? a.kinds : [a?.kind].filter(Boolean);
+const hasKind = (a, ...ks) => kindsOf(a).some(k => ks.includes(k));
+const alertCode = a => a.code || (a.demand ? demandCode(a.demand) : null);
+const alertHref = a => { const h = a.action?.href || ""; return h.startsWith("?") ? hrefWith(Object.fromEntries(new URLSearchParams(h))) : h || "#/painel/alertas"; };
+
+// ---- Regra única de "precisa do humano" (§5.1 needsHuman). No servidor quando existe; aqui só no fallback e no texto do gate.
+// Baixa confiança = mesma condição de tools/squad/alerts.py (is_low): valor bruto c < 0,70 (AGENTS.md "confiança < 70%"),
+// com folga de 1e-9 para 0,7 vindo de conta de ponto flutuante. A exibição em % continua arredondada (pct).
+const isLowConf = c => typeof c === "number" && c < 0.70 - 1e-9;
+const ruleNeedsHuman = (g, returns = 0) => !!g && (!!g.human_required || isLowConf(g.confidence) || g.risk === "alto" || returns > thresholds().maxAutoCycles);
+// D14-QA-1: inteiro, salvo quando o arredondamento esconderia que o valor está abaixo do limite (0,695 → "69,5%", não "70%").
+const pct = c => {
+  if (typeof c !== "number" || !isFinite(c)) return "—";
+  const lim = Number(thresholds().lowConfidence) || 0.7, r = Math.round(c * 100);
+  if (c < lim - 1e-9 && r >= Math.round(lim * 100)) return `${(Math.floor(c * 1000 + 1e-6) / 10).toFixed(1).replace(".", ",")}%`;
+  return `${r}%`;
+};
+function demandEndEvent(info) {
+  if (!info) return null;
+  if (info.canceled) return info.related.find(e => e.type === "control" && e.action === "cancel") || { ts: info.d.ts, agent: "humano" };
+  if (info.delivered) return info.delivered;
+  if (info.status === "Concluída") return [...info.gates].reverse().find(g => g.gate === "G3" && g.recommendation === "APPROVE") || info.last;
+  return null;
+}
+function gateFileFor(g) { const f = (state.gates || []).filter(x => (x.demand || null) === (g.demand || null) && x.gate === g.gate).sort((a, b) => (a.mtime || 0) - (b.mtime || 0)).at(-1); return f || null; }
+function b1Owner(g) {
+  if (g.to && AGENTS[g.to] && g.to !== "auditor" && g.to !== "humano") return g.to;
+  const f = gateFileFor(g); if (f?.from && AGENTS[f.from] && f.from !== "auditor") return f.from;
+  const h = [...state.log].reverse().find(e => e.type === "handoff" && (e.demand || null) === (g.demand || null) && e.to === "auditor" && String(e.ts) <= String(g.ts));
+  return h?.agent || "orquestrador";
+}
+// Fallback §5.2/§5.4: abertos + histórico, com a mesma forma de Alert do contrato.
+let derivedMemo = { st: null, v: null };
+function deriveAlerts() {
+  if (derivedMemo.st === state && derivedMemo.at > Date.now() - 5000) return derivedMemo.v;
+  const th = thresholds(), infos = new Map(allInfos().map(x => [x.d.id, x])), items = [];
+  const gatesHref = (dem, code) => dem ? `#/demandas/${code}/gates` : "#/painel/squad-base";
+  const keys = new Map();
+  for (const e of state.log) if (e.type === "gate" && e.gate) { const k = `${e.demand || ""}|${e.gate}`; if (!keys.has(k)) keys.set(k, []); keys.get(k).push(e); }
+  for (const gs of keys.values()) {
+    const demand = gs[0].demand || null, info = demand ? infos.get(demand) : null;
+    if (demand && !info) continue;
+    const code = info?.code || null, end = demandEndEvent(info);
+    const humans = state.log.filter(e => e.type === "human" && e.gate === gs[0].gate && (e.demand || null) === demand);
+    gs.forEach((g, i) => {
+      const next = gs[i + 1] || null;
+      const hBefore = humans.filter(h => String(h.ts) < String(g.ts)).at(-1);
+      const returns = gs.slice(0, i + 1).filter(x => x.recommendation === "RETURN" && (!hBefore || String(x.ts) > String(hBefore.ts))).length;
+      const f = !next ? gateFileFor(g) : null;
+      const cycle = Math.max(i + 1, Number(f?.cycle) || 0);
+      const dec = humans.find(h => String(h.ts) > String(g.ts) && (!next || String(h.ts) < String(next.ts)));
+      const conf = pct(g.confidence), low = isLowConf(g.confidence);
+      const human = returns > th.maxAutoCycles ? "cycle-limit" : ruleNeedsHuman({ ...g, human_required: g.human_required ?? f?.human_required }) ? "human-required" : null;
+      const ret = g.recommendation === "RETURN";
+      const base = { demand, code, gate: g.gate, cycle, returns, confidence: g.confidence ?? null, risk: g.risk || null, agent: ret ? b1Owner(g) : g.agent,
+        openedAt: g.ts, source: { event: g.id || null, file: f?.file || null } };
+      const verb = `Auditor ${ret ? "devolveu" : "aprovou"} ${g.gate} · ${conf}`;
+      // Fase 1 (até a decisão humana ou o próximo gate): B1/B2/B3.
+      const k1 = [ret && "gate-return", human].filter(Boolean);
+      const closers1 = [dec && human ? { ts: dec.ts, by: "humano", ev: dec.id } : null, dec && ret && dec.recommendation === "OVERRIDE" ? { ts: dec.ts, by: "humano", ev: dec.id } : null,
+        next ? { ts: next.ts, by: next.agent, ev: next.id } : null, end ? { ts: end.ts, by: end.agent || "humano", ev: end.id } : null].filter(Boolean).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+      if (k1.length) {
+        const main = human || "gate-return", c = closers1[0] || null;
+        const rule = human === "cycle-limit" ? `B3 — ${returns}º RETURN seguido de ${g.gate} sem decisão humana: máx. ${th.maxAutoCycles} ciclos de autocorreção (AGENTS.md, Limites de autonomia)`
+          : human ? `B2 — ${[g.human_required ? "intervenção humana obrigatória no parecer" : "", low ? `confiança ${conf} < ${Math.round(th.lowConfidence * 100)}%` : "", g.risk === "alto" ? "risco alto" : ""].filter(Boolean).join(", ")} sem decisão humana (AGENTS.md, Limites de autonomia)`
+          : `B1 — o Auditor devolveu ${g.gate}; a demanda só anda com a correção reenviada`;
+        items.push({ ...base, id: `${main}:${g.id || g.gate}`, severity: "bloqueio", kind: main, kinds: k1.concat(low && !human ? ["low-confidence"] : []), rule,
+          title: human === "cycle-limit" ? `Decidir ${g.gate} — 3º ciclo · ${conf}` : human ? `${verb} — exige sua decisão` : verb,
+          detail: g.detail || g.title || "", owner: human ? "humano" : b1Owner(g),
+          action: { label: human ? `Decidir ${g.gate}${human === "cycle-limit" ? " — 3º ciclo" : ""}` : `Ver parecer de ${g.gate}`, href: gatesHref(demand, code), external: null },
+          closedAt: c?.ts || null, closedBy: c?.by || null, closedByEvent: c?.ev || null });
+      }
+      // Fase 2: depois da decisão humana, B1 continua até o reenvio (sem OVERRIDE) e a baixa confiança vira A1 (risco aceito).
+      if (dec && human) {
+        const closers2 = [next ? { ts: next.ts, by: next.agent, ev: next.id } : null, end ? { ts: end.ts, by: end.agent || "humano", ev: end.id } : null].filter(Boolean).sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+        const c = closers2[0] || null;
+        if (ret && dec.recommendation !== "OVERRIDE") items.push({ ...base, id: `gate-return:${g.id || g.gate}:${dec.id}`, severity: "bloqueio", kind: "gate-return", kinds: ["gate-return"].concat(low ? ["low-confidence"] : []),
+          rule: `B1 — você aceitou a devolução de ${g.gate}; aguardando a correção e a reauditoria`, title: `${verb} · aguardando correção`, detail: dec.detail || "", owner: b1Owner(g), openedAt: dec.ts,
+          action: { label: `Ver parecer de ${g.gate}`, href: gatesHref(demand, code), external: null }, closedAt: c?.ts || null, closedBy: c?.by || null, closedByEvent: c?.ev || null });
+        else if (low && (dec.recommendation === "APPROVE" || dec.recommendation === "OVERRIDE")) {
+          const cc = [next && next.confidence != null && !isLowConf(next.confidence) ? { ts: next.ts, by: next.agent, ev: next.id } : null, end ? { ts: end.ts, by: end.agent || "humano", ev: end.id } : null].filter(Boolean)[0] || null;
+          items.push({ ...base, id: `low-confidence:${g.id || g.gate}`, severity: "aviso", kind: "low-confidence", kinds: ["low-confidence"], rule: `A1 — ${g.gate} seguiu com confiança ${conf} < ${Math.round(th.lowConfidence * 100)}% por decisão humana (risco aceito)`,
+            title: `Seguiu com ${g.gate} a ${conf}`, detail: dec.detail || "", owner: "squad", openedAt: dec.ts, action: { label: "Ver parecer", href: gatesHref(demand, code), external: null },
+            closedAt: cc?.ts || null, closedBy: cc?.by || null, closedByEvent: cc?.ev || null });
+        }
+      }
+    });
+  }
+  // B1–B3 da squad base vindos só de arquivo (gate sem evento no log).
+  const bg = latestGateFor(null);
+  if (bg && !bg.id && !humanFor(bg.gate, null, bg.ts) && ruleNeedsHuman(bg))
+    items.push({ id: `human-required:${bg.file || bg.gate}`, severity: "bloqueio", kind: "human-required", kinds: ["human-required"], demand: null, code: null, gate: bg.gate, cycle: bg.cycle || 1, returns: 0,
+      confidence: bg.confidence ?? null, risk: bg.risk || null, rule: "B2 — parecer da squad base exige decisão humana (AGENTS.md, Limites de autonomia)", title: `${bg.gate} da squad base exige sua decisão · ${pct(bg.confidence)}`,
+      owner: "humano", agent: "auditor", openedAt: bg.mtime ? new Date(bg.mtime * 1000).toISOString() : null, action: { label: `Decidir ${bg.gate}`, href: "#/painel/squad-base" }, source: { event: null, file: bg.file || null }, closedAt: null });
+  // B4: triagem com perguntas em aberto.
+  for (const info of infos.values()) for (const v of info.related.filter(e => e.type === "validation" && e.status === "perguntas")) {
+    const clar = info.related.find(e => e.type === "clarification" && e.validation === v.id);
+    const ov = info.related.find(e => e.type === "start" && e.override && String(e.ts) > String(v.ts));
+    const cancel = info.related.find(e => e.type === "control" && e.action === "cancel");
+    const later = info.related.some(e => e.type === "validation" && String(e.ts) > String(v.ts));
+    const c = [clar && { ts: clar.ts, by: "humano", ev: clar.id }, ov && { ts: ov.ts, by: "humano", ev: ov.id }, cancel && { ts: cancel.ts, by: "humano", ev: cancel.id }].filter(Boolean).sort((a, b) => String(a.ts).localeCompare(String(b.ts)))[0];
+    if (!c && later) continue;
+    const n = (v.questions || []).length;
+    items.push({ id: `triage-open:${v.id}`, severity: "bloqueio", kind: "triage-open", kinds: ["triage-open"], demand: info.d.id, code: info.code, gate: null, rule: "B4 — a triagem do Arquiteto tem perguntas sem resposta; Iniciar fica bloqueado (ADR-008)",
+      title: `${n} pergunta${n === 1 ? "" : "s"} da triagem`, owner: "humano", agent: "arquiteto", openedAt: v.ts, action: { label: `Responder ${n} pergunta${n === 1 ? "" : "s"}`, href: `#/demandas/${info.code}/validacao` },
+      source: { event: v.id }, closedAt: c?.ts || null, closedBy: c?.by || null, closedByEvent: c?.ev || null });
+  }
+  // A3: PR aguardando merge.
+  for (const e of state.log) if (e.type === "review") {
+    const c = state.log.find(x => (x.type === "delivered" || x.type === "review-rejected") && x.pr === e.pr && (x.demand || null) === (e.demand || null) && String(x.ts) > String(e.ts));
+    const code = e.demand ? demandCode(e.demand) : null;
+    items.push({ id: `pr-waiting:${e.id}`, severity: "aviso", kind: "pr-waiting", kinds: ["pr-waiting"], demand: e.demand || null, code, gate: null, rule: "A3 — PR aberto aguardando a sua revisão e o merge (Git Flow: merge só pelo humano)",
+      title: `PR #${e.pr ?? "?"} aguardando revisão${e.release ? ` · release ${e.release}` : ""}`, owner: "humano", agent: "orquestrador", openedAt: e.ts,
+      action: { label: `Revisar PR #${e.pr ?? "?"}`, href: code ? `#/demandas/${code}` : "#/auditoria/eventos?tipo=review", external: e.url || null }, source: { event: e.id },
+      closedAt: c?.ts || null, closedBy: c?.agent || null, closedByEvent: c?.id || null });
+  }
+  // A2: agente sem progresso (só ao vivo).
+  for (const ag of deriveAgentsBase()) if (ag.state === "sem-progresso" || ag.state === "interrompido")
+    items.push({ id: `agent-stalled:${ag.runId}`, severity: "aviso", kind: "agent-stalled", kinds: ["agent-stalled"], demand: ag.task?.demand || null, code: ag.task?.code || null, gate: null,
+      rule: ag.state === "interrompido" ? "A2 — execução interrompida (processo encerrado sem “Finalizado”)" : `A2 — execução aberta sem atividade há ≥ ${Math.round(th.stalledSeconds / 60)} min (p99,9 das ferramentas = 501 s)`,
+      title: `${AGENTS[ag.agent]?.label || ag.agent} ${ag.state === "interrompido" ? "interrompido" : "sem progresso"}`, detail: ag.runner === "claude" || !ag.runner ? "Verifique o terminal (permissão pendente?)." : "Retomar a execução.",
+      owner: ag.runner && ag.runner !== "claude" ? "orquestrador" : "humano", agent: ag.agent, openedAt: ag.lastActivityAt, action: { label: "Ver integrante", href: `?agente=${ag.agent}` }, source: { event: null, run: ag.runId }, closedAt: null });
+  const rank = a => (a.severity === "bloqueio" ? 0 : 2) + (a.owner === "humano" ? 0 : 1);
+  const open = items.filter(a => !a.closedAt).sort((a, b) => rank(a) - rank(b) || String(a.openedAt).localeCompare(String(b.openedAt)));
+  const hist = items.filter(a => a.closedAt).sort((a, b) => String(b.closedAt).localeCompare(String(a.closedAt)));
+  derivedMemo = { st: state, at: Date.now(), v: { open, hist } };
+  return derivedMemo.v;
+}
+function alertsNow() {
+  if (Array.isArray(live?.alerts)) return live.alerts;
+  if (Array.isArray(state?.alerts)) return state.alerts;
+  return state ? deriveAlerts().open : [];
+}
+function alertsHistory() {
+  if (Array.isArray(state?.alertsHistory)) return state.alertsHistory;
+  return state ? deriveAlerts().hist : [];
+}
+const alertsFor = demand => alertsNow().filter(a => (a.demand || null) === (demand || null));
+const humanAlerts = () => alertsNow().filter(a => a.owner === "humano");
+function gateOfAlert(a, demand) {
+  const ev = a.source?.event ? state.log.find(e => e.id === a.source.event && e.type === "gate") : null;
+  if (ev) return ev;
+  const g = latestGateFor(demand);
+  if (g && (!a.gate || g.gate === a.gate)) return g;
+  return [...state.log].reverse().find(e => e.type === "gate" && e.gate === a.gate && (e.demand || null) === (demand || null)) || null;
+}
+
+// ---- Integrantes (§7): esquema Agent. Fallback deriva de runs[] (estado, tarefa, passo, ferramenta, espera).
+function stepFor(agent, info) {
+  if (!info) return null;
+  if (agent === "arquiteto") return info.vinfo && !info.vinfo.ready ? "Triagem" : "F1 · contrato";
+  if (["backend", "devops", "observabilidade", "frontend"].includes(agent)) return "F2 · implementação";
+  if (agent === "qa") return "F3 · validação";
+  if (agent === "auditor") { const n = 1 + info.gates.filter(g => g.recommendation === "APPROVE").length + (info.start?.route === "direta" ? 1 : 0); return `G${Math.min(3, n)} · parecer`; }
+  if (agent === "orquestrador") { const { steps, idx } = stageOf(info); return steps[Math.min(idx, steps.length - 1)]; }
+  return null;
+}
+const lastTs = arr => (arr || []).reduce((m, a) => { const t = a.endedAt || a.ts; return t && String(t) > String(m || "") ? t : m; }, null);
+function deriveAgentsBase() {
+  const th = thresholds(), byAgent = runsByAgent(), infos = new Map(allInfos().map(x => [x.d.id, x]));
+  return ROLES.map(agent => {
+    const runs = byAgent[agent] || [];
+    const openRun = runs.filter(r => ["trabalhando", "coordenando"].includes(r.status)).at(-1);
+    const cur = openRun || runs.slice().sort((a, b) => String(a.updated || "").localeCompare(String(b.updated || ""))).at(-1) || null;
+    const lastAt = cur ? (lastTs(cur.activity) && String(lastTs(cur.activity)) > String(cur.updated || "") ? lastTs(cur.activity) : cur.updated || lastTs(cur.activity)) : null;
+    const age = ageS(lastAt);
+    const pend = cur?.current || (cur?.activity || []).filter(a => a.kind === "tool" && a.pending).at(-1) || null;
+    let st = "ocioso";
+    if (openRun && age != null && age >= th.stalledSeconds && !(pend && ageS(pend.ts) != null && ageS(pend.ts) < th.stalledSeconds)) st = "sem-progresso";
+    else if (cur && ["interrompido", "parado"].includes(cur.status) && age != null && age < 3600) st = cur.status === "parado" ? "sem-progresso" : "interrompido";
+    else if (openRun) st = "trabalhando";
+    else if (cur && age != null && age < 900) st = "concluido";
+    const info = cur?.demand ? infos.get(cur.demand) : null;
+    const recent = (cur?.activity || []).slice(-20);
+    return { agent, state: st, runId: cur?.id || null, runner: cur?.runner || null, model: cur?.model || null, modelProvider: cur?.modelProvider,
+      task: cur ? { description: cur.description || "", demand: cur.demand || null, code: info?.code || null, step: stepFor(agent, info), startedAt: cur.started || null } : null,
+      current: pend && st !== "concluido" && st !== "ocioso" ? { tool: pend.tool, label: toolLabel(pend.tool, pend.summary), target: pend.tool === "Bash" ? maskCmd(pend.detail || pend.summary) : pend.summary || "", since: pend.ts, long: ageS(pend.ts) >= th.longToolSeconds } : null,
+      lastActivityAt: lastAt, lastActivity: recent.at(-1) ? (recent.at(-1).kind === "tool" ? toolLabel(recent.at(-1).tool, recent.at(-1).summary) : String(recent.at(-1).summary || "").split("\n")[0].slice(0, 160)) : "",
+      recentFiles: (cur?.files || []).slice(-10).reverse(),
+      recentCommands: (cur?.activity || []).filter(a => a.kind === "tool" && a.tool === "Bash").slice(-5).reverse().map(a => ({ ts: a.ts, label: a.summary, command: maskCmd(a.detail || a.summary), error: !!a.error })),
+      recent, toolCount: cur?.toolCount || 0,
+      subagents: agent === "orquestrador" ? runs.flatMap(r => (r.activity || []).filter(a => a.tool === "Agent" && a.pending)).map(a => ({ agent: ROLES.find(k => String(a.summary || "").toLowerCase().startsWith(AGENTS[k].label.toLowerCase())) || "outro", description: a.summary, since: a.ts })) : [] };
+  });
+}
+// Espera de ação (§7.4) derivada, a partir dos alertas abertos e do log.
+function deriveAgents() {
+  const base = deriveAgentsBase(), open = alertsNow(), th = thresholds();
+  const act = a => a.action ? { label: a.action.label, href: alertHref(a) } : null;
+  const liveSubs = new Set(base.filter(a => a.state === "trabalhando").map(a => a.agent));
+  for (const ag of base) {
+    let w = null;
+    const human = open.filter(a => a.owner === "humano");
+    if (ag.agent === "orquestrador") {
+      const subs = (ag.subagents || []).filter(s => s.agent);
+      if (subs.length) w = { on: [...new Set(subs.map(s => s.agent))], reason: `Aguardando ${subs.map(s => AGENTS[s.agent]?.label || s.agent).join(", ")}`, since: subs[0].since };
+      else if (human.length) w = { on: ["humano"], reason: human[0].action?.label || human[0].title, since: human[0].openedAt, alert: human[0].id, action: act(human[0]) };
+    } else {
+      const dem = ag.task?.demand;
+      const hb = dem && human.find(a => a.demand === dem && a.severity === "bloqueio");
+      const b1 = open.find(a => hasKind(a, "gate-return") && a.owner === ag.agent);
+      const ho = dem && [...state.log].reverse().find(e => e.type === "handoff" && e.agent === ag.agent && e.demand === dem);
+      const gAfter = ho && state.log.some(e => e.type === "gate" && e.demand === dem && String(e.ts) > String(ho.ts));
+      if (hb) w = { on: ["humano"], reason: hb.action?.label || hb.title, since: hb.openedAt, alert: hb.id, action: act(hb) };
+      else if (b1 && ag.state !== "trabalhando") w = { on: ["orquestrador"], reason: `Aguardando reenvio da correção de ${b1.gate}`, since: b1.openedAt, alert: b1.id };
+      else if (ho && ho.to === "auditor" && !gAfter && ag.state !== "trabalhando") w = { on: ["auditor"], reason: "Aguardando parecer do Auditor", since: ho.ts };
+      if (ag.agent === "auditor" && !w && !liveSubs.has("auditor")) {
+        const pend = [...state.log].reverse().find(e => e.type === "handoff" && e.to === "auditor" && e.demand && !state.log.some(g => g.type === "gate" && g.demand === e.demand && String(g.ts) > String(e.ts)) && !isClosed(findDemand(e.demand) || { status: "" }));
+        if (pend) w = { on: ["orquestrador"], reason: `Aguardando delegação da avaliação (${demandCode(pend.demand) || "demanda"})`, since: pend.ts };
+      }
+    }
+    ag.waiting = w;
+    ag.alerts = open.filter(a => a.agent === ag.agent || (a.owner === ag.agent)).map(a => a.id);
+    if (w && (ag.state === "concluido" || ag.state === "ocioso")) ag.state = "aguardando";
+    void th;
+  }
+  return base;
+}
+let agentsMemo = { st: null, lv: null, at: 0, v: null };
+function agentsNow() {
+  const src = Array.isArray(live?.agents) ? live.agents : Array.isArray(state?.agents) ? state.agents : null;
+  if (src) return ROLES.map(r => src.find(a => a && a.agent === r) || { agent: r, state: "ocioso", task: null, current: null, waiting: null, recent: [], recentFiles: [], recentCommands: [], toolCount: 0 });
+  if (!state) return [];
+  if (agentsMemo.st === state && agentsMemo.at > Date.now() - 1400) return agentsMemo.v;
+  agentsMemo = { st: state, at: Date.now(), v: deriveAgents() };
+  return agentsMemo.v;
+}
+const agentOf = r => agentsNow().find(a => a.agent === r) || null;
+
+// ---- Componentes ----
+function agentCard(ag, opts = {}) {
+  const m = AGENTS[ag.agent] || { label: ag.agent };
+  const blk = alertsNow().some(a => a.severity === "bloqueio" && a.owner === "humano" && (ag.alerts || []).includes(a.id)) || (ag.waiting?.on || []).includes("humano") && alertsNow().some(a => a.id === ag.waiting?.alert && a.severity === "bloqueio");
+  const task = ag.state === "ocioso" && !ag.waiting ? "Sem tarefa" : `${ag.state === "concluido" ? "Última: " : ""}${ag.task?.code ? `${ag.task.code}${ag.task.step ? ` · ${ag.task.step}` : ""}` : ag.task?.description || "Sem tarefa"}`;
+  const cur = ag.current ? `▶ ${ag.current.label || toolLabel(ag.current.tool, ag.current.target)}` : ag.state === "trabalhando" || ag.state === "sem-progresso" ? (ag.lastActivity ? `Última: ${ag.lastActivity}` : "Pensando / escrevendo a próxima ação") : "";
+  const w = ag.waiting;
+  const wlong = w?.since && ageS(w.since) >= thresholds().waitWarnSeconds;
+  const wtxt = w ? `◷ Aguarda: ${(w.on || []).map(who).join(", ")} — ${w.reason || ""}` : "";
+  const model = modelId(ag.model, ag.runner);
+  const tag = opts.tag || "a";
+  return `<${tag} class="agent ${blk ? "blk" : ag.state === "trabalhando" ? "work" : ""}" href="${esc(hrefWith({ agente: ag.agent }))}" data-agent="${esc(ag.agent)}" aria-label="${esc(`${m.label}: ${STATES[ag.state]?.[0] || "Livre"}. ${task}. ${cur} ${wtxt}`)}">
+    <span class="top">${av(ag.agent)}<span class="name">${esc(m.label)}</span>${stateHtml(ag.state)}</span>
+    <span class="ln two"><span class="tk">${esc(task)}</span>${ag.lastActivityAt ? ageSpan(ag.lastActivityAt) : ""}</span>
+    <span class="ln cur ${cur ? "" : "empty"}">${cur ? `${esc(cur)}${ag.current?.since ? ` · ${ageSpan(ag.current.since, "")}` : ""}${ag.current?.long ? " · comando longo" : ""}` : "&nbsp;"}</span>
+    <span class="ln wait ${wlong ? "long" : ""} ${w ? "" : "empty"}">${w ? `${esc(wtxt)}${w.since ? ` · ${ageSpan(w.since)}` : ""}` : "&nbsp;"}</span>
+    <span class="ln meta">${model ? `${esc(model)} · ${esc(providerLabel(ag.modelProvider === undefined ? providerOf(model) : ag.modelProvider))}` : "modelo não registrado"} · ${ag.toolCount || 0} ações</span></${tag}>`;
+}
+function renderSquadStrip() { return `<div class="squad">${agentsNow().map(ag => agentCard(ag)).join("")}</div>`; }
+const seenAlerts = { get() { try { return new Set(JSON.parse(localStorage.getItem("sc-seen-alerts") || "[]")); } catch (e) { return new Set(); } },
+  add(id) { try { const s = this.get(); s.add(id); localStorage.setItem("sc-seen-alerts", JSON.stringify([...s].slice(-300))); } catch (e) {} } };
+function alertActionHtml(a, cls = "btn xs") {
+  const dis = isStale() && a.owner === "humano" ? ` aria-disabled="true" title="Sem dados atuais — reconectando"` : "";
+  const code = alertCode(a);
+  if (a.action?.external) return `${extLink(a.action.external, esc(a.action.label || "Abrir"), cls + " primary")}${code ? `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>` : ""}`;
+  return `<a class="${cls} ${a.owner === "humano" ? "primary" : ""}" href="${esc(alertHref(a))}"${dis}>${esc(a.action?.label || "Ver")}${code ? `<span class="sr-only"> na ${esc(code)}</span>` : ""}</a>`;
+}
+function alertItemHtml(a, seen) {
+  const code = alertCode(a), info = code ? findDemand(code) : null;
+  const isSeen = a.severity === "aviso" && seen.has(a.id);
+  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : a.kind === "agent-stalled" ? "Squad" : "Squad"}</b>`;
+  const auditHref = `#/auditoria/alertas?${new URLSearchParams(Object.entries({ demanda: code || "", tipo: a.kind || "" }).filter(([, v]) => v))}`;
+  return `<li class="${esc(a.severity)} ${isSeen ? "seen" : ""}" data-alert="${esc(a.id)}"><div class="t">${sevHtml(a.severity)} ${where}
+      <div><b>${esc(a.title || "")}</b></div>
+      <div class="who"><span>Quem age: <b>${a.owner === "humano" ? `<span class="you">Você</span>` : esc(who(a.owner))}</b></span><span>Desde: ${ageSpan(a.openedAt) || "—"}</span></div></div>
+    <div class="act">${alertActionHtml(a)}${a.severity === "aviso" && !isSeen ? `<button class="linkbtn" data-seen="${esc(a.id)}">Visto</button>` : ""}</div>
+    <details id="why-${esc(a.id.replace(/[^\w-]/g, "_"))}"><summary>Por quê?</summary><p style="margin:4px 0">${esc(a.rule || "")}${a.detail ? ` — ${esc(String(a.detail).slice(0, 240))}` : ""}</p><a href="${esc(auditHref)}">Ver na Auditoria</a>${a.source?.event ? ` · evento <code>${esc(a.source.event)}</code>` : ""}</details></li>`;
+}
+function myNextHtml() {
+  const a = humanAlerts()[0];
+  if (!a) return "";
+  const code = alertCode(a);
+  return `<div class="mynext ${esc(a.severity)}" role="region" aria-labelledby="h-mynext"><div><small>SUA PRÓXIMA AÇÃO</small>
+    <h2 id="h-mynext">${sevHtml(a.severity)} ${code ? `${esc(code)} · ` : ""}${esc(a.action?.label || a.title)} · ${ageSpan(a.openedAt)}</h2>
+    <p>${esc(a.title || "")} · ${esc(a.rule || "")}</p></div><div class="act">${alertActionHtml(a, "btn sm")}</div></div>`;
+}
+const otherActions = () => { const items = []; for (const info of allInfos()) { const a = nextAction(info); if (a && a.order >= 4) items.push({ ...a, info }); } return items.sort((a, b) => a.order - b.order || String(a.info.d.ts).localeCompare(String(b.info.d.ts))); };
+function centralHtml() {
+  const f = route.parts[0] === "alertas" ? route.params.get("alerta") : null;
+  const all = alertsNow().filter(a => f === "voce" ? a.owner === "humano" : true);
+  const seen = seenAlerts.get(), max = route.parts[0] === "alertas" ? 99 : 5;
+  const list = (sev, emptyTxt) => { const xs = all.filter(a => a.severity === sev);
+    return `<div><h3 id="h-${sev}">${sev === "bloqueio" ? "Bloqueios" : "Avisos"} (${xs.length})</h3><ul class="alist" aria-labelledby="h-${sev}">${xs.length ? xs.slice(0, max).map(a => alertItemHtml(a, seen)).join("") : `<li class="empty">✓ ${emptyTxt}</li>`}</ul>
+      ${xs.length > max ? `<p class="more"><a href="#/painel/alertas?alerta=${sev}">Ver todos (${xs.length})</a></p>` : ""}</div>`; };
+  const others = f && f !== "voce" ? [] : otherActions();
+  return `<div class="central">${f === "aviso" ? "" : list("bloqueio", "Nenhum bloqueio")}${f === "bloqueio" ? "" : list("aviso", "Nenhum aviso")}</div>
+    ${others.length ? `<h3 style="margin-top:16px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Outras ações suas (${others.length})</h3>
+      <ul class="alist">${others.map(a => `<li class="other"><div class="t"><a class="ttl" href="#/demandas/${a.info.code}"><span class="code">${a.info.code}</span>${esc(a.info.eff.title)}</a>
+        <div class="who"><span class="validate" style="font-weight:600">${esc(a.label)}</span><span>Quem age: <b><span class="you">Você</span></b></span><span>Desde: ${ageSpan(a.info.d.ts)}</span></div></div><div class="act">${actionButtons(a)}</div></li>`).join("")}</ul>` : ""}`;
 }
 
 // Demanda ativa (iniciada e ainda não concluída): a tela Execuções passa a ser dela.
@@ -504,7 +992,7 @@ function demandSteps(active) {
       if (s) { s.st = "done"; s.entry = e; } else steps.push({ id: AGENTS[e.agent]?.ini || "•", agent: e.agent, title: `${AGENTS[e.agent]?.label || e.agent}: ${e.title}`, st: "done", entry: e, ts: e.ts });
     } else if (e.type === "gate") {
       const s = [...steps].reverse().find(s => s.agent === "auditor" && s.st !== "done");
-      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${Math.round((e.confidence || 0) * 100)}%`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
+      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${pct(e.confidence || 0)}`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
       if (s) Object.assign(s, item); else steps.push(item);
     }
   }
@@ -543,9 +1031,9 @@ const runPill = on => `<span class="pill ${on ? "run" : "idle"}">${on ? "Em exec
 function nextAction(info) {
   const { d, code } = info;
   if (info.canceled || info.delivered || info.status === "Concluída" || info.inBacklog) return null;
-  const g = latestGateFor(d.id);
-  if (g && info.work.length && !info.inReview && gateNeedsHuman(g) && !humanFor(g.gate, d.id, g.ts))
-    return { order: 1, urgent: true, g, label: `Decidir ${g.gate} — intervenção obrigatória`, href: `#/demandas/${code}/gates`, btn: `Decidir ${g.gate}` };
+  const al = alertsFor(d.id).find(a => a.owner === "humano" && a.gate && hasKind(a, "human-required", "cycle-limit"));
+  const g = al && !info.inReview ? gateOfAlert(al, d.id) : null;
+  if (g) return { order: 1, urgent: true, g, alert: al, label: `Decidir ${g.gate} — ${hasKind(al, "cycle-limit") ? "3º ciclo de autocorreção" : "intervenção obrigatória"}`, href: `#/demandas/${code}/gates`, btn: `Decidir ${g.gate}` };
   if (info.vinfo?.st === "perguntas") { const n = (info.vinfo.val?.questions || []).length;
     return { order: 2, urgent: true, label: `Responder ${n} pergunta${n === 1 ? "" : "s"} do Arquiteto`, href: `#/demandas/${code}/validacao`, btn: "Responder" }; }
   if (info.inReview) return { order: 3, label: `Revisar PR #${info.inReview.pr ?? "?"}`, href: `#/demandas/${code}`, ext: info.inReview.url, btn: `Revisar PR #${info.inReview.pr ?? "?"}` };
@@ -553,16 +1041,8 @@ function nextAction(info) {
   if (info.preStart && info.vinfo?.st === "atrasada") return { order: 5, label: "Validação atrasada — aguardar ou iniciar com override", href: `#/demandas/${code}`, btn: "Ver validação" };
   return null;
 }
-function needsYou() {
-  const items = [];
-  for (const info of allInfos()) { const a = nextAction(info); if (a) items.push({ ...a, info }); }
-  // Release sem demanda aguardando revisão (review sem delivered posterior do mesmo PR).
-  for (const e of state.log) if (e.type === "review" && !e.demand && !state.log.some(x => x.type === "delivered" && !x.demand && x.pr === e.pr && String(x.ts) > String(e.ts)))
-    items.push({ order: 3, label: `Revisar PR #${e.pr ?? "?"}${e.release ? ` · release ${e.release}` : ""}`, href: "#/auditoria/eventos?tipo=review", ext: e.url, btn: `Revisar PR #${e.pr ?? "?"}`, info: null });
-  const bg = latestGateFor(null);
-  if (bg && gateNeedsHuman(bg) && !humanFor(bg.gate, null, bg.ts)) items.push({ order: 6, g: bg, label: `Decidir ${bg.gate} da squad base`, href: "#/painel/squad-base", btn: `Decidir ${bg.gate}`, info: null });
-  return items.sort((a, b) => a.order - b.order || (a.info && b.info ? a.info.d.ts.localeCompare(b.info.d.ts) : 0));
-}
+// "Sua ação" (§4): alertas com owner humano + ações não-alerta (Iniciar, validação atrasada) — base do contador "Você".
+function needsYou() { return [...humanAlerts(), ...otherActions()]; }
 function actionButtons(a, sm = true) {
   const cls = `btn ${sm ? "sm" : ""}`;
   if (a.ext) return `${extLink(a.ext, esc(a.btn), cls + " primary")}${a.info ? `<a class="${cls}" href="${a.href}">Ver ${esc(a.info.code)}</a>` : `<a class="${cls}" href="${a.href}">Ver registro</a>`}`;
@@ -597,10 +1077,12 @@ function stepperHtml(info) {
 // Recomendação do Auditor (bloco) e decisão humana POR GATE EXIBIDO (X11: data-gate/data-demand/nota próprios).
 const gateMsg = {};
 function recoHtml(g) {
-  const conf = g?.confidence != null ? Math.round(g.confidence * 100) : null;
-  return `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
+  const conf = g?.confidence != null ? pct(g.confidence) : null;
+  // D14-QA-6: a largura usa o número (0–100); pct() já traz "%" e só serve ao texto.
+  const w = typeof g?.confidence === "number" && isFinite(g.confidence) ? Math.min(100, Math.max(0, g.confidence * 100)) : 0;
+  return `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf} confiança</span>` : ""}</div>
     <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
-    <div class="bar"><div style="width:${conf ?? 0}%"></div></div>
+    <div class="bar"><div style="width:${w}%"></div></div>
     <p>Risco ${esc(g.risk || "—")}. ${esc((g.open_risks || []).join(" ") || g.rationale || g.detail || "")}</p></div>`;
 }
 function evidencesHtml(evs) {
@@ -609,7 +1091,7 @@ function evidencesHtml(evs) {
 function gateDecisionHtml(g, demand) {
   const key = `${demand || "base"}-${g.gate}`, nid = `note-${key}`;
   const human = humanFor(g.gate, demand, g.ts);
-  const required = gateNeedsHuman(g);
+  const required = alertsFor(demand).some(a => a.gate === g.gate && hasKind(a, "human-required", "cycle-limit")) || (!human && ruleNeedsHuman(g));
   const btn = (act, label, extra = "") => `<button class="btn ${act === "APPROVE" ? "primary" : ""}" data-human="${act}" data-gate="${esc(g.gate)}" data-demand="${esc(demand || "")}" data-note="${nid}" ${human ? "disabled" : ""} ${extra}>${label}</button>`;
   const m = gateMsg[key];
   return `<p class="${required ? "warn-msg" : "muted"}" style="font-size:13px">${required ? "<b>Obrigatória</b> neste gate (confiança &lt; 70%, risco alto ou 3º ciclo)." : "Não obrigatória. Você pode aceitar a recomendação ou alterar o próximo passo."}</p>
@@ -617,7 +1099,7 @@ function gateDecisionHtml(g, demand) {
     <textarea id="${nid}" data-keep rows="2" placeholder="Observação para o Orquestrador (opcional)"></textarea>
     <div class="actions">${g.recommendation === "APPROVE"
       ? btn("APPROVE", `Enviar para ${esc(AGENTS[g.to]?.label || "próxima etapa")}`) + btn("RETURN", "Devolver")
-      : btn("APPROVE", "Aceitar devolução · corrigir e reauditar") + btn("OVERRIDE", "Seguir mesmo assim", `style="color:var(--amber);border-color:var(--amber)"`)}</div>
+      : btn("APPROVE", "Aceitar devolução · corrigir e reauditar") + btn("OVERRIDE", "Seguir mesmo assim", `data-variant="danger-outline" style="color:var(--danger);border-color:var(--danger)"`)}</div>
     ${human ? `<p class="ok-msg">Decisão registrada (${hhmm(human.ts)}): ${{ APPROVE: g.recommendation === "APPROVE" ? `${esc(AGENTS[g.to]?.label || "próxima etapa")} assumirá a próxima etapa.` : "o Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.", RETURN: "etapa devolvida ao agente de origem.", OVERRIDE: "você assumiu o risco; o Orquestrador libera a demanda e registra a decisão." }[human.recommendation] || esc(human.recommendation || "")}</p>` : ""}
     ${m ? `<p class="${m.ok ? "ok-msg" : "fail"}" style="font-size:13px">${esc(m.text)}</p>` : ""}`;
 }
@@ -631,30 +1113,35 @@ const crumbs = items => `<nav class="crumbs" aria-label="Trilha"><ol>${items.map
 
 // ---- Painel (#/painel) ----
 function renderPainel() {
-  routeTitle = "Painel";
-  const all = allInfos(), needs = needsYou();
+  routeTitle = route.parts[0] === "alertas" ? "Painel · Bloqueios e avisos" : "Painel";
+  const all = allInfos(), al = alertsNow();
   const active = all.filter(x => !x.preStart && !x.inBacklog && !isClosed(x));
   const delivered = all.filter(x => x.delivered).sort((a, b) => String(b.delivered.ts).localeCompare(String(a.delivered.ts))).slice(0, 3);
   const bg = latestGateFor(null);
-  const showBase = !active.length || (bg && gateNeedsHuman(bg) && !humanFor(bg.gate, null, bg.ts)) || route.parts[0] === "squad-base";
+  const showBase = !active.length || alertsFor(null).some(a => a.gate && a.owner === "humano") || route.parts[0] === "squad-base";
+  const ags = agentsNow(), nW = ags.filter(a => a.state === "trabalhando").length, nA = ags.filter(a => a.state === "aguardando" || a.waiting).length, nS = ags.filter(a => a.state === "sem-progresso").length;
+  const f = route.parts[0] === "alertas" ? route.params.get("alerta") : null;
+  const FL = { bloqueio: "só bloqueios", aviso: "só avisos", voce: "só os que dependem de você" };
+  const nb = al.filter(a => a.severity === "bloqueio").length, na = al.filter(a => a.severity === "aviso").length;
   return `${routeNotice ? `<p class="notice">${esc(routeNotice)}</p>` : ""}
-  <div class="page-head"><div><h1 tabindex="-1">Painel</h1><div class="sub">O que depende de você e o que está andando na squad.</div></div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${runPill(anyRunning())}<a class="btn primary" href="#/demandas/nova">+ Nova demanda</a></div></div>
-  <section class="dsec" aria-labelledby="h-precisa"><h2 id="h-precisa">Precisa de você <span class="muted" style="font-weight:400">(${needs.length})</span></h2>
-    ${needs.length ? `<ul class="rows">${needs.map(a => `<li><div class="t">${a.info ? `<a class="ttl" href="#/demandas/${a.info.code}"><span class="code">${a.info.code}</span>${esc(a.info.eff.title)}</a>` : `<b>${a.order === 6 ? "Squad base (ADR-000)" : "Release"}</b>`}
-        <div class="meta"><span class="${a.urgent ? "fail" : "validate"}" style="font-weight:600">${esc(a.label)}</span>${a.info ? `<span class="tag">${esc(a.info.status)}</span>` : ""}</div></div>
-        <div class="act">${actionButtons(a)}</div></li>`).join("")}</ul>`
-      : `<p class="muted">Nada depende de você agora. <a href="#/demandas/nova">Registrar uma nova demanda</a>.</p>`}
+  <div class="page-head"><div><h1 tabindex="-1">Painel</h1><div class="sub">O que foge do normal sobe; o que depende de você vem primeiro.</div></div>
+    <a class="btn primary sm" href="#/demandas/nova" style="flex-grow:0">+ Nova demanda</a></div>
+  ${myNextHtml()}
+  <section class="dsec" id="alertas" aria-labelledby="h-precisa" style="margin-top:16px"><h2 id="h-precisa" tabindex="-1">Bloqueios e avisos <span class="squad-sum">(${nb} bloqueio${nb === 1 ? "" : "s"} · ${na} aviso${na === 1 ? "" : "s"})</span></h2>
+    ${f && FL[f] ? `<p style="font-size:13px;margin:0">Filtro: ${FL[f]} · <a href="#/painel/alertas">ver todos</a></p>` : ""}
+    ${centralHtml()}
   </section>
+  <section class="dsec" aria-labelledby="h-agentes"><h2 id="h-agentes">Squad ao vivo <span class="squad-sum">${nW} trabalhando · ${nA} aguardando${nS ? ` · ${nS} sem progresso` : ""}</span></h2>${renderSquadStrip()}</section>
   <section class="dsec" aria-labelledby="h-andamento"><h2 id="h-andamento">Em andamento <span class="muted" style="font-weight:400">(${active.length})</span></h2>
-    ${active.length ? `<ul class="rows">${active.map(x => { const now = demandSteps(x).find(p => p.st === "now"); const w = workingOn(x.d.id); const { steps, idx } = stageOf(x);
+    ${active.length ? `<ul class="rows">${active.map(x => { const now = demandSteps(x).find(p => p.st === "now"); const w = workingOn(x.d.id); const { steps, idx } = stageOf(x); const xa = alertsFor(x.d.id);
+      const nbx = xa.filter(a => a.severity === "bloqueio").length, nax = xa.filter(a => a.severity === "aviso").length;
       return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>
-        <div class="meta"><span class="${statusCls(x.status)}" style="font-weight:600">${esc(x.status)}</span><span class="tag">etapa: ${esc(steps[Math.min(idx, steps.length - 1)])}</span>${w.length ? `<span class="tag pass">trabalhando: ${esc(w.join(", "))}</span>` : ""}</div>
+        <div class="meta"><span class="${statusCls(x.status)}" style="font-weight:600">${esc(x.status)}</span><span class="tag">etapa: ${esc(steps[Math.min(idx, steps.length - 1)])}</span>${w.length ? `<span class="tag pass">trabalhando: ${esc(w.join(", "))}</span>` : ""}
+          ${nbx ? `<span class="sev bloqueio">${ICON.bloqueio}${nbx} bloqueio${nbx === 1 ? "" : "s"}</span>` : ""}${nax ? `<span class="sev aviso">${ICON.aviso}${nax} aviso${nax === 1 ? "" : "s"}</span>` : ""}</div>
         <div class="muted" style="font-size:12.5px;margin-top:3px">${esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.")}</div></div>
         <div class="act"><a class="btn sm" href="#/demandas/${x.code}/execucao">Ver execução</a></div></li>`; }).join("")}</ul>`
       : `<p class="muted">Nenhuma demanda em execução.</p>`}
   </section>
-  <section class="dsec" aria-labelledby="h-agentes"><h2 id="h-agentes">Agentes</h2>${renderSquadStrip()}</section>
   <section class="dsec" aria-labelledby="h-entregues"><h2 id="h-entregues">Entregues recentemente</h2>
     ${delivered.length ? `<ul class="rows">${delivered.map(x => `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>${reviewHtml(x)}</div>
       <div class="act">${x.delivered.pr ? extLink(x.delivered.url, `PR #${esc(x.delivered.pr)}`, "btn sm") : ""}</div></li>`).join("")}</ul>` : `<p class="muted">Nenhuma entrega por PR ainda.</p>`}
@@ -697,6 +1184,8 @@ function renderDemanda(ref) {
       ${a?.order === 2 ? `<p style="font-size:13px;margin:0">As perguntas estão na seção <a href="#/demandas/${code}/validacao">Validação</a>. Depois de responder, Iniciar fica disponível aqui.</p>` : ""}
       ${info.vinfo && !info.vinfo.ready ? `<p class="why">${esc(VSTATUS[info.vinfo.st] || "")}.</p>` : ""}${preStartHtml(info, false)}</div>`;
   else if (a?.order === 3) next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>${esc(a.label)}</h2>${reviewHtml(info)}<div class="actions">${extLink(info.inReview.url, `Revisar PR #${esc(info.inReview.pr ?? "?")} no GitHub`, "btn primary")}</div></div>`;
+  else if (alertsFor(id).find(x => x.severity === "bloqueio" && x.owner !== "humano")) { const b = alertsFor(id).find(x => x.severity === "bloqueio" && x.owner !== "humano");
+    next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>Aguardando ${esc(who(b.owner))}: ${esc(b.action?.label || b.title)} · ${ageSpan(b.openedAt)}</h2><p style="margin:0;font-size:13px">${esc(b.rule || "")}. Nada depende de você agora.</p></div>`; }
   else next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>Nada depende de você agora</h2><p style="margin:0;font-size:13px">${isClosed(info) ? `Demanda ${esc(info.status.toLowerCase())}.` : w.length ? `${esc(w.join(", "))} trabalhando.` : "Aguardando o próximo passo do Orquestrador."}${!isClosed(info) ? ` <a href="#/demandas/${code}/execucao">Ver execução</a>` : ""}</p></div>`;
   // Execução
   const pipe = info.work.length || info.related.some(e => e.type === "task" && e.agent !== "humano") ? demandSteps(info) : [];
@@ -706,7 +1195,7 @@ function renderDemanda(ref) {
   const gateEvs = info.related.filter(e => e.type === "gate");
   const lastIdx = {}; gateEvs.forEach((e, i) => { lastIdx[e.gate] = i; });
   const gatesHtml = gateEvs.length ? gateEvs.map((e, i) => { const h = humanFor(e.gate, id, e.ts, gateEvs.slice(i + 1).find(x => x.gate === e.gate)?.ts); const file = lastIdx[e.gate] === i ? state.gates.find(f => f.demand === id && f.gate === e.gate) : null;
-    return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(e.gate)} · <span class="${e.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(e.recommendation)}</span> · ${Math.round((e.confidence || 0) * 100)}% · risco ${esc(e.risk || "—")}</b><span class="muted" style="font-size:12px">${hhmm(e.ts)}</span></div>
+    return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(e.gate)} · <span class="${e.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(e.recommendation)}</span> · ${pct(e.confidence || 0)} · risco ${esc(e.risk || "—")}</b><span class="muted" style="font-size:12px">${hhmm(e.ts)}</span></div>
       ${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}
       ${e.detail ? `<p class="muted" style="font-size:13px;margin:6px 0">${esc(e.detail)}</p>` : ""}
       <details id="gd-${id}-${i}"><summary style="cursor:pointer;font-size:13px;color:var(--accent)">Evidências (${(e.evidences || []).length})${file ? " e parecer completo" : ""}</summary>${evidencesHtml(file?.evidences || e.evidences)}${file ? `<p class="muted" style="font-size:13px">${esc(file.rationale || "")}</p>${(file.open_risks || []).length ? `<ul style="font-size:13px">${file.open_risks.map(r => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}` : ""}</details>
@@ -744,11 +1233,12 @@ function renderDemanda(ref) {
   ${controlsHtml(info)}
   ${flash && !info.preStart && !info.inBacklog ? `<p class="${flashErr ? "fail" : "ok-msg"}">${esc(flash)}</p>` : ""}
   ${stepperHtml(info)}
+  ${alertsFor(id).length ? `<div class="dem-alerts" role="region" aria-label="Bloqueios e avisos da ${esc(code)}"><ul class="alist">${alertsFor(id).map(x => alertItemHtml(x, seenAlerts.get())).join("")}</ul></div>` : ""}
   ${next}
-  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:var(--usage-h, 0px);z-index:4">${SECTIONS.map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${SECTIONS.map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
   <section class="dsec" id="sec-execucao" aria-labelledby="h-execucao"><h2 id="h-execucao" tabindex="-1">Execução</h2>
     <div class="sub" style="margin-top:0">${esc(now ? `Agora: ${now.title}` : isClosed(info) ? `Demanda ${info.status.toLowerCase()}.` : info.preStart || info.inBacklog ? "Ainda não iniciada." : "Aguardando o próximo passo do Orquestrador.")}</div>
-    ${involved.length ? `<div class="mrow" style="margin:10px 0"><span class="lbl">Agentes envolvidos:</span>${involved.map(ag => `<a class="tag" href="${esc(hrefWith({ agente: ag }))}">${esc(AGENTS[ag].label)} · ${esc(agentStatus(runsByAgent()[ag]))}</a>`).join("")}</div>` : ""}
+    ${involved.length ? `<div class="mrow" style="margin:10px 0 0"><span class="lbl">Agentes envolvidos:</span></div><div class="squad" style="margin-bottom:12px">${involved.filter(ag => ROLES.includes(ag)).map(ag => agentCard(agentOf(ag))).join("")}</div>` : ""}
     ${pipe.length ? timelineHtml(pipe) : `<p class="muted">Sem passos de execução ainda.</p>`}
   </section>
   <section class="dsec" id="sec-gates" aria-labelledby="h-gates"><h2 id="h-gates" tabindex="-1">Gates</h2>
@@ -763,23 +1253,6 @@ function renderDemanda(ref) {
       ${evs.map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td><td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div></details>
     <p style="font-size:13px"><a href="#/auditoria/eventos?demanda=${code}">Ver na Auditoria</a></p>
   </section>`;
-}
-
-function feedHtml(runs) {
-  if (!runs?.length) return `<p class="muted">Este agente ainda não recebeu nenhuma tarefa.</p>`;
-  return runs.slice().reverse().map(r => `
-    ${r.status === "trabalhando" ? `<div class="live-now"><span class="pulse"></span><div><span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600">Executando agora</span>
-      <b>${r.current ? `${esc(r.current.tool)} · ${esc(r.current.summary)}` : "Pensando / escrevendo a próxima ação"}</b>
-      <span class="muted">${r.current ? since(r.current.ts) : since(r.updated)} · sessão iniciada ${hhmm(r.started)} · ${r.toolCount} ações</span></div></div>` : ""}
-    <div style="margin-bottom:18px">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(r.description || "Sessão")}</b>
-        <span class="tag">${esc(r.status)}</span>${runModelChips(r)}<span class="tag">${r.toolCount} ações</span>
-        <span class="muted" style="font-size:12px">início ${hhmm(r.started)} · última ${hhmm(r.updated)}</span>${r.demand && demandCode(r.demand) ? `<a href="#/demandas/${demandCode(r.demand)}" style="font-size:12px">Abrir ${demandCode(r.demand)} ›</a>` : ""}</div>
-      ${r.files.length ? `<div class="files">${r.files.map(f => `<code>${esc(f)}</code>`).join("")}</div>` : ""}
-      <ul class="feed">${r.activity.slice().reverse().map(a => `<li class="${a.kind === "tool" && a.pending && r.status === "trabalhando" ? "live" : ""}"><time>${hhmm(a.ts)}</time><div>${a.kind === "tool"
-        ? `<span class="tool ${a.error ? "err" : ""}">${esc(a.tool)}</span>${esc(a.summary)}${a.pending && r.status === "trabalhando" ? ` <span class="muted">· em execução ${since(a.ts)}</span>` : (a.error ? ` <span class="fail">· erro</span>` : "")}${a.detail ? `<details><summary>detalhe</summary><pre>${esc(a.detail)}</pre></details>` : ""}`
-        : `<span class="txt">${esc(a.summary)}</span>`}</div></li>`).join("")}</ul>
-    </div>`).join("");
 }
 
 const ROUTES = { padrao: "Padrão · Arquiteto → G1 → implementação → G2 → QA → G3", direta: "Direta · implementação → G2 → QA → G3 (mudança pequena, sem contrato novo)" };
@@ -875,7 +1348,7 @@ function controlsHtml(info) {
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
     ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
     <label class="muted" style="font-size:12px" for="cp-${id}">Prioridade</label>
-    <select id="cp-${id}" data-ctlpr="${id}" style="padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${["alta", "normal", "baixa"].map(p => `<option value="${p}" ${p === info.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
+    <select id="cp-${id}" data-ctlpr="${id}" style="padding:7px 8px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)">${["alta", "normal", "baixa"].map(p => `<option value="${p}" ${p === info.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
     <button class="btn" id="ctl-cancel-${id}" data-ctl="cancel" data-id="${id}" ${ctlConfirm.has(id) ? `data-confirm="1"` : ""} style="height:36px;color:var(--red);border-color:var(--red);margin-left:auto">${ctlConfirm.has(id) ? "Confirmar cancelamento" : "Cancelar demanda"}</button>
   </div>`;
 }
@@ -883,7 +1356,7 @@ function controlsHtml(info) {
 function backlogItemHtml(info) {
   const { d, code, eff, issue } = info;
   const id = d.id, msg = cardMsg[id];
-  const sel = "width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff";
+  const sel = "width:100%;padding:7px 8px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)";
   const editing = blEditing.has(id);
   return `<div class="bl-item" data-bl="${id}">
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(eff.title)}</b><span class="tag backlog">Backlog</span></div>
@@ -933,7 +1406,7 @@ function questionsHtml(d, v) {
 function preStartHtml(info, withQuestions = true) {
   const { d, vinfo } = info;
   const ready = !vinfo || vinfo.ready;
-  const sel = "width:100%;padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff";
+  const sel = "width:100%;padding:7px 8px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)";
   const msg = cardMsg[d.id];
   return `${withQuestions ? questionsHtml(d, vinfo) : ""}
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:8px;margin-top:10px;align-items:end">
@@ -954,9 +1427,9 @@ function preCancelHtml(id) {
   if (!cancelOpen.has(id)) return `<div class="actions" style="margin-top:8px"><button class="btn" id="pc-${id}" data-precancel-open="${id}" style="height:36px;color:var(--red);border-color:var(--red)">Cancelar demanda</button></div>`;
   return `<div class="qbox open" role="group" aria-label="Confirmar cancelamento">
     <label for="cn-${id}">Motivo (opcional)</label>
-    <input type="text" id="cn-${id}" data-keep maxlength="500" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">
+    <input type="text" id="cn-${id}" data-keep maxlength="500" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)">
     <p class="why">A demanda não poderá ser iniciada, respondida nem editada depois de cancelada.</p>
-    <div class="actions"><button class="btn" data-precancel-confirm="${id}" style="height:36px;color:#fff;background:var(--red);border-color:var(--red)">Confirmar cancelamento</button><button class="btn" data-precancel-back="${id}" style="height:36px">Voltar</button></div>
+    <div class="actions"><button class="btn" data-precancel-confirm="${id}" style="height:36px;color:var(--on-accent);background:var(--red);border-color:var(--red)">Confirmar cancelamento</button><button class="btn" data-precancel-back="${id}" style="height:36px">Voltar</button></div>
   </div>`;
 }
 
@@ -968,13 +1441,13 @@ function applyOverride(id) {
 }
 
 // ---- Demandas (#/demandas?f=…) e Nova demanda (#/demandas/nova) ----
-const FILTERS = [["ativas", "Ativas"], ["acao", "Precisa de você"], ["fila", "Na fila"], ["backlog", "Backlog"], ["entregues", "Entregues"], ["canceladas", "Canceladas"], ["todas", "Todas"]];
+const FILTERS = [["ativas", "Ativas"], ["acao", "Com ação sua"], ["fila", "Na fila"], ["backlog", "Backlog"], ["entregues", "Entregues"], ["canceladas", "Canceladas"], ["todas", "Todas"]];
 function filterDemands(f) {
   const all = allInfos(), { queue, backlog } = queueData();
   if (f === "fila") return queue;
   if (f === "backlog") return backlog;
   const rev = all.slice().reverse();
-  if (f === "acao") return rev.filter(x => nextAction(x));
+  if (f === "acao") return rev.filter(x => nextAction(x) || alertsFor(x.d.id).some(a => a.owner === "humano"));
   if (f === "entregues") return rev.filter(x => x.delivered || x.status === "Concluída");
   if (f === "canceladas") return rev.filter(x => x.canceled);
   if (f === "todas") return rev;
@@ -990,10 +1463,12 @@ function renderDemandas() {
     : list.length ? `<ul class="rows">${list.map(x => { const a = nextAction(x); const pr = x.inReview || x.delivered || x.rejected;
       return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>
         <div class="meta"><span class="${statusCls(x.status)}" style="font-weight:600">${esc(x.status)}</span>
+          ${(() => { const xa = alertsFor(x.d.id), b = xa.filter(a => a.severity === "bloqueio").length, v = xa.filter(a => a.severity === "aviso").length;
+            return `${b ? `<span class="sev bloqueio">${ICON.bloqueio}${b} bloqueio${b === 1 ? "" : "s"}</span>` : ""}${v ? `<span class="sev aviso">${ICON.aviso}${v} aviso${v === 1 ? "" : "s"}</span>` : ""}`; })()}
           ${x.queued ? `<span class="tag backlog">${qpos[x.d.id]}º na fila</span>` : ""}
           ${x.eff.kind ? `<span class="tag">${esc(KINDS[x.eff.kind]?.tag || x.eff.kind)}</span>` : ""}<span class="tag">prioridade ${esc(x.priority)}</span>
           ${x.issue ? extLink(x.issue.url, `issue #${esc(x.issue.number)}`, "tag") : ""}${pr?.pr ? extLink(pr.url, `PR #${esc(pr.pr)}`, "tag") : ""}
-          ${x.gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}</div>
+          ${x.gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${pct(g.confidence || 0)}</span>`).join("")}</div>
         ${x.last ? `<div class="muted" style="font-size:12px;margin-top:3px">último passo: ${esc(AGENTS[x.last.agent]?.label || x.last.agent)} — ${esc(x.last.title)}</div>` : ""}</div>
         <div class="act">${a ? actionButtons({ ...a, info: x }) : ""}</div></li>`; }).join("")}</ul>`
     : `<p class="muted">Nenhuma demanda neste filtro.</p>`;
@@ -1009,7 +1484,7 @@ function renderNova() {
   return `${crumbs([["Demandas", "#/demandas"], ["Nova demanda", ""]])}<h1 tabindex="-1">Nova demanda</h1><div class="sub">Registrar cria a issue no GitHub e guarda a demanda no log; em seguida você vai para a página dela.</div>
     <section class="card" style="max-width:720px;margin-top:20px">
       <label for="dem-title" class="muted" style="font-size:12px;font-weight:500">Título</label>
-      <input id="dem-title" data-keep placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit">
+      <input id="dem-title" data-keep placeholder="Ex.: listar os pedidos de um cliente" style="width:100%;margin:6px 0 10px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:2px;font:inherit">
       <label for="dem-detail" class="muted" style="font-size:12px;font-weight:500">Descrição, critérios de aceite, restrições</label>
       <textarea id="dem-detail" data-keep rows="5" placeholder="O que precisa existir quando estiver pronto? O que não pode mudar?"></textarea>
       <fieldset class="kind" style="margin-top:12px"><legend>Tipo (obrigatório)</legend>
@@ -1020,26 +1495,31 @@ function renderNova() {
         <label class="when-opt" for="dem-when-backlog"><input type="radio" name="dem-when" id="dem-when-backlog" value="backlog" data-keep><span><b>Guardar no backlog</b> — sem validação<small>Você escolhe quando entra na fila (“Mover para a fila”).</small></span></label>
       </fieldset>
       <label for="dem-priority" class="muted" style="font-size:12px;font-weight:500">Prioridade</label>
-      <select id="dem-priority" data-keep style="width:100%;margin:6px 0 0;padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${k === "normal" ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <select id="dem-priority" data-keep style="width:100%;margin:6px 0 0;padding:8px 10px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)">${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${k === "normal" ? "selected" : ""}>${v}</option>`).join("")}</select>
       <div class="actions"><button class="btn primary" data-register="1">Registrar demanda</button></div>
       ${flash ? `<p class="${flashErr ? "fail" : "ok-msg"}" style="font-size:13px;margin-top:12px">${esc(flash)}</p>` : ""}
       <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (na página da demanda) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>`;
 }
 
-// ---- Squad (#/squad) ----
+// ---- Squad (#/squad) — D14: grade de cartões (§7.1) + tabela "Esperas"; o detalhe fica na gaveta (§7.2). ----
 function renderSquad() {
   routeTitle = "Squad";
-  const byAgent = runsByAgent(), working = state.runs.filter(r => r.status === "trabalhando").length;
-  return `<div class="page-head"><div><h1 tabindex="-1">Squad</h1><div class="sub">O que cada agente está fazendo agora — lido ao vivo das sessões. ${working} agente${working === 1 ? "" : "s"} trabalhando.</div></div>${runPill(working > 0)}</div>
-  <div class="agents-grid">${Object.keys(AGENTS).filter(a => a !== "humano").map(a => `
-    <section class="card"><div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">${av(a)}
-      <div><b>${AGENTS[a].label}</b><div class="muted" style="font-size:12px">${AGENTS[a].role}</div></div>
-      <span class="dot ${agentStatus(byAgent[a])}" title="${agentStatus(byAgent[a])}"></span><a href="${esc(hrefWith({ agente: a }))}" style="font-size:12px;margin-left:8px;white-space:nowrap">Abrir gaveta</a></div>${feedHtml(byAgent[a])}</section>`).join("")}</div>`;
+  const ags = agentsNow(), working = ags.filter(a => a.state === "trabalhando").length;
+  const waits = ags.filter(a => a.waiting).sort((a, b) => String(a.waiting.since || "").localeCompare(String(b.waiting.since || "")));
+  return `<div class="page-head"><div><h1 tabindex="-1">Squad</h1><div class="sub">O que cada integrante está fazendo agora e se espera alguém — lido ao vivo das sessões. ${working} trabalhando.</div></div></div>
+  <div class="agents-grid">${ags.map(ag => `<section aria-label="${esc(AGENTS[ag.agent]?.label || ag.agent)}">${agentCard(ag)}</section>`).join("")}</div>
+  <section class="dsec" aria-labelledby="h-esperas"><h2 id="h-esperas">Esperas <span class="squad-sum">(${waits.length})</span></h2>
+    ${waits.length ? `<div class="tbl" style="margin-top:0"><table class="waits"><thead><tr><th>Quem espera</th><th>Por quem</th><th>O quê</th><th>Desde</th><th></th></tr></thead><tbody>
+      ${waits.map(a => `<tr><td><a href="${esc(hrefWith({ agente: a.agent }))}">${esc(AGENTS[a.agent]?.label || a.agent)}</a></td><td>${(a.waiting.on || []).map(o => o === "humano" ? `<span class="you">Você</span>` : esc(who(o))).join(", ")}</td>
+        <td>${esc(a.waiting.reason || "")}</td><td>${ageSpan(a.waiting.since) || "—"}</td><td>${a.waiting.action ? `<a class="btn xs primary" href="${esc(a.waiting.action.href?.startsWith("?") ? hrefWith(Object.fromEntries(new URLSearchParams(a.waiting.action.href))) : a.waiting.action.href)}">${esc(a.waiting.action.label)}</a>` : ""}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="muted">Ninguém está esperando outro integrante agora.</p>`}
+    <p style="font-size:13px"><a href="#/auditoria/politicas">Legenda de estados e limites</a></p>
+  </section>`;
 }
 
 // ---- Auditoria (#/auditoria/eventos|gates|handoffs|politicas) ----
-const AUD_TABS = [["eventos", "Eventos"], ["gates", "Gates"], ["handoffs", "Handoffs"], ["politicas", "Políticas"]];
+const AUD_TABS = [["eventos", "Eventos"], ["gates", "Gates"], ["alertas", "Alertas"], ["handoffs", "Handoffs"], ["politicas", "Políticas"]];
 const codeLink = id => { const c = id ? demandCode(id) : null; return c ? `<a href="#/demandas/${c}">${c}</a>` : ""; };
 function renderAuditoria() {
   const tab = AUD_TABS.some(([k]) => k === route.parts[0]) ? route.parts[0] : "eventos";
@@ -1070,13 +1550,43 @@ function renderAuditoria() {
     const gates = state.gates.filter(g => !fid || g.demand === fid).slice().reverse();
     return `${head}<div class="filters"><div><label for="f-gdemanda">Demanda</label><select id="f-gdemanda" data-filter="demanda">${[["", "Todas"], ...allInfos().slice().reverse().map(x => [x.code, `${x.code} · ${x.eff.title.slice(0, 40)}`])].map(([v, t]) => `<option value="${esc(v)}" ${v === fd ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
       <span class="muted" style="font-size:12px;align-self:center">Pareceres do Auditor (<code>docs/squad/gates/</code>): o arquivo guarda o último ciclo de cada gate.</span></div>
-    ${gates.length ? gates.map(g => `<section class="card" style="margin-top:18px"><h3>${g.demand ? `${codeLink(g.demand) || esc(g.demand)} · ` : "Squad base · "}${esc(g.gate)} · ${esc(g.recommendation)} · ${Math.round((g.confidence || 0) * 100)}% · risco ${esc(g.risk)}</h3>
+    ${gates.length ? gates.map(g => `<section class="card" style="margin-top:18px"><h3>${g.demand ? `${codeLink(g.demand) || esc(g.demand)} · ` : "Squad base · "}${esc(g.gate)} · ${esc(g.recommendation)} · ${pct(g.confidence || 0)} · risco ${esc(g.risk)}</h3>
       ${evidencesHtml(g.evidences)}<p class="muted">${esc(g.rationale || "")}</p></section>`).join("") : `<p class="muted" style="margin-top:18px">Nenhum gate avaliado${fd ? " nesta demanda" : ""} ainda.</p>`}`;
+  }
+  if (tab === "alertas") {
+    const fd = P.get("demanda") || "", ft = P.get("tipo") || "", fe = P.get("estado") || "";
+    const fid = fd ? (findDemand(fd)?.d.id || "__none__") : "";
+    const rows = [...alertsNow().map(a => ({ ...a, _open: true })), ...alertsHistory().map(a => ({ ...a, _open: false }))]
+      .filter(a => (!fid || a.demand === fid) && (!ft || kindsOf(a).includes(ft)) && (!fe || (fe === "aberto") === a._open));
+    const KIND = { "gate-return": "B1 · gate devolvido", "human-required": "B2 · decisão humana", "cycle-limit": "B3 · 3º ciclo", "triage-open": "B4 · triagem aberta", "low-confidence": "A1 · baixa confiança aceita", "agent-stalled": "A2 · sem progresso", "pr-waiting": "A3 · PR aguardando" };
+    const opt = (v, t, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(t)}</option>`;
+    return `${head}<div class="filters" role="group" aria-label="Filtros de alertas">
+      <div><label for="f-ademanda">Demanda</label><select id="f-ademanda" data-filter="demanda">${opt("", "Todas", fd)}${allInfos().slice().reverse().map(x => opt(x.code, `${x.code} · ${x.eff.title.slice(0, 40)}`, fd)).join("")}</select></div>
+      <div><label for="f-atipo">Regra</label><select id="f-atipo" data-filter="tipo">${opt("", "Todas", ft)}${Object.entries(KIND).map(([k, t]) => opt(k, t, ft)).join("")}</select></div>
+      <div><label for="f-aestado">Estado</label><select id="f-aestado" data-filter="estado">${opt("", "Abertos e fechados", fe)}${opt("aberto", "Abertos", fe)}${opt("fechado", "Fechados", fe)}</select></div>
+      ${fd || ft || fe ? `<a href="#/auditoria/alertas" style="font-size:13px;min-height:36px;display:inline-flex;align-items:center">Limpar filtros</a>` : ""}
+      <span class="muted" style="font-size:12px;align-self:center">${rows.length} itens · reconstruídos do log e dos pareceres (nada é gravado por causa de alertas — ADR-017)${Array.isArray(state.alertsHistory) ? "" : " · calculados no navegador (servidor sem alertsHistory)"}</span></div>
+    <div class="tbl"><table><thead><tr><th>Severidade</th><th>Demanda</th><th>Regra</th><th>Item</th><th>Quem age</th><th>Aberto em</th><th>Fechado em</th><th>Por quem</th><th>Evento</th></tr></thead><tbody>
+    ${rows.slice(0, 300).map(a => `<tr><td>${sevHtml(a.severity)}${a._open ? "" : `<div class="muted" style="font-size:11.5px">fechado</div>`}</td><td>${alertCode(a) ? `<a href="#/demandas/${alertCode(a)}">${esc(alertCode(a))}</a>` : a.gate ? "Squad base" : "—"}</td>
+      <td>${esc(kindsOf(a).map(k => KIND[k] || k).join(" + "))}<div class="muted" style="font-size:12px">${esc(a.rule || "")}</div></td><td><b>${esc(a.title || "")}</b></td><td>${esc(who(a.owner))}</td>
+      <td>${a.openedAt ? `${esc(fullTime(a.openedAt))}` : "—"}</td><td>${a.closedAt ? esc(fullTime(a.closedAt)) : a._open ? `<span class="validate">aberto</span>` : "—"}</td><td>${esc(a.closedBy ? who(a.closedBy) : "")}</td>
+      <td>${a.source?.event ? `<a href="#/auditoria/eventos?${alertCode(a) ? `demanda=${alertCode(a)}&` : ""}tipo=${esc(a.kind === "pr-waiting" ? "review" : a.kind === "triage-open" ? "validation" : "gate")}"><code>${esc(a.source.event)}</code></a>` : a.source?.file ? `<code>${esc(a.source.file)}</code>` : "—"}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">Nenhum alerta com esses filtros.</td></tr>`}</tbody></table></div>`;
   }
   if (tab === "handoffs") return `${head}<p class="muted" style="font-size:12px">Briefs de passagem de contexto (<code>docs/squad/memory/handoffs/</code>).</p>
     ${Object.entries(state.handoffs).map(([n, t]) => `<details class="card" id="ho-${esc(n)}" style="margin-top:10px"><summary><b>${esc(n)}</b></summary><pre>${esc(t)}</pre></details>`).join("") || `<p class="muted">Nenhum handoff ainda.</p>`}`;
   if (!policy) return `${head}<p class="muted">Carregando políticas…</p>`;
-  return `${head}<div class="grid2"><section class="card"><h3>Gates (docs/squad/gates.md)</h3><pre>${esc(policy.gates)}</pre></section>
+  const th = thresholds();
+  const legend = `<section class="card" id="legenda" style="margin-top:24px"><h3>Legenda: severidades, estados e limites (D14 · ADR-017)</h3>
+    <div class="legend">
+      <div>${sevHtml("bloqueio")}<span>a demanda não anda sem uma ação de alguém nomeado (B1 gate devolvido, B2 decisão humana obrigatória, B3 3º ciclo, B4 triagem com perguntas).</span></div>
+      <div>${sevHtml("aviso")}<span>anda, mas há risco ou atraso (A1 confiança &lt; ${Math.round(th.lowConfidence * 100)}% aceita, A2 sem progresso, A3 PR aguardando).</span></div>
+      <div><span class="you">Você</span><span>item cuja ação é sua (owner = humano).</span></div>
+      ${Object.entries(STATES).map(([k, [l]]) => `<div>${stateHtml(k)}<span>${esc({ "sem-progresso": `execução aberta sem atividade há ≥ ${Math.round(th.stalledSeconds / 60)} min`, interrompido: "processo encerrado sem “Finalizado” (última hora)", trabalhando: "execução aberta com atividade recente", aguardando: "sem execução ativa e esperando alguém (◷)", concluido: "última execução terminou há menos de 15 min", ocioso: "nenhuma execução recente" }[k] || l)}</span></div>`).join("")}
+      <div><span class="state aguardando"><span class="ic" aria-hidden="true">◷</span>Espera</span><span>fica em destaque acima de ${Math.round(th.waitWarnSeconds / 60)} min.</span></div>
+      <div><span class="mono">≥ ${Math.round(th.longToolSeconds / 60)} min</span><span>ferramenta pendente vira “comando longo” (não é aviso).</span></div>
+      <div><span class="mono">${th.maxAutoCycles} ciclos</span><span>máximo de autocorreção por gate; o ${th.maxAutoCycles + 1}º RETURN escala para você.</span></div>
+    </div></section>`;
+  return `${head}${legend}<div class="grid2"><section class="card"><h3>Gates (docs/squad/gates.md)</h3><pre>${esc(policy.gates)}</pre></section>
     <section class="card"><h3>Constituição (CLAUDE.md)</h3><pre>${esc(policy.constituicao)}</pre></section></div>`;
 }
 
@@ -1093,29 +1603,71 @@ function renderProduto() {
   return `${crumbs([["Produto", "#/produto/grafana" + q], [tname, ""]])}<h1 tabindex="-1">Produto · ${tname}</h1><div class="sub">Como o produto está se comportando. O Auditor usa traces e métricas como evidência nos gates.</div>
   <div style="display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin-top:18px">
     <div><label for="obs-product" class="muted" style="font-size:12px;font-weight:500;display:block">Produto</label>
-    <select id="obs-product" style="padding:8px 10px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${products.map(p => `<option value="${esc(p.id)}" ${p.id === prod?.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+    <select id="obs-product" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)">${products.map(p => `<option value="${esc(p.id)}" ${p.id === prod?.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     ${url ? extLink(url, `Abrir ${tname} em nova aba`) : ""}
   </div>
   <nav class="seg" aria-label="Ferramentas de observabilidade"><a href="#/produto/grafana${q}" ${tool === "grafana" ? `aria-current="page"` : ""}>Grafana · métricas</a><a href="#/produto/jaeger${q}" ${tool === "jaeger" ? `aria-current="page"` : ""}>Jaeger · traces</a></nav>
-  ${url ? `<iframe src="${esc(url)}" title="${esc(tname)} · ${esc(prod.name)}" style="width:100%;height:calc(100vh - 300px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:#fff"></iframe>`
+  ${url ? `<iframe src="${esc(url)}" title="${esc(tname)} · ${esc(prod.name)}" style="width:100%;height:calc(100vh - 300px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:var(--surface)"></iframe>`
         : `<p class="muted" style="margin-top:18px">Este produto não tem ${esc(tool)} configurado em docs/squad/project.json.</p>`}
   <h3 style="margin-top:22px">Links do produto</h3>
   <ul style="font-size:14px">${(prod?.links || []).map(l => `<li>${extLink(l.url, esc(l.label))}</li>`).join("") || `<li class="muted">Nenhum link configurado.</li>`}</ul>`;
 }
 
+// D14 §7.2: painel do integrante — 7 seções, ao vivo, sem perder rolagem nem <details> abertos (ids estáveis).
+let drawerMsgs = false, drawerKey = null;
+function drawerHtml(ag) {
+  const m = AGENTS[ag.agent], runs = (runsByAgent()[ag.agent] || []).slice().sort((a, b) => String(b.updated || b.started || "").localeCompare(String(a.updated || a.started || "")));
+  const cur = runs.find(r => r.id === ag.runId) || null, code = ag.task?.code || (ag.task?.demand ? demandCode(ag.task.demand) : null), info = code ? findDemand(code) : null;
+  const model = modelId(ag.model, ag.runner);
+  const w = ag.waiting, subs = ag.subagents || [];
+  const mine = humanAlerts().filter(a => (ag.alerts || []).includes(a.id) || a.agent === ag.agent || (ag.task?.demand && a.demand === ag.task.demand) || (ag.agent === "orquestrador"));
+  const stAg = Array.isArray(state?.agents) ? state.agents.find(x => x.agent === ag.agent) : null;
+  const recent = (Array.isArray(ag.recent) && ag.recent.length ? ag.recent : Array.isArray(stAg?.recent) && stAg.recent.length && stAg.runId === ag.runId ? stAg.recent : cur?.activity || []).slice(-40).reverse().filter(a => drawerMsgs || a.kind === "tool");
+  const working = ag.state === "trabalhando" || ag.state === "sem-progresso";
+  const sec = (id, title, body) => `<section aria-labelledby="dh-${id}"><h3 id="dh-${id}">${title}</h3>${body}</section>`;
+  const actBtn = a => a ? `<a class="btn xs primary" href="${esc(a.href?.startsWith("?") ? hrefWith(Object.fromEntries(new URLSearchParams(a.href))) : a.href)}">${esc(a.label)}</a>` : "";
+  return `<div class="head">${av(ag.agent)}<div style="min-width:0"><b style="font-size:17px">${esc(m.label)}</b> ${stateHtml(ag.state)}<div class="muted" style="font-size:12.5px">${esc(m.role)}</div>
+      <div class="mrow">${model ? modelChip(model, ag.modelProvider, "run", ag.runner) : modelChip(null, null, "none")}${ag.runner ? `<span class="lbl">runner ${esc(ag.runner)}</span>` : ""}
+        <span class="lbl">${ag.task?.startedAt ? `sessão iniciada ${esc(hhmm(ag.task.startedAt))} · ` : ""}${ag.toolCount || 0} ações</span></div></div>
+    <a class="btn close sm" id="closeDrawer" href="${esc(hrefWith({ agente: null }))}">Fechar</a></div>
+  ${sec("agora", working ? "Agora · Executando agora" : "Agora", `<dl class="kv">
+      <dt>Tarefa</dt><dd>${esc(ag.task?.description || (ag.agent === "orquestrador" && ag.state !== "ocioso" ? "Sessão principal — coordenação da squad" : "Sem tarefa"))}</dd>
+      <dt>Demanda</dt><dd>${code ? `<a href="#/demandas/${code}">Abrir ${esc(code)} ›</a> ${esc(info?.eff.title || "")}` : "—"}</dd>
+      <dt>Passo</dt><dd>${esc(ag.task?.step || "—")}</dd>
+      <dt>Ferramenta</dt><dd>${ag.current ? `<b>${esc(ag.current.label || toolLabel(ag.current.tool, ag.current.target))}</b>${ag.current.target && ag.current.tool === "Bash" ? `<code style="display:block;font-size:11.5px;overflow-wrap:anywhere">${esc(maskCmd(ag.current.target))}</code>` : ""} · ${ageSpan(ag.current.since, "") || ""}${ag.current.long ? " · comando longo" : ""}`
+        : ag.lastActivityAt ? `Última atividade ${ageSpan(ag.lastActivityAt)}: ${esc(ag.lastActivity || "—")}` : "Nenhuma atividade registrada."}</dd></dl>
+    ${ag.state === "interrompido" ? `<p class="notice err" style="margin-top:8px">Execução interrompida sem “Finalizado”. Próxima ação: o Orquestrador retoma a tarefa (ou verifique o terminal).</p>` : ""}
+    ${ag.state === "sem-progresso" ? `<p class="notice" style="margin-top:8px">Sem atividade há ${esc(fmtAge(ageS(ag.lastActivityAt)))} (limite ${Math.round(thresholds().stalledSeconds / 60)} min). Verifique o terminal: pode haver pedido de permissão pendente.</p>` : ""}`)}
+  ${sec("espera", "Espera de ação", w ? `<div class="waitbox"><div>Aguarda <b>${(w.on || []).map(who).join(", ")}</b>: ${esc(w.reason || "")}${w.since ? ` · desde ${esc(hhmm(w.since))} (${ageSpan(w.since)})` : ""}</div>
+      ${subs.length ? `<ul style="margin:6px 0 0;padding-left:18px">${subs.map(x => `<li>Aguardando ${ROLES.includes(x.agent) ? `<a href="${esc(hrefWith({ agente: x.agent }))}">${esc(AGENTS[x.agent].label)}</a>` : esc(who(x.agent))} — “${esc(x.description || "")}” · ${ageSpan(x.since)}</li>`).join("")}</ul>` : ""}
+      ${(w.on || []).includes("humano") && w.action ? `<div class="actions">${actBtn(w.action)}</div>` : ""}</div>` : `<div class="waitbox none">Não está esperando ninguém.</div>`)}
+  ${sec("humano", "O que o humano precisa fazer", mine.length ? `<ul class="alist">${mine.map(a => `<li class="${esc(a.severity)}"><div class="t">${sevHtml(a.severity)} ${alertCode(a) ? `<b>${esc(alertCode(a))}</b> · ` : ""}${esc(a.title)}<div class="who"><span>Desde: ${ageSpan(a.openedAt)}</span></div></div><div class="act">${alertActionHtml(a)}</div></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nada agora.</p>`)}
+  ${sec("arquivos", "Arquivos recentes", (ag.recentFiles || []).length ? `<div class="files">${ag.recentFiles.slice(0, 10).map(f => `<code>${esc(f)}</code>`).join("")}</div>${code ? `<a href="#/auditoria/eventos?demanda=${code}&autor=${esc(ag.agent)}" style="font-size:12.5px">ver no registro</a>` : ""}` : `<p class="muted" style="margin:0">Nenhum arquivo escrito nesta execução.</p>`)}
+  ${sec("comandos", "Comandos recentes", (ag.recentCommands || []).length ? `<ul class="cmds">${ag.recentCommands.slice(0, 5).map(c => `<li><time>${esc(hhmm(c.ts))}</time> ${esc(c.label || "")} ${c.error ? `<span class="fail">· erro</span>` : `<span class="pass">· ok</span>`}<code>${esc(maskCmd(c.command))}</code></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nenhum comando nesta execução.</p>`)}
+  ${sec("linha", "Linha do tempo", `<label style="font-size:12.5px;display:inline-flex;gap:6px;align-items:center;min-height:32px"><input type="checkbox" id="drawer-msgs" ${drawerMsgs ? "checked" : ""}> Mostrar mensagens do agente</label>
+    ${recent.length ? `<ul class="feed">${recent.map(a => `<li class="${a.kind === "tool" && a.pending && working ? "live" : ""}"><time>${esc(hhmm(a.ts))}</time><div>${a.kind === "tool"
+      ? `<span class="tool ${a.error ? "err" : ""}">${esc(a.tool)}</span>${esc(toolLabel(a.tool, a.summary))}${a.pending && working ? ` <span class="muted">· em execução ${ageSpan(a.ts, "")}</span>` : a.error ? ` <span class="fail">· erro</span>` : ""}${a.error && a.detail ? `<pre>${esc(String(a.detail).split("\n").slice(0, 3).join("\n"))}</pre>` : ""}`
+      : `<span class="txt">${esc(String(a.summary || "").slice(0, 600))}</span>`}</div></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Sem atividade nesta execução.</p>`}`)}
+  ${sec("anteriores", "Execuções anteriores", runs.filter(r => r.id !== ag.runId).length ? `<details id="dr-prev-${esc(ag.agent)}"><summary style="cursor:pointer;color:var(--accent);font-size:13px">${runs.filter(r => r.id !== ag.runId).length} execuções</summary><ul class="cmds">${runs.filter(r => r.id !== ag.runId).slice(0, 20).map(r => `<li><b>${esc(r.description || "Sessão")}</b> · ${esc(r.status)}${r.demand && demandCode(r.demand) ? ` · <a href="#/demandas/${demandCode(r.demand)}">Abrir ${demandCode(r.demand)} ›</a>` : ""}
+      <div class="mrow">${runModelChips(r)}<span class="lbl">início ${esc(hhmm(r.started))} · fim ${esc(hhmm(r.updated))} · ${r.toolCount} ações</span></div></li>`).join("")}</ul></details>` : `<p class="muted" style="margin:0">Nenhuma execução anterior.</p>`)}`;
+}
 function renderDrawer(focus) {
   const d = $("#drawer");
-  if (!drawerAgent) { const was = !d.hidden; d.hidden = true; d.innerHTML = ""; if (was && focus) document.querySelector("#main h1")?.focus({ preventScroll: true }); return; }
+  if (!drawerAgent) { const was = !d.hidden; d.hidden = true; d.innerHTML = ""; drawerKey = null; if (was && focus) document.querySelector("#main h1")?.focus({ preventScroll: true }); return; }
+  const ag = agentOf(drawerAgent) || { agent: drawerAgent, state: "ocioso" };
+  const html = drawerHtml(ag);
   const wasHidden = d.hidden;
-  const runs = runsByAgent()[drawerAgent];
-  const scroll = d.scrollTop;
-  const opened = new Set([...d.querySelectorAll("details[open]")].map(el => el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80)));
-  d.innerHTML = `<div class="head">${av(drawerAgent)}<div><b style="font-size:17px">${AGENTS[drawerAgent].label}</b><div class="muted">${AGENTS[drawerAgent].role} · ${agentStatus(runs)}</div></div>
-    <a class="btn close" id="closeDrawer" href="${esc(hrefWith({ agente: null }))}">Fechar</a></div><hr>${feedHtml(runs)}`;
-  d.hidden = false; d.scrollTop = scroll;
-  d.setAttribute("role", "dialog"); d.setAttribute("aria-label", `Gaveta: ${AGENTS[drawerAgent].label}`);
+  const key = html.replace(/<span class="age[^>]*>[^<]*<\/span>/g, "");
+  if (key !== drawerKey) {
+    const scroll = d.scrollTop, open = new Set([...d.querySelectorAll("details[open][id]")].map(el => el.id)), fid = d.contains(document.activeElement) ? document.activeElement.id : null;
+    d.innerHTML = html; drawerKey = key;
+    d.querySelectorAll("details[id]").forEach(el => { if (open.has(el.id)) el.open = true; });
+    d.scrollTop = scroll;
+    if (fid && !focus) document.getElementById(fid)?.focus({ preventScroll: true });
+  }
+  d.hidden = false;
+  d.setAttribute("role", "dialog"); d.setAttribute("aria-label", `Integrante: ${AGENTS[drawerAgent].label}`);
   if (wasHidden || focus) $("#closeDrawer")?.focus({ preventScroll: true });
-  d.querySelectorAll("details").forEach(el => { if (opened.has(el.previousSibling?.textContent || el.parentElement?.textContent?.slice(0, 80))) el.open = true; });
 }
 
 // ---- D13: roteador por hash (#/tela/item/secao?filtros&agente=papel) ----
@@ -1181,6 +1733,7 @@ function afterRouteChange() {
     if (sec === "validacao") target = document.querySelector("#sec-validacao [data-ans]");
     if (sec === "gates" && target && target.closest(".next-box")) scrollTo = target.closest(".next-box");
     target ||= scrollTo?.querySelector("h2");
+  } else if (route.view === "painel" && sec === "alertas") { scrollTo = document.getElementById("alertas"); target = scrollTo?.querySelector("h2");
   } else if (route.view === "painel" && sec === "squad-base") { scrollTo = document.getElementById("squad-base"); target = document.querySelector('#squad-base textarea[id^="note-"]') || scrollTo?.querySelector("h2"); }
   if (scrollTo) scrollTo.scrollIntoView({ block: "start" }); else window.scrollTo(0, 0);
   const h1 = document.querySelector("#main h1");
@@ -1220,15 +1773,22 @@ async function render() {
   else if (fk) { const el = document.querySelector(fk); if (el && !el.disabled) el.focus({ preventScroll: true }); }
   renderDrawer();
   renderBell();
+  applyStale();
 }
 const keepStore = {};
-// Contadores do menu: Painel = nº de "Precisa de você" (vermelho com ordem 1 ou 2); Squad = agentes trabalhando.
+// Contadores: menu (Painel = "Você", §6.2; Squad = trabalhando) e barra global (§6.1) — zero aparece em --muted, nunca some.
 function updateCounts() {
-  const needs = needsYou();
-  const cp = $("#c-painel"); cp.textContent = needs.length || ""; cp.classList.toggle("alert", needs.some(n => n.order <= 2));
-  cp.setAttribute("aria-label", needs.length ? `${needs.length} ${needs.length === 1 ? "item precisa" : "itens precisam"} de você` : "");
-  const w = state.runs.filter(r => r.status === "trabalhando").length;
+  const al = alertsNow(), you = needsYou().length, nb = al.filter(a => a.severity === "bloqueio").length, na = al.filter(a => a.severity === "aviso").length;
+  const hb = al.some(a => a.severity === "bloqueio" && a.owner === "humano");
+  const cp = $("#c-painel"); cp.textContent = you || ""; cp.classList.toggle("alert", hb);
+  cp.setAttribute("aria-label", you ? `${you} ${you === 1 ? "item depende" : "itens dependem"} de você` : "");
+  const w = agentsNow().filter(a => a.state === "trabalhando").length;
   $("#c-ag").textContent = w || ""; $("#c-ag").setAttribute("aria-label", w ? `${w} trabalhando` : "");
+  const pl = (n, a, b) => `${n} ${n === 1 ? a : b}`;
+  const html = `<a class="ctr bloq ${nb ? "on" : ""}" href="#/painel/alertas?alerta=bloqueio" aria-label="${pl(nb, "bloqueio", "bloqueios")}">${ICON.bloqueio}<b>${nb}</b><span class="cw"> ${nb === 1 ? "bloqueio" : "bloqueios"}</span></a>
+    <a class="ctr aviso ${na ? "on" : ""}" href="#/painel/alertas?alerta=aviso" aria-label="${pl(na, "aviso", "avisos")}">${ICON.aviso}<b>${na}</b><span class="cw"> ${na === 1 ? "aviso" : "avisos"}</span></a>
+    <a class="ctr voce ${you ? "on" : ""}" href="#/painel/alertas?alerta=voce" aria-label="${pl(you, "item depende", "itens dependem")} de você">Você <b>${you}</b></a>`;
+  const c = $("#ctrs"); if (c.dataset.h !== html) { c.innerHTML = html; c.dataset.h = html; }
 }
 // D5: ao sair da edição, os valores guardados (data-keep) não podem reaparecer na próxima edição.
 function clearEditFields(id) {
@@ -1257,63 +1817,81 @@ function announceDemandChanges() {
 const editing = () => { const el = document.activeElement; return el && el.closest("#main, #drawer") && ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName); };
 // ---- Notificações: só o que merece atenção (ação necessária / novidade); o resto fica no log.
 const notifStore = { get(k, d) { try { return JSON.parse(localStorage.getItem("sc.notif." + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("sc.notif." + k, JSON.stringify(v)); } catch (e) {} } };
-let notifOpen = false, toastCursor = notifStore.get("toastCursor", null), lastSeen = notifStore.get("lastSeen", null);
+let notifOpen = false, lastSeen = notifStore.get("lastSeen", null);
 function demandCode(id) { const ds = state.log.filter(e => e.type === "task" && e.agent === "humano"); const i = ds.findIndex(d => d.id === id); return i >= 0 ? `D${i + 1}` : null; }
+// D14 §6.4: o sino tem três níveis — bloqueio | aviso (de alerts[]) | novidade (do log). A regra de "ação" não mora mais aqui.
 function classify(e) {
   const code = e.demand ? demandCode(e.demand) : null;
   const pre = code ? `${code} · ` : "";
   const dem = sub => code ? `#/demandas/${code}${sub ? "/" + sub : ""}` : null;
-  if (e.type === "gate") {
-    const conf = Math.round((e.confidence || 0) * 100);
-    const acao = e.recommendation === "RETURN" || (e.confidence != null && e.confidence < 0.7) || e.risk === "alto";
-    return { level: acao ? "acao" : "novidade", code, title: `${pre}Auditor ${e.recommendation === "APPROVE" ? "aprovou" : "devolveu"} ${e.gate} · ${conf}%`, body: acao ? "Intervenção humana necessária." : (e.detail || ""), href: dem("gates") || "#/painel/squad-base" };
-  }
-  if (e.type === "handoff") return { level: "novidade", code, title: `${pre}${AGENTS[e.agent]?.label || e.agent} → ${AGENTS[e.to]?.label || "squad"}`, body: e.title, href: dem("execucao") || "#/painel" };
-  if (e.type === "defect") return { level: "acao", code, title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, href: code ? `#/auditoria/eventos?demanda=${code}&tipo=defect` : "#/auditoria/eventos?tipo=defect" };
-  if (e.type === "start") return { level: "novidade", code, title: `${pre}Demanda iniciada`, body: e.title.replace(/^Iniciar: /, ""), href: dem() || "#/demandas" };
-  if (e.type === "control") return { level: "novidade", code, title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", href: dem() || "#/demandas" };
+  const N = x => ({ level: "novidade", code, ...x });
+  if (e.type === "gate") return N({ title: `${pre}Auditor ${e.recommendation === "APPROVE" ? "aprovou" : "devolveu"} ${e.gate} · ${pct(e.confidence)}`, body: e.detail || "", href: dem("gates") || "#/painel/squad-base" });
+  if (e.type === "handoff") return N({ title: `${pre}${AGENTS[e.agent]?.label || e.agent} → ${AGENTS[e.to]?.label || "squad"}`, body: e.title, href: dem("execucao") || "#/painel" });
+  if (e.type === "defect") return N({ title: `${pre}Defeito registrado pelo ${AGENTS[e.agent]?.label || e.agent}`, body: e.title, href: code ? `#/auditoria/eventos?demanda=${code}&tipo=defect` : "#/auditoria/eventos?tipo=defect" });
+  if (e.type === "start") return N({ title: `${pre}Demanda iniciada`, body: String(e.title || "").replace(/^Iniciar: /, ""), href: dem() || "#/demandas" });
+  if (e.type === "control") return N({ title: `${pre}Controle humano: ${e.action}`, body: e.detail || "", href: dem() || "#/demandas" });
   if (REVIEW_TYPES.includes(e.type)) {
-    const who = e.release ? `Release ${e.release} · ` : pre;
-    const pr = e.pr != null ? `PR #${e.pr}` : "PR";
-    const href = dem() || "#/auditoria/eventos?tipo=review";
-    if (e.type === "review") return { level: "novidade", code, title: `${who}${pr} aguardando sua revisão`, body: e.url || e.title || "", href };
-    if (e.type === "delivered") return { level: "novidade", code, title: `${who}Entregue · ${pr} integrado`, body: [e.mergeCommit ? `commit ${shortSha(e.mergeCommit)}` : "", e.mergedBy ? `por ${e.mergedBy}` : ""].filter(Boolean).join(" ") || e.title || "", href };
-    return { level: "acao", code, title: `${who}${pr} devolvido pelo revisor`, body: e.detail || e.title || "", href };
+    const whoR = e.release ? `Release ${e.release} · ` : pre, pr = e.pr != null ? `PR #${e.pr}` : "PR", href = dem() || "#/auditoria/eventos?tipo=review";
+    if (e.type === "review") return N({ title: `${whoR}${pr} aguardando sua revisão`, body: e.url || e.title || "", href });
+    if (e.type === "delivered") return N({ title: `${whoR}Entregue · ${pr} integrado`, body: [e.mergeCommit ? `commit ${shortSha(e.mergeCommit)}` : "", e.mergedBy ? `por ${e.mergedBy}` : ""].filter(Boolean).join(" ") || e.title || "", href });
+    return N({ title: `${whoR}${pr} devolvido pelo revisor`, body: e.detail || e.title || "", href });
   }
   if (e.type === "validation") return e.status === "perguntas"
-    ? { level: "acao", code, title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), href: dem("validacao") || "#/demandas" }
-    : { level: "novidade", code, title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", href: dem() || "#/demandas" };
+    ? N({ title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), href: dem("validacao") || "#/demandas" })
+    : N({ title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", href: dem() || "#/demandas" });
   return null;
 }
-function notifications() { return state.log.map(e => { const c = classify(e); return c ? { ...c, id: e.id, ts: e.ts } : null; }).filter(Boolean).slice(-30).reverse(); }
+const LEVEL_LABEL = { bloqueio: "Bloqueio", aviso: "Aviso", novidade: "Novidade" };
+function notifications() {
+  const al = alertsNow(), srcs = new Set(al.map(a => a.source?.event).filter(Boolean));
+  const alerts = al.map(a => ({ id: "al:" + a.id, level: a.severity, code: alertCode(a), title: `${alertCode(a) ? alertCode(a) + " · " : ""}${a.title}`,
+    body: `${a.owner === "humano" ? "Sua ação" : `Quem age: ${who(a.owner)}`} · ${a.action?.label || ""}`, href: alertHref(a), ts: a.openedAt || "" }));
+  const news = state.log.filter(e => !srcs.has(e.id)).map(e => { const c = classify(e); return c ? { ...c, id: e.id, ts: e.ts } : null; }).filter(Boolean).slice(-30).reverse();
+  return [...alerts, ...news];
+}
+const isUnread = n => !lastSeen || String(n.ts) > String(lastSeen);
+const newestTs = () => notifications().reduce((m, n) => String(n.ts) > String(m || "") ? n.ts : m, lastSeen);
 function renderBell() {
+  if (!state) return;
   const items = notifications();
-  const unread = items.filter(n => !lastSeen || n.ts > lastSeen);
+  const unread = items.filter(isUnread);
   const badge = $("#bell-badge");
-  badge.hidden = unread.length === 0; badge.textContent = unread.length; badge.classList.toggle("acao", unread.some(n => n.level === "acao"));
-  document.title = (unread.length ? `(${unread.length}) ` : "") + `${routeTitle} · Squad Control · ${product?.name || ""}`.replace(/ · $/, "");
+  const lvl = unread.some(n => n.level === "bloqueio") ? "bloqueio" : unread.some(n => n.level === "aviso") ? "aviso" : "";
+  badge.hidden = unread.length === 0; badge.textContent = unread.length; badge.className = `badge ${lvl}`;
+  const nb = alertsNow().filter(a => a.severity === "bloqueio").length;
+  document.title = (nb ? `⬣${nb} ` : "") + (unread.length ? `(${unread.length}) ` : "") + `${routeTitle} · Squad Control · ${product?.name || ""}`.replace(/ · $/, "");
+  $("#bell").setAttribute("aria-label", `Notificações${unread.length ? ` (${unread.length} novas)` : ""}`);
   const panel = $("#notif-panel");
   panel.hidden = !notifOpen; $("#bell").setAttribute("aria-expanded", String(notifOpen));
   if (notifOpen) panel.innerHTML = `<h4>Notificações <span>${unread.length ? unread.length + " novas" : "tudo lido"}</span></h4>` +
-    (items.length ? items.map(n => `<a class="notif ${(!lastSeen || n.ts > lastSeen) ? "unread" : ""}" href="${esc(n.href)}" data-goto="1" style="color:inherit;text-decoration:none"><time>${hhmm(n.ts)}</time><div><span class="lvl ${n.level}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small>${esc((n.body || "").slice(0, 140))}</small></div></a>`).join("") : `<div class="notif" style="cursor:default"><time></time><small>Nenhuma notificação ainda.</small></div>`);
+    (items.length ? items.map(n => `<a class="notif ${isUnread(n) ? "unread" : ""}" href="${esc(n.href)}" data-goto="1" style="color:inherit;text-decoration:none"><time>${hhmm(n.ts)}</time><div><span class="lvl ${n.level}">${n.level === "novidade" ? "Novidade" : `${ICON[n.level]} ${LEVEL_LABEL[n.level]}`}</span><b>${esc(n.title)}</b><small>${esc((n.body || "").slice(0, 140))}</small></div></a>`).join("") : `<div class="notif" style="cursor:default"><time></time><small>Nenhuma notificação ainda.</small></div>`);
 }
+let toastMore = 0;
 function toast(n) {
   const box = $("#toasts");
-  while (box.children.length >= 3) box.firstChild.remove();
+  if (box.querySelectorAll(".toast").length >= 3) { toastMore++; let m = box.querySelector(".toast-more"); if (!m) { m = document.createElement("div"); m.className = "toast-more"; box.appendChild(m); } m.textContent = `+${toastMore} no sino`; return; }
   const el = document.createElement("div");
   el.className = `toast ${n.level}`;
-  el.innerHTML = `<div><span class="lvl" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;color:${n.level === "acao" ? "var(--red)" : "var(--accent)"}">${n.level === "acao" ? "Ação necessária" : "Novidade"}</span><b>${esc(n.title)}</b><small class="muted">${esc((n.body || "").slice(0, 120))}</small></div><div class="t-actions"><button class="primary" data-goto="1" data-href="${esc(n.href)}">${n.code ? `Abrir ${esc(n.code)}` : "Abrir"}</button><button data-dismiss="1" aria-label="Fechar">×</button></div>`;
-  box.appendChild(el);
-  if (n.level !== "acao") setTimeout(() => el.remove(), 6000);
+  el.innerHTML = `<div><span class="sev ${n.level}">${ICON[n.level] || ""}${LEVEL_LABEL[n.level] || ""}</span><b>${esc(n.title)}</b><small class="muted">${esc((n.body || "").slice(0, 120))}</small></div><div class="t-actions"><button class="primary" data-goto="1" data-href="${esc(n.href)}">${n.code ? `Abrir ${esc(n.code)}` : "Abrir"}</button><button data-dismiss="1" aria-label="Fechar">×</button></div>`;
+  box.insertBefore(el, box.querySelector(".toast-more"));
+  if (n.level !== "bloqueio") setTimeout(() => el.remove(), 8000);
   if (document.hidden && "Notification" in window && Notification.permission === "granted") {
     try { new Notification(n.title, { body: n.body || "", tag: n.id }); } catch (e) {}
   }
 }
+// Toast só para bloqueio novo e aviso novo com owner humano (§6.4); o mesmo evento de origem não gera um segundo toast.
+let prevAlerts = null;
 function processNotifications() {
-  const items = notifications().slice().reverse();
-  if (toastCursor === null) { toastCursor = items.at(-1)?.ts || new Date().toISOString(); notifStore.set("toastCursor", toastCursor); renderBell(); return; }
-  for (const n of items) if (n.ts > toastCursor) toast(n);
-  const newest = items.at(-1)?.ts; if (newest && newest > toastCursor) { toastCursor = newest; notifStore.set("toastCursor", toastCursor); }
+  const al = alertsNow();
+  if (prevAlerts) {
+    const fresh = al.filter(a => !prevAlerts.ids.has(a.id) && !(a.source?.event && prevAlerts.src.has(a.source.event)) && (a.severity === "bloqueio" || a.owner === "humano"));
+    for (const a of fresh) {
+      toast({ id: a.id, level: a.severity, code: alertCode(a), title: `${alertCode(a) ? alertCode(a) + " · " : ""}${a.title}`, body: `${a.owner === "humano" ? "Sua ação" : `Quem age: ${who(a.owner)}`}: ${a.action?.label || ""}`, href: alertHref(a) });
+      const t = `${SEV_LABEL[a.severity]} novo${alertCode(a) ? ` na ${alertCode(a)}` : ""}: ${a.title}. ${a.owner === "humano" ? "Ação sua." : ""}`;
+      if (a.severity === "bloqueio" && a.owner === "humano") { const el = $("#sr-alert"); el.textContent = ""; setTimeout(() => { el.textContent = t; }, 50); } else announce(t);
+    }
+  }
+  prevAlerts = { ids: new Set(al.map(a => a.id)), src: new Set(al.map(a => a.source?.event).filter(Boolean)) };
   renderBell();
 }
 // ---- D11 (ADR-014, contrato ui-consumo-da-ia §4): consumo da IA por provedor, só fonte real, nunca somado.
@@ -1382,29 +1960,110 @@ function renderUsage() {
   const html = USAGE_PROVIDERS.map(m => usageProvHtml(list.find(p => p && p.id === m.id) || null, m)).join("");
   if (usageLastHtml !== html) { el.innerHTML = html; usageLastHtml = html; }
   document.documentElement.style.setProperty("--usage-h", `${el.offsetHeight || 0}px`);
+  syncHeaderH();
 }
-async function refresh() {
-  try { state = await fetch("/api/state").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }); }
-  catch (e) { $("#srv-down").hidden = false; return; }
-  $("#srv-down").hidden = true;
-  renderUsage();
-  updateCounts();
-  if (routeKey !== null && !editing() && route.view !== "produto") await render();
+// ---- D14 §8: tempo real — /api/live a cada 1,5 s (10 s em aba oculta), /api/state só quando a versão muda ou a cada 15 s.
+// Sem /api/live (servidor sem F1): /api/state a cada 3 s, como na D13. Nunca há requisições sobrepostas.
+let everErr = false, liveBand = null, polling = false;
+async function fetchState() {
+  const st = await fetch("/api/state", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  state = st; lastStateAt = Date.now();
+  if (st.now && liveSupported !== true) syncClock(st.now);
+  lastVersion = live?.version ?? st.version ?? lastVersion;
+}
+const markOk = () => { lastOkAt = Date.now(); everErr = false; };
+async function afterData() {
+  renderUsage(); updateCounts(); renderGlobal();
+  if (routeKey !== null && !editing() && route.view !== "produto") await render(); else renderDrawer();
   processNotifications(); announceDemandChanges();
 }
+async function refresh() {
+  try { await fetchState(); markOk(); } catch (e) { everErr = true; renderGlobal(); return; }
+  await afterData();
+}
+const liveSig = () => live ? JSON.stringify([(live.alerts || []).map(a => [a.id, a.owner, a.severity, a.title]),
+  (live.agents || []).map(g => [g.agent, g.state, g.current?.label, g.current?.since, g.waiting?.reason, g.waiting?.on, g.task?.step, g.task?.code, g.toolCount, g.lastActivity])]) : null;
+async function poll() {
+  if (polling) return; polling = true; clearTimeout(pollTimer);
+  try {
+    let needState = !state;
+    if (liveSupported !== false) {
+      const r = await fetch("/api/live", { cache: "no-store" });
+      if (r.status === 404) { liveSupported = false; live = null; }
+      else if (!r.ok) throw new Error(r.status);
+      else { const j = await r.json(); live = j; liveSupported = true; syncClock(j.now); markOk(); if (j.version && j.version !== lastVersion) needState = true; }
+    }
+    needState = needState || Date.now() - lastStateAt >= (liveSupported ? 15000 : 3000);
+    if (needState) { await fetchState(); markOk(); liveKey = liveSig(); await afterData(); }
+    else { const k = liveSig(); if (k !== liveKey) { liveKey = k; await afterData(); } else { updateCounts(); renderGlobal(); } }
+  } catch (e) { everErr = true; renderGlobal(); }
+  polling = false;
+  pollTimer = setTimeout(poll, document.hidden ? 10000 : 1500);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+// Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
+const STALE_SEL = "[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register]";
+function applyStale() {
+  const stale = isStale();
+  document.querySelectorAll(STALE_SEL).forEach(el => {
+    if (stale && !el.disabled) { el.disabled = true; el.dataset.staleDis = "1"; el.dataset.prevTitle = el.title || ""; el.title = "Sem dados atuais — reconectando"; }
+    else if (!stale && el.dataset.staleDis) { el.disabled = false; delete el.dataset.staleDis; el.title = el.dataset.prevTitle || ""; }
+  });
+}
+function renderGlobal() {
+  const el = $("#live-ind"); if (!el) return;
+  const age = staleSeconds(), s = Number.isFinite(age) ? Math.floor(age) : null;
+  const band = !lastOkAt ? (everErr ? "off" : "conn") : age > 15 ? "off" : age > 5 ? "late" : "ok";
+  el.className = `live ${band === "ok" ? "" : band === "conn" ? "late" : band}`;
+  el.querySelector(".ic").textContent = band === "off" ? "✕" : band === "late" ? "▲" : "●";
+  const lt = band === "off" ? `Sem conexão${lastOkAt ? `<span class="lw"> desde ${esc(hhmm(new Date(lastOkAt).toISOString()))}</span>` : ""}` : band === "late" ? "Atrasado" : band === "conn" ? "Conectando…" : `Ao vivo<span class="lw"> · atualizado</span>`;
+  const q = el.querySelector(".lt"); if (q.innerHTML !== lt) q.innerHTML = lt;
+  el.querySelector(".age").textContent = band === "ok" || band === "late" ? ` há ${s} s` : "";
+  el.title = lastOkAt ? `Última resposta boa do servidor: ${new Date(lastOkAt).toLocaleTimeString("pt-BR")}${liveSupported === false ? " · modo compatível (/api/state a cada 3 s)" : ""}` : "";
+  if (band !== liveBand) {
+    liveBand = band;
+    $("#live-sr").textContent = { ok: "Ao vivo", late: "Atrasado: sem atualização há mais de 5 s", off: "Sem conexão com o servidor", conn: "" }[band];
+    const sd = $("#srv-down");
+    sd.hidden = band !== "off";
+    sd.innerHTML = `Sem conexão${lastOkAt ? ` desde ${esc(hhmm(new Date(lastOkAt).toISOString()))}` : ""}: servidor indisponível. Rode <code>make squad</code>; o painel tenta de novo sozinho. ${state ? "Decisões, respostas, início e cancelamento ficam desabilitados até os dados voltarem." : ""}`;
+  }
+  applyStale();
+}
+setInterval(() => {
+  document.querySelectorAll("[data-age]").forEach(el => { const t = `${el.dataset.pre || ""}${fmtAge(ageS(el.dataset.age))}`; if (el.textContent !== t) el.textContent = t; });
+  renderGlobal();
+}, 1000);
+// Tema (§10.2): Sistema → Claro → Escuro, guardado em localStorage["sc-theme"].
+const THEME_LABEL = { system: "Sistema", light: "Claro", dark: "Escuro" };
+const themePref = () => { try { const v = localStorage.getItem("sc-theme"); return THEME_LABEL[v] ? v : "system"; } catch (e) { return "system"; } };
+const mqDark = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+function applyTheme() {
+  const p = themePref(), dark = p === "dark" || (p === "system" && !!mqDark?.matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  $("#theme-lbl").textContent = `Tema: ${THEME_LABEL[p]}`;
+  $("#theme-btn").setAttribute("aria-label", `Tema: ${THEME_LABEL[p]} (${dark ? "escuro" : "claro"} em uso). Alternar para ${THEME_LABEL[{ system: "light", light: "dark", dark: "system" }[p]]}`);
+}
+mqDark?.addEventListener?.("change", applyTheme);
+applyTheme();
+const syncHeaderH = () => { const h = $("#hdr")?.offsetHeight; if (h) document.documentElement.style.setProperty("--hdr-h", `${h}px`); };
+window.addEventListener("resize", syncHeaderH);
 
 document.addEventListener("click", async ev => {
+  if (ev.target.closest("#theme-btn")) { const n = { system: "light", light: "dark", dark: "system" }[themePref()]; try { localStorage.setItem("sc-theme", n); } catch (e) {} applyTheme(); announce(`Tema: ${THEME_LABEL[n]}`); return; }
+  const sn = ev.target.closest("[data-seen]");
+  if (sn) { seenAlerts.add(sn.dataset.seen); await render(); return; }
+  if (ev.target.closest(".ctr") && location.hash === ev.target.closest(".ctr").getAttribute("href")) { ev.preventDefault(); routeKey = null; applyRoute(); return; }
   if (ev.target.closest("#bell")) {
     notifOpen = !notifOpen;
     if (notifOpen) { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
-    else { lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); }
+    else { lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); }
     return renderBell();
   }
-  if (!ev.target.closest("#notif-panel") && notifOpen) { notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); renderBell(); }
+  if (!ev.target.closest("#notif-panel") && notifOpen) { notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell(); }
   const go = ev.target.closest("[data-goto]");
   if (go) {   // sino e toast levam ao ITEM (§6.2); marcar como lido segue a regra atual
     const t = go.closest(".toast"); if (t) t.remove();
-    notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); renderBell();
+    notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell();
     if (go.dataset.href) { ev.preventDefault(); if (location.hash === go.dataset.href) { routeKey = null; applyRoute(); } else location.hash = go.dataset.href; }
     return;
   }
@@ -1528,10 +2187,10 @@ document.addEventListener("click", async ev => {
     document.getElementById(h.dataset.note)?.focus({ preventScroll: true });
   }
 });
-document.addEventListener("change", async ev => { if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { location.hash = hrefWith({ produto: ev.target.value }); return; } if (ev.target.dataset?.filter) { location.hash = hrefWith({ [ev.target.dataset.filter]: ev.target.value || null }); } });
+document.addEventListener("change", async ev => { if (ev.target.id === "drawer-msgs") { drawerMsgs = ev.target.checked; drawerKey = null; renderDrawer(); document.getElementById("drawer-msgs")?.focus(); return; } if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { location.hash = hrefWith({ produto: ev.target.value }); return; } if (ev.target.dataset?.filter) { location.hash = hrefWith({ [ev.target.dataset.filter]: ev.target.value || null }); } });
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
-  if (notifOpen) { notifOpen = false; lastSeen = notifications()[0]?.ts || lastSeen; notifStore.set("lastSeen", lastSeen); renderBell(); $("#bell").focus(); return; }
+  if (notifOpen) { notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell(); $("#bell").focus(); return; }
   if (drawerAgent) location.hash = hrefWith({ agente: null });
 });
 window.addEventListener("hashchange", applyRoute);
@@ -1544,7 +2203,8 @@ fetch("/api/project").then(r => r.json()).then(p => {
   renderBell();
 }).catch(() => {});
 
-refresh().finally(() => { applyRoute(); setInterval(refresh, 3000); });
+syncHeaderH();
+poll().finally(() => { applyRoute(); });
 </script>
 </body>
 </html>

@@ -8,6 +8,7 @@ Exemplo:
 
 Modelo (ADR-012): `--model <ID exato>` ou env `SQUAD_MODEL`; `--run` herda de `SQUAD_RUN` (exportados por
 run_agent.py). `SQUAD_LOG=<arquivo>` grava em outro log (testes).
+Passo (D14, ADR-017): `--step "F2 · implementação"` (opcional) em `progress`/`handoff` alimenta o cartão do integrante.
 """
 import argparse
 import json
@@ -50,7 +51,10 @@ def main() -> None:
     p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
     p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
+    p.add_argument("--step", help="passo atual, curto (≤ 40 caracteres), ex.: 'F2 · implementação' (D14, ADR-017)")
     a = p.parse_args()
+    if a.step is not None and len(a.step.strip()) > 40:
+        p.error("--step deve ter no máximo 40 caracteres")
 
     evidences = []
     for e in a.evidence:
@@ -86,6 +90,7 @@ def main() -> None:
         "mergeCommit": a.merge_commit,
         "refs": a.ref,
         "evidences": evidences,
+        "step": a.step.strip() if a.step else None,   # opcional: ausente não altera o formato gravado
     }
     entry = {k: v for k, v in entry.items() if v not in (None, [], "")}
     LOG.parent.mkdir(parents=True, exist_ok=True)

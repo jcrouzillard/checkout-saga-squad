@@ -15,14 +15,21 @@ Modelo por agente (D9, ADR-012): runs[] e log[] trazem model/modelProvider (e mo
 """
 import shlex
 import argparse
+import hashlib
 import json
 import os
 import pathlib
 import re
+import sys
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import alerts as al  # noqa: E402  (D14, ADR-017: regras B1–B4/A1–A3 e estado dos agentes)
+from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das transcrições)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -41,6 +48,11 @@ AGENT_ALIASES = {
     "jev": "auditor",  # nome antigo do gatekeeper nas transcrições já gravadas
 }
 RUNNING_WINDOW_S = 45
+# D14 (contrato §9.5): limites nomeados; valores em tools/squad/alerts.py (SQUAD_STALLED_S ajusta o A2).
+STALLED_S, LONG_TOOL_S, WAIT_WARN_S = al.STALLED_S, al.LONG_TOOL_S, al.WAIT_WARN_S
+LOW_CONFIDENCE, MAX_AUTO_CYCLES = al.LOW_CONFIDENCE, al.MAX_AUTO_CYCLES
+LIVE_MAX_BYTES = 64 * 1024
+LOCK = threading.RLock()   # o estado incremental das transcrições é compartilhado entre as threads do servidor
 
 
 def transcripts_root() -> pathlib.Path:
@@ -128,44 +140,22 @@ def logpy_calls(command: str) -> list[tuple[str, str]]:
     return out
 
 
-_scan_cache: dict[str, tuple[float, dict]] = {}
+_STORE: TranscriptStore | None = None
+
+
+def store() -> TranscriptStore:
+    global _STORE
+    if _STORE is None:
+        _STORE = TranscriptStore(rel, summarize_tool)
+    return _STORE
 
 
 def scan_transcript(path: pathlib.Path) -> dict:
     """Modelos (message.model, sem <synthetic>), 1º prompt e chamadas a log.py de uma transcrição.
-    Cache por (arquivo, mtime): o /api/state é consultado a cada poll."""
-    try:
-        mtime = path.stat().st_mtime
-    except OSError:
-        return {"models": {}, "first_prompt": "", "calls": []}
-    cached = _scan_cache.get(str(path))
-    if cached and cached[0] == mtime:
-        return cached[1]
-    models: dict[str, int] = {}
-    first_prompt, calls = "", []
-    for r in read_jsonl(path):
-        msg = r.get("message") or {}
-        content = msg.get("content")
-        if r.get("type") == "user" and not first_prompt:
-            if isinstance(content, str):
-                first_prompt = content
-            elif isinstance(content, list):
-                first_prompt = next((c.get("text", "") for c in content if c.get("type") == "text"), "")
-        if r.get("type") != "assistant":
-            continue
-        model = msg.get("model")
-        if not is_model_id(model):
-            continue
-        models[model] = models.get(model, 0) + 1  # dict preserva a ordem do 1º uso
-        for c in content if isinstance(content, list) else []:
-            if c.get("type") == "tool_use" and c.get("name") == "Bash":
-                cmd = (c.get("input") or {}).get("command", "")
-                if "log.py" in cmd:
-                    for agent, title in logpy_calls(cmd):
-                        calls.append({"ts": r.get("timestamp"), "agent": agent, "title": title, "model": model})
-    info = {"models": models, "first_prompt": first_prompt, "calls": calls}
-    _scan_cache[str(path)] = (mtime, info)
-    return info
+    D14: servido pelo estado incremental (só os bytes novos são lidos a cada consulta)."""
+    with LOCK:
+        st = store().get(path)
+        return {"models": st.models, "first_prompt": st.first_prompt_any, "calls": st.calls}
 
 
 def model_fields(models: dict[str, int], hint: str | None = None, runner: str | None = None) -> dict:
@@ -231,22 +221,14 @@ def resolve_agent(meta: dict, first_prompt: str) -> str:
 
 
 HEREDOC_WRITE = re.compile(r"(?:cat|tee)\s*>{1,2}\s*['\"]?([\w./-]+\.\w+)")
-_completed_cache: dict[str, tuple[float, set[str]]] = {}
 
 
 def completed_agent_ids(base: pathlib.Path) -> set[str]:
-    """IDs de subagentes cuja notificação de término já chegou à sessão do Orquestrador."""
+    """IDs de subagentes cuja notificação de término já chegou à sessão do Orquestrador (leitura incremental)."""
     done: set[str] = set()
-    for main in base.glob("*.jsonl"):
-        mtime = main.stat().st_mtime
-        cached = _completed_cache.get(str(main))
-        if cached and cached[0] == mtime:
-            done |= cached[1]
-            continue
-        text = main.read_text(encoding="utf-8", errors="ignore")
-        ids = set(re.findall(r"<task-id>(\w+)</task-id>\\n<tool-use-id>[^<]*</tool-use-id>\\n<output-file>[^<]*</output-file>\\n<status>completed</status>", text))
-        _completed_cache[str(main)] = (mtime, ids)
-        done |= ids
+    with LOCK:
+        for main in base.glob("*.jsonl"):
+            done |= store().get(main).completed
     return done
 
 
@@ -333,22 +315,103 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
     }
 
 
-def collect_runs() -> list[dict]:
+_meta_cache: dict[str, tuple[float, dict]] = {}
+
+
+def read_meta(path: pathlib.Path) -> dict:
+    meta_path = path.with_suffix(".meta.json")
+    try:
+        mt = meta_path.stat().st_mtime
+    except OSError:
+        return {}
+    c = _meta_cache.get(str(meta_path))
+    if c and c[0] == mt:
+        return c[1]
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        meta = {}
+    _meta_cache[str(meta_path)] = (mt, meta)
+    return meta
+
+
+def run_from_state(st, agent: str | None = None, orchestrator=False, completed: set[str] | None = None,
+                   now: float | None = None, notified_map: dict | None = None) -> dict | None:
+    """Mesmo resultado de parse_run (lendo o arquivo inteiro), a partir do estado incremental.
+    Orquestrador (§9.3): todas as ferramentas, sem as mensagens de texto; status calculado como o dos demais."""
+    if not st.rows:
+        return None
+    now = time.time() if now is None else now
+    meta = read_meta(st.path)
+    updated = st.mtime
+    ended_turn = st.ended_turn
+    recent = (now - updated) < RUNNING_WINDOW_S
+    run_id = st.path.stem.replace("agent-", "")
+    current = st.current(tools_only=orchestrator)
+    if recent and (not ended_turn or current):
+        status = "trabalhando"
+    elif ended_turn and ((completed is not None and run_id in completed) or (now - updated) > 90):
+        status = "concluído"
+    elif recent or not ended_turn or current:
+        status = "trabalhando"
+    else:
+        status = "trabalhando" if (now - updated) < 900 else "parado"
+    notified = al.ts_epoch((notified_map or {}).get(run_id))
+    # Turno encerrado só vale depois da janela de 45 s (uma mensagem de texto pode vir antes do tool_use seguinte)
+    # ou quando o Orquestrador já recebeu a notificação de término desta run.
+    finished = (ended_turn and not current and not recent) or (notified is not None and notified >= updated - 5)
+    return {
+        "id": run_id,
+        "agent": agent or resolve_agent(meta, st.first_prompt),
+        "description": meta.get("description", ""),
+        **model_fields(st.models, hint="anthropic" if st.models else None),
+        "demand": meta.get("demand") or (None if orchestrator else first_demand(st.first_prompt)),
+        "status": status,
+        "started": st.started,
+        "updated": datetime.fromtimestamp(updated, timezone.utc).isoformat(timespec="seconds"),
+        "toolCount": st.tool_count,
+        "current": current if status == "trabalhando" else None,
+        "files": list(st.files),
+        "activity": list(st.tools if orchestrator else st.activity)[-80:],
+        # internos (prefixo "_", removidos da resposta)
+        "_last": updated, "_open": not finished, "_current": current, "_commands": list(st.commands),
+        "_state": st, "_toolUseId": meta.get("toolUseId"),
+    }
+
+
+def collect_runs(now: float | None = None) -> list[dict]:
     base = transcripts_root()
     runs = []
-    completed = completed_agent_ids(base)
-    for path in sorted(base.glob("*/subagents/agent-*.jsonl")):
-        run = parse_run(path, completed=completed)
-        if run:
-            runs.append(run)
-    runs.extend(collect_external_runs())
-    # Sessão principal = Orquestrador (apenas delegações)
-    for path in sorted(base.glob("*.jsonl")):
-        if (base / path.stem / "subagents").exists():
-            run = parse_run(path, agent="orquestrador", delegations_only=True)
-            if run and run["toolCount"]:
+    with LOCK:
+        mains = sorted(base.glob("*.jsonl"))
+        subs = sorted(base.glob("*/subagents/agent-*.jsonl"))
+        store().prune({str(p) for p in mains + subs})
+        completed, notified = set(), {}
+        for m in mains:
+            completed |= store().get(m).completed
+            notified.update(store().get(m).notified)
+        for path in subs:
+            run = run_from_state(store().get(path), completed=completed, now=now, notified_map=notified)
+            if run:
                 runs.append(run)
+        runs.extend(collect_external_runs(now))
+        # Sessão principal = Orquestrador (todas as ferramentas; só sessões que delegaram)
+        for path in mains:
+            if (base / path.stem / "subagents").exists():
+                st = store().get(path)
+                if st.agent_tool_count:
+                    run = run_from_state(st, agent="orquestrador", orchestrator=True, now=now)
+                    if run:
+                        runs.append(run)
     return runs
+
+
+def public_run(r: dict) -> dict:
+    out = {k: v for k, v in r.items() if not k.startswith("_")}
+    out["lastActivityAt"] = al.iso(r.get("_last"))
+    out["stalled"] = bool(r.get("_stalled"))
+    out["waitingOn"] = r.get("_waitingOn", [])
+    return out
 
 
 def pid_alive(pid) -> bool:
@@ -359,11 +422,23 @@ def pid_alive(pid) -> bool:
         return False
 
 
-def collect_external_runs() -> list[dict]:
+_tail_cache: dict[str, tuple[float, int, list[str]]] = {}
+
+
+def _log_tail(path: pathlib.Path, st) -> list[str]:
+    c = _tail_cache.get(str(path))
+    if c and c[0] == st.st_mtime and c[1] == st.st_size:
+        return c[2]
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()[-40:]
+    _tail_cache[str(path)] = (st.st_mtime, st.st_size, lines)
+    return lines
+
+
+def collect_external_runs(now: float | None = None) -> list[dict]:
     """Execuções disparadas por tools/squad/run_agent.py (qualquer fornecedor): metadados + saída ao vivo + progress."""
     runs_dir = RUNS_DIR
     top_level = None  # run_id -> transcrição de topo do `claude -p` (runs antigos, sem sessionId)
-    progress = [e for e in read_jsonl(LOG) if e.get("type") == "progress" and e.get("run")]
+    progress = [e for e in read_log() if e.get("type") == "progress" and e.get("run")]
     out = []
     for meta_path in sorted(runs_dir.glob("*.json")):
         try:
@@ -376,20 +451,24 @@ def collect_external_runs() -> list[dict]:
             status = "interrompido"
         activity = [{"ts": e["ts"], "kind": "tool", "tool": "progress", "summary": e["title"], "pending": False,
                      "detail": e.get("detail", "")} for e in progress if e["run"] == meta["id"]]
-        mtime = log_path.stat().st_mtime if log_path.exists() else meta_path.stat().st_mtime
-        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()[-40:] if log_path.exists() else []
+        try:
+            lst = log_path.stat()
+        except OSError:
+            lst = None
+        mtime = lst.st_mtime if lst else meta_path.stat().st_mtime
+        lines = _log_tail(log_path, lst) if lst else []
         if lines:
             activity.append({"ts": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
                              "kind": "text", "summary": "\n".join(l for l in lines if l.strip())[-600:]})
         current = None
+        last = next((a for a in reversed(activity) if a["kind"] == "tool"), None)
         if status == "trabalhando":
-            last = next((a for a in reversed(activity) if a["kind"] == "tool"), None)
             current = {"tool": meta.get("runner", "runner"), "summary": (last or {}).get("summary", "em execução"),
                        "ts": (last or {}).get("ts", meta.get("started"))}
         runner = meta.get("runner")
         models: dict[str, int] = {}
         hint = meta.get("modelProvider")
-        if runner == "codex" and log_path.exists():
+        if runner == "codex" and lst:
             # O cabeçalho reflete o que rodou; vale mais que o gravado (que vem dele de todo modo).
             with log_path.open(encoding="utf-8", errors="ignore") as f:
                 head = codex_header(f.read(20000))
@@ -413,6 +492,7 @@ def collect_external_runs() -> list[dict]:
                 hint = "anthropic" if models else hint
         if not models and is_model_id(meta.get("model")):
             models = {meta["model"]: 1}
+        last_prog = max([al.ts_epoch(a["ts"]) or 0 for a in activity if a["kind"] == "tool"], default=0)
         out.append({"id": meta["id"], "agent": meta.get("agent", "outro"), "description": meta.get("description", ""),
                     **model_fields(models, hint, runner), "modelRequested": meta.get("modelRequested"),
                     "sessionId": meta.get("sessionId"), "demand": meta.get("demand"),
@@ -420,8 +500,162 @@ def collect_external_runs() -> list[dict]:
                     "started": meta.get("started"),
                     "updated": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
                     "toolCount": len([x for x in activity if x["kind"] == "tool"]), "current": current,
-                    "files": [], "activity": activity[-80:]})
+                    "files": [], "activity": activity[-80:],
+                    "_last": max(mtime, last_prog), "_open": status == "trabalhando", "_external": True,
+                    "_current": {"kind": "tool", "tool": "progress", "summary": current["summary"], "ts": current["ts"]}
+                    if current else None, "_commands": []})
     return out
+
+
+# ---------------------------------------------------------------- D14: log/gates em cache, alertas e agentes
+_log_cache: dict = {"sig": None, "rows": []}
+
+
+def _sig(path: pathlib.Path):
+    try:
+        st = path.stat()
+        return (st.st_size, st.st_mtime)
+    except OSError:
+        return None
+
+
+def read_log() -> list[dict]:
+    """Log de decisões com cache por (tamanho, mtime)."""
+    sig = _sig(LOG)
+    if sig != _log_cache["sig"]:
+        _log_cache.update(sig=sig, rows=read_jsonl(LOG))
+    return _log_cache["rows"]
+
+
+def _dir_sig(d: pathlib.Path, pattern="*") -> tuple:
+    try:
+        return tuple(sorted((p.name, p.stat().st_mtime) for p in d.glob(pattern)))
+    except OSError:
+        return ()
+
+
+def usage_sig() -> str:
+    """Assinatura do consumo da IA (D11) para a `version` do /api/live — D14-QA-3.
+
+    Usa o objeto `usage` já calculado (snapshot do Claude + cauda dos rollouts do Codex, com o cache por
+    (caminho, mtime, tamanho) de `_codex_last_rate_limits`): muda quando percentuais, janelas ou estado mudam, e não a
+    cada gravação dos rollouts. `collectedAt` fica fora para não forçar recarga do /api/state a cada tique da statusline."""
+    try:
+        providers = collect_usage()["providers"]
+        return repr([{k: v for k, v in p.items() if k != "collectedAt"} for p in providers])
+    except Exception:
+        return ""
+
+
+def data_version() -> str:
+    """Muda quando log, gates, handoffs, inbox, .squad/runs ou o consumo da IA mudam (contrato §9.1)."""
+    parts = (_sig(LOG), _dir_sig(GATES_DIR, "*.json"), _dir_sig(HANDOFFS_DIR, "*.md"),
+             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"), usage_sig())
+    return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
+
+
+_gates_cache: dict = {"sig": None, "gates": []}
+_rules_cache: dict = {"sig": None, "rules": None}
+
+
+def gates_cached() -> list[dict]:
+    sig = _dir_sig(GATES_DIR, "*.json")
+    if sig != _gates_cache["sig"]:
+        _gates_cache.update(sig=sig, gates=collect_gates())
+    return _gates_cache["gates"]
+
+
+def rules_cached() -> "al.Rules":
+    rows, gates = read_log(), gates_cached()
+    sig = (_log_cache["sig"], _gates_cache["sig"])
+    if sig != _rules_cache["sig"]:
+        _rules_cache.update(sig=sig, rules=al.Rules(rows, gates))
+    return _rules_cache["rules"]
+
+
+def orchestrator_view(runs: list[dict], rules, now: float) -> dict | None:
+    """Pendências da sessão principal atual do Orquestrador: subagentes em execução, pergunta ao humano, demanda."""
+    orch_runs = [r for r in runs if r.get("agent") == "orquestrador" and r.get("_state") is not None]
+    if not orch_runs:
+        return None
+    cur = max(orch_runs, key=lambda r: r["_last"])
+    st = cur["_state"]
+    by_id = {r["id"]: r for r in runs}
+    by_use = {r.get("_toolUseId"): r for r in runs if r.get("_toolUseId")}
+    subs = []
+    for agent_id, use in st.launched.items():
+        since = al.ts_epoch(use.get("since")) or 0
+        notified = al.ts_epoch(st.notified.get(agent_id))
+        if notified is not None and notified >= since:
+            continue
+        run = by_id.get(agent_id)
+        if run is None and now - since > al.STALLED_MAX_S:
+            continue
+        if run is not None and not (run["_open"] or now - run["_last"] < 90):
+            continue
+        role = (run or {}).get("agent")
+        if role in (None, "outro"):   # subagente fora dos 8 papéis nomeados: tenta o 1º termo da descrição
+            head = re.split(r"[\s·:]", (use.get("description") or "").strip().lower(), maxsplit=1)[0]
+            role = next((r for r in al.ROLES if head.startswith(r[:5])), role)
+        subs.append({"runId": agent_id, "description": use.get("description"), "since": use.get("since"),
+                     "agent": role})
+    ask = None
+    for tid, item in st.pending.items():
+        if item.get("tool") == "Agent":   # delegação síncrona pendente
+            run = by_use.get(tid)
+            subs.append({"runId": (run or {}).get("id") or "?", "description": item.get("summary"),
+                         "since": item.get("ts"), "agent": (run or {}).get("agent")})
+        elif item.get("tool") in ("AskUserQuestion", "ExitPlanMode"):
+            ask = item.get("ts")
+    rows = read_log()
+    demand = None
+    for e in reversed(rows):
+        d = e.get("demand")
+        if d and e.get("agent") == "orquestrador" and not rules._closed(d):
+            demand = d
+            break
+    if demand is None:
+        demand = next((e["demand"] for e in reversed(rows) if e.get("type") == "start" and e.get("demand")
+                       and not rules._closed(e["demand"])), None)
+    return {"demand": demand, "subagents": subs, "ask": ask}
+
+
+def compute(full: bool) -> dict:
+    """Núcleo de /api/live (full=False) e dos campos novos de /api/state (full=True)."""
+    t0 = time.perf_counter()
+    now = time.time()
+    with LOCK:
+        runs = collect_runs(now)
+        rules = rules_cached()
+        rows = read_log()
+        gate_alerts = list(rules.open.values())
+        agents, stalled = al.build_agents(runs, rules, rows, gate_alerts, now, orchestrator_view(runs, rules, now))
+        alerts = al.with_age(al.sort_alerts(gate_alerts + stalled), now)
+        out = {"now": datetime.fromtimestamp(now, timezone.utc).isoformat(timespec="seconds"),
+               "version": data_version(), "thresholds": al.thresholds(),
+               "summary": al.summary(alerts, agents), "alerts": alerts}
+        if full:
+            out["agents"] = agents
+            out["alertsHistory"] = sorted(rules.history, key=lambda a: a.get("closedAt") or "", reverse=True)
+            out["_runs"] = [public_run(r) for r in runs]
+            out["_rules"] = rules
+        else:
+            out["agents"] = [al.compact_agent(a) for a in agents]
+    out["serverMs"] = round((time.perf_counter() - t0) * 1000)
+    return out
+
+
+def live_payload() -> tuple[bytes, str]:
+    data = compute(full=False)
+    body = json.dumps(data, ensure_ascii=False).encode()
+    if len(body) > LIVE_MAX_BYTES:   # nunca passa de 64 KB: corta o menos essencial primeiro
+        for a in data["agents"]:
+            a["recentCommands"] = a["recentCommands"][:2]
+            a["recentFiles"] = a["recentFiles"][:3]
+        for a in data["alerts"]:
+            a["detail"] = al.trunc(a.get("detail"), 80)
+        body = json.dumps(data, ensure_ascii=False).encode()
+    return body, data["version"]
 
 
 MATCH_WINDOW_S = 120
@@ -718,16 +952,38 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith("/api/live"):
+            # D14 (ADR-017, contrato §9.1): canal leve consultado a cada 1,5 s — sem enrich_log nem handoffs.
+            body, version = live_payload()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("ETag", f'W/"{version}"')   # versão dos dados (log/gates/handoffs/inbox/runs)
+            self.send_header("X-Squad-Version", version)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.startswith("/api/state"):
-            runs = collect_runs()
+            extra = compute(full=True)
+            runs, rules = extra.pop("_runs"), extra.pop("_rules")
+            log = enrich_log(read_log(), runs)
+            for e in log:   # só na resposta: ciclo e devoluções por gate (o log segue append-only)
+                if e.get("type") == "gate" and e.get("id") in rules.gate_meta:
+                    for k, v in rules.gate_meta[e["id"]].items():
+                        e.setdefault(k, v)
             return self._json({
-                "now": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "log": enrich_log(read_jsonl(LOG), runs),
-                "gates": collect_gates(),
+                "now": extra["now"],
+                "log": log,
+                "gates": gates_cached(),
                 "runs": runs,
                 "handoffs": collect_handoffs(),
                 "github": github_issues(),
                 "usage": collect_usage(),
+                # D14 — só acréscimos (contrato §9.2)
+                "version": extra["version"], "thresholds": extra["thresholds"], "summary": extra["summary"],
+                "alerts": extra["alerts"], "alertsHistory": extra["alertsHistory"], "agents": extra["agents"],
+                "serverMs": extra["serverMs"],
             })
         if self.path.startswith("/api/usage"):
             return self._json({"usage": collect_usage()})
@@ -924,6 +1180,8 @@ def main():
     ap.add_argument("--port", type=int, default=int(os.environ.get("SQUAD_PORT") or 7070))
     port = ap.parse_args().port
     print(f"Squad Control em http://localhost:{port}  (transcrições: {transcripts_root()})")
+    # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
+    threading.Thread(target=lambda: compute(full=False), daemon=True).start()
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 
