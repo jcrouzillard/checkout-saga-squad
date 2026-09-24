@@ -146,22 +146,36 @@ def looks_like_test_env(text: str) -> bool:
 
 
 # ---------------------------------------------------------------- segredos e PII (§8.2)
+# Aspas: qualquer nível de escape (`"`, `\"`, `\\\"` ... — JSON logado como texto uma ou mais vezes) e aspas
+# simples/crase (toString, SQL, YAML). Valor entre aspas é mascarado até a aspa de fechamento do MESMO nível de
+# escape (inclui espaços, nunca atravessa a linha); sem aspa de fechamento, cai no valor sem aspas (\S sem separadores).
+QA = r"""\\*["'`]"""
+# Palavra-chave de segredo só quando TERMINA a chave (accessToken, bearer_token, X-Auth-Token, client_secret,
+# spring.datasource.password), opcionalmente seguida de um sufixo da lista abaixo (secretKey, tokenValue,
+# passwordHash). Chaves que só CONTÊM a palavra (tokenizer, tokenCount, totalTokens, maxTokens, passwordPolicy,
+# passwordMinLength, secretsManager) não são segredo — mesma leitura do mínimo do contrato §8.2, `palavra\s*[=:]`.
+SECRET_WORDS = (r"(?:password|passwd|senha|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|"
+                r"credentials?)")
+SECRET_SUFFIX = r"(?:[_.-]?(?:key|value|hash|b64|base64|enc|encoded|encrypted|plain))?"
+_SECRET_KEY = r"(?<![\w.-])[\w.-]{0,80}?" + SECRET_WORDS + SECRET_SUFFIX + r"(?![\w-])"
+_QUOTED_VALUE = (r"(?P<bs>\\*)(?P<q>[\"'`])(?!\[MASCARADO)(?!(?P=bs)(?P=q))(?P<val>.*?)"
+                 r"(?<!\\)(?P=bs)(?P=q)")
+_BARE_VALUE = r"""(?P<bq>\\*["'`])?(?!\[MASCARADO)(?P<bare>[^\s"'`\\,;&}]+)"""
 SECRET_PATTERNS = [
     ("chave_privada", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.S)),
     ("jwt", re.compile(r"\beyJ[\w-]+\.[\w-]+\.[\w-]+")),
-    ("authorization", re.compile(r"(?i)(authorization\\?\"?\s*[:=]\s*\\?\"?)[A-Za-z]+ [^\s\"'\\,}]+")),
+    ("authorization", re.compile(r"(?i)(authorization" + QA + r"?\s*[:=]\s*" + QA + r"?)[A-Za-z]+ [^\s\"'`\\,}]+")),
     ("github", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}")),
     ("github_pat", re.compile(r"\bgithub_pat_\w+")),
     ("aws", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("sk", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}")),
     ("slack", re.compile(r"\bxox[bap]-[\w-]+")),
     ("url_credencial", re.compile(r"(?<=://)(?!\[MASCARADO)[^/\s:@\"']+:[^/\s@\"']+(?=@)")),
-    ("cookie", re.compile(r"(?i)((?<![\w-])(?:set-)?cookie\\?\"?\s*[=:]\s*\\?\"?)(?!\[MASCARADO)([^\s\"\\][^\r\n\"\\]*)")),
-    # chaves compostas (accessToken, bearer_token, x-api-key, client_secret...): sem \b antes da palavra-chave
-    ("chave_valor", re.compile(
-        r"(?i)(\\?\"?(?<![\w.-])[\w.-]{0,80}?(?:password|passwd|senha|secret|token|api[_-]?key|access[_-]?key|"
-        r"credential)[\w.-]{0,80}\\?\"?"
-        r"\s*[=:]\s*\\?\"?)(?!\[MASCARADO)([^\s\"'\\,;&}]+)")),
+    ("cookie", re.compile(r"(?i)((?<![\w-])(?:set-)?cookie" + QA + r"?\s*[=:]\s*" + QA + r"?)(?!\[MASCARADO)"
+                          r"([^\s\"'`\\][^\r\n\"'`\\]*)")),
+    # chaves compostas (accessToken, bearer_token, x-api-key, client_secret...), chave e valor com ou sem aspas
+    ("chave_valor", re.compile(r"(?i)(" + QA + r"?" + _SECRET_KEY + QA + r"?\s*[=:]\s*)"
+                               r"(?:" + _QUOTED_VALUE + "|" + _BARE_VALUE + ")")),
 ]
 SECRET_MASK = "[MASCARADO:segredo]"
 
@@ -198,14 +212,12 @@ ADDRESS_KEYS = r"(?:shippingAddress|shipping_address|billingAddress|endereco|end
 NAME_KEYS = r"(?:customerName|recipient|recipientName|destinatario|fullName|nomeCompleto|nome)"
 ZIP_KEYS = r"(?:zipCode|zip_code|zip|cep|postalCode|postal_code)"
 STREET_KEYS = r"(?:street|logradouro|rua|complement|complemento)"
-Q = r"\\?\""   # aspas, possivelmente escapadas (JSON dentro de mensagem de log)
+Q = r"\\*\""   # aspas com qualquer nível de escape (JSON logado como texto 1, 2 ou mais vezes)
 
 PII_PATTERNS = [
     # endereço de entrega inteiro (JSON, JSON escapado e toString Java) — ressalva 1
     ("endereco", re.compile("(" + Q + ADDRESS_KEYS + Q + r"\s*:\s*)\{[^{}]*\}")),
-    ("endereco", re.compile(r"(\b" + ADDRESS_KEYS + r"\s*=\s*)\w*[\[{(][^\]})]*[\]})]")),
-    # toString de record/classe sem chave antes: Address[street=..., number=...], ShippingAddress{...}
-    ("endereco", re.compile(r"((?<![\w$])[\w$.]*[Aa]ddress)[\[{](?=[^\]{}\n]*=)[^\]{}\n]*[\]}]")),
+    # `address=Address[...]` e o toString de record/classe (Address[...], ShippingAddress{...}): ver _mask_records
     ("endereco", re.compile(r"((?<![\w.])" + STREET_KEYS + r"=)[^,\]})\n]+")),
     ("cep", re.compile(r"((?<![\w.])" + ZIP_KEYS + r"=)[\d.\s-]{5,10}(?=[,\]})\s]|$)")),
     ("nome", re.compile(r"((?<![\w.])" + NAME_KEYS + r"=)[^,\]})\n]+")),
@@ -215,19 +227,77 @@ PII_PATTERNS = [
     ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
     ("cnpj", re.compile(r"(?<![\w./-])\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}(?![\w-])")),
     ("cpf", re.compile(r"(?<![\w.-])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\w-])")),
-    # separadores opcionais (529982247-25, 529 982 247 25, 52998224725): só com dígito verificador válido
-    ("cpf", re.compile(r"(?<![\w.-])\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}(?![\w-])"),
-     lambda v: _cpf_ok(re.sub(r"\D", "", v))),
+    # separadores opcionais (529982247-25, 529 982 247 25, 52998224725): só com dígito verificador válido.
+    # Decisão (G2-D16-2): 11 dígitos SEM separador só são CPF se o contexto indicar documento (cpf, document,
+    # taxId...) logo antes — ids numéricos (orderId=12345678909) podem ter DV de CPF válido por acaso (1 em 100).
+    # Com separador (529982247-25, 529 982 247 25) basta o DV válido.
+    ("cpf", re.compile(r"(?<![\w.-])\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}(?![\w-])"), lambda m: _cpf_match(m)),
     ("cartao", re.compile(r"(?<![\w-])[3-6]\d{3}(?:[ -]?\d){9,15}(?![\w-])"),
-     lambda v: 13 <= len(re.sub(r"\D", "", v)) <= 19 and _luhn(re.sub(r"\D", "", v))),
+     lambda m: 13 <= len(re.sub(r"\D", "", m.group(0))) <= 19 and _luhn(re.sub(r"\D", "", m.group(0)))),
     ("cep", re.compile(r"(?<![\w-])\d{5}-\d{3}(?![\w-])")),
     ("telefone", re.compile(r"(?:\+55\s?)?\(\d{2}\)\s?9?\d{4}-?\d{4}(?!\d)|\+55\s?\d{2}\s?9?\d{4}-?\d{4}(?!\d)")),
-    ("ip", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])"), _public_ip),
-    ("ip", re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:])"), _public_ip),
+    ("ip", re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])"), lambda m: _public_ip(m.group(0))),
+    ("ip", re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:])"),
+     lambda m: _public_ip(m.group(0))),
 ]
 CUSTOMER_RE = [re.compile("(" + Q + r"customerId" + Q + r"\s*:\s*" + Q + r")([^\"\\]+)(" + Q + ")"),
-               re.compile(r"(\bcustomerId=)([^&\s\"',;}\]]+)()")]
+               re.compile(r"(\bcustomerId\s*=\s*)([^&\s\"'`,;}\]]+)()"),
+               re.compile(r"(\bcustomerId\s*[=:]\s*" + QA + r")([^\"'`\\\n]+)(" + QA + ")")]
 PSEUDO_RE = re.compile(r"^cust-[0-9a-f]{8}$")
+
+
+_CPF_CONTEXT = re.compile(r"(?i)(?:cpf|documento?|document_?number|tax_?id|national_?id|nif)(?:\W+\w+){0,2}\W*$")
+
+
+def _cpf_match(m: re.Match) -> bool:
+    v = m.group(0)
+    digits = re.sub(r"\D", "", v)
+    if not _cpf_ok(digits):
+        return False
+    if v != digits:                     # tem formatação (., -, espaço)
+        return True
+    return bool(_CPF_CONTEXT.search(m.string[max(0, m.start() - 40):m.start()]))
+
+
+_REC_START = re.compile(r"((?<![\w$])[\w$.]*[Aa]ddress)(?=[\[{])|(\b" + ADDRESS_KEYS + r"\s*=\s*\w*)(?=[\[{(])")
+_OPEN, _CLOSE = "[{(", "]})"
+
+
+def _balanced_end(text: str, i: int) -> int:
+    """Fim (exclusivo) do bloco que abre em text[i], com balanceamento simples de []{}(); sem fechamento na linha,
+    vai até o fim da linha (lado seguro: record truncado)."""
+    depth = 0
+    for j in range(i, len(text)):
+        c = text[j]
+        if c == "\n":
+            return j
+        if c in _OPEN:
+            depth += 1
+        elif c in _CLOSE:
+            depth -= 1
+            if depth == 0:
+                return j + 1
+    return len(text)
+
+
+def _mask_records(text: str, bump) -> str:
+    """Endereço em toString Java (Address[street=Rua [bloco 2], number=3], ShippingAddress{...}) e em
+    `address=Address[...]`: o bloco inteiro, com colchetes/chaves internos."""
+    out, pos = [], 0
+    for m in _REC_START.finditer(text):
+        if m.start() < pos:
+            continue
+        key = m.group(1) or m.group(2)
+        i = m.end()
+        end = _balanced_end(text, i)
+        inner = text[i + 1:end]
+        if inner.startswith("MASCARADO:") or (m.group(1) and "=" not in inner):
+            continue
+        bump("endereco", "endereco")
+        out.append(text[pos:m.start()] + key + "[MASCARADO:endereco]")
+        pos = end
+    out.append(text[pos:])
+    return "".join(out)
 
 
 def key_path(data_root: pathlib.Path) -> pathlib.Path:
@@ -267,10 +337,16 @@ def mask_text(text: str, key: bytes) -> tuple[str, dict]:
     for typ, rx in SECRET_PATTERNS:
         def rep(m, typ=typ):
             bump("secret", typ)
-            if typ in ("authorization", "cookie", "chave_valor"):
+            if typ == "chave_valor":
+                if m.group("q"):                          # valor entre aspas: preserva as aspas e o nível de escape
+                    quote = m.group("bs") + m.group("q")
+                    return m.group(1) + quote + SECRET_MASK + quote
+                return m.group(1) + (m.group("bq") or "") + SECRET_MASK
+            if typ in ("authorization", "cookie"):
                 return m.group(1) + SECRET_MASK
             return SECRET_MASK
         text = rx.sub(rep, text)
+    text = _mask_records(text, bump)
     for item in PII_PATTERNS:
         typ, rx = item[0], item[1]
         ok = item[2] if len(item) > 2 else None
@@ -280,14 +356,13 @@ def mask_text(text: str, key: bytes) -> tuple[str, dict]:
         def rep(m, typ=typ, ok=ok, cat=cat, label=label):
             whole = m.group(0)
             key = m.group(1) if m.re.groups else ""
-            if "[MASCARADO:" in whole[len(key):] or (ok and not ok(whole)):
+            if "[MASCARADO:" in whole[len(key):] or (ok and not ok(m)):
                 return whole
             bump(cat, typ)
             if not key:
                 return label
-            if '\\"' in key:          # JSON escapado dentro de uma mensagem de log
-                return key + '\\"' + label + '\\"'
-            return key + ('"' + label + '"' if '"' in key else label)
+            q = re.match(r'\\*"', key)   # JSON (escapado n vezes): o rótulo vai entre aspas do mesmo nível
+            return key + (q.group(0) + label + q.group(0) if q else label)
         text = rx.sub(rep, text)
     for rx in CUSTOMER_RE:
         def rep(m):

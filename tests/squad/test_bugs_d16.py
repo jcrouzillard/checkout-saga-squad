@@ -510,6 +510,91 @@ class T03Mask(unittest.TestCase):
         self.assertEqual(bugs.resolve_vars(expr, 0, 3600, 15),
                          "rate(x[3600s]) + 3600 + 3600000 + 15000 + rate(y[15s])")
 
+    # ---- 2ª devolução do G2 (G2-D16-2), 3º ciclo autorizado pelo humano
+    def test_ca6_aspas_simples(self):
+        for text, secret in {"password='hunter2'": "hunter2", "api_key='AB12'": "AB12", "token: 'abc'": "abc",
+                             "senha = 'pw1'": "pw1", "clientSecret=`cs9`": "cs9",
+                             "Authorization: 'Bearer abc.def'": "abc.def"}.items():
+            out, c = self._mask_idem(text)
+            self.assertNotIn(secret, out, text)
+            self.assertIn("[MASCARADO:segredo]", out, text)
+            self.assertTrue(er.find_secrets(text), text)                            # bloqueia no título/descrição
+        self.assertEqual(self._mask_idem("password='hunter2' ok")[0], "password='[MASCARADO:segredo]' ok")
+
+    def test_ca6_aspas_simples_no_titulo_bloqueia(self):
+        st, d, _ = draft(files=[upload("a.log", b"x\n")])
+        for title in ("falha password='hunter2'", "erro api_key='AB12'", "token: 'abc' expirado"):
+            st, e, _ = create_bug(d["draft"], title=title)
+            self.assertEqual((st, e["code"]), (422, "segredo_no_texto"), title)
+        st, e, _ = call("POST", "/api/demand", {"title": "Pagamento falha", "kind": "produto", "nature": "bug",
+                                                "detail": "senha: 'x y z' no log",
+                                                "bug": {"draft": d["draft"], "consent": CONSENT}})
+        self.assertEqual((st, e["code"]), (422, "segredo_no_texto"))
+
+    def test_ca6_valor_com_espaco_entre_aspas(self):
+        cases = {'{"password":"my pass word","user":"bob"}': '{"password":"[MASCARADO:segredo]","user":"bob"}',
+                 "password='a b c' fim": "password='[MASCARADO:segredo]' fim",
+                 'accessToken = "x y"\nlinha2 ok': 'accessToken = "[MASCARADO:segredo]"\nlinha2 ok',
+                 r'{"m":"p {\"secret\":\"um dois\",\"n\":1}"}': r'{"m":"p {\"secret\":\"[MASCARADO:segredo]\",\"n\":1}"}',
+                 '"password":"a\\"b c","x":1': '"password":"[MASCARADO:segredo]","x":1'}
+        for text, expected in cases.items():
+            self.assertEqual(self._mask_idem(text)[0], expected, text)
+        # sem aspa de fechamento na linha: não atravessa a linha
+        out, _ = self._mask_idem("password='sem fim\nproxima linha intacta")
+        self.assertEqual(out, "password='[MASCARADO:segredo] fim\nproxima linha intacta")
+        json.loads(self._mask_idem('{"password":"my pass word"}')[0])
+
+    def test_ca6_json_escapado_duas_vezes(self):
+        inner = {"password": "pw9 z", "authorization": "Bearer abc.def", "customerId": "c-9",
+                 "shippingAddress": {"street": "Rua A", "zipCode": "01310-100"}, "customerName": "Joao Silva",
+                 "street": "Rua B", "nome": "Ana Lima"}
+        once = json.dumps({"payload": json.dumps(inner)})                       # envelope com payload como string
+        text = json.dumps({"level": "ERROR", "message": "evento " + once})       # mensagem do Spring (2x escapado)
+        self.assertIn('\\\\\\"password\\\\\\"', text)
+        for t in (text, json.dumps({"message": text})):                          # 2 e 3 níveis
+            out, c = self._mask_idem(t)
+            for v in ("pw9", "abc.def", "c-9", "Rua A", "01310-100", "Joao Silva", "Rua B", "Ana Lima"):
+                self.assertNotIn(v, out, v)
+            self.assertGreaterEqual(c["pseudonimo"], 1)
+            json.loads(out)
+        m = json.loads(json.loads(json.loads(self._mask_idem(text)[0])["message"][len("evento "):])["payload"])
+        self.assertEqual(m["password"], "[MASCARADO:segredo]")
+        self.assertEqual(m["shippingAddress"], "[MASCARADO:endereco]")
+        self.assertTrue(m["customerId"].startswith("cust-"))
+
+    def test_ca6_address_com_colchetes_internos(self):
+        for text in ("erro: Address[street=Rua [bloco 2], number=3] depois",
+                     "shippingAddress=Address[street=Rua {b} [2], number=3, zipCode=01310-100] depois",
+                     "ShippingAddress{street=Rua (fundos) [x], number=3} depois"):
+            out, c = self._mask_idem(text)
+            for v in ("bloco", "number=3", "fundos", "01310-100", "]]", ", number", "}"):
+                self.assertNotIn(v, out, text)
+            self.assertTrue(out.endswith("ddress[MASCARADO:endereco] depois"), out)
+            self.assertEqual(c["endereco"], 1, text)
+        # record truncado (sem fechamento na linha): mascara até o fim da linha, sem atravessar
+        out, _ = self._mask_idem("Address[street=Rua [bloco 2, number=3\nproxima")
+        self.assertEqual(out, "Address[MASCARADO:endereco]\nproxima")
+
+    def test_ca6_falsos_positivos(self):
+        text = ("tokenizer=bert-base tokenCount=12 totalTokens: 1024 maxTokens=5 keyTokens: 5 "
+                "passwordPolicy=strict passwordMinLength=8 secretsManager: enabled PWD=/home/app")
+        self.assertEqual(self._mask_idem(text)[0], text)
+        self.assertEqual(self._mask_idem('{"maxTokens":2048,"tokenizer":"bert"}')[0], '{"maxTokens":2048,"tokenizer":"bert"}')
+        self.assertEqual(er.find_secrets(text), [])
+        # sufixos permitidos continuam segredo
+        out, _ = self._mask_idem("secretKey=s1 tokenValue=t1 passwordHash=h1 credentials=c1")
+        for v in ("s1", "t1", "h1", "c1"):
+            self.assertNotIn(v, out)
+        # Decisão: 11 dígitos sem formatação só viram CPF com contexto de documento (cpf/document/taxId)
+        for text in ("orderId=12345678909", "amount_cents=52998224725", '"orderId":"52998224725"'):
+            self.assertEqual(self._mask_idem(text)[0], text)
+        for text, expected in {"cpf=12345678909": "cpf=[MASCARADO:cpf]",
+                               '"document":"52998224725"': '"document":"[MASCARADO:cpf]"',
+                               "taxId: 52998224725": "taxId: [MASCARADO:cpf]",
+                               "CPF do cliente 52998224725": "CPF do cliente [MASCARADO:cpf]",
+                               "orderId=529982247-25": "orderId=[MASCARADO:cpf]"}.items():  # formatado: basta o DV
+            self.assertEqual(self._mask_idem(text)[0], expected, text)
+
     def test_ca10_metadados_de_imagem(self):
         st, d, _ = draft(files=[upload("a.png", make_png()), upload("b.jpg", make_jpeg()), upload("c.webp", make_webp())])
         self.assertEqual(st, 201, d)
