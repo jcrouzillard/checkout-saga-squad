@@ -65,7 +65,9 @@ agora" sempre explícito (RACI mínimo: `owner`); rastreabilidade: todo item cit
 ### 5.1 Definições auxiliares
 - `code(demand)`: `D{n}` pela ordem dos eventos `task` com `agent == "humano"` (mesma regra de `demandCode` do cliente).
 - Demanda **encerrada**: tem `control/cancel`, `delivered`, ou gate G3 APPROVE sem PR (regra `is_done`). Itens de
-  demanda encerrada **fecham** (vão para o histórico).
+  demanda encerrada **fecham** (vão para o histórico). **Exceção (errata G2-D14)**: se a demanda está encerrada só por
+  G3 APPROVE sem PR e esse G3 tem `needsHuman(g)` (confiança < 70%, risco alto ou `human_required`) sem `decided(g)`,
+  o B2 desse G3 **continua aberto** (AGENTS.md: intervenção humana obrigatória). `control/cancel` e `delivered` fecham tudo.
 - Gates de uma chave `k = (demand|null, gate)`: eventos `type == "gate"` do log em ordem de `ts`, complementados pelo
   arquivo `docs/squad/gates/<gate>-<Dn>.json` (campos `cycle`, `human_required`) quando o arquivo é o mais recente (mesma
   heurística de `latestGateFor`, ±5 s).
@@ -81,11 +83,11 @@ agora" sempre explícito (RACI mínimo: `owner`); rastreabilidade: todo item cit
 | Id | Severidade | Tipo (`kind`) | Abre quando | Fecha quando | `owner` (quem age) | Ação (rótulo → destino) |
 |---|---|---|---|---|---|---|
 | **B1** | bloqueio | `gate-return` | último gate da chave é `RETURN` | novo gate na chave; `human/OVERRIDE` posterior; demanda encerrada | agente de origem do trabalho devolvido (`gate.to`, senão `from` do arquivo, senão o autor do último `handoff` para o Auditor); vira `humano` se B2/B3 também valem | "Ver parecer de Gx" → `#/demandas/Dn/gates` |
-| **B2** | bloqueio | `human-required` | último gate da chave com `needsHuman(g)` (exceto `returns>=3`, que é B3) e **não** `decided(g)` | `decided(g)`; novo gate; demanda encerrada | `humano` | "Decidir Gx" → `#/demandas/Dn/gates` (squad base: `#/painel/squad-base`) |
+| **B2** | bloqueio | `human-required` | último gate da chave com `needsHuman(g)` (exceto `returns>=3`, que é B3) e **não** `decided(g)` | `decided(g)`; novo gate; demanda encerrada (exceto G3 APPROVE que encerrou a demanda — ver §5.1) | `humano` | "Decidir Gx" → `#/demandas/Dn/gates` (squad base: `#/painel/squad-base`) |
 | **B3** | bloqueio | `cycle-limit` | `returns(k) >= 3` e não `decided` | decisão humana na chave; demanda encerrada | `humano` | "Decidir Gx — 3º ciclo" → `#/demandas/Dn/gates` |
 | **B4** | bloqueio | `triage-open` | último `validation` da demanda com `status == "perguntas"` sem `clarification` cujo `validation` = seu id | `clarification`; `start` com `override`; `control/cancel` | `humano` | "Responder n perguntas" → `#/demandas/Dn/validacao` |
 | **A1** | aviso | `low-confidence` | gate com `confidence < 0.70` **já decidido** pelo humano (APPROVE/OVERRIDE) — risco aceito | novo gate da chave com `confidence >= 0.70`; demanda encerrada | `squad` (informativo) | "Ver parecer" → `#/demandas/Dn/gates` |
-| **A2** | aviso | `agent-stalled` | run **não encerrada** (turno aberto ou ferramenta pendente, ou run externa `trabalhando`) com `now − última atividade >= 600 s`; **ou** run externa `interrompido` (pid morto sem "Finalizado") da última hora | nova atividade; run encerrada | `humano` (verificar terminal/permissão) se a run é do Claude Code interativo; `orquestrador` (retomar) se é `run_agent.py` | "Ver integrante" → `?agente=<papel>` |
+| **A2** | aviso | `agent-stalled` | run **não encerrada** (turno aberto ou ferramenta pendente, ou run externa `trabalhando`) com `600 s <= now − última atividade < STALLED_MAX_S` (3600 s; acima disso a run é considerada abandonada/sessão morta e **não** gera A2); **ou** run externa `interrompido` (pid morto sem "Finalizado") da última hora | nova atividade; run encerrada | `humano` (verificar terminal/permissão) se a run é do Claude Code interativo; `orquestrador` (retomar) se é `run_agent.py` | "Ver integrante" → `?agente=<papel>` |
 | **A3** | aviso | `pr-waiting` | evento `review` sem `delivered`/`review-rejected` posterior do mesmo `pr` | `delivered` ou `review-rejected` | `humano` | "Revisar PR #n" → `url` (externo) + "Ver Dn" |
 
 **Conciliação B2 × A1** (o humano pôs "confiança < 70%" em aviso; AGENTS.md torna a intervenção **obrigatória** nesse
@@ -106,6 +108,9 @@ uma ferramenta (≈ 1 falso positivo a cada 1.600 ferramentas) e ainda bem antes
 Abaixo de 5 min (usado pelo `pending.py` para "Arquiteto ocupado") os builds do Maven/Docker gerariam avisos falsos com
 frequência (p99 = 3 min). Ferramenta pendente ≥ 180 s (p99) não é aviso: aparece no cartão como "comando longo".
 O limite fica em `thresholds.stalledSeconds` na API (ajustável por `SQUAD_STALLED_S`), exibido na legenda.
+Teto (errata G2-D14): `STALLED_MAX_S = 3600` s. Run aberta sem atividade há mais de 1 h é tratada como sessão morta:
+sai do A2 e não conta como `trabalhando`/`sem-progresso`. O valor deve constar em `thresholds.stalledMaxSeconds` do
+`/api/live` e do `/api/state` (§9.1).
 
 ### 5.4 Histórico (auditoria)
 Para B1–B4, A1 e A3 o servidor também devolve os itens **fechados** (reconstruídos do log: `openedAt`, `closedAt`,
@@ -193,8 +198,8 @@ Seções, nesta ordem (todas ao vivo, sem perder rolagem nem `details` abertos n
 
 | Estado | Rótulo na UI | Regra | Ícone | Cor |
 |---|---|---|---|---|
-| `sem-progresso` | Sem progresso | A2 aberto para a run atual | ▲ | `--warn` |
-| `interrompido` | Interrompido | run externa com pid morto sem "Finalizado" (última hora) | ■ | `--danger` |
+| `interrompido` | Interrompido | run externa com pid morto sem "Finalizado" (última hora) — também abre A2 | ■ | `--danger` |
+| `sem-progresso` | Sem progresso | A2 aberto para a run atual (não interrompida) | ▲ | `--warn` |
 | `trabalhando` | Trabalhando | run não encerrada com atividade < 600 s | ● (pulso; sem animação com `prefers-reduced-motion`) | `--ok` |
 | `aguardando` | Aguardando | run encerrada/sem run e `waiting` presente | ◷ | `--warn` |
 | `concluido` | Concluiu | última run encerrada há < 15 min, sem `waiting` | ✓ | `--accent` |
@@ -244,7 +249,7 @@ Indicador §6.1. Com a última resposta boa > 15 s: botões de decisão de gate,
   "now": "2026-09-24T14:30:02+00:00",
   "version": "b3f1…",                         // hash de (tamanho+mtime do log, mtimes de docs/squad/gates, handoffs, inbox, .squad/runs/*.json)
   "serverMs": 41,
-  "thresholds": { "stalledSeconds": 600, "longToolSeconds": 180, "waitWarnSeconds": 600, "lowConfidence": 0.7, "maxAutoCycles": 2 },
+  "thresholds": { "stalledSeconds": 600, "stalledMaxSeconds": 3600, "longToolSeconds": 180, "waitWarnSeconds": 600, "lowConfidence": 0.7, "maxAutoCycles": 2 },
   "summary": { "bloqueios": 2, "avisos": 3, "voce": 3, "trabalhando": 2, "aguardando": 1, "semProgresso": 0 },
   "alerts": [ Alert ],                         // só abertos, já ordenados (§5.2)
   "agents": [ Agent ]                          // sempre os 8 papéis, na ordem de AGENTS do cliente
@@ -496,3 +501,12 @@ T6 "Quem fechou o bloqueio de G2 da D13 e quando?" — ≤ 3 cliques (Auditoria 
 
 ## 16. Histórico
 - 2026-09-24 — v1 (Arquiteto, D14 `1e3d3c894630`).
+- 2026-09-24 — errata pós-G2 (Arquiteto, D14 `1e3d3c894630`; `docs/squad/gates/G2-D14.json`), alinhando o contrato a
+  `tools/squad/alerts.py`, sem mudar regra de negócio:
+  1. §5.2/§5.3: teto `STALLED_MAX_S = 3600` s no A2; `thresholds.stalledMaxSeconds` acrescentado em §9.1.
+  2. §7.3: `interrompido` passa a ter precedência sobre `sem-progresso` (a run interrompida também abre A2).
+  3. §5.1/§5.2: G3 APPROVE com `needsHuman` sem decisão mantém B2 aberto mesmo com a demanda encerrada por `is_done`.
+  4. Registro de divergência: a regra "confiança < 70% é **bloqueio** (B2) até a decisão humana e **aviso** (A1)
+     depois" diverge da primeira resposta do humano na triagem, que a classificou só como aviso. Prevalece pela
+     hierarquia de verdade (AGENTS.md: ADRs/regras da constituição acima de preferências de UI; "Limites de autonomia"
+     torna a intervenção obrigatória). Mudá-la exige **novo ADR**.

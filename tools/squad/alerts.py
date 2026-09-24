@@ -32,7 +32,8 @@ GATE_KIND_ORDER = ["cycle-limit", "human-required", "gate-return", "low-confiden
 
 
 def thresholds() -> dict:
-    return {"stalledSeconds": STALLED_S, "longToolSeconds": LONG_TOOL_S, "waitWarnSeconds": WAIT_WARN_S,
+    return {"stalledSeconds": STALLED_S, "stalledMaxSeconds": STALLED_MAX_S, "longToolSeconds": LONG_TOOL_S,
+            "waitWarnSeconds": WAIT_WARN_S,
             "lowConfidence": LOW_CONFIDENCE, "maxAutoCycles": MAX_AUTO_CYCLES}
 
 
