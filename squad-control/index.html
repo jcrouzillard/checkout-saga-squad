@@ -361,7 +361,7 @@ const PIPELINE = [
 
 let project = null, product = null, state = null, drawerAgent = null, policy = null, flash = "";
 // D13 (ADR-016): a URL (hash) é a fonte do estado de navegação — tela, item, seção, filtros e gaveta.
-let route = { view: "painel", parts: [], params: new URLSearchParams() }, routeKey = null, routeNotice = "", routeTitle = "Painel";
+let route = { view: "painel", parts: [], params: new URLSearchParams() }, routeKey = null, routeNotice = "", noticeFresh = false, routeTitle = "Painel";
 let flashErr = false;            // D4: mensagem do formulário de demanda é erro?
 const cardMsg = {};              // D4: mensagem por card de demanda { id: { ok, text } }
 let lastDemandStatus = null;     // D4: para anunciar mudanças de estado via aria-live
@@ -449,7 +449,8 @@ function latestGateFor(demand) {
 }
 // Mesma condição de intervenção obrigatória da UI anterior (l. 445): human_required, confiança < 70% ou risco alto.
 const gateNeedsHuman = g => !!g && (!!g.human_required || (g.confidence != null && Math.round(g.confidence * 100) < 70) || g.risk === "alto");
-function humanFor(gate, demand, after) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate && (e.demand || null) === (demand || null) && (!after || e.ts > after)); }
+// before (opcional): limite superior — a decisão de um ciclo de gate é a anterior ao próximo ciclo do mesmo gate.
+function humanFor(gate, demand, after, before) { return [...state.log].reverse().find(e => e.type === "human" && e.gate === gate && (e.demand || null) === (demand || null) && (!after || e.ts > after) && (!before || e.ts < before)); }
 
 function pipelineStatus() {
   const byAgent = runsByAgent();
@@ -549,7 +550,7 @@ function nextAction(info) {
     return { order: 2, urgent: true, label: `Responder ${n} pergunta${n === 1 ? "" : "s"} do Arquiteto`, href: `#/demandas/${code}/validacao`, btn: "Responder" }; }
   if (info.inReview) return { order: 3, label: `Revisar PR #${info.inReview.pr ?? "?"}`, href: `#/demandas/${code}`, ext: info.inReview.url, btn: `Revisar PR #${info.inReview.pr ?? "?"}` };
   if (info.preStart && (!info.vinfo || info.vinfo.ready)) return { order: 4, label: "Iniciar", href: `#/demandas/${code}`, btn: "Iniciar" };
-  if (info.vinfo?.st === "atrasada") return { order: 5, label: "Validação atrasada — aguardar ou iniciar com override", href: `#/demandas/${code}`, btn: "Ver validação" };
+  if (info.preStart && info.vinfo?.st === "atrasada") return { order: 5, label: "Validação atrasada — aguardar ou iniciar com override", href: `#/demandas/${code}`, btn: "Ver validação" };
   return null;
 }
 function needsYou() {
@@ -682,7 +683,7 @@ function renderDemanda(ref) {
   const { d, code, eff, start, issue } = info, id = d.id;
   routeTitle = code;
   const { qpos } = queueData();
-  const sec = route.parts[2] || "";
+  const sec = route.parts[1] || "";
   const a = nextAction(info);
   const g = latestGateFor(id);
   const w = workingOn(id);
@@ -704,7 +705,7 @@ function renderDemanda(ref) {
   // Gates (todos os eventos gate da demanda, pelo log; parecer completo do arquivo quando houver)
   const gateEvs = info.related.filter(e => e.type === "gate");
   const lastIdx = {}; gateEvs.forEach((e, i) => { lastIdx[e.gate] = i; });
-  const gatesHtml = gateEvs.length ? gateEvs.map((e, i) => { const h = humanFor(e.gate, id, e.ts); const file = lastIdx[e.gate] === i ? state.gates.find(f => f.demand === id && f.gate === e.gate) : null;
+  const gatesHtml = gateEvs.length ? gateEvs.map((e, i) => { const h = humanFor(e.gate, id, e.ts, gateEvs.slice(i + 1).find(x => x.gate === e.gate)?.ts); const file = lastIdx[e.gate] === i ? state.gates.find(f => f.demand === id && f.gate === e.gate) : null;
     return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(e.gate)} · <span class="${e.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(e.recommendation)}</span> · ${Math.round((e.confidence || 0) * 100)}% · risco ${esc(e.risk || "—")}</b><span class="muted" style="font-size:12px">${hhmm(e.ts)}</span></div>
       ${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}
       ${e.detail ? `<p class="muted" style="font-size:13px;margin:6px 0">${esc(e.detail)}</p>` : ""}
@@ -823,9 +824,9 @@ const shortSha = c => String(c || "").slice(0, 7);
 // D8: bloco de revisão no card e na tela Execuções.
 function reviewHtml(info) {
   if (info.canceled) return "";
-  if (info.delivered) { const v = info.delivered; return `<div class="pass" style="font-size:12px;margin-top:6px">Entregue${v.pr ? ` · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">PR #${esc(v.pr)}</a>` : ""}${v.mergeCommit ? ` · commit <code>${esc(shortSha(v.mergeCommit))}</code>` : ""}${v.mergedBy ? ` · integrado por ${esc(v.mergedBy)}` : ""}${v.mergedAt ? ` às ${esc(hhmm(v.mergedAt))}` : ""}</div>`; }
-  if (info.inReview) { const v = info.inReview; return `<div class="validate" style="font-size:13px;margin-top:6px">Aguardando sua revisão · PR #${esc(v.pr ?? "?")} · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">Revisar no GitHub<span class="sr-only"> (abre em nova aba)</span></a></div>`; }
-  if (info.rejected) { const v = info.rejected; return `<div class="qbox open"><b>Devolvida pelo revisor${v.pr ? ` · <a href="${esc(v.url || "#")}" target="_blank" rel="noopener">PR #${esc(v.pr)}</a>` : ""}</b><div style="white-space:pre-wrap;margin-top:6px">${esc(v.detail || "Sem comentários do revisor.")}</div></div>`; }
+  if (info.delivered) { const v = info.delivered; return `<div class="pass" style="font-size:12px;margin-top:6px">Entregue${v.pr ? ` · ${extLink(v.url, `PR #${esc(v.pr)}`)}` : ""}${v.mergeCommit ? ` · commit <code>${esc(shortSha(v.mergeCommit))}</code>` : ""}${v.mergedBy ? ` · integrado por ${esc(v.mergedBy)}` : ""}${v.mergedAt ? ` às ${esc(hhmm(v.mergedAt))}` : ""}</div>`; }
+  if (info.inReview) { const v = info.inReview; return `<div class="validate" style="font-size:13px;margin-top:6px">Aguardando sua revisão · PR #${esc(v.pr ?? "?")} · ${extLink(v.url, "Revisar no GitHub")}</div>`; }
+  if (info.rejected) { const v = info.rejected; return `<div class="qbox open"><b>Devolvida pelo revisor${v.pr ? ` · ${extLink(v.url, `PR #${esc(v.pr)}`)}` : ""}</b><div style="white-space:pre-wrap;margin-top:6px">${esc(v.detail || "Sem comentários do revisor.")}</div></div>`; }
   if (info.status.startsWith("Aprovada pelo Auditor")) return `<div class="muted" style="font-size:12px;margin-top:6px">G3 aprovado; o Orquestrador está abrindo o PR para a sua revisão.</div>`;
   return "";
 }
@@ -866,6 +867,8 @@ function demandInfo(d, index) {
     : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
   return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
 }
+// Confirmação pendente de "Cancelar demanda" (em andamento): fica no estado, não no nó, para sobreviver ao polling.
+const ctlConfirm = new Set();
 function controlsHtml(info) {
   if (info.preStart || ["Concluída", "Entregue", "Cancelada"].includes(info.status)) return "";
   const id = info.d.id;
@@ -873,7 +876,7 @@ function controlsHtml(info) {
     ${info.paused ? `<button class="btn" data-ctl="resume" data-id="${id}" style="height:36px">Retomar</button>` : `<button class="btn" data-ctl="pause" data-id="${id}" style="height:36px">Pausar</button>`}
     <label class="muted" style="font-size:12px" for="cp-${id}">Prioridade</label>
     <select id="cp-${id}" data-ctlpr="${id}" style="padding:7px 8px;border:1px solid #C9C9C5;border-radius:2px;font:inherit;background:#fff">${["alta", "normal", "baixa"].map(p => `<option value="${p}" ${p === info.priority ? "selected" : ""}>${p}</option>`).join("")}</select>
-    <button class="btn" data-ctl="cancel" data-id="${id}" style="height:36px;color:var(--red);border-color:var(--red);margin-left:auto">Cancelar demanda</button>
+    <button class="btn" id="ctl-cancel-${id}" data-ctl="cancel" data-id="${id}" ${ctlConfirm.has(id) ? `data-confirm="1"` : ""} style="height:36px;color:var(--red);border-color:var(--red);margin-left:auto">${ctlConfirm.has(id) ? "Confirmar cancelamento" : "Cancelar demanda"}</button>
   </div>`;
 }
 // D5: item do backlog — leitura, edição inline (título, descrição, tipo, prioridade) e "Mover para a fila".
@@ -889,7 +892,7 @@ function backlogItemHtml(info) {
       <span class="tag">criada ${hhmm(d.ts)}</span>
       <span class="tag" title="Tipo da demanda">${esc(KINDS[eff.kind]?.tag || eff.kind || "sem tipo")}</span>
       <span class="tag">prioridade ${esc(eff.priority)}</span>
-      ${issue ? `<a class="tag" href="${esc(issue.url)}" target="_blank" rel="noopener">issue #${issue.number}</a>` : `<span class="tag">issue: sincronizando…</span>`}
+      ${issue ? extLink(issue.url, `issue #${esc(issue.number)}`, "tag") : `<span class="tag">issue: sincronizando…</span>`}
     </div>
     ${editing ? `<div class="bl-edit" role="group" aria-label="Editar ${esc(code)}">
       <label class="f" for="ble-t-${id}">Título</label><input type="text" id="ble-t-${id}" data-keep value="${esc(eff.title)}" maxlength="200">
@@ -1139,7 +1142,7 @@ function canonical(h) {
   if (!r.view) return "#/painel";
   if (r.view === "execucoes") { const a = state ? activeDemand() : null; return a ? `#/demandas/${a.code}/execucao` : "#/painel"; }
   if (ALIASES[r.view]) return ALIASES[r.view];
-  if (!VIEWS.includes(r.view)) { routeNotice = "Página não encontrada — você está no Painel."; return "#/painel"; }
+  if (!VIEWS.includes(r.view)) { routeNotice = "Página não encontrada — você está no Painel."; noticeFresh = true; return "#/painel"; }
   if (r.view === "auditoria" && !r.parts.length) return "#/auditoria/eventos" + (r.params.toString() ? "?" + r.params : "");
   if (r.view === "produto" && !r.parts.length) return "#/produto/grafana" + (r.params.toString() ? "?" + r.params : "");
   return null;
@@ -1151,10 +1154,12 @@ function applyRoute() {
   if (c && c !== location.hash) { history.replaceState(null, "", c); }
   const r = parseHash(location.hash);
   const k = keyOf(r), changed = k !== routeKey;
-  const hadNotice = routeNotice && changed && routeKey !== null && !c;
-  if (hadNotice) routeNotice = "";
+  // O aviso de rota inexistente vale só para o redirecionamento que o criou; qualquer navegação seguinte o limpa.
+  const fresh = noticeFresh; noticeFresh = false;
+  if (routeNotice && changed && routeKey !== null && !fresh) routeNotice = "";
   route = r; drawerAgent = AGENTS[r.params.get("agente")] ? r.params.get("agente") : null;
-  if (changed) { routeKey = k; flash = ""; flashErr = false; pendingFocus = true; syncMenu(); render(); }
+  if (changed) { routeKey = k; flash = ""; flashErr = false; ctlConfirm.clear(); pendingFocus = true; syncMenu(); render(); }
+  else if (fresh) render();
   else renderDrawer(true);
 }
 function syncMenu() {
@@ -1430,7 +1435,8 @@ document.addEventListener("click", async ev => {
   const ctl = ev.target.closest("[data-ctl]");
   if (ctl) {
     const id = ctl.dataset.id, action = ctl.dataset.ctl;
-    if (action === "cancel" && !ctl.dataset.confirm) { ctl.dataset.confirm = "1"; ctl.textContent = "Confirmar cancelamento"; return; }
+    if (action === "cancel" && !ctlConfirm.has(id)) { ctlConfirm.add(id); ctl.dataset.confirm = "1"; ctl.textContent = "Confirmar cancelamento"; return; }
+    if (action === "cancel") ctlConfirm.delete(id);
     const res = await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, priority: $(`[data-ctlpr="${id}"]`)?.value }) });
     const cj = res.ok ? null : await res.json().catch(() => ({}));
     flash = res.ok ? { pause: "Demanda pausada: o Orquestrador não despacha o próximo passo até você retomar.", resume: "Demanda retomada.", cancel: "Demanda cancelada; o Orquestrador interrompe o agente no próximo ciclo." }[action] : `Falha ao registrar o controle (${res.status}): ${cj.error || "erro no servidor"}.`;
