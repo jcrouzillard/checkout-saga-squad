@@ -246,7 +246,7 @@ def after_review(delivered: bool):
     with (ROOT / ".squad/after-review.log").open("a", encoding="utf-8") as log_file:
         subprocess.Popen(["sh", "-c", script], cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
                          stdin=subprocess.DEVNULL, start_new_session=True)
-    print("pós-revisão em segundo plano: " + " → ".join(c[2] + " " + c[3] for c in steps) + " (log em .squad/after-review.log)")
+    print("pós-revisão em segundo plano: " + " → ".join(" ".join(c[2:]) for c in steps) + " (log em .squad/after-review.log)")
 
 
 def review_sync(a):
