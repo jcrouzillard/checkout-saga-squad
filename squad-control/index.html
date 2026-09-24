@@ -273,7 +273,7 @@
   .u-lvl { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
   .u-win.warn .u-meter > div { background: var(--amber); } .u-win.warn .u-lvl { color: var(--amber); }
   .u-win.crit .u-meter > div { background: var(--red); } .u-win.crit .u-lvl { color: var(--red); }
-  .u-prov.stale .u-win { opacity: .55; }
+  .u-prov.stale .u-win, .u-prov.stale .u-win .wl, .u-prov.stale .u-win .rs { color: var(--dim); } .u-prov.stale .u-meter > div { opacity: .55; }
   .u-alert { display: inline-flex; gap: 4px; align-items: center; color: var(--amber); font-weight: 600; font-size: 11px; white-space: nowrap; }
   .u-alert svg { flex: none; }
   .u-none-t { color: var(--amber); font-weight: 600; font-size: 11px; }
@@ -464,6 +464,29 @@
     .alist .act { justify-content: flex-start; }
     .drawer { width: 100%; padding: 0 16px 16px; top: 0; z-index: 12; }
   }
+  /* ================= D15 (ADR-018, contrato ambiente-de-teste §5.2): ambiente de teste e produtivo local ================= */
+  .stepper li.skip { border-top-style: dashed; border-top-color: var(--line-strong); color: var(--dim); }
+  .te-st { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+  .te-st .ic { font-size: 11px; line-height: 1; }
+  .te-st.ok { color: var(--ok); } .te-st.warn { color: var(--warn); } .te-st.danger { color: var(--danger); } .te-st.accent { color: var(--accent); } .te-st.muted { color: var(--muted); }
+  .te-card { border: 1px solid var(--line); border-left: 3px solid var(--line-strong); border-radius: 4px; padding: 12px 16px; background: var(--surface); margin-top: 8px; min-width: 0; }
+  .te-card.ok { border-left-color: var(--ok); } .te-card.warn { border-left-color: var(--warn); } .te-card.danger { border-left-color: var(--danger); } .te-card.accent { border-left-color: var(--accent); }
+  .te-card h3 { font-size: 14px; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .te-card p { margin: 6px 0 0; font-size: 13px; }
+  .te-card pre { margin: 6px 0 0; max-height: 140px; overflow: auto; font-size: 11.5px; }
+  .te-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px; }
+  .te-links { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; margin-top: 8px; }
+  .te-links a { min-height: 32px; display: inline-flex; align-items: center; }
+  .te-queue { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; }
+  .te-queue li { display: flex; flex-wrap: wrap; gap: 2px 10px; padding: 5px 0; border-bottom: 1px solid var(--line2); }
+  .te-queue .pos { font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--accent); }
+  .te-confirm { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--raised); border-radius: 0 4px 4px 0; font-size: 13px; }
+  .te-confirm.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+  .te-confirm input { width: 100%; max-width: 260px; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 2px; font: inherit; font-family: "IBM Plex Mono", monospace; }
+  .te-box { margin-top: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+  .te-box h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  .te-stale { color: var(--warn); font-weight: 600; }
+  @media (max-width: 900px) { .te-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
 <body>
@@ -943,7 +966,7 @@ function alertActionHtml(a, cls = "btn xs") {
 function alertItemHtml(a, seen) {
   const code = alertCode(a), info = code ? findDemand(code) : null;
   const isSeen = a.severity === "aviso" && seen.has(a.id);
-  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : a.kind === "agent-stalled" ? "Squad" : "Squad"}</b>`;
+  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : /^prod/.test(a.kind || "") ? "Produtivo local" : /^test-env/.test(a.kind || "") ? "Ambiente de teste" : "Squad"}</b>`;
   const auditHref = `#/auditoria/alertas?${new URLSearchParams(Object.entries({ demanda: code || "", tipo: a.kind || "" }).filter(([, v]) => v))}`;
   return `<li class="${esc(a.severity)} ${isSeen ? "seen" : ""}" data-alert="${esc(a.id)}"><div class="t">${sevHtml(a.severity)} ${where}
       <div><b>${esc(a.title || "")}</b></div>
@@ -1021,7 +1044,7 @@ function findDemand(ref) {
   const m = /^d(\d+)$/i.exec(ref || "");
   return (m ? all[Number(m[1]) - 1] : null) || all.find(x => x.d.id === ref) || null;
 }
-const statusCls = s => (s.startsWith("Concluída") || s.startsWith("Entregue")) ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
+const statusCls = s => s.startsWith("Falha") ? "fail" : (s.startsWith("Concluída") || s.startsWith("Entregue")) ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
 const extLink = (url, text, cls = "") => `<a class="ext ${cls}" href="${esc(url || "#")}" target="_blank" rel="noopener">${text}<span class="sr-only"> (abre em nova aba)</span></a>`;
 const workingOn = id => state.runs.filter(r => r.demand === id && r.status === "trabalhando").map(r => AGENTS[r.agent]?.label || r.agent);
 const anyRunning = () => state.runs.some(r => r.status === "trabalhando");
@@ -1036,7 +1059,10 @@ function nextAction(info) {
   if (g) return { order: 1, urgent: true, g, alert: al, label: `Decidir ${g.gate} — ${hasKind(al, "cycle-limit") ? "3º ciclo de autocorreção" : "intervenção obrigatória"}`, href: `#/demandas/${code}/gates`, btn: `Decidir ${g.gate}` };
   if (info.vinfo?.st === "perguntas") { const n = (info.vinfo.val?.questions || []).length;
     return { order: 2, urgent: true, label: `Responder ${n} pergunta${n === 1 ? "" : "s"} do Arquiteto`, href: `#/demandas/${code}/validacao`, btn: "Responder" }; }
-  if (info.inReview) return { order: 3, label: `Revisar PR #${info.inReview.pr ?? "?"}`, href: `#/demandas/${code}`, ext: info.inReview.url, btn: `Revisar PR #${info.inReview.pr ?? "?"}` };
+  if (info.inReview) { const n = info.inReview.pr ?? "?", k = info.te?.k;
+    // D15 (§3.2): "Precisa de você" ganha "Pronto para testar" (testar e revisar o PR) e "Falha ao publicar".
+    const label = k === "ready" ? `Testar e revisar PR #${n}` : k === "failed" ? `Falha ao publicar no teste · revisar PR #${n}` : `Revisar PR #${n}`;
+    return { order: 3, label, href: `#/demandas/${code}`, ext: info.inReview.url, btn: `Revisar PR #${n}` }; }
   if (info.preStart && (!info.vinfo || info.vinfo.ready)) return { order: 4, label: "Iniciar", href: `#/demandas/${code}`, btn: "Iniciar" };
   if (info.preStart && info.vinfo?.st === "atrasada") return { order: 5, label: "Validação atrasada — aguardar ou iniciar com override", href: `#/demandas/${code}`, btn: "Ver validação" };
   return null;
@@ -1051,10 +1077,12 @@ function actionButtons(a, sm = true) {
 
 // Etapas (stepper) derivadas só de demandInfo().
 function stageOf(info) {
-  const steps = info.inBacklog || info.start?.fromBacklog ? ["Backlog", "Na fila", "Execução", "Gates", "Revisão (PR)", "Entregue"] : ["Registrada", "Validação", "Na fila", "Execução", "Gates", "Revisão (PR)", "Entregue"];
-  const off = steps.length === 6 ? -1 : 0;
+  // D15 (§3.2): "Pronto para testar" entre "Revisão (PR)" e "Entregue" — opcional ("pulado" se integrado sem teste).
+  const steps = info.inBacklog || info.start?.fromBacklog ? ["Backlog", "Na fila", "Execução", "Gates", "Revisão (PR)", "Pronto para testar", "Entregue"] : ["Registrada", "Validação", "Na fila", "Execução", "Gates", "Revisão (PR)", "Pronto para testar", "Entregue"];
+  const off = steps.length === 7 ? -1 : 0;
   let idx;
   if (info.delivered || info.status === "Concluída") idx = steps.length;
+  else if (info.inReview && (info.te ? info.te.k === "ready" || info.te.k === "divergent" : info.readyLog)) idx = 6 + off;
   else if (info.inReview || info.rejected || info.status.startsWith("Aprovada pelo Auditor")) idx = 5 + off;
   else if (info.gates.length) idx = 4 + off;
   else if (info.work.length) idx = 3 + off;
@@ -1069,8 +1097,9 @@ function stepperHtml(info) {
   const cur = Math.min(idx, steps.length - 1), all = idx >= steps.length;
   const why = info.canceled ? "cancelada" : info.paused ? "pausada" : info.rejected ? "devolvida pelo revisor" : info.status === "Devolvida" ? "devolvida pelo Auditor" : "";
   return `<ol class="stepper" style="--n:${steps.length}" aria-label="Etapas da demanda">${steps.map((s, i) => {
-    const st = all || i < cur ? "done" : i === cur ? (stop ? "stop" : "now") : "";
-    return `<li class="${st}" ${i === cur && !all ? `aria-current="step"` : ""}>${esc(s)}${i === cur && !all && why ? ` · ${why}` : ""}${st === "done" ? `<span class="sr-only"> (concluída)</span>` : ""}</li>`; }).join("")}</ol>
+    const skip = s === "Pronto para testar" && i < idx && !info.tested;
+    const st = skip ? "skip" : all || i < cur ? "done" : i === cur ? (stop ? "stop" : "now") : "";
+    return `<li class="${st}" ${i === cur && !all ? `aria-current="step"` : ""}>${esc(s)}${skip ? " · pulado" : ""}${i === cur && !all && why ? ` · ${why}` : ""}${st === "done" ? `<span class="sr-only"> (concluída)</span>` : ""}</li>`; }).join("")}</ol>
     <div class="stepper-legend">${all ? `Entregue (${steps.length} de ${steps.length})` : `${esc(steps[cur])}${why ? ` · ${why}` : ""} (${cur + 1} de ${steps.length})`}</div>`;
 }
 
@@ -1111,6 +1140,182 @@ function timelineHtml(pipe) {
 }
 const crumbs = items => `<nav class="crumbs" aria-label="Trilha"><ol>${items.map((it, i) => i < items.length - 1 ? `<li><a href="${it[1]}">${esc(it[0])}</a></li>` : `<li><span aria-current="page">${esc(it[0])}</span></li>`).join("")}</ol></nav>`;
 
+// ================= D15 (ADR-018, contrato ambiente-de-teste §3, §5): ambiente de teste compartilhado e produtivo local =================
+// Fonte: state.testEnv (/api/state) ou GET /api/test-env; resumo em live.testEnv (/api/live). Sem o recurso no servidor,
+// nada disto aparece (nem ações). Toda ação é um POST /api/test-env/request feito pelo humano — nada automático aqui.
+let testEnvApi = null, testEnvSupported = null, testEnvCheckedAt = 0, lastLiveTe = null;
+const TE_STATES = { livre: ["Livre", "○", "ok"], publicando: ["Publicando", "◷", "warn"], ocupado: ["Ocupado", "●", "accent"], falhou: ["Falhou", "■", "danger"], divergente: ["Divergente", "▲", "warn"] };
+const TE_PHASE = { guard: "verificação de isolamento", checkout: "checkout do commit", build: "build", up: "subida dos containers", health: "saúde dos serviços", smoke: "smoke test" };
+const TE_URLS = [["console", "Console de Checkout"], ["grafana", "Grafana"], ["jaeger", "Jaeger"], ["prometheus", "Prometheus"]];
+const TE_APIS = [["saga", "saga-orchestrator"], ["order", "order-service"], ["inventory", "inventory-service"], ["payment", "payment-service"], ["shipping", "shipping-service"]];
+function te() {
+  const o = state?.testEnv && typeof state.testEnv === "object" ? state.testEnv : testEnvApi;
+  return o && typeof o === "object" && TE_STATES[o.state] ? o : null;
+}
+const teQueue = o => (Array.isArray(o?.queue) ? o.queue : []).filter(x => x && x.demand);
+const tePos = (o, q) => Number(q?.position) > 0 ? Number(q.position) : teQueue(o).indexOf(q) + 1;
+// Situação de UMA demanda no ambiente de teste (sem findDemand: roda dentro de demandInfo).
+function teFor(id, code) {
+  const o = te(); if (!o) return null;
+  const is = r => !!r && (r === id || String(r).toUpperCase() === code);
+  if (is(o.demand)) {
+    if (o.state === "publicando") return { k: "publishing", o };
+    if (o.state === "ocupado") return { k: "ready", o, stale: !!o.stale };
+    if (o.state === "divergente") return { k: "divergent", o, stale: !!o.stale };
+    if (o.state === "falhou") return { k: "failed", o };
+  }
+  const q = teQueue(o).find(x => is(x.demand));
+  if (q) return { k: "queued", o, position: tePos(o, q) };
+  return { k: "none", o };
+}
+function teStatusLabel(t, rv) {
+  const pr = `PR #${rv?.pr ?? "?"}`;
+  if (!t) return `Em revisão · ${pr}`;
+  return { publishing: "Publicando no teste", ready: `Pronto para testar · ${pr}`, divergent: `Pronto para testar · ${pr} · ambiente divergente`, failed: "Falha ao publicar no teste",
+    queued: `Na fila do teste · posição ${t.position}` }[t.k] || `Em revisão · ${pr}`;
+}
+const teCode = ref => { if (!ref) return null; const o = te(); if (o && ref === o.demand && o.code) return o.code; const q = teQueue(o).find(x => x.demand === ref && x.code); return q ? q.code : findDemand(ref)?.code || String(ref); };
+const teStateHtml = st => { const [l, i, c] = TE_STATES[st] || ["—", "○", "muted"]; return `<span class="te-st ${c}"><span class="ic" aria-hidden="true">${i}</span>${l}</span>`; };
+const tePr = o => o?.pr != null && o.pr !== "" ? ` · ${o.prUrl ? extLink(o.prUrl, `PR #${esc(o.pr)}`) : `PR #${esc(o.pr)}`}` : "";
+const teCommit = c => c ? ` · commit <code>${esc(shortSha(c))}</code>` : "";
+function teLinksHtml(o, withApis) {
+  const u = o?.urls && typeof o.urls === "object" ? o.urls : {};
+  const main = TE_URLS.filter(([k]) => u[k]).map(([k, l]) => extLink(u[k], `${esc(l)} do teste`));
+  const apis = TE_APIS.filter(([k]) => u[k]).map(([k, l]) => extLink(u[k], esc(l)));
+  if (!main.length && !apis.length) return "";
+  return `<div class="te-links">${main.join("")}</div>${withApis && apis.length ? `<details id="te-apis"><summary style="cursor:pointer;font-size:12.5px;color:var(--accent)">APIs do teste (${apis.length})</summary><div class="te-links">${apis.join("")}</div></details>` : ""}`;
+}
+// Confirmações e mensagens das ações (no estado, não no nó — sobrevivem ao polling).
+const teAsk = {}, teMsg = {};
+const teMsgHtml = scope => teMsg[scope] ? `<p class="${teMsg[scope].ok ? "ok-msg" : "fail"}" style="font-size:13px;margin:8px 0 0" role="status">${esc(teMsg[scope].text)}</p>` : "";
+const teBtn = (scope, action, demand, label, cls = "btn xs") => `<button class="${cls}" data-te="${action}" data-scope="${esc(scope)}" data-demand="${esc(demand || "")}">${label}</button>`;
+const teAskBtn = (scope, action, label, cls = "btn xs") => `<button class="${cls}" id="te-ask-${esc(scope)}-${action}" data-te-ask="${action}" data-scope="${esc(scope)}">${label}</button>`;
+function teConfirmHtml(scope, demand, o) {
+  const a = teAsk[scope]; if (!a) return "";
+  const back = `<button class="btn xs" data-te-back="1" data-scope="${esc(scope)}">Voltar</button>`;
+  const code = teCode(o?.demand);
+  if (a === "reset-data") return `<div class="te-confirm danger" role="group" aria-label="Confirmar: apagar dados do teste">
+    <b>Apagar os dados do ambiente de teste?</b><p style="margin:4px 0 0">Remove o volume <code>checkout-teste_pgdata</code> (pedidos, estoque, pagamentos e envios do teste). O produtivo não é tocado.${o?.demand && o.state !== "livre" ? ` Em seguida o mesmo commit da ${esc(code)} é republicado.` : ""} Não dá para desfazer.</p>
+    <label for="te-reset-${esc(scope)}" style="display:block;margin-top:8px">Digite <code>APAGAR</code> para confirmar</label><input type="text" id="te-reset-${esc(scope)}" data-keep data-te-reset="${esc(scope)}" autocomplete="off" spellcheck="false" aria-describedby="te-reset-help-${esc(scope)}">
+    <p class="why" id="te-reset-help-${esc(scope)}">O botão só registra o pedido com a palavra exata.</p>
+    <div class="actions">${teBtn(scope, "reset-data", demand, "Apagar dados do teste", "btn xs danger")}${back}</div></div>`;
+  const txt = { publish: [`Publicar ${demand ? esc(teCode(demand)) : "a demanda"} no ambiente de teste?`, `Sobe o commit atual do PR no projeto <code>checkout-teste</code> (portas do produtivo + 10 000; console 18090). O produtivo não é tocado e os dados do teste são mantidos.${o && o.state !== "livre" && o.demand && teCode(o.demand) !== teCode(demand) ? ` O ambiente está com a ${esc(code)}: o pedido entra na fila na posição ${teQueue(o).length + 1}.` : ""}`, "Confirmar publicação", "btn xs primary"],
+    release: [`Liberar o ambiente de teste${code ? ` (${esc(code)})` : ""}?`, "Para os containers do teste e mantém os dados; se houver fila, o próximo pedido é publicado.", "Confirmar liberação", "btn xs primary"],
+    down: ["Derrubar o ambiente de teste?", "Remove os containers do teste para liberar memória; os dados (volume) são preservados.", "Confirmar derrubada", "btn xs primary"] }[a];
+  if (!txt) return "";
+  return `<div class="te-confirm" role="group" aria-label="Confirmar ação no ambiente de teste"><b>${txt[0]}</b><p style="margin:4px 0 0">${txt[1]}</p><div class="actions">${teBtn(scope, a, demand, txt[2], txt[3])}${back}</div></div>`;
+}
+// Cartão do ambiente (Painel e Produto): estado, ocupante, fila, links e ações Liberar / Derrubar / Apagar dados.
+function teCardHtml(scope, full) {
+  const o = te(); if (!o) return "";
+  const cls = TE_STATES[o.state][2], code = teCode(o.demand), q = teQueue(o), err = o.lastError && typeof o.lastError === "object" ? o.lastError : null;
+  const dl = code ? `<a href="#/demandas/${esc(code)}">${esc(code)}</a>` : "";
+  const head = o.state === "livre" ? "Ambiente de teste livre"
+    : o.state === "publicando" ? `Publicando: ${dl}${tePr(o)}${teCommit(o.commit)}`
+    : o.state === "ocupado" ? `Em teste: ${dl}${tePr(o)}${teCommit(o.commit)}`
+    : o.state === "falhou" ? `Falhou: ${dl}${tePr(o)}${err?.phase ? ` · fase ${esc(TE_PHASE[err.phase] || err.phase)}` : ""}`
+    : `Divergente: ${dl}${tePr(o)}${teCommit(o.commit)}`;
+  const when = o.state === "publicando" ? (o.startedAt || o.publishedAt) : o.publishedAt;
+  const lines = [];
+  if (o.state === "publicando") lines.push(`Fase: ${esc(TE_PHASE[o.phase] || o.phase || "iniciando")}${when ? ` · início ${ageSpan(when)}` : ""}`);
+  else if (o.state === "ocupado" || o.state === "divergente") lines.push(`${when ? `Publicado ${ageSpan(when)}` : "Publicado"}${o.stale ? ` · <span class="te-stale">▲ desatualizado</span>: o PR recebeu commits depois da publicação${o.prHead ? ` (PR agora em <code>${esc(shortSha(o.prHead))}</code>)` : ""}` : ""}`);
+  if (o.state === "divergente") lines.push("O log diz ocupado, mas os containers do teste não estão saudáveis (A5). Republique ou libere o ambiente.");
+  if (o.warning) lines.push(`<span class="te-stale">▲ Aviso:</span> ${esc(typeof o.warning === "string" ? o.warning : o.warning.detail || o.warning.message || JSON.stringify(o.warning))}`);
+  if (o.stopped && o.state !== "livre") lines.push("Containers do teste parados (dados preservados).");
+  if (o.state === "livre" && o.lastReleased && o.lastReleased.demand) { const lr = o.lastReleased;
+    lines.push(`Última liberação: ${esc(teCode(lr.demand))}${lr.reason ? ` · motivo ${esc({ delivered: "entregue", "review-rejected": "PR devolvido", canceled: "cancelada", human: "você liberou", obsolete: "pedido obsoleto" }[lr.reason] || lr.reason)}` : ""}${lr.at ? ` · ${ageSpan(lr.at)}` : ""}`); }
+  const hl = o.health && typeof o.health === "object" ? Object.entries(o.health).filter(([, v]) => v && typeof v === "object") : [];
+  const sick = hl.filter(([, v]) => (v.health && v.health !== "healthy") || (v.state && v.state !== "running"));
+  if (hl.length && (o.state === "ocupado" || o.state === "divergente")) lines.push(sick.length ? `<span class="te-stale">▲ ${sick.length} serviço${sick.length === 1 ? "" : "s"} sem saúde:</span> ${sick.map(([k, v]) => `<code>${esc(k)}</code> (${esc(v.health || v.state || "?")})`).join(", ")}` : `✓ ${hl.length} serviços saudáveis`);
+  if (o.state === "falhou" && err) lines.push(`${err.hint === "reset-data" ? "Os dados do teste têm migrações de outra demanda: apague os dados do teste para publicar. " : ""}${err.detail ? `<details id="te-err-${esc(scope)}"><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Detalhe da falha</summary><pre>${esc(String(err.detail).slice(0, 1500))}</pre></details>` : ""}`);
+  const busy = o.state === "publicando";
+  const acts = busy ? `<p class="why" style="margin-top:8px">Ações indisponíveis durante a publicação (uma operação por vez).</p>`
+    : `<div class="actions">${o.demand && o.state !== "livre" ? teAskBtn(scope, "release", "Liberar ambiente") : ""}${teAskBtn(scope, "down", "Derrubar")}${teAskBtn(scope, "reset-data", "Apagar dados do teste", "btn xs danger-outline")}</div>`;
+  return `<div class="te-card ${cls}" role="group" aria-labelledby="te-h-${esc(scope)}">
+    <h3 id="te-h-${esc(scope)}">${teStateHtml(o.state)} <span>${head}</span></h3>${full && o.project ? `<p class="muted" style="font-size:12px;margin-top:2px">projeto <code>${esc(o.project)}</code> · portas do produtivo + 10 000</p>` : ""}
+    ${lines.map(l => `<p>${l}</p>`).join("")}
+    ${o.state === "ocupado" || o.state === "divergente" ? teLinksHtml(o, full) : ""}
+    <p><b>Fila do teste:</b> ${q.length ? `${q.length} pedido${q.length === 1 ? "" : "s"}` : "vazia"}</p>
+    ${q.length ? `<ol class="te-queue">${q.map(x => { const c = x.code || teCode(x.demand); return `<li><span class="pos">${tePos(o, x)}º</span><a href="#/demandas/${esc(c)}">${esc(c)}</a>${x.pr != null ? `<span>PR #${esc(x.pr)}</span>` : ""}${x.requestedAt ? `<span class="muted">pedido ${ageSpan(x.requestedAt)}</span>` : ""}</li>`; }).join("")}</ol>` : ""}
+    ${acts}${teConfirmHtml(scope, o.demand || null, o)}${teMsgHtml(scope)}</div>`;
+}
+// Produtivo local: último prod-updated / prod-update-failed do log (§6, §8).
+function prodHtml() {
+  const e = [...(state?.log || [])].reverse().find(x => x.type === "prod-updated" || x.type === "prod-update-failed");
+  if (!e) return te() ? `<div class="te-card"><h3>Produtivo local</h3><p class="muted">Nenhuma atualização automática registrada ainda (acontece após cada merge na develop).</p></div>` : "";
+  const svcs = Array.isArray(e.services) ? e.services : [];
+  const from = e.from ? ` (antes <code>${esc(shortSha(e.from))}</code>)` : "";
+  if (e.type === "prod-updated") return `<div class="te-card ok" role="group" aria-labelledby="prod-h"><h3 id="prod-h"><span class="te-st ok"><span class="ic" aria-hidden="true">✓</span>Atualizado</span> <span>Produtivo local${teCommit(e.commit)}${from}</span></h3>
+    <p>${svcs.length ? `Serviços recriados: ${svcs.map(s => `<code>${esc(s)}</code>`).join(", ")}` : "Nenhum serviço reiniciado (mudança fora do código dos serviços)."}${e.durationSec != null ? ` · ${esc(e.durationSec)} s` : ""} · ${ageSpan(e.ts)}</p></div>`;
+  return `<div class="te-card danger" role="group" aria-labelledby="prod-h"><h3 id="prod-h"><span class="te-st danger"><span class="ic" aria-hidden="true">■</span>Falhou</span> <span>Atualização do produtivo${teCommit(e.commit)}${from}</span></h3>
+    <p>Fase ${esc(e.phase || "—")}${svcs.length ? ` · serviços: ${svcs.map(s => `<code>${esc(s)}</code>`).join(", ")}` : ""} · ${e.rolledBack === true ? "rollback feito: serviços voltaram à imagem anterior" : e.rolledBack === false ? "<b>sem rollback</b> (migração nova ou falha antes do build) — veja o bloqueio B5" : ""} · ${ageSpan(e.ts)}</p>
+    ${e.detail ? `<details id="prod-err"><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Detalhe da falha</summary><pre>${esc(String(e.detail).slice(0, 1500))}</pre></details>` : ""}</div>`;
+}
+function envSectionHtml(where) {
+  const card = teCardHtml(where, where === "produto"), prod = prodHtml();
+  if (!card && !prod) return "";
+  return `<section class="dsec" id="ambientes" aria-labelledby="h-amb-${where}"><h2 id="h-amb-${where}">Ambientes <span class="squad-sum">teste compartilhado e produtivo local</span></h2>
+    <div class="te-grid">${card ? `<div>${card}</div>` : ""}${prod ? `<div>${prod}</div>` : ""}</div>
+    ${where === "painel" && card ? `<p style="font-size:13px;margin:8px 0 0"><a href="#/produto/grafana">Ver links do teste e APIs em Produto</a></p>` : ""}</section>`;
+}
+// Bloco "Ambiente de teste" na página da demanda (PR aberto).
+function demandTeHtml(info) {
+  const t = info.te; if (!t || !info.inReview) return "";
+  const o = t.o, id = info.d.id, scope = id, n = esc(info.inReview.pr ?? "?"), occ = teCode(o.demand), err = o.lastError && typeof o.lastError === "object" ? o.lastError : null;
+  let body = "", acts = "";
+  if (t.k === "none") {
+    body = `<p style="margin:0;font-size:13px">Em revisão · PR #${n} — ainda não publicado. Publicar sobe o commit do PR num ambiente isolado para você testar antes do merge.
+      ${o.state === "livre" ? "O ambiente está livre." : `O ambiente está com a ${esc(occ || "outra demanda")} (${esc(TE_STATES[o.state][0].toLowerCase())}); seu pedido entra na fila na posição ${teQueue(o).length + 1}.`}</p>`;
+    acts = teAsk[scope] ? "" : teAskBtn(scope, "publish", "Publicar no ambiente de teste", "btn sm primary");
+  } else if (t.k === "queued") {
+    body = `<p style="margin:0;font-size:13px"><b>Na fila do teste · posição ${t.position}</b>${occ ? ` · em teste agora: <a href="#/demandas/${esc(occ)}">${esc(occ)}</a>${tePr(o)}` : ""}. A publicação começa sozinha quando o ambiente for liberado (pedido já feito por você).</p>`;
+    acts = teBtn(scope, "cancel", id, "Sair da fila", "btn sm");
+  } else if (t.k === "publishing") {
+    body = `<p style="margin:0;font-size:13px"><b>Publicando no teste</b>${teCommit(o.commit)} · fase ${esc(TE_PHASE[o.phase] || o.phase || "iniciando")}${o.startedAt || o.publishedAt ? ` · início ${ageSpan(o.startedAt || o.publishedAt)}` : ""}. Nenhuma ação necessária.</p>`;
+  } else if (t.k === "ready" || t.k === "divergent") {
+    const c = o.urls?.console;
+    body = `<p style="margin:0;font-size:13px"><b>Pronto para testar · PR #${n}</b>${teCommit(o.commit)}${o.publishedAt ? ` · publicado ${ageSpan(o.publishedAt)}` : ""}</p>
+      ${t.stale ? `<p class="notice" style="margin:8px 0 0">▲ <b>Desatualizado</b>: o PR recebeu commits depois da publicação (publicado <code>${esc(shortSha(o.commit))}</code>${o.prHead ? `, PR em <code>${esc(shortSha(o.prHead))}</code>` : ""}). Republique para testar a versão atual.</p>` : ""}
+      ${t.k === "divergent" ? `<p class="notice" style="margin:8px 0 0">▲ <b>Divergente</b>: os containers do teste não estão saudáveis (A5). Republique ou libere o ambiente.</p>` : ""}
+      ${teLinksHtml(o, false)}`;
+    acts = `${c ? extLink(c, "Abrir ambiente", "btn sm primary") : ""}${t.stale || t.k === "divergent" ? teBtn(scope, "publish", id, "Republicar", "btn sm") : ""}${teAskBtn(scope, "release", "Liberar ambiente", "btn sm")}`;
+  } else if (t.k === "failed") {
+    body = `<p style="margin:0;font-size:13px" class="fail"><b>Falha ao publicar no teste</b>${err?.phase ? ` · fase ${esc(TE_PHASE[err.phase] || err.phase)}` : ""}${teCommit(o.commit)}</p>
+      ${err?.hint === "reset-data" ? `<p style="margin:6px 0 0;font-size:13px">O banco do teste tem migrações de outra demanda: apague os dados do teste e tente de novo.</p>` : ""}
+      ${err?.detail ? `<details id="te-derr-${esc(id)}"><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Detalhe da falha</summary><pre>${esc(String(err.detail).slice(0, 1500))}</pre></details>` : ""}`;
+    acts = `${teBtn(scope, "publish", id, "Tentar de novo", "btn sm primary")}${teAskBtn(scope, "reset-data", "Apagar dados do teste", "btn sm danger-outline")}`;
+  }
+  return `<div class="te-box" role="group" aria-labelledby="te-dh-${esc(id)}"><h3 id="te-dh-${esc(id)}">Ambiente de teste</h3>${body}
+    ${acts && !teAsk[scope] ? `<div class="actions">${acts}</div>` : ""}${teConfirmHtml(scope, id, o)}${teMsgHtml(scope)}</div>`;
+}
+// Busca /api/test-env só quando /api/state não traz testEnv; 404/sem JSON = recurso ausente (nova tentativa a cada 60 s).
+async function fetchTestEnv() {
+  if (state?.testEnv && typeof state.testEnv === "object") { testEnvApi = null; testEnvSupported = true; return; }
+  if (testEnvSupported === false && Date.now() - testEnvCheckedAt < 60000) return;
+  testEnvCheckedAt = Date.now();
+  try {
+    const r = await fetch("/api/test-env", { cache: "no-store" });
+    const j = r.ok ? await r.json().catch(() => null) : null;
+    if (j && typeof j === "object" && TE_STATES[j.state]) { testEnvApi = j; testEnvSupported = true; }
+    else if (!r.ok && r.status < 500) { testEnvApi = null; testEnvSupported = false; }
+    else if (r.ok) { testEnvApi = null; testEnvSupported = false; }
+  } catch (e) { /* rede: mantém o último valor */ }
+}
+const teSum = o => o ? JSON.stringify([o.state || null, o.demand || null, !!o.stale, o.queueSize ?? teQueue(o).length]) : null;
+// Produto não é redesenhado pelo polling (iframe): só o cartão dos ambientes é atualizado, sem perder o campo APAGAR.
+function updateTeSlot(force) {
+  const s = $("#te-slot"); if (!s || (!force && editing())) return;
+  const html = envSectionHtml("produto"), key = html.replace(/<span class="age[^>]*>[^<]*<\/span>/g, "");
+  if (!force && s.dataset.k === key) return;
+  const keep = {}; s.querySelectorAll("[data-keep]").forEach(el => { if (el.id) keep[el.id] = el.value; });
+  const open = new Set([...s.querySelectorAll("details[open][id]")].map(el => el.id));
+  s.innerHTML = html; s.dataset.k = key;
+  for (const [k, v] of Object.entries(keep)) { const el = document.getElementById(k); if (el) el.value = v; }
+  s.querySelectorAll("details[id]").forEach(el => { if (open.has(el.id)) el.open = true; });
+  applyStale();
+}
+const rerender = () => route.view === "produto" ? updateTeSlot(true) : render();
+
 // ---- Painel (#/painel) ----
 function renderPainel() {
   routeTitle = route.parts[0] === "alertas" ? "Painel · Bloqueios e avisos" : "Painel";
@@ -1142,6 +1347,7 @@ function renderPainel() {
         <div class="act"><a class="btn sm" href="#/demandas/${x.code}/execucao">Ver execução</a></div></li>`; }).join("")}</ul>`
       : `<p class="muted">Nenhuma demanda em execução.</p>`}
   </section>
+  ${envSectionHtml("painel")}
   <section class="dsec" aria-labelledby="h-entregues"><h2 id="h-entregues">Entregues recentemente</h2>
     ${delivered.length ? `<ul class="rows">${delivered.map(x => `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>${reviewHtml(x)}</div>
       <div class="act">${x.delivered.pr ? extLink(x.delivered.url, `PR #${esc(x.delivered.pr)}`, "btn sm") : ""}</div></li>`).join("")}</ul>` : `<p class="muted">Nenhuma entrega por PR ainda.</p>`}
@@ -1183,7 +1389,7 @@ function renderDemanda(ref) {
   else if (info.preStart) next = `<div class="next-box ${a?.order === 2 ? "urgent" : ""}"><small>PRÓXIMA AÇÃO</small><h2>${esc(a ? a.label : "Aguardando a validação do Arquiteto")}</h2>
       ${a?.order === 2 ? `<p style="font-size:13px;margin:0">As perguntas estão na seção <a href="#/demandas/${code}/validacao">Validação</a>. Depois de responder, Iniciar fica disponível aqui.</p>` : ""}
       ${info.vinfo && !info.vinfo.ready ? `<p class="why">${esc(VSTATUS[info.vinfo.st] || "")}.</p>` : ""}${preStartHtml(info, false)}</div>`;
-  else if (a?.order === 3) next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>${esc(a.label)}</h2>${reviewHtml(info)}<div class="actions">${extLink(info.inReview.url, `Revisar PR #${esc(info.inReview.pr ?? "?")} no GitHub`, "btn primary")}</div></div>`;
+  else if (a?.order === 3) next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>${esc(a.label)}</h2>${reviewHtml(info)}<div class="actions">${extLink(info.inReview.url, `Revisar PR #${esc(info.inReview.pr ?? "?")} no GitHub`, "btn primary")}</div>${demandTeHtml(info)}</div>`;
   else if (alertsFor(id).find(x => x.severity === "bloqueio" && x.owner !== "humano")) { const b = alertsFor(id).find(x => x.severity === "bloqueio" && x.owner !== "humano");
     next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>Aguardando ${esc(who(b.owner))}: ${esc(b.action?.label || b.title)} · ${ageSpan(b.openedAt)}</h2><p style="margin:0;font-size:13px">${esc(b.rule || "")}. Nada depende de você agora.</p></div>`; }
   else next = `<div class="next-box"><small>PRÓXIMA AÇÃO</small><h2>Nada depende de você agora</h2><p style="margin:0;font-size:13px">${isClosed(info) ? `Demanda ${esc(info.status.toLowerCase())}.` : w.length ? `${esc(w.join(", "))} trabalhando.` : "Aguardando o próximo passo do Orquestrador."}${!isClosed(info) ? ` <a href="#/demandas/${code}/execucao">Ver execução</a>` : ""}</p></div>`;
@@ -1335,10 +1541,16 @@ function demandInfo(d, index) {
   const priority = [...controls].reverse().find(c => c.action === "reprioritize" && c.priority)?.priority || start?.priority || (inBacklog ? eff.priority : "normal");
   const preStart = !canceled && !done && !paused && !work.length && !start;
   const queued = !canceled && !done && !paused && !work.length && !!start;
+  // D15: ambiente de teste (só com o recurso no servidor) e se a demanda chegou a ser publicada no teste (passo "pulado").
+  const code = `D${index + 1}`;
+  const teInfo = inReview && !canceled && !paused ? teFor(d.id, code) : null;
+  const tested = related.some(e => e.type === "test-env-published");
+  const lastTe = related.filter(e => /^test-env-(publishing|published|failed|released)$/.test(e.type)).at(-1);
+  const readyLog = !!inReview && lastTe?.type === "test-env-published";
   const status = canceled ? "Cancelada" : delivered ? "Entregue" : legacyDone ? "Concluída" : paused ? "Pausada"
-    : inReview ? `Em revisão · PR #${inReview.pr ?? "?"}` : approvedOpeningPR ? "Aprovada pelo Auditor · abrindo PR" : rejectedIdle ? "Devolvida pelo revisor"
+    : inReview ? teStatusLabel(teInfo, inReview) : approvedOpeningPR ? "Aprovada pelo Auditor · abrindo PR" : rejectedIdle ? "Devolvida pelo revisor"
     : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
-  return { code: `D${index + 1}`, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
+  return { code, te: teInfo, tested, readyLog, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
 }
 // Confirmação pendente de "Cancelar demanda" (em andamento): fica no estado, não no nó, para sobreviver ao polling.
 const ctlConfirm = new Set();
@@ -1558,7 +1770,8 @@ function renderAuditoria() {
     const fid = fd ? (findDemand(fd)?.d.id || "__none__") : "";
     const rows = [...alertsNow().map(a => ({ ...a, _open: true })), ...alertsHistory().map(a => ({ ...a, _open: false }))]
       .filter(a => (!fid || a.demand === fid) && (!ft || kindsOf(a).includes(ft)) && (!fe || (fe === "aberto") === a._open));
-    const KIND = { "gate-return": "B1 · gate devolvido", "human-required": "B2 · decisão humana", "cycle-limit": "B3 · 3º ciclo", "triage-open": "B4 · triagem aberta", "low-confidence": "A1 · baixa confiança aceita", "agent-stalled": "A2 · sem progresso", "pr-waiting": "A3 · PR aguardando" };
+    const KIND = { "gate-return": "B1 · gate devolvido", "human-required": "B2 · decisão humana", "cycle-limit": "B3 · 3º ciclo", "triage-open": "B4 · triagem aberta", "low-confidence": "A1 · baixa confiança aceita", "agent-stalled": "A2 · sem progresso", "pr-waiting": "A3 · PR aguardando",
+      "prod-update-failed": "B5 · produtivo não atualizado", "test-env-failed": "A4 · falha ao publicar no teste", "test-env-divergent": "A5 · ambiente de teste divergente" };
     const opt = (v, t, cur) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(t)}</option>`;
     return `${head}<div class="filters" role="group" aria-label="Filtros de alertas">
       <div><label for="f-ademanda">Demanda</label><select id="f-ademanda" data-filter="demanda">${opt("", "Todas", fd)}${allInfos().slice().reverse().map(x => opt(x.code, `${x.code} · ${x.eff.title.slice(0, 40)}`, fd)).join("")}</select></div>
@@ -1579,7 +1792,8 @@ function renderAuditoria() {
   const legend = `<section class="card" id="legenda" style="margin-top:24px"><h3>Legenda: severidades, estados e limites (D14 · ADR-017)</h3>
     <div class="legend">
       <div>${sevHtml("bloqueio")}<span>a demanda não anda sem uma ação de alguém nomeado (B1 gate devolvido, B2 decisão humana obrigatória, B3 3º ciclo, B4 triagem com perguntas).</span></div>
-      <div>${sevHtml("aviso")}<span>anda, mas há risco ou atraso (A1 confiança &lt; ${Math.round(th.lowConfidence * 100)}% aceita, A2 sem progresso, A3 PR aguardando).</span></div>
+      <div>${sevHtml("aviso")}<span>anda, mas há risco ou atraso (A1 confiança &lt; ${Math.round(th.lowConfidence * 100)}% aceita, A2 sem progresso, A3 PR aguardando, A4 falha ao publicar no teste, A5 ambiente de teste divergente).</span></div>
+      <div>${sevHtml("bloqueio")}<span>B5 — atualização do produtivo local falhou sem atualização bem-sucedida depois (ação sua; D15 · ADR-018).</span></div>
       <div><span class="you">Você</span><span>item cuja ação é sua (owner = humano).</span></div>
       ${Object.entries(STATES).map(([k, [l]]) => `<div>${stateHtml(k)}<span>${esc({ "sem-progresso": `execução aberta sem atividade há ≥ ${Math.round(th.stalledSeconds / 60)} min`, interrompido: "processo encerrado sem “Finalizado” (última hora)", trabalhando: "execução aberta com atividade recente", aguardando: "sem execução ativa e esperando alguém (◷)", concluido: "última execução terminou há menos de 15 min", ocioso: "nenhuma execução recente" }[k] || l)}</span></div>`).join("")}
       <div><span class="state aguardando"><span class="ic" aria-hidden="true">◷</span>Espera</span><span>fica em destaque acima de ${Math.round(th.waitWarnSeconds / 60)} min.</span></div>
@@ -1606,6 +1820,7 @@ function renderProduto() {
     <select id="obs-product" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)">${products.map(p => `<option value="${esc(p.id)}" ${p.id === prod?.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     ${url ? extLink(url, `Abrir ${tname} em nova aba`) : ""}
   </div>
+  <div id="te-slot">${envSectionHtml("produto")}</div>
   <nav class="seg" aria-label="Ferramentas de observabilidade"><a href="#/produto/grafana${q}" ${tool === "grafana" ? `aria-current="page"` : ""}>Grafana · métricas</a><a href="#/produto/jaeger${q}" ${tool === "jaeger" ? `aria-current="page"` : ""}>Jaeger · traces</a></nav>
   ${url ? `<iframe src="${esc(url)}" title="${esc(tname)} · ${esc(prod.name)}" style="width:100%;height:calc(100vh - 300px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:var(--surface)"></iframe>`
         : `<p class="muted" style="margin-top:18px">Este produto não tem ${esc(tool)} configurado em docs/squad/project.json.</p>`}
@@ -1710,7 +1925,7 @@ function applyRoute() {
   const fresh = noticeFresh; noticeFresh = false;
   if (routeNotice && changed && routeKey !== null && !fresh) routeNotice = "";
   route = r; drawerAgent = AGENTS[r.params.get("agente")] ? r.params.get("agente") : null;
-  if (changed) { routeKey = k; flash = ""; flashErr = false; ctlConfirm.clear(); pendingFocus = true; syncMenu(); render(); }
+  if (changed) { routeKey = k; flash = ""; flashErr = false; ctlConfirm.clear(); for (const x in teAsk) delete teAsk[x]; for (const x in teMsg) delete teMsg[x]; pendingFocus = true; syncMenu(); render(); }
   else if (fresh) render();
   else renderDrawer(true);
 }
@@ -1836,6 +2051,12 @@ function classify(e) {
     if (e.type === "delivered") return N({ title: `${whoR}Entregue · ${pr} integrado`, body: [e.mergeCommit ? `commit ${shortSha(e.mergeCommit)}` : "", e.mergedBy ? `por ${e.mergedBy}` : ""].filter(Boolean).join(" ") || e.title || "", href });
     return N({ title: `${whoR}${pr} devolvido pelo revisor`, body: e.detail || e.title || "", href });
   }
+  // D15: ciclo do ambiente de teste e do produtivo (novidades; alertas A4/A5/B5 vêm do servidor).
+  if (e.type === "test-env-published") return N({ title: `${pre}Pronto para testar${e.pr != null ? ` · PR #${e.pr}` : ""}`, body: `Publicado no ambiente de teste${e.commit ? ` · commit ${shortSha(e.commit)}` : ""}`, href: dem() || "#/produto/grafana" });
+  if (e.type === "test-env-failed") return N({ title: `${pre}Falha ao publicar no teste${e.phase ? ` · fase ${TE_PHASE[e.phase] || e.phase}` : ""}`, body: String(e.detail || "").slice(0, 140), href: dem() || "#/produto/grafana" });
+  if (e.type === "test-env-released") return N({ title: `${pre}Ambiente de teste liberado`, body: e.reason ? `motivo: ${e.reason}` : "", href: dem() || "#/produto/grafana" });
+  if (e.type === "prod-updated") return N({ title: "Produtivo local atualizado", body: `${e.commit ? `commit ${shortSha(e.commit)} · ` : ""}${(e.services || []).length ? (e.services || []).join(", ") : "nenhum serviço reiniciado"}`, href: "#/produto/grafana" });
+  if (e.type === "prod-update-failed") return N({ title: "Falha ao atualizar o produtivo local", body: `fase ${e.phase || "—"}${e.rolledBack ? " · rollback feito" : ""}`, href: "#/produto/grafana" });
   if (e.type === "validation") return e.status === "perguntas"
     ? N({ title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), href: dem("validacao") || "#/demandas" })
     : N({ title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", href: dem() || "#/demandas" });
@@ -1969,12 +2190,14 @@ async function fetchState() {
   const st = await fetch("/api/state", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
   state = st; lastStateAt = Date.now();
   if (st.now && liveSupported !== true) syncClock(st.now);
+  await fetchTestEnv();   // D15: antes de desenhar (o status da demanda depende dele)
+  infoCache = { log: null, list: null };
   lastVersion = live?.version ?? st.version ?? lastVersion;
 }
 const markOk = () => { lastOkAt = Date.now(); everErr = false; };
 async function afterData() {
   renderUsage(); updateCounts(); renderGlobal();
-  if (routeKey !== null && !editing() && route.view !== "produto") await render(); else renderDrawer();
+  if (routeKey !== null && !editing() && route.view !== "produto") await render(); else { if (route.view === "produto") updateTeSlot(); renderDrawer(); }
   processNotifications(); announceDemandChanges();
 }
 async function refresh() {
@@ -1991,7 +2214,9 @@ async function poll() {
       const r = await fetch("/api/live", { cache: "no-store" });
       if (r.status === 404) { liveSupported = false; live = null; }
       else if (!r.ok) throw new Error(r.status);
-      else { const j = await r.json(); live = j; liveSupported = true; syncClock(j.now); markOk(); if (j.version && j.version !== lastVersion) needState = true; }
+      else { const j = await r.json(); live = j; liveSupported = true; syncClock(j.now); markOk(); if (j.version && j.version !== lastVersion) needState = true;
+        // D15: resumo do ambiente de teste no /api/live mudou → recarrega o estado completo (uma vez por mudança).
+        const lt = j.testEnv && typeof j.testEnv === "object" ? teSum(j.testEnv) : null; if (lt && lt !== lastLiveTe) { lastLiveTe = lt; if (lt !== teSum(te())) needState = true; } }
     }
     needState = needState || Date.now() - lastStateAt >= (liveSupported ? 15000 : 3000);
     if (needState) { await fetchState(); markOk(); liveKey = liveSig(); await afterData(); }
@@ -2002,7 +2227,7 @@ async function poll() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 // Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
-const STALE_SEL = "[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register]";
+const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register]";
 function applyStale() {
   const stale = isStale();
   document.querySelectorAll(STALE_SEL).forEach(el => {
@@ -2069,6 +2294,42 @@ document.addEventListener("click", async ev => {
   }
   if (ev.target.closest("[data-dismiss]")) { ev.target.closest(".toast").remove(); return; }
   if (ev.target.closest("#skip")) { ev.preventDefault(); document.querySelector("#main h1")?.focus(); return; }
+  // D15: ambiente de teste — confirmação no próprio bloco (sem confirm()); cada ação é UM POST do humano.
+  const tAsk = ev.target.closest("[data-te-ask]");
+  if (tAsk) { const sc = tAsk.dataset.scope; teAsk[sc] = tAsk.dataset.teAsk; delete teMsg[sc]; await rerender();
+    (document.getElementById(`te-reset-${sc}`) || document.querySelector(`[data-te][data-scope="${CSS.escape(sc)}"]`))?.focus(); return; }
+  const tBack = ev.target.closest("[data-te-back]");
+  if (tBack) { const sc = tBack.dataset.scope, a = teAsk[sc]; delete teAsk[sc]; const inp = document.getElementById(`te-reset-${sc}`); if (inp) { inp.removeAttribute("data-keep"); delete keepStore[inp.id]; }
+    await rerender(); document.getElementById(`te-ask-${sc}-${a}`)?.focus(); return; }
+  const tAct = ev.target.closest("[data-te]");
+  if (tAct) {
+    const sc = tAct.dataset.scope, action = tAct.dataset.te, demand = tAct.dataset.demand || null;
+    const body = { demand, action };
+    if (action === "reset-data") {
+      const inp = document.getElementById(`te-reset-${sc}`);
+      if ((inp?.value || "").trim() !== "APAGAR") { teMsg[sc] = { ok: false, text: "Digite APAGAR (em maiúsculas) para confirmar a remoção dos dados do teste." }; announce(teMsg[sc].text); await rerender(); document.getElementById(`te-reset-${sc}`)?.focus(); return; }
+      body.confirm = "APAGAR";
+    }
+    tAct.disabled = true;
+    let res = null, j = {};
+    try { res = await fetch("/api/test-env/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); j = await res.json().catch(() => ({})); } catch (e) { res = null; }
+    const code = demand ? teCode(demand) : null;
+    if (res && res.ok) {
+      delete teAsk[sc];
+      const inp = document.getElementById(`te-reset-${sc}`); if (inp) { inp.removeAttribute("data-keep"); delete keepStore[inp.id]; }
+      teMsg[sc] = { ok: true, text: j.duplicate ? `Pedido já registrado${code ? ` para a ${code}` : ""}: ${j.position ? `posição ${j.position} na fila do teste` : `ambiente ${TE_STATES[j.state]?.[0].toLowerCase() || "em andamento"}`}.` : { publish: j.position ? `Pedido registrado: ${code || "demanda"} na fila do teste · posição ${j.position}.` : `Publicação pedida${code ? ` para a ${code}` : ""}: o ambiente de teste está sendo atualizado.`,
+        cancel: `${code || "Demanda"} saiu da fila do teste.`, release: "Ambiente de teste liberado (dados preservados); se houver fila, o próximo é publicado.",
+        down: "Ambiente de teste derrubado (dados preservados).", "reset-data": "Pedido registrado: os dados do teste serão apagados (o produtivo não é tocado)." }[action] || "Pedido registrado." };
+    } else {
+      const st = res ? res.status : "sem conexão";
+      teMsg[sc] = { ok: false, text: res && res.status === 409 ? `Não foi possível publicar (409): ${j.error || "o PR da demanda não está aberto"}.`
+        : res && res.status === 400 ? `Pedido recusado (400): ${j.error || "confirmação ausente"}.` : res && res.status === 404 ? "O servidor ainda não oferece o ambiente de teste (404)." : `Falha ao registrar o pedido (${st}): ${j.error || "erro no servidor"}.` };
+    }
+    announce(teMsg[sc].text);
+    await refresh();
+    if (route.view === "produto") updateTeSlot(true);
+    return;
+  }
   const pco = ev.target.closest("[data-precancel-open]");
   if (pco) { const id = pco.dataset.precancelOpen; cancelOpen.add(id); delete cardMsg[id]; await render(); document.getElementById(`cn-${id}`)?.focus(); return; }
   const pcb = ev.target.closest("[data-precancel-back]");

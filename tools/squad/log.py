@@ -19,7 +19,10 @@ from datetime import datetime, timezone
 
 LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl")
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
-TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected"}
+TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected",
+         # D15 (ADR-018): ambiente de teste e produtivo — gravados por tools/squad/testenv.py e prod.py
+         "test-env-request", "test-env-publishing", "test-env-published", "test-env-failed", "test-env-released",
+         "test-env-reset", "prod-updated", "prod-update-failed"}
 
 
 def main() -> None:

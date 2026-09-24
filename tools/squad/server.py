@@ -30,6 +30,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import alerts as al  # noqa: E402  (D14, ADR-017: regras B1–B4/A1–A3 e estado dos agentes)
 from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das transcrições)
+import testenv as te  # noqa: E402  (D15, ADR-018: ambiente de teste compartilhado)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -547,10 +548,71 @@ def usage_sig() -> str:
         return ""
 
 
+# ---------------------------------------------------------------- D15: ambiente de teste (ADR-018)
+class TestEnvProbe:
+    """Saúde do checkout-teste (docker ps) e head do PR do ocupante (gh) em cache, renovados em segundo plano:
+    /api/live nunca espera docker/gh (orçamento de 300 ms do ADR-017). SQUAD_TESTENV_PROBE=0 desliga (testes)."""
+    TTL_HEALTH, TTL_PR = 15, 60
+
+    def __init__(self):
+        self.health, self.health_at, self.heads, self.busy = None, 0.0, {}, False
+        self.lock = threading.Lock()
+
+    def enabled(self) -> bool:
+        return os.environ.get("SQUAD_TESTENV_PROBE", "1") != "0"
+
+    def _refresh(self, ref):
+        try:
+            h = te.project_health(te.TEST_PROJECT)
+            head = None
+            if ref:
+                head = (te.pr_info(ref) or {}).get("headRefOid")
+            with self.lock:
+                self.health, self.health_at = h, time.time()
+                if ref:
+                    self.heads[str(ref)] = (time.time(), head)
+        finally:
+            self.busy = False
+
+    def get(self, s: dict) -> tuple[dict | None, str | None]:
+        if not self.enabled():
+            return None, None
+        ref = s.get("url") or s.get("pr") if s.get("demand") else None
+        now = time.time()
+        with self.lock:
+            head_entry = self.heads.get(str(ref)) if ref else None
+            stale = now - self.health_at > self.TTL_HEALTH or (ref and (not head_entry or now - head_entry[0] > self.TTL_PR))
+            if stale and not self.busy:
+                self.busy = True
+                threading.Thread(target=self._refresh, args=(ref,), daemon=True).start()
+            return self.health, (head_entry or (0, None))[1]
+
+
+TE_PROBE = TestEnvProbe()
+TE_SPAWNED: list[list[str]] = []   # comandos disparados (inspecionados pelos testes com SQUAD_TESTENV_SPAWN=0)
+
+
+def test_env_view() -> dict:
+    rows = read_log()
+    health, head = TE_PROBE.get(te.derive(rows))
+    return te.view(rows, health=health, pr_head=head, codes=al.demand_codes(rows))
+
+
+def te_spawn(*args: str):
+    """Dispara testenv.py em segundo plano (o servidor só grava o pedido; quem mexe no Docker é o testenv.py)."""
+    cmd = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "testenv.py"), *args]
+    TE_SPAWNED.append(list(args))
+    if os.environ.get("SQUAD_TESTENV_SPAWN", "1") == "0":
+        return
+    import subprocess
+    subprocess.Popen(cmd, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
 def data_version() -> str:
     """Muda quando log, gates, handoffs, inbox, .squad/runs ou o consumo da IA mudam (contrato §9.1)."""
     parts = (_sig(LOG), _dir_sig(GATES_DIR, "*.json"), _dir_sig(HANDOFFS_DIR, "*.md"),
-             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"), usage_sig())
+             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"), usage_sig(),
+             repr(TE_PROBE.health) if TE_PROBE.enabled() else "")
     return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
 
 
@@ -628,12 +690,14 @@ def compute(full: bool) -> dict:
         runs = collect_runs(now)
         rules = rules_cached()
         rows = read_log()
-        gate_alerts = list(rules.open.values())
+        test_env = test_env_view()
+        gate_alerts = list(rules.open.values()) + al.env_alerts(rows, test_env, rules.codes)
         agents, stalled = al.build_agents(runs, rules, rows, gate_alerts, now, orchestrator_view(runs, rules, now))
         alerts = al.with_age(al.sort_alerts(gate_alerts + stalled), now)
         out = {"now": datetime.fromtimestamp(now, timezone.utc).isoformat(timespec="seconds"),
                "version": data_version(), "thresholds": al.thresholds(),
-               "summary": al.summary(alerts, agents), "alerts": alerts}
+               "summary": al.summary(alerts, agents), "alerts": alerts,
+               "testEnv": test_env if full else te.live_summary(test_env)}
         if full:
             out["agents"] = agents
             out["alertsHistory"] = sorted(rules.history, key=lambda a: a.get("closedAt") or "", reverse=True)
@@ -984,7 +1048,10 @@ class Handler(SimpleHTTPRequestHandler):
                 "version": extra["version"], "thresholds": extra["thresholds"], "summary": extra["summary"],
                 "alerts": extra["alerts"], "alertsHistory": extra["alertsHistory"], "agents": extra["agents"],
                 "serverMs": extra["serverMs"],
+                "testEnv": extra["testEnv"],   # D15 — acréscimo (formato de GET /api/test-env)
             })
+        if self.path.startswith("/api/test-env"):
+            return self._json(test_env_view())
         if self.path.startswith("/api/usage"):
             return self._json({"usage": collect_usage()})
         if self.path.startswith("/api/project"):
@@ -1015,6 +1082,26 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/test-env/request"):
+            # D15: só o humano pede; o servidor grava `test-env-request` e dispara o testenv.py em segundo plano.
+            data = json.loads(raw or b"{}")
+            action, demand = data.get("action"), data.get("demand")
+            if demand and not any(e.get("id") == demand and e.get("type") == "task" for e in read_jsonl(LOG)):
+                return self._json({"error": "demanda não encontrada"}, 404)
+            try:
+                res = te.request(demand, action, data.get("confirm"))
+            except te.RequestError as e:
+                return self._json({"error": str(e)}, e.status)
+            if not res.get("duplicate"):
+                if action == "release":
+                    te_spawn("release", "--demand", demand, "--reason", "human")
+                elif action == "down":
+                    te_spawn("down")
+                elif action == "reset-data":
+                    te_spawn("reset-data")
+                else:
+                    te_spawn("reconcile")
+            return self._json({k: v for k, v in res.items() if v is not None}, 202)
         if self.path.startswith("/api/demand/clarify"):
             data = json.loads(raw or b"{}")
             rows = read_jsonl(LOG)
@@ -1048,6 +1135,10 @@ class Handler(SimpleHTTPRequestHandler):
             entry = self._append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": data.get("id"),
                                       "action": action, "priority": data.get("priority"),
                                       "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
+            if action == "cancel":
+                s = te.derive(read_jsonl(LOG))   # D15: cancelada libera o teste / sai da fila (reconcile)
+                if s["demand"] == data.get("id") or any(q["demand"] == data.get("id") for q in s["queue"]):
+                    te_spawn("reconcile")
             return self._json(entry, 201)
         if self.path.startswith("/api/demand/edit"):
             data = json.loads(raw or b"{}")

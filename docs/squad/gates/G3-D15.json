@@ -1,0 +1,53 @@
+{
+  "gate": "G3",
+  "demand": "518f89f27ae8",
+  "from": "qa",
+  "to": "release",
+  "cycle": 1,
+  "handoffs": ["46ca110545a8"],
+  "evidence_events": ["527ae303972f"],
+  "commits": ["c3bb7ee", "13bd899", "ddbfc63", "79446b3"],
+  "recommendation": "APPROVE",
+  "confidence": 0.85,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Suítes da squad (docker/gh falsos)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "python3 -m unittest tests.squad.test_ambiente_teste_d15 (41 OK), test_e2e_compose_seguro_d15 (11 OK, run.sh real com docker FALSO no PATH), test_alertas_d14 (20 OK), test_governanca_d14_qa (19 OK); python3 tests/squad/test_entrega_por_pr.py (todas as verificações passaram). after_review testado com Popen simulado (nada disparado em segundo plano; .squad/ não criado no worktree)"},
+    {"name": "Condição do G2: R6 corrigido no run.sh", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/e2e/run.sh: único 'docker' executável na linha 524 dentro de e2e_compose() (args=(compose -p \"$E2E_COMPOSE_PROJECT\") + --env-file opcional); reinício = e2e_compose kill/start saga-orchestrator (não recria); projeto vazio → recusa; checkout-saga fora do CI sem E2E_ALLOW_PROD=1 → SKIP; linha 759 é só 'command -v docker'. CI: compose tem 'name: checkout-saga' e CI definido → reinício no projeto certo. make e2e-teste passa E2E_COMPOSE_PROJECT=checkout-teste + --env-file infra/teste/teste.env"},
+    {"name": "CA1/CA4: produtivo intacto (leitura real)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "bash tests/squad/prova_produtivo_intacto.sh antes.json e depois de todas as verificações '--compare antes.json': config --hash da branch == cópia principal (11 serviços) == com.docker.compose.config-hash dos 11 containers em execução; digest b80841ef7cc18130 (o MESMO do G2 → nada mudou no produtivo desde o G2), pgdata CreatedAt 2026-09-23T18:56:12-03:00; 'RESULTADO: produtivo intacto'; docker ps antes/depois: mesmos containers, todos healthy"},
+    {"name": "CA2/CA5/CA11/CA12/CA14/CA16/CA18", "status": "pass", "weight": 3, "blocking": true,
+     "source": "testes existentes e verdes: test_portas_adulteradas_recusadas_sem_up (CA2), test_publish_sem_pedido_do_humano_CA5 + 409 em test_formato_api_e_http (CA5), test_republicar_desatualizado_nao_passa_pela_fila_CA11, test_publicar_fila_liberar_e_proximo released reason=delivered (CA12), TestProd.test_so_docs_nada_CA14, test_zz_CA16_nenhum_comando_destrutivo + test_e2e_compose_seguro_d15 (CA16), test_formato_api_e_http /api/state antigo válido + test_alertas_d14 (CA18); CA2 real (check-ports) já verificado no G2"},
+    {"name": "CA13/CA15 (simulados)", "status": "validate", "weight": 2, "blocking": false,
+     "source": "TestProd.test_so_o_servico_alterado_CA13, test_rollback_CA15, test_migracao_sem_rollback_B5_R4 verdes com docker simulado; execução real só ocorre no primeiro merge com código de serviço após a D15"},
+    {"name": "CA3/CA6-CA10/CA17 com o checkout-teste no ar", "status": "validate", "weight": 2, "blocking": false,
+     "source": "lógica coberta por testes (fila, obsoleto, APAGAR, lock, republicação sem down -v, e2e com -p checkout-teste); a execução real exige subir o checkout-teste (autorização humana) — tratada como condição pós-merge (ver rationale)"},
+    {"name": "Critério padrão G3: e2e 7 cenários", "status": "validate", "weight": 2, "blocking": false,
+     "source": "D15 não altera services/**; run.sh mudou só no cenário de reinício (coberto por test_e2e_compose_seguro_d15). Não rodado de verdade por restrição de segurança; o CI do PR roda 'docker compose up' + run.sh (CI definido, projeto checkout-saga do runner)"},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 1, "blocking": false,
+     "source": "git diff origin/develop...HEAD: 24 arquivos, todos do escopo do contrato. Por commit: Arquiteto docs/adr+contracts; DevOps Dockerfile/Makefile/compose/infra/teste; Orquestrador tools/squad, AGENTS.md, prompts/plantao.md; Frontend squad-control; QA tests/e2e, tests/squad, tests/ui; Auditor gates. Ressalva do G2 (Orquestrador em tests/squad) sanada: o QA adotou e ampliou test_ambiente_teste_d15.py (13bd899, 79446b3) e a linha de test_alertas_d14.py segue autorizada pelo §5.1"},
+    {"name": "Rastreabilidade", "status": "pass", "weight": 1, "blocking": false,
+     "source": "decisions.jsonl demand=518f89f27ae8: validação(5 perguntas)→respostas humanas→start→task→ADR-018→handoff Arquiteto→G1 ce03ac19e9da→handoffs 2ab9dbbf31f2/91ee4966ac66/0c6324e3bd07→G2 ec9e873bd056→defeito f6ed87f48c62→handoff QA 46ca110545a8→evidência 527ae303972f; commits com prefixo 'D15'; plantão chama reconcile (plantao.sh + prompts/plantao.md, risco do G2 fechado); checklist tests/ui/checklist-ambiente-teste-d15.md com roteiro humano"}
+  ],
+  "open_risks": [
+    "CAs reais pendentes (CA3, CA6-CA10, CA13/CA15 reais, CA17 real): condição pós-merge com o humano, antes do próximo merge com código de serviço.",
+    "R2 — SEQUÊNCIA OBRIGATÓRIA: 'python3 tools/squad/prod.py baseline' na cópia principal logo após o merge da D15 e antes de qualquer outro merge. Sem baseline as imagens atuais não têm o rótulo de revisão e o próximo review-sync reconstrói e recria os 5 serviços; baseline antes do merge incluiria o Dockerfile no diff.",
+    "O merge da própria D15 é tratado pelo gitflow antigo já carregado (sem after_review): a primeira atualização automática do produtivo acontece no merge seguinte — por isso o baseline tem de vir antes dele.",
+    "after_review encadeia 'prod.py update --auto ; testenv.py reconcile' com ';': o reconcile roda mesmo se a atualização do produtivo falhar (B5 abre; o teste é outro projeto, então não agrava o produtivo). Aceito; melhoria futura: não publicar o próximo da fila com B5 aberto.",
+    "make down continua 'docker compose down -v' sem -p (pré-existente, fora dos CAs): apaga checkout-saga_pgdata se rodado da cópia principal. Recomendação ao DevOps em demanda futura.",
+    "R10: o servidor da 7070 não recarrega tools/squad/** nem squad-control/**; o humano reinicia o Squad Control após o merge.",
+    "Erratas documentais do G2 (locks em .squad/, campos aditivos do GET /api/test-env, down mantém ocupante com stopped=true) seguem recomendadas ao Arquiteto; não bloqueiam."
+  ],
+  "post_merge_steps": [
+    "1. (Orquestrador) Na cópia principal (develop, já com o merge da D15): 'python3 tools/squad/prod.py baseline' — antes de qualquer outro merge.",
+    "2. (Humano) Reiniciar o Squad Control da 7070 para carregar server.py/testenv/telas novas.",
+    "3. (Humano + QA) 'bash tests/squad/prova_produtivo_intacto.sh /tmp/fp-antes.json'.",
+    "4. (Humano) Primeira publicação real no checkout-teste pelo Squad Control (demanda com PR aberto): conferir CA6 (saúde 18080-18084/18090, Pronto para testar), CA3 (rede/volume/imagens checkout-teste*, pedido de :18081 ausente em :8081, trace só no :26686), CA7/CA8 (2º pedido na fila sem recriar; PR fechado → obsolete), CA9 (pedido persiste após republicar), CA10 (apagar só com APAGAR), CA17 ('make e2e-teste').",
+    "5. (Humano + QA) 'bash tests/squad/prova_produtivo_intacto.sh /tmp/fp-depois.json --compare /tmp/fp-antes.json' → 'RESULTADO: produtivo intacto'; registrar como evidência da D15.",
+    "6. CA13/CA15 reais: observar no primeiro merge seguinte que mude services/** (prod-updated só no serviço alterado, StartedAt dos demais e pgdata inalterados); CA15 real só se o humano autorizar um teste de rollback.",
+    "Se qualquer passo 4-5 falhar: SQUAD_PROD_AUTOUPDATE=0 no ambiente do plantão/review-sync e abrir defeito na D15 (hotfix) antes do próximo merge."
+  ],
+  "human_required": false,
+  "rationale": "A condição bloqueante do G2 (R6) foi corrigida e verificada no código e por teste com o run.sh real e docker falso: todo 'docker compose' passa por e2e_compose com -p, o reinício é kill+start e o produtivo é pulado fora do CI. Todas as suítes da squad estão verdes (41+11+20+19 + script). O produtivo foi provado intacto por leitura real antes e depois desta auditoria, com o mesmo digest do G2, e o compose da branch gera config-hash idêntico ao dos containers em execução — o merge em si não recria nada. Os CAs que dependem do checkout-teste no ar ficam como condição pós-merge com o humano, e não como bloqueio, porque: (a) o merge não toca o produtivo (CA1 provado) e o teste só sobe por pedido explícito do humano (CA5); (b) o prod.py só age a partir do merge seguinte, então existe uma janela segura para o baseline e para a validação real com prod-fingerprint antes/depois; (c) subir o checkout-teste a partir da branch antes do merge exigiria o mesmo aval humano e não reduziria o risco, já que o ambiente real só existe de fato na cópia principal após o merge; (d) há chave de desligamento (SQUAD_PROD_AUTOUPDATE=0). O risco é moderado (ferramenta que opera o produtivo automaticamente) e é contido pela sequência baseline → validação real → próximo merge."
+}

@@ -1,4 +1,5 @@
-.PHONY: up down ps logs build test e2e restart-orchestrator kill-orchestrator squad
+.PHONY: up down ps logs build test e2e restart-orchestrator kill-orchestrator squad \
+	teste-publicar teste-status teste-liberar teste-derrubar teste-apagar-dados teste-config e2e-teste prod-atualizar
 
 ## Sobe toda a stack (infra + observabilidade + serviços), (re)construindo as imagens.
 up:
@@ -60,3 +61,45 @@ plantao: ## Plantão do Orquestrador fora da sessão (SQUAD_RUNNER=claude|codex)
 
 run-agent: ## make run-agent ROLE=qa TASK="..." [RUNNER=codex]
 	SQUAD_RUNNER=$(or $(RUNNER),claude) python3 tools/squad/run_agent.py $(ROLE) "$(TASK)"
+
+## ---------------------------------------------------------------------------
+## Ambiente de teste compartilhado e produtivo local (D15, ADR-018,
+## docs/contracts/ambiente-de-teste.md). O teste é o projeto Compose
+## checkout-teste (portas = produtivo + 10000); o produtivo é o checkout-saga.
+## Toda operação que muda containers delega a tools/squad/ (testenv.py/prod.py):
+## nenhum alvo aqui roda "docker compose up/down" direto no teste ou no produtivo.
+## ---------------------------------------------------------------------------
+TESTE_COMPOSE := docker compose -p checkout-teste --env-file infra/teste/teste.env
+TESTE_E2E_ENV := ORDER_URL=http://localhost:18081 SAGA_URL=http://localhost:18080 \
+	INVENTORY_URL=http://localhost:18082 PAYMENT_URL=http://localhost:18083 \
+	SHIPPING_URL=http://localhost:18084 JAEGER_URL=http://localhost:26686 \
+	E2E_COMPOSE_PROJECT=checkout-teste E2E_COMPOSE_ENV_FILE=infra/teste/teste.env
+
+teste-publicar: ## make teste-publicar DEMAND=<id> — pede (como humano) a publicação do PR da demanda no teste
+	@test -n "$(DEMAND)" || { echo "uso: make teste-publicar DEMAND=<id>"; exit 2; }
+	python3 tools/squad/testenv.py request --action publish --demand $(DEMAND)
+	python3 tools/squad/testenv.py reconcile
+
+teste-status: ## Estado do ambiente de teste (ocupante, fila, saúde) — só leitura
+	python3 tools/squad/testenv.py status
+
+teste-liberar: ## make teste-liberar DEMAND=<id> — libera o teste (stop, mantém dados) e publica o próximo da fila
+	@test -n "$(DEMAND)" || { echo "uso: make teste-liberar DEMAND=<id>"; exit 2; }
+	python3 tools/squad/testenv.py release --demand $(DEMAND) --reason human
+
+teste-derrubar: ## Derruba o teste sem -v (libera memória, preserva os dados)
+	python3 tools/squad/testenv.py down
+
+teste-apagar-dados: ## make teste-apagar-dados CONFIRMA=APAGAR — apaga o volume do teste (nunca o produtivo)
+	@test "$(CONFIRMA)" = "APAGAR" || { echo "recusado: apagar os dados do teste exige CONFIRMA=APAGAR"; exit 2; }
+	python3 tools/squad/testenv.py request --action reset-data --confirm APAGAR
+	python3 tools/squad/testenv.py reset-data
+
+teste-config: ## Configuração resolvida do teste (só leitura; base do guard de portas/imagens)
+	$(TESTE_COMPOSE) config
+
+e2e-teste: ## Suíte e2e contra o ambiente de teste (18080-18084, Jaeger 26686), sem tocar o produtivo
+	$(TESTE_E2E_ENV) bash tests/e2e/run.sh
+
+prod-atualizar: ## Atualiza o produtivo (checkout-saga) só nos serviços alterados desde o último deploy
+	python3 tools/squad/prod.py update
