@@ -21,7 +21,7 @@
     --bg: #F7F7F5; --surface: #FFFFFF; --raised: #F0F1F2; --text: #1B1D21; --muted: #4B5058; --dim: #646A73;
     --line: #E3E4E6; --line-strong: #858B94; --accent: #0B5F6A; --accent-soft: #E6F1F2; --danger: #A4262C; --danger-soft: #FBEDED;
     --warn: #8A5300; --warn-soft: #FDF3E3; --ok: #2E6B3F; --ok-soft: #EAF3EC; --on-accent: #FFFFFF;
-    --shadow: 0 8px 24px rgb(0 0 0 / .12); --hdr-h: 56px;
+    --shadow: 0 8px 24px rgb(0 0 0 / .12); --hdr-h: 56px; --hdr-stick: var(--hdr-h);
     color-scheme: light;
   }
   :root[data-theme="dark"] {
@@ -75,7 +75,7 @@
   .toc { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 22px 0 0; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; background: var(--surface); }
   .toc a { color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
   .toc a[aria-current] { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 6px; }
-  .dsec { margin-top: 26px; scroll-margin-top: calc(var(--hdr-h) + var(--usage-h, 0px) + 56px); }
+  .dsec { margin-top: 26px; scroll-margin-top: calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px) + 56px); }
   .dsec > h2 { font-size: 16px; font-weight: 600; margin: 0 0 10px; padding-top: 12px; border-top: 1px solid var(--text); }
   .dsec > h2:focus { outline: none; } .dsec > h2:focus-visible { outline: 2px solid var(--accent); }
   .rows { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
@@ -254,7 +254,7 @@
   /* D11 (ADR-014): faixa de consumo da IA — fixa no topo de <main>, um bloco por provedor (nunca somados).
      Cada bloco = 3 linhas (cabeçalho, 5 h, semana), barra na mesma linha do texto: <= 72 px a partir de 600 px.
      O texto encurta por container query conforme a largura do bloco; o completo fica no title e no aria-valuetext. */
-  .ai-usage { position: sticky; top: var(--hdr-h); z-index: 5; margin: -28px -32px 22px; padding: 7px 32px; background: var(--surface); border-bottom: 1px solid var(--line);
+  .ai-usage { position: sticky; top: var(--hdr-stick, var(--hdr-h)); z-index: 5; margin: -28px -32px 22px; padding: 7px 32px; background: var(--surface); border-bottom: 1px solid var(--line);
               display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px; font-size: 12px; line-height: 16px; }
   .u-prov { container-type: inline-size; min-width: 0; }
   .u-prov + .u-prov { border-left: 1px solid var(--line2); padding-left: 28px; }
@@ -294,6 +294,8 @@
     .brand { min-height: 48px; } .brand span { display: none; }
     .bell { height: 48px; }
     header { position: relative; } .hdr-actions { position: static !important; }
+    /* D14-QA-4: cabeçalho não fixo abaixo de 600 px → a faixa de consumo (e o sumário da demanda) grudam no topo, não a --hdr-h. */
+    :root { --hdr-stick: 0px; }
     .notif-panel { top: 100%; left: 16px; right: 16px; width: auto; max-height: 70vh; }
     .strip { flex-wrap: wrap; gap: 2px 12px; padding: 7px 16px; }
     main { padding: 20px 16px; }
@@ -693,7 +695,13 @@ const alertHref = a => { const h = a.action?.href || ""; return h.startsWith("?"
 // com folga de 1e-9 para 0,7 vindo de conta de ponto flutuante. A exibição em % continua arredondada (pct).
 const isLowConf = c => typeof c === "number" && c < 0.70 - 1e-9;
 const ruleNeedsHuman = (g, returns = 0) => !!g && (!!g.human_required || isLowConf(g.confidence) || g.risk === "alto" || returns > thresholds().maxAutoCycles);
-const pct = c => c == null ? "—" : `${Math.round(c * 100)}%`;
+// D14-QA-1: inteiro, salvo quando o arredondamento esconderia que o valor está abaixo do limite (0,695 → "69,5%", não "70%").
+const pct = c => {
+  if (typeof c !== "number" || !isFinite(c)) return "—";
+  const lim = Number(thresholds().lowConfidence) || 0.7, r = Math.round(c * 100);
+  if (c < lim - 1e-9 && r >= Math.round(lim * 100)) return `${(Math.floor(c * 1000 + 1e-6) / 10).toFixed(1).replace(".", ",")}%`;
+  return `${r}%`;
+};
 function demandEndEvent(info) {
   if (!info) return null;
   if (info.canceled) return info.related.find(e => e.type === "control" && e.action === "cancel") || { ts: info.d.ts, agent: "humano" };
@@ -984,7 +992,7 @@ function demandSteps(active) {
       if (s) { s.st = "done"; s.entry = e; } else steps.push({ id: AGENTS[e.agent]?.ini || "•", agent: e.agent, title: `${AGENTS[e.agent]?.label || e.agent}: ${e.title}`, st: "done", entry: e, ts: e.ts });
     } else if (e.type === "gate") {
       const s = [...steps].reverse().find(s => s.agent === "auditor" && s.st !== "done");
-      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${Math.round((e.confidence || 0) * 100)}%`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
+      const item = { id: e.gate, agent: "auditor", title: `Auditor avaliou ${e.gate}: ${e.recommendation} · ${pct(e.confidence || 0)}`, st: e.recommendation === "APPROVE" ? "done" : "fail", entry: e, ts: e.ts };
       if (s) Object.assign(s, item); else steps.push(item);
     }
   }
@@ -1069,8 +1077,8 @@ function stepperHtml(info) {
 // Recomendação do Auditor (bloco) e decisão humana POR GATE EXIBIDO (X11: data-gate/data-demand/nota próprios).
 const gateMsg = {};
 function recoHtml(g) {
-  const conf = g?.confidence != null ? Math.round(g.confidence * 100) : null;
-  return `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf}% confiança</span>` : ""}</div>
+  const conf = g?.confidence != null ? pct(g.confidence) : null;
+  return `<div class="reco"><div class="row"><small>RECOMENDAÇÃO DO AUDITOR · ${esc(g.gate)}</small>${conf != null ? `<span class="conf">${conf} confiança</span>` : ""}</div>
     <h2>${g.recommendation === "APPROVE" ? `Encaminhar para ${esc(AGENTS[g.to]?.label || g.to || "próxima etapa")}` : `Devolver para ${esc(AGENTS[g.from]?.label || g.from || "origem")}`}</h2>
     <div class="bar"><div style="width:${conf ?? 0}%"></div></div>
     <p>Risco ${esc(g.risk || "—")}. ${esc((g.open_risks || []).join(" ") || g.rationale || g.detail || "")}</p></div>`;
@@ -1185,7 +1193,7 @@ function renderDemanda(ref) {
   const gateEvs = info.related.filter(e => e.type === "gate");
   const lastIdx = {}; gateEvs.forEach((e, i) => { lastIdx[e.gate] = i; });
   const gatesHtml = gateEvs.length ? gateEvs.map((e, i) => { const h = humanFor(e.gate, id, e.ts, gateEvs.slice(i + 1).find(x => x.gate === e.gate)?.ts); const file = lastIdx[e.gate] === i ? state.gates.find(f => f.demand === id && f.gate === e.gate) : null;
-    return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(e.gate)} · <span class="${e.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(e.recommendation)}</span> · ${Math.round((e.confidence || 0) * 100)}% · risco ${esc(e.risk || "—")}</b><span class="muted" style="font-size:12px">${hhmm(e.ts)}</span></div>
+    return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>${esc(e.gate)} · <span class="${e.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(e.recommendation)}</span> · ${pct(e.confidence || 0)} · risco ${esc(e.risk || "—")}</b><span class="muted" style="font-size:12px">${hhmm(e.ts)}</span></div>
       ${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}
       ${e.detail ? `<p class="muted" style="font-size:13px;margin:6px 0">${esc(e.detail)}</p>` : ""}
       <details id="gd-${id}-${i}"><summary style="cursor:pointer;font-size:13px;color:var(--accent)">Evidências (${(e.evidences || []).length})${file ? " e parecer completo" : ""}</summary>${evidencesHtml(file?.evidences || e.evidences)}${file ? `<p class="muted" style="font-size:13px">${esc(file.rationale || "")}</p>${(file.open_risks || []).length ? `<ul style="font-size:13px">${file.open_risks.map(r => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}` : ""}</details>
@@ -1225,7 +1233,7 @@ function renderDemanda(ref) {
   ${stepperHtml(info)}
   ${alertsFor(id).length ? `<div class="dem-alerts" role="region" aria-label="Bloqueios e avisos da ${esc(code)}"><ul class="alist">${alertsFor(id).map(x => alertItemHtml(x, seenAlerts.get())).join("")}</ul></div>` : ""}
   ${next}
-  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-h) + var(--usage-h, 0px));z-index:4">${SECTIONS.map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${SECTIONS.map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
   <section class="dsec" id="sec-execucao" aria-labelledby="h-execucao"><h2 id="h-execucao" tabindex="-1">Execução</h2>
     <div class="sub" style="margin-top:0">${esc(now ? `Agora: ${now.title}` : isClosed(info) ? `Demanda ${info.status.toLowerCase()}.` : info.preStart || info.inBacklog ? "Ainda não iniciada." : "Aguardando o próximo passo do Orquestrador.")}</div>
     ${involved.length ? `<div class="mrow" style="margin:10px 0 0"><span class="lbl">Agentes envolvidos:</span></div><div class="squad" style="margin-bottom:12px">${involved.filter(ag => ROLES.includes(ag)).map(ag => agentCard(agentOf(ag))).join("")}</div>` : ""}
@@ -1458,7 +1466,7 @@ function renderDemandas() {
           ${x.queued ? `<span class="tag backlog">${qpos[x.d.id]}º na fila</span>` : ""}
           ${x.eff.kind ? `<span class="tag">${esc(KINDS[x.eff.kind]?.tag || x.eff.kind)}</span>` : ""}<span class="tag">prioridade ${esc(x.priority)}</span>
           ${x.issue ? extLink(x.issue.url, `issue #${esc(x.issue.number)}`, "tag") : ""}${pr?.pr ? extLink(pr.url, `PR #${esc(pr.pr)}`, "tag") : ""}
-          ${x.gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${Math.round((g.confidence || 0) * 100)}%</span>`).join("")}</div>
+          ${x.gates.map(g => `<span class="tag ${g.recommendation === "APPROVE" ? "pass" : "fail"}">${esc(g.gate)} ${esc(g.recommendation)} ${pct(g.confidence || 0)}</span>`).join("")}</div>
         ${x.last ? `<div class="muted" style="font-size:12px;margin-top:3px">último passo: ${esc(AGENTS[x.last.agent]?.label || x.last.agent)} — ${esc(x.last.title)}</div>` : ""}</div>
         <div class="act">${a ? actionButtons({ ...a, info: x }) : ""}</div></li>`; }).join("")}</ul>`
     : `<p class="muted">Nenhuma demanda neste filtro.</p>`;
@@ -1540,7 +1548,7 @@ function renderAuditoria() {
     const gates = state.gates.filter(g => !fid || g.demand === fid).slice().reverse();
     return `${head}<div class="filters"><div><label for="f-gdemanda">Demanda</label><select id="f-gdemanda" data-filter="demanda">${[["", "Todas"], ...allInfos().slice().reverse().map(x => [x.code, `${x.code} · ${x.eff.title.slice(0, 40)}`])].map(([v, t]) => `<option value="${esc(v)}" ${v === fd ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
       <span class="muted" style="font-size:12px;align-self:center">Pareceres do Auditor (<code>docs/squad/gates/</code>): o arquivo guarda o último ciclo de cada gate.</span></div>
-    ${gates.length ? gates.map(g => `<section class="card" style="margin-top:18px"><h3>${g.demand ? `${codeLink(g.demand) || esc(g.demand)} · ` : "Squad base · "}${esc(g.gate)} · ${esc(g.recommendation)} · ${Math.round((g.confidence || 0) * 100)}% · risco ${esc(g.risk)}</h3>
+    ${gates.length ? gates.map(g => `<section class="card" style="margin-top:18px"><h3>${g.demand ? `${codeLink(g.demand) || esc(g.demand)} · ` : "Squad base · "}${esc(g.gate)} · ${esc(g.recommendation)} · ${pct(g.confidence || 0)} · risco ${esc(g.risk)}</h3>
       ${evidencesHtml(g.evidences)}<p class="muted">${esc(g.rationale || "")}</p></section>`).join("") : `<p class="muted" style="margin-top:18px">Nenhum gate avaliado${fd ? " nesta demanda" : ""} ainda.</p>`}`;
   }
   if (tab === "alertas") {
