@@ -1,0 +1,46 @@
+{
+  "gate": "G2",
+  "demand": "841f9a27e64a",
+  "title": "D16: demandas de bug (servidor + UI) — reauditoria, 2º ciclo",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "handoffs": ["528eecec9dec"],
+  "branch": "feature/D16-demandas-de-bug",
+  "commits": ["bf00da0"],
+  "previous": "docs/squad/gates/G2-D16.json",
+  "recommendation": "RETURN",
+  "confidence": 0.8,
+  "risk": "moderado",
+  "human_required": true,
+  "cycle": 2,
+  "evidences": [
+    {"name": "Suítes da squad (B,3)", "status": "pass", "source": "python3 tests/squad/<cada>.py: test_bugs_d16 32 OK (27 -> 32); test_alertas_d14 20 OK; test_governanca_d14_qa 19 OK; test_ambiente_teste_d15 41 OK; test_e2e_compose_seguro_d15 11 OK; test_entrega_por_pr 'Todas as verificações passaram'"},
+    {"name": "Itens devolvidos no 1º ciclo (B,3)", "status": "pass", "source": "log sintético do Auditor contra evidence_rules.mask_text (todos idempotentes na 2ª passada): accessToken=, bearer_token=, auth_token:, client_secret=, X-Auth-Token:, x-api-key:, \"accessToken\"/\"refreshToken\"/\"idToken\"/\"apiToken\" em JSON, sessionToken em JSON aninhado 3 níveis, accessToken em JSON escapado 1 vez, ?access_token= e &id_token= em URL (orderId/state preservados) -> mascarados; 'Address[street=..., zipCode=...]' dentro de mensagem de exceção com stack trace, 'ShippingAddress{...}' e 'com.checkout.shipping.domain.Address[...]' -> [MASCARADO:endereco]; CPF 529.982.247-25, 52998224725, 529982247-25, 529 982 247 25 -> mascarado; 529982247-26 e 12345678900 (dígito inválido) mantidos; Cookie/Set-Cookie mascarados; $__range_s/_ms e $__interval_ms em resolve_vars (test_ca6_grafana_variaveis_ms_e_s)"},
+    {"name": "Demais PII (B,2)", "status": "pass", "source": "cartão Luhn em 3 formatos mascarado e 4111111111111112 (Luhn inválido) mantido; e-mail; telefone (11) 98765-4321, +55 11 987654321, +5511987654321; IP público 8.8.8.8 e 2001:4860:4860::8888 mascarados, 10/8, 192.168/16, 172.17/12, 127.0.0.1, fe80::1 e ::1 mantidos; Authorization Bearer <JWT> mascarado; customerId -> cust-<hmac> em k=v e JSON"},
+    {"name": "Máscara >= mínimo do contrato §8.2 (B,3)", "status": "fail", "source": "docs/contracts/demandas-de-bug.md:226 exige (password|passwd|senha|secret|token|api[_-]?key)\\s*[=:]\\s*\\S+. Valor entre ASPAS SIMPLES fica em claro e find_secrets também não o acusa (título/descrição passariam): \"password='hunter2'\", \"api_key='AB12'\", \"token: 'abc'\" -> inalterados, find_secrets=[]. Causa: em SECRET_PATTERNS['chave_valor'] o prefixo antes do valor aceita só \\\\?\\\"? e a classe do valor [^\\s\\\"'\\\\,;&}]+ exclui a aspa simples, então o 1º caractere ' impede o casamento. Lacuna já existia no 1º ciclo (não apontada por mim então) e é de aderência ao mínimo do contrato, num repositório público e permanente"},
+    {"name": "Robustez além do mínimo (recomendado)", "status": "validate", "source": "JSON escapado DUAS vezes (payload JSON-string dentro de envelope JSON dentro da mensagem JSON do Spring: \\\\\\\"password\\\\\\\":\\\\\\\"pw9\\\\\\\") deixa em claro password, authorization, shippingAddress/street, customerName e customerId (CPF/e-mail/cartão são pegos por padrão de valor). Valor com espaço entre aspas ('\"password\":\"my pass word\"', 'accessToken = \"x y\"') mascara só a 1ª palavra. 'Address[street=Rua [bloco 2], number=3]' vaza ', number=3]'"},
+    {"name": "Falsos positivos (1)", "status": "validate", "source": "traceId/orderId/sagaId/spanId/trace_id em k=v e JSON, timestamp, amount, duration_ms=12345678901 preservados; 'tokenizer carregado' preservado (teste). Porém chaves que só CONTÊM a palavra são mascaradas: tokenizer=bert-base, tokenCount=12, totalTokens: 1024, keyTokens: 5, passwordPolicy=strict, secretsManager: enabled -> [MASCARADO:segredo]; orderId=12345678909 (11 dígitos com DV de CPF válido) -> [MASCARADO:cpf]. Erra para o lado seguro; perda de diagnóstico pequena"},
+    {"name": "409 tipo_divergente (B,2)", "status": "pass", "source": "server.py:1106-1109 usa meta['kind'] do rascunho e devolve 409 tipo_divergente quando data.kind diverge, antes de gravar; test_kind_do_rascunho: rascunho operacao + kind produto -> 409, log e bugs/ inalterados, rascunho preservado, reenvio com operacao -> 201"},
+    {"name": "Escopo do commit (1)", "status": "pass", "source": "git show --stat bf00da0: evidence_rules.py, bugs.py (resolve_vars), server.py (kind), tests/squad/test_bugs_d16.py; UI inalterada"}
+  ],
+  "return_instructions": [
+    "Orquestrador (tools/squad/evidence_rules.py, SECRET_PATTERNS['chave_valor']): aceitar valor entre aspas simples (e crase) — ex.: prefixo \\\\?[\"'`]? antes do valor e valor [^\\s\"'`\\\\,;&}]+ — cobrindo password='x', api_key='x', token: 'x'; confirmar que find_secrets passa a acusar esses casos no título/descrição.",
+    "Valor entre aspas com espaço: quando o valor começar com aspa, mascarar até a aspa de fechamento (\"password\":\"my pass word\" -> \"password\":\"[MASCARADO:segredo]\").",
+    "Recomendado (não bloqueante, mas realista no produto): tolerar aspas escapadas 2 vezes (\\\\*\\\" em vez de \\\\?\\\") em chave_valor, authorization, endereço/rua/CEP/nome e customerId.",
+    "Recomendado: restringir a palavra-chave a sufixo/limite de palavra-camelCase para não mascarar tokenizer=, tokenCount=, totalTokens:, passwordPolicy= (ex.: (?:token|secret|password|...)(?![a-z]) com (?i) só no primeiro caractere), mantendo accessToken, bearer_token, X-Auth-Token, client_secret.",
+    "Acrescentar os casos acima a test_ca6_* em tests/squad/test_bugs_d16.py e reenviar o G2."
+  ],
+  "open_risks": [
+    "É o 2º ciclo de devolução no G2: um novo RETURN passa a exigir decisão humana (AGENTS.md: máximo de 2 ciclos). Por isso human_required = true já neste parecer: o humano pode (a) autorizar um 3º ciclo curto só para aspas simples, ou (b) aceitar o risco e liberar para QA com a correção como ressalva obrigatória antes do G3.",
+    "A máscara é por padrão: a prévia lida pelo humano continua sendo a última defesa antes do git público e permanente.",
+    "tests/ui/*.js (D16) não rodados pelo Auditor (sem node no host)."
+  ],
+  "qa_priorities": [
+    "CA-6 com corpus real: logs do Spring Boot em JSON com payload do outbox/Kafka logado como string (JSON escapado 1 e 2 vezes), stack traces com Address[...], e chaves em aspas simples (valores vindos de toString/SQL). Usar logs coletados pelo humano; QA não sobe containers.",
+    "Fluxo UI ponta a ponta com Puppeteer em Docker contra servidor do worktree com SQUAD_ROOT_DATA no temporário: prévia, 2 confirmações, 201, 409 tipo_divergente exibido de forma clara (o formulário precisa pedir nova prévia), selo/filtro BUG, página do bug, Acrescentar evidência.",
+    "find_secrets no título/descrição com as mesmas variações (aspas simples, chave composta) -> 422.",
+    "Falsos positivos que atrapalham diagnóstico (tokenCount, totalTokens, 11 dígitos com DV de CPF em ids numéricos).",
+    "CA-13 real (gitflow/align_memory com bugs/ não rastreado) e assumir ownership de tests/squad/test_bugs_d16.py."
+  ],
+  "rationale": "Todos os pontos devolvidos no 1º ciclo foram corrigidos e verificados por mim com corpus próprio (chaves compostas em k=v, cabeçalho, URL query, JSON aninhado e escapado; record Address em stack trace; CPF com separadores e DV; Cookie; variáveis Grafana; 409 tipo_divergente), com idempotência e sem falsos positivos em traceId/orderId/sagaId. Suítes verdes (32 testes na D16). Devolvo porque o critério bloqueante do gate — máscara no mínimo do contrato §8.2 — ainda falha para valores entre aspas simples (password='x' fica em claro e não é bloqueado no título), algo que o padrão mínimo do contrato (\\S+) cobre. A correção é de uma linha, mas como este é o 2º ciclo, o próximo passo cabe ao humano."
+}
