@@ -1,0 +1,37 @@
+{
+  "gate": "G2",
+  "demand": "642a73cb38e5",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Escopo e ownership", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff --stat 7c23ffe..HEAD: só tools/squad/server.py, tools/squad/statusline_usage.py (Orquestrador, 0e0cdae) e squad-control/index.html (Frontend, 3ed1032). Nada em services/, infra/ ou docs de outros donos."},
+    {"name": "Ressalva 1 — encadeamento seguro (shlex) e CA4 byte a byte", "status": "pass", "weight": 3, "blocking": true,
+     "source": "install() monta --next=<shlex.quote(prev)> e --data-root=<shlex.quote>; statusline.prev.json à parte. Teste no scratchpad (--settings cópia sintética): comando instalado executado via sh -c com stdin JSON de exemplo vs 'bash ~/.claude/statusline-command.sh' direto → stdout (570 B) e stderr idênticos (cmp), rc 0/0; --next 'echo hi; exit 7' → rc 7; comando com aspas simples e duplas (\"it's\") instalado, executado e desinstalado corretamente; tempo total 0,11 s."},
+    {"name": "Ressalvas 2–4 — backup datado, uninstall só statusLine, recusa não-command, idempotência", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Backup settings.json.bak-squad-AAAAMMDD-HHMMSS (sufixo -n se colidir) no install e no uninstall; 2º --install → 'já instalado' sem alterar; após mudar model/newKey no settings, --uninstall restaurou só statusLine (incl. padding) e preservou as outras chaves; sem arquivo lateral, restaura pelo --next parseado; statusLine type=static → 'recusado', rc 2, arquivo intacto. Nenhum teste tocou ~/.claude/settings.json real (só leitura da chave statusLine)."},
+    {"name": "Ressalva 5 — timeout só na gravação; snapshot só números/horas; sem reescrita desnecessária", "status": "pass", "weight": 2, "blocking": true,
+     "source": "run_statusline: tee em thread daemon com join(1 s) em paralelo; --next sem timeout, stdout/stderr herdados. Snapshot gerado a partir de stdin com session_id/transcript_path/cwd: contém só collectedAt/fiveHour/sevenDay (usedPercent, resetsAt). JSON inválido e JSON sem rate_limits → snapshot inalterado (cmp), sem erro. Valores iguais e coleta < 60 s → não reescreve."},
+    {"name": "Ressalva 6 — Codex: varredura limitada + cache; CA2", "status": "pass", "weight": 2, "blocking": true,
+     "source": "_codex_recent_files lista só as 3 pastas AAAA/MM/DD mais recentes, top 5 por mtime; lê ≤ 512 KiB do fim; cache por (caminho, mtime, tamanho). /api/usage codex = 9,0% / 22,0%, resets 21:35:11Z e 27/09 22:59:51Z, plan plus, collectedAt 21:24:49Z — idêntico ao último token_count do rollout mais recente (conferido à mão, epoch 1790199311/1790549991)."},
+    {"name": "API §3, stale com reason, CA1/CA5/CA6/CA7/CA11 e desempenho", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Servidor do worktree na 7097 com SQUAD_ROOT_DATA do plankton: /api/usage 200 em ~1 ms; /api/state.usage presente (state 0,27–0,67 s, custo pré-existente); ordem claude, codex; claude none 'Statusline não instalada'; codex stale 'Janela de 5 h renovada às 18:35'; grep session|@|/Users|token vazio. Via import com DATA_ROOT/CODEX_HOME de fixture: snapshot fresco → fresh; corrompido → none 'Snapshot ilegível' sem afetar o outro; coleta antiga → stale 'Coleta com mais de 15 min'; CODEX_HOME vazio → none. Servidor 7097 derrubado; 7070 intacto."},
+    {"name": "index.html não quebra o existente", "status": "pass", "weight": 2, "blocking": true,
+     "source": "#main preservado como <div id=\"main\"> dentro de <main>; todas as referências (#main [data-keep], editing(), innerHTML) continuam válidas; faixa #ai-usage é irmã do #main, então o re-render não a destrói e o polling só troca seu innerHTML quando muda (sem foco, sem campos, sem aria-live); renderUsage() roda antes do guard editing() (CA9) e esconde em observabilidade; role=meter com aria-valuenow/min/max/label e rótulo textual Atenção/Crítico; esc() em todos os textos vindos da API."},
+    {"name": "CA3/CA8/CA9/CA10 no navegador e sessão interativa", "status": "validate", "weight": 2, "blocking": false,
+     "source": "Não verificável aqui: sticky ao rolar, altura ≤ 72 px, 390 px sem rolagem horizontal (inclui a correção do cabeçalho declarada pelo Frontend), atualização durante edição; CA3 depende do --install feito pelo humano. Fica para o QA/humano."}
+  ],
+  "open_risks": [
+    "--install deve ser feito pelo humano a partir do checkout principal (plankton) após o merge: se rodado a partir do worktree plankton-d11, a statusline apontará para um script que some quando o worktree for removido (o comando grava o caminho absoluto de SCRIPT). Documentar no handoff ao humano.",
+    "Se a gravação do tee passar de 1 s, a thread daemon é encerrada com o processo e pode deixar um .claude.*.tmp órfão em .squad/usage (inócuo, mas acumula). Baixo.",
+    "Codex: sessão longa iniciada antes das 3 pastas de data mais recentes não é considerada (arquivo fica na pasta da data de início). Aceitável pelo contrato; pode mostrar stale indevido em sessões de vários dias.",
+    "Layout 600–900 px: .u-prov usa coluna fixa de 104 px + 2 janelas em meia largura; pode passar de 72 px de altura e quebrar muito texto — QA deve medir.",
+    "A correção de cabeçalho a ≤ 600 px (header/tabs/strip/notif-panel) muda layout pré-existente fora da faixa: QA deve confirmar que sino, abas e painel de notificações seguem utilizáveis a 390 px."
+  ],
+  "human_required": false,
+  "rationale": "Todas as 6 ressalvas do G1 estão resolvidas no código e foram verificadas por execução, não pelo texto do handoff: encadeamento com shlex e arquivo lateral, saída e código de saída idênticos ao da statusline real do usuário com stdin de exemplo, backup datado, uninstall restrito à chave statusLine, recusa para tipo não-command, timeout só na gravação, snapshot com whitelist, varredura do Codex limitada com cache e reason explícito para janela renovada. A API segue o §3 e isola falhas por provedor; /api/usage responde em ~1 ms. O diff do index.html preserva #main e o comportamento de foco durante o polling. Resta a verificação visual/responsiva e o CA3 (depende de --install humano), por isso o critério de navegador fica 'validar'. Risco moderado porque o --install mexe em ~/.claude/settings.json fora do repo (mitigado: ação humana, backup, uninstall testado). Confiança = (2+3+3+2+2+3+2+1)/19 ≈ 0.95, arredondada para 0.9 pelas ressalvas de layout não medidas."
+}

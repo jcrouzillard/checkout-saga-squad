@@ -2,6 +2,7 @@
 """Servidor do painel Squad Control (somente stdlib).
 
 - Serve `squad-control/index.html` (painel genérico da squad; o produto gerenciado vem de docs/squad/project.json).
+- GET  /api/usage  -> consumo da IA (Claude Code via tee de statusline, Codex via rollouts) — D11/ADR-014
 - GET  /api/state  -> log de decisões + pareceres do Auditor + atividade ao vivo de cada agente
                       (lida das transcrições dos subagentes do Claude Code).
 - POST /api/human  -> registra a decisão humana (aceitar/devolver) no log compartilhado;
@@ -14,14 +15,22 @@ Modelo por agente (D9, ADR-012): runs[] e log[] trazem model/modelProvider (e mo
 """
 import shlex
 import argparse
+import hashlib
 import json
 import os
 import pathlib
 import re
+import sys
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import alerts as al  # noqa: E402  (D14, ADR-017: regras B1–B4/A1–A3 e estado dos agentes)
+from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das transcrições)
+import testenv as te  # noqa: E402  (D15, ADR-018: ambiente de teste compartilhado)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -40,6 +49,11 @@ AGENT_ALIASES = {
     "jev": "auditor",  # nome antigo do gatekeeper nas transcrições já gravadas
 }
 RUNNING_WINDOW_S = 45
+# D14 (contrato §9.5): limites nomeados; valores em tools/squad/alerts.py (SQUAD_STALLED_S ajusta o A2).
+STALLED_S, LONG_TOOL_S, WAIT_WARN_S = al.STALLED_S, al.LONG_TOOL_S, al.WAIT_WARN_S
+LOW_CONFIDENCE, MAX_AUTO_CYCLES = al.LOW_CONFIDENCE, al.MAX_AUTO_CYCLES
+LIVE_MAX_BYTES = 64 * 1024
+LOCK = threading.RLock()   # o estado incremental das transcrições é compartilhado entre as threads do servidor
 
 
 def transcripts_root() -> pathlib.Path:
@@ -127,44 +141,22 @@ def logpy_calls(command: str) -> list[tuple[str, str]]:
     return out
 
 
-_scan_cache: dict[str, tuple[float, dict]] = {}
+_STORE: TranscriptStore | None = None
+
+
+def store() -> TranscriptStore:
+    global _STORE
+    if _STORE is None:
+        _STORE = TranscriptStore(rel, summarize_tool)
+    return _STORE
 
 
 def scan_transcript(path: pathlib.Path) -> dict:
     """Modelos (message.model, sem <synthetic>), 1º prompt e chamadas a log.py de uma transcrição.
-    Cache por (arquivo, mtime): o /api/state é consultado a cada poll."""
-    try:
-        mtime = path.stat().st_mtime
-    except OSError:
-        return {"models": {}, "first_prompt": "", "calls": []}
-    cached = _scan_cache.get(str(path))
-    if cached and cached[0] == mtime:
-        return cached[1]
-    models: dict[str, int] = {}
-    first_prompt, calls = "", []
-    for r in read_jsonl(path):
-        msg = r.get("message") or {}
-        content = msg.get("content")
-        if r.get("type") == "user" and not first_prompt:
-            if isinstance(content, str):
-                first_prompt = content
-            elif isinstance(content, list):
-                first_prompt = next((c.get("text", "") for c in content if c.get("type") == "text"), "")
-        if r.get("type") != "assistant":
-            continue
-        model = msg.get("model")
-        if not is_model_id(model):
-            continue
-        models[model] = models.get(model, 0) + 1  # dict preserva a ordem do 1º uso
-        for c in content if isinstance(content, list) else []:
-            if c.get("type") == "tool_use" and c.get("name") == "Bash":
-                cmd = (c.get("input") or {}).get("command", "")
-                if "log.py" in cmd:
-                    for agent, title in logpy_calls(cmd):
-                        calls.append({"ts": r.get("timestamp"), "agent": agent, "title": title, "model": model})
-    info = {"models": models, "first_prompt": first_prompt, "calls": calls}
-    _scan_cache[str(path)] = (mtime, info)
-    return info
+    D14: servido pelo estado incremental (só os bytes novos são lidos a cada consulta)."""
+    with LOCK:
+        st = store().get(path)
+        return {"models": st.models, "first_prompt": st.first_prompt_any, "calls": st.calls}
 
 
 def model_fields(models: dict[str, int], hint: str | None = None, runner: str | None = None) -> dict:
@@ -230,22 +222,14 @@ def resolve_agent(meta: dict, first_prompt: str) -> str:
 
 
 HEREDOC_WRITE = re.compile(r"(?:cat|tee)\s*>{1,2}\s*['\"]?([\w./-]+\.\w+)")
-_completed_cache: dict[str, tuple[float, set[str]]] = {}
 
 
 def completed_agent_ids(base: pathlib.Path) -> set[str]:
-    """IDs de subagentes cuja notificação de término já chegou à sessão do Orquestrador."""
+    """IDs de subagentes cuja notificação de término já chegou à sessão do Orquestrador (leitura incremental)."""
     done: set[str] = set()
-    for main in base.glob("*.jsonl"):
-        mtime = main.stat().st_mtime
-        cached = _completed_cache.get(str(main))
-        if cached and cached[0] == mtime:
-            done |= cached[1]
-            continue
-        text = main.read_text(encoding="utf-8", errors="ignore")
-        ids = set(re.findall(r"<task-id>(\w+)</task-id>\\n<tool-use-id>[^<]*</tool-use-id>\\n<output-file>[^<]*</output-file>\\n<status>completed</status>", text))
-        _completed_cache[str(main)] = (mtime, ids)
-        done |= ids
+    with LOCK:
+        for main in base.glob("*.jsonl"):
+            done |= store().get(main).completed
     return done
 
 
@@ -332,22 +316,103 @@ def parse_run(path: pathlib.Path, agent: str | None = None, delegations_only=Fal
     }
 
 
-def collect_runs() -> list[dict]:
+_meta_cache: dict[str, tuple[float, dict]] = {}
+
+
+def read_meta(path: pathlib.Path) -> dict:
+    meta_path = path.with_suffix(".meta.json")
+    try:
+        mt = meta_path.stat().st_mtime
+    except OSError:
+        return {}
+    c = _meta_cache.get(str(meta_path))
+    if c and c[0] == mt:
+        return c[1]
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        meta = {}
+    _meta_cache[str(meta_path)] = (mt, meta)
+    return meta
+
+
+def run_from_state(st, agent: str | None = None, orchestrator=False, completed: set[str] | None = None,
+                   now: float | None = None, notified_map: dict | None = None) -> dict | None:
+    """Mesmo resultado de parse_run (lendo o arquivo inteiro), a partir do estado incremental.
+    Orquestrador (§9.3): todas as ferramentas, sem as mensagens de texto; status calculado como o dos demais."""
+    if not st.rows:
+        return None
+    now = time.time() if now is None else now
+    meta = read_meta(st.path)
+    updated = st.mtime
+    ended_turn = st.ended_turn
+    recent = (now - updated) < RUNNING_WINDOW_S
+    run_id = st.path.stem.replace("agent-", "")
+    current = st.current(tools_only=orchestrator)
+    if recent and (not ended_turn or current):
+        status = "trabalhando"
+    elif ended_turn and ((completed is not None and run_id in completed) or (now - updated) > 90):
+        status = "concluído"
+    elif recent or not ended_turn or current:
+        status = "trabalhando"
+    else:
+        status = "trabalhando" if (now - updated) < 900 else "parado"
+    notified = al.ts_epoch((notified_map or {}).get(run_id))
+    # Turno encerrado só vale depois da janela de 45 s (uma mensagem de texto pode vir antes do tool_use seguinte)
+    # ou quando o Orquestrador já recebeu a notificação de término desta run.
+    finished = (ended_turn and not current and not recent) or (notified is not None and notified >= updated - 5)
+    return {
+        "id": run_id,
+        "agent": agent or resolve_agent(meta, st.first_prompt),
+        "description": meta.get("description", ""),
+        **model_fields(st.models, hint="anthropic" if st.models else None),
+        "demand": meta.get("demand") or (None if orchestrator else first_demand(st.first_prompt)),
+        "status": status,
+        "started": st.started,
+        "updated": datetime.fromtimestamp(updated, timezone.utc).isoformat(timespec="seconds"),
+        "toolCount": st.tool_count,
+        "current": current if status == "trabalhando" else None,
+        "files": list(st.files),
+        "activity": list(st.tools if orchestrator else st.activity)[-80:],
+        # internos (prefixo "_", removidos da resposta)
+        "_last": updated, "_open": not finished, "_current": current, "_commands": list(st.commands),
+        "_state": st, "_toolUseId": meta.get("toolUseId"),
+    }
+
+
+def collect_runs(now: float | None = None) -> list[dict]:
     base = transcripts_root()
     runs = []
-    completed = completed_agent_ids(base)
-    for path in sorted(base.glob("*/subagents/agent-*.jsonl")):
-        run = parse_run(path, completed=completed)
-        if run:
-            runs.append(run)
-    runs.extend(collect_external_runs())
-    # Sessão principal = Orquestrador (apenas delegações)
-    for path in sorted(base.glob("*.jsonl")):
-        if (base / path.stem / "subagents").exists():
-            run = parse_run(path, agent="orquestrador", delegations_only=True)
-            if run and run["toolCount"]:
+    with LOCK:
+        mains = sorted(base.glob("*.jsonl"))
+        subs = sorted(base.glob("*/subagents/agent-*.jsonl"))
+        store().prune({str(p) for p in mains + subs})
+        completed, notified = set(), {}
+        for m in mains:
+            completed |= store().get(m).completed
+            notified.update(store().get(m).notified)
+        for path in subs:
+            run = run_from_state(store().get(path), completed=completed, now=now, notified_map=notified)
+            if run:
                 runs.append(run)
+        runs.extend(collect_external_runs(now))
+        # Sessão principal = Orquestrador (todas as ferramentas; só sessões que delegaram)
+        for path in mains:
+            if (base / path.stem / "subagents").exists():
+                st = store().get(path)
+                if st.agent_tool_count:
+                    run = run_from_state(st, agent="orquestrador", orchestrator=True, now=now)
+                    if run:
+                        runs.append(run)
     return runs
+
+
+def public_run(r: dict) -> dict:
+    out = {k: v for k, v in r.items() if not k.startswith("_")}
+    out["lastActivityAt"] = al.iso(r.get("_last"))
+    out["stalled"] = bool(r.get("_stalled"))
+    out["waitingOn"] = r.get("_waitingOn", [])
+    return out
 
 
 def pid_alive(pid) -> bool:
@@ -358,11 +423,23 @@ def pid_alive(pid) -> bool:
         return False
 
 
-def collect_external_runs() -> list[dict]:
+_tail_cache: dict[str, tuple[float, int, list[str]]] = {}
+
+
+def _log_tail(path: pathlib.Path, st) -> list[str]:
+    c = _tail_cache.get(str(path))
+    if c and c[0] == st.st_mtime and c[1] == st.st_size:
+        return c[2]
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()[-40:]
+    _tail_cache[str(path)] = (st.st_mtime, st.st_size, lines)
+    return lines
+
+
+def collect_external_runs(now: float | None = None) -> list[dict]:
     """Execuções disparadas por tools/squad/run_agent.py (qualquer fornecedor): metadados + saída ao vivo + progress."""
     runs_dir = RUNS_DIR
     top_level = None  # run_id -> transcrição de topo do `claude -p` (runs antigos, sem sessionId)
-    progress = [e for e in read_jsonl(LOG) if e.get("type") == "progress" and e.get("run")]
+    progress = [e for e in read_log() if e.get("type") == "progress" and e.get("run")]
     out = []
     for meta_path in sorted(runs_dir.glob("*.json")):
         try:
@@ -375,20 +452,24 @@ def collect_external_runs() -> list[dict]:
             status = "interrompido"
         activity = [{"ts": e["ts"], "kind": "tool", "tool": "progress", "summary": e["title"], "pending": False,
                      "detail": e.get("detail", "")} for e in progress if e["run"] == meta["id"]]
-        mtime = log_path.stat().st_mtime if log_path.exists() else meta_path.stat().st_mtime
-        lines = log_path.read_text(encoding="utf-8", errors="ignore").splitlines()[-40:] if log_path.exists() else []
+        try:
+            lst = log_path.stat()
+        except OSError:
+            lst = None
+        mtime = lst.st_mtime if lst else meta_path.stat().st_mtime
+        lines = _log_tail(log_path, lst) if lst else []
         if lines:
             activity.append({"ts": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
                              "kind": "text", "summary": "\n".join(l for l in lines if l.strip())[-600:]})
         current = None
+        last = next((a for a in reversed(activity) if a["kind"] == "tool"), None)
         if status == "trabalhando":
-            last = next((a for a in reversed(activity) if a["kind"] == "tool"), None)
             current = {"tool": meta.get("runner", "runner"), "summary": (last or {}).get("summary", "em execução"),
                        "ts": (last or {}).get("ts", meta.get("started"))}
         runner = meta.get("runner")
         models: dict[str, int] = {}
         hint = meta.get("modelProvider")
-        if runner == "codex" and log_path.exists():
+        if runner == "codex" and lst:
             # O cabeçalho reflete o que rodou; vale mais que o gravado (que vem dele de todo modo).
             with log_path.open(encoding="utf-8", errors="ignore") as f:
                 head = codex_header(f.read(20000))
@@ -412,6 +493,7 @@ def collect_external_runs() -> list[dict]:
                 hint = "anthropic" if models else hint
         if not models and is_model_id(meta.get("model")):
             models = {meta["model"]: 1}
+        last_prog = max([al.ts_epoch(a["ts"]) or 0 for a in activity if a["kind"] == "tool"], default=0)
         out.append({"id": meta["id"], "agent": meta.get("agent", "outro"), "description": meta.get("description", ""),
                     **model_fields(models, hint, runner), "modelRequested": meta.get("modelRequested"),
                     "sessionId": meta.get("sessionId"), "demand": meta.get("demand"),
@@ -419,8 +501,225 @@ def collect_external_runs() -> list[dict]:
                     "started": meta.get("started"),
                     "updated": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
                     "toolCount": len([x for x in activity if x["kind"] == "tool"]), "current": current,
-                    "files": [], "activity": activity[-80:]})
+                    "files": [], "activity": activity[-80:],
+                    "_last": max(mtime, last_prog), "_open": status == "trabalhando", "_external": True,
+                    "_current": {"kind": "tool", "tool": "progress", "summary": current["summary"], "ts": current["ts"]}
+                    if current else None, "_commands": []})
     return out
+
+
+# ---------------------------------------------------------------- D14: log/gates em cache, alertas e agentes
+_log_cache: dict = {"sig": None, "rows": []}
+
+
+def _sig(path: pathlib.Path):
+    try:
+        st = path.stat()
+        return (st.st_size, st.st_mtime)
+    except OSError:
+        return None
+
+
+def read_log() -> list[dict]:
+    """Log de decisões com cache por (tamanho, mtime)."""
+    sig = _sig(LOG)
+    if sig != _log_cache["sig"]:
+        _log_cache.update(sig=sig, rows=read_jsonl(LOG))
+    return _log_cache["rows"]
+
+
+def _dir_sig(d: pathlib.Path, pattern="*") -> tuple:
+    try:
+        return tuple(sorted((p.name, p.stat().st_mtime) for p in d.glob(pattern)))
+    except OSError:
+        return ()
+
+
+def usage_sig() -> str:
+    """Assinatura do consumo da IA (D11) para a `version` do /api/live — D14-QA-3.
+
+    Usa o objeto `usage` já calculado (snapshot do Claude + cauda dos rollouts do Codex, com o cache por
+    (caminho, mtime, tamanho) de `_codex_last_rate_limits`): muda quando percentuais, janelas ou estado mudam, e não a
+    cada gravação dos rollouts. `collectedAt` fica fora para não forçar recarga do /api/state a cada tique da statusline."""
+    try:
+        providers = collect_usage()["providers"]
+        return repr([{k: v for k, v in p.items() if k != "collectedAt"} for p in providers])
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------- D15: ambiente de teste (ADR-018)
+class TestEnvProbe:
+    """Saúde do checkout-teste (docker ps) e head do PR do ocupante (gh) em cache, renovados em segundo plano:
+    /api/live nunca espera docker/gh (orçamento de 300 ms do ADR-017). SQUAD_TESTENV_PROBE=0 desliga (testes)."""
+    TTL_HEALTH, TTL_PR = 15, 60
+
+    def __init__(self):
+        self.health, self.health_at, self.heads, self.busy = None, 0.0, {}, False
+        self.lock = threading.Lock()
+
+    def enabled(self) -> bool:
+        return os.environ.get("SQUAD_TESTENV_PROBE", "1") != "0"
+
+    def _refresh(self, ref):
+        try:
+            h = te.project_health(te.TEST_PROJECT)
+            head = None
+            if ref:
+                head = (te.pr_info(ref) or {}).get("headRefOid")
+            with self.lock:
+                self.health, self.health_at = h, time.time()
+                if ref:
+                    self.heads[str(ref)] = (time.time(), head)
+        finally:
+            self.busy = False
+
+    def get(self, s: dict) -> tuple[dict | None, str | None]:
+        if not self.enabled():
+            return None, None
+        ref = s.get("url") or s.get("pr") if s.get("demand") else None
+        now = time.time()
+        with self.lock:
+            head_entry = self.heads.get(str(ref)) if ref else None
+            stale = now - self.health_at > self.TTL_HEALTH or (ref and (not head_entry or now - head_entry[0] > self.TTL_PR))
+            if stale and not self.busy:
+                self.busy = True
+                threading.Thread(target=self._refresh, args=(ref,), daemon=True).start()
+            return self.health, (head_entry or (0, None))[1]
+
+
+TE_PROBE = TestEnvProbe()
+TE_SPAWNED: list[list[str]] = []   # comandos disparados (inspecionados pelos testes com SQUAD_TESTENV_SPAWN=0)
+
+
+def test_env_view() -> dict:
+    rows = read_log()
+    health, head = TE_PROBE.get(te.derive(rows))
+    return te.view(rows, health=health, pr_head=head, codes=al.demand_codes(rows))
+
+
+def te_spawn(*args: str):
+    """Dispara testenv.py em segundo plano (o servidor só grava o pedido; quem mexe no Docker é o testenv.py)."""
+    cmd = [sys.executable, str(pathlib.Path(__file__).resolve().parent / "testenv.py"), *args]
+    TE_SPAWNED.append(list(args))
+    if os.environ.get("SQUAD_TESTENV_SPAWN", "1") == "0":
+        return
+    import subprocess
+    subprocess.Popen(cmd, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def data_version() -> str:
+    """Muda quando log, gates, handoffs, inbox, .squad/runs ou o consumo da IA mudam (contrato §9.1)."""
+    parts = (_sig(LOG), _dir_sig(GATES_DIR, "*.json"), _dir_sig(HANDOFFS_DIR, "*.md"),
+             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"), usage_sig(),
+             repr(TE_PROBE.health) if TE_PROBE.enabled() else "")
+    return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
+
+
+_gates_cache: dict = {"sig": None, "gates": []}
+_rules_cache: dict = {"sig": None, "rules": None}
+
+
+def gates_cached() -> list[dict]:
+    sig = _dir_sig(GATES_DIR, "*.json")
+    if sig != _gates_cache["sig"]:
+        _gates_cache.update(sig=sig, gates=collect_gates())
+    return _gates_cache["gates"]
+
+
+def rules_cached() -> "al.Rules":
+    rows, gates = read_log(), gates_cached()
+    sig = (_log_cache["sig"], _gates_cache["sig"])
+    if sig != _rules_cache["sig"]:
+        _rules_cache.update(sig=sig, rules=al.Rules(rows, gates))
+    return _rules_cache["rules"]
+
+
+def orchestrator_view(runs: list[dict], rules, now: float) -> dict | None:
+    """Pendências da sessão principal atual do Orquestrador: subagentes em execução, pergunta ao humano, demanda."""
+    orch_runs = [r for r in runs if r.get("agent") == "orquestrador" and r.get("_state") is not None]
+    if not orch_runs:
+        return None
+    cur = max(orch_runs, key=lambda r: r["_last"])
+    st = cur["_state"]
+    by_id = {r["id"]: r for r in runs}
+    by_use = {r.get("_toolUseId"): r for r in runs if r.get("_toolUseId")}
+    subs = []
+    for agent_id, use in st.launched.items():
+        since = al.ts_epoch(use.get("since")) or 0
+        notified = al.ts_epoch(st.notified.get(agent_id))
+        if notified is not None and notified >= since:
+            continue
+        run = by_id.get(agent_id)
+        if run is None and now - since > al.STALLED_MAX_S:
+            continue
+        if run is not None and not (run["_open"] or now - run["_last"] < 90):
+            continue
+        role = (run or {}).get("agent")
+        if role in (None, "outro"):   # subagente fora dos 8 papéis nomeados: tenta o 1º termo da descrição
+            head = re.split(r"[\s·:]", (use.get("description") or "").strip().lower(), maxsplit=1)[0]
+            role = next((r for r in al.ROLES if head.startswith(r[:5])), role)
+        subs.append({"runId": agent_id, "description": use.get("description"), "since": use.get("since"),
+                     "agent": role})
+    ask = None
+    for tid, item in st.pending.items():
+        if item.get("tool") == "Agent":   # delegação síncrona pendente
+            run = by_use.get(tid)
+            subs.append({"runId": (run or {}).get("id") or "?", "description": item.get("summary"),
+                         "since": item.get("ts"), "agent": (run or {}).get("agent")})
+        elif item.get("tool") in ("AskUserQuestion", "ExitPlanMode"):
+            ask = item.get("ts")
+    rows = read_log()
+    demand = None
+    for e in reversed(rows):
+        d = e.get("demand")
+        if d and e.get("agent") == "orquestrador" and not rules._closed(d):
+            demand = d
+            break
+    if demand is None:
+        demand = next((e["demand"] for e in reversed(rows) if e.get("type") == "start" and e.get("demand")
+                       and not rules._closed(e["demand"])), None)
+    return {"demand": demand, "subagents": subs, "ask": ask}
+
+
+def compute(full: bool) -> dict:
+    """Núcleo de /api/live (full=False) e dos campos novos de /api/state (full=True)."""
+    t0 = time.perf_counter()
+    now = time.time()
+    with LOCK:
+        runs = collect_runs(now)
+        rules = rules_cached()
+        rows = read_log()
+        test_env = test_env_view()
+        gate_alerts = list(rules.open.values()) + al.env_alerts(rows, test_env, rules.codes)
+        agents, stalled = al.build_agents(runs, rules, rows, gate_alerts, now, orchestrator_view(runs, rules, now))
+        alerts = al.with_age(al.sort_alerts(gate_alerts + stalled), now)
+        out = {"now": datetime.fromtimestamp(now, timezone.utc).isoformat(timespec="seconds"),
+               "version": data_version(), "thresholds": al.thresholds(),
+               "summary": al.summary(alerts, agents), "alerts": alerts,
+               "testEnv": test_env if full else te.live_summary(test_env)}
+        if full:
+            out["agents"] = agents
+            out["alertsHistory"] = sorted(rules.history, key=lambda a: a.get("closedAt") or "", reverse=True)
+            out["_runs"] = [public_run(r) for r in runs]
+            out["_rules"] = rules
+        else:
+            out["agents"] = [al.compact_agent(a) for a in agents]
+    out["serverMs"] = round((time.perf_counter() - t0) * 1000)
+    return out
+
+
+def live_payload() -> tuple[bytes, str]:
+    data = compute(full=False)
+    body = json.dumps(data, ensure_ascii=False).encode()
+    if len(body) > LIVE_MAX_BYTES:   # nunca passa de 64 KB: corta o menos essencial primeiro
+        for a in data["agents"]:
+            a["recentCommands"] = a["recentCommands"][:2]
+            a["recentFiles"] = a["recentFiles"][:3]
+        for a in data["alerts"]:
+            a["detail"] = al.trunc(a.get("detail"), 80)
+        body = json.dumps(data, ensure_ascii=False).encode()
+    return body, data["version"]
 
 
 MATCH_WINDOW_S = 120
@@ -519,6 +818,187 @@ def collect_handoffs() -> dict:
     return {p.name: p.read_text(encoding="utf-8") for p in sorted(HANDOFFS_DIR.glob("*.md"))}
 
 
+# ---------------------------------------------------------------- consumo da IA (D11, ADR-014)
+# Só fonte real: Codex pelos rollouts ($CODEX_HOME/sessions), Claude Code pelo snapshot do tee de statusline.
+USAGE_FRESH_S = 15 * 60
+CODEX_TAIL_BYTES = 512 * 1024
+CODEX_DAY_DIRS = 3      # pastas de data mais recentes consideradas (não varre a árvore toda)
+CODEX_MAX_FILES = 5
+_codex_cache: dict = {}  # (caminho, mtime, tamanho) -> última rate_limits válida
+
+
+def claude_snapshot_path() -> pathlib.Path:
+    return DATA_ROOT / ".squad/usage/claude.json"
+
+
+def codex_sessions_dir() -> pathlib.Path:
+    home = os.environ.get("CODEX_HOME")
+    return (pathlib.Path(home).expanduser() if home else pathlib.Path.home() / ".codex") / "sessions"
+
+
+def _iso_z(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_time(value) -> datetime | None:
+    """Aceita epoch (s) ou ISO-8601; devolve datetime UTC."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(float(value), timezone.utc)
+        if isinstance(value, str) and value:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (ValueError, OverflowError, OSError):
+        return None
+    return None
+
+
+def _usage_window(pct, resets, minutes) -> dict | None:
+    if isinstance(pct, bool) or not isinstance(pct, (int, float)):
+        return None
+    used = float(pct)
+    r = _parse_time(resets)
+    return {"usedPercent": used, "remainingPercent": max(0.0, 100.0 - used),
+            "resetsAt": _iso_z(r) if r else None,
+            "windowMinutes": int(minutes) if isinstance(minutes, (int, float)) and not isinstance(minutes, bool) else None}
+
+
+def _usage_provider(pid: str, label: str, source: str, collected: datetime | None,
+                    five: dict | None, week: dict | None, reason_none: str | None = None, **extra) -> dict:
+    base = {"id": pid, "label": label, "source": source, **extra}
+    if collected is None or (five is None and week is None):
+        return {**base, "status": "none", "available": False, "collectedAt": None,
+                "reason": reason_none or "Sem fonte real", "fiveHour": None, "week": None}
+    now = datetime.now(timezone.utc)
+    reason = None
+    for name, w in (("Janela de 5 h", five), ("Janela semanal", week)):
+        r = _parse_time(w and w.get("resetsAt"))
+        if r and r < now:
+            loc = r.astimezone()
+            when = loc.strftime("%H:%M") if loc.date() == now.astimezone().date() else loc.strftime("%d/%m %H:%M")
+            reason = f"{name} renovada às {when}"
+            break
+    if reason is None and (now - collected).total_seconds() > USAGE_FRESH_S:
+        reason = "Coleta com mais de 15 min"
+    return {**base, "status": "stale" if reason else "fresh", "available": reason is None,
+            "collectedAt": _iso_z(collected), "reason": reason, "fiveHour": five, "week": week}
+
+
+def usage_claude() -> dict:
+    args = ("claude", "Claude Code", "statusline")
+    snap = claude_snapshot_path()
+    if not snap.exists():
+        return _usage_provider(*args, None, None, None, "Statusline não instalada")
+    try:
+        d = json.loads(snap.read_text(encoding="utf-8"))
+        f, w = d.get("fiveHour") or {}, d.get("sevenDay") or {}
+        five = _usage_window(f.get("usedPercent"), f.get("resetsAt"), 300)
+        week = _usage_window(w.get("usedPercent"), w.get("resetsAt"), 10080)
+        return _usage_provider(*args, _parse_time(d.get("collectedAt")), five, week, "Snapshot sem rate_limits")
+    except Exception:
+        return _usage_provider(*args, None, None, None, "Snapshot ilegível")
+
+
+def _codex_recent_files(base: pathlib.Path) -> list[tuple[pathlib.Path, float, int]]:
+    """Lista só as CODEX_DAY_DIRS pastas AAAA/MM/DD mais recentes e devolve os rollouts de maior mtime."""
+    def subdirs(p: pathlib.Path) -> list[pathlib.Path]:
+        return sorted((c for c in p.iterdir() if c.is_dir() and c.name.isdigit()), key=lambda c: c.name, reverse=True)
+    days: list[pathlib.Path] = []
+    for y in subdirs(base):
+        for m in subdirs(y):
+            for d in subdirs(m):
+                days.append(d)
+                if len(days) >= CODEX_DAY_DIRS:
+                    break
+            if len(days) >= CODEX_DAY_DIRS:
+                break
+        if len(days) >= CODEX_DAY_DIRS:
+            break
+    files = []
+    for d in days:
+        for f in d.glob("rollout-*.jsonl"):
+            try:
+                st = f.stat()
+                files.append((st.st_mtime, st.st_size, f))
+            except OSError:
+                continue
+    files.sort(key=lambda t: t[0], reverse=True)
+    return [(f, mt, sz) for mt, sz, f in files[:CODEX_MAX_FILES]]
+
+
+def _codex_last_rate_limits(path: pathlib.Path, mtime: float, size: int) -> dict | None:
+    key = (str(path), mtime, size)
+    if key in _codex_cache:
+        return _codex_cache[key]
+    found = None
+    with path.open("rb") as fh:
+        start = max(0, size - CODEX_TAIL_BYTES)
+        fh.seek(start)
+        chunk = fh.read()
+    lines = chunk.split(b"\n")
+    if start > 0:
+        lines = lines[1:]  # primeira linha pode estar cortada
+    for raw in reversed(lines):
+        if b"token_count" not in raw or b"rate_limits" not in raw:
+            continue
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            continue
+        p = ev.get("payload") or {}
+        rl = p.get("rate_limits") if p.get("type") == "token_count" else None
+        if not isinstance(rl, dict) or rl.get("limit_id") not in (None, "codex"):
+            continue
+        ts = _parse_time(ev.get("timestamp"))
+        if ts is None:
+            continue
+        found = {"ts": ts, "rl": rl}
+        break
+    for k in [k for k in _codex_cache if k[0] == str(path)]:
+        _codex_cache.pop(k, None)
+    _codex_cache[key] = found
+    return found
+
+
+def usage_codex() -> dict:
+    args = ("codex", "Codex", "codex-rollout")
+    try:
+        base = codex_sessions_dir()
+        if not base.is_dir():
+            return _usage_provider(*args, None, None, None, "Sem sessões do Codex")
+        best = None
+        for f, mt, sz in _codex_recent_files(base):
+            try:
+                hit = _codex_last_rate_limits(f, mt, sz)
+            except OSError:
+                continue
+            if hit and (best is None or hit["ts"] > best["ts"]):
+                best = hit
+        if best is None:
+            return _usage_provider(*args, None, None, None, "Nenhum rate_limits nas sessões recentes do Codex")
+        rl = best["rl"]
+        pri, sec = rl.get("primary") or {}, rl.get("secondary") or {}
+        five = _usage_window(pri.get("used_percent"), pri.get("resets_at"), pri.get("window_minutes"))
+        week = _usage_window(sec.get("used_percent"), sec.get("resets_at"), sec.get("window_minutes"))
+        plan = rl.get("plan_type") if isinstance(rl.get("plan_type"), str) else None
+        return _usage_provider(*args, best["ts"], five, week, "rate_limits sem janelas", plan=plan)
+    except Exception:
+        return _usage_provider(*args, None, None, None, "Falha ao ler as sessões do Codex")
+
+
+def collect_usage() -> dict:
+    providers = []
+    for fn, pid, label, src in ((usage_claude, "claude", "Claude Code", "statusline"),
+                                (usage_codex, "codex", "Codex", "codex-rollout")):
+        try:
+            providers.append(fn())
+        except Exception:  # nunca derruba /api/state nem o outro provedor
+            providers.append(_usage_provider(pid, label, src, None, None, None, "Falha na leitura"))
+    return {"providers": providers}
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(UI_DIR), **kw)
@@ -536,16 +1016,44 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith("/api/live"):
+            # D14 (ADR-017, contrato §9.1): canal leve consultado a cada 1,5 s — sem enrich_log nem handoffs.
+            body, version = live_payload()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("ETag", f'W/"{version}"')   # versão dos dados (log/gates/handoffs/inbox/runs)
+            self.send_header("X-Squad-Version", version)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.startswith("/api/state"):
-            runs = collect_runs()
+            extra = compute(full=True)
+            runs, rules = extra.pop("_runs"), extra.pop("_rules")
+            log = enrich_log(read_log(), runs)
+            for e in log:   # só na resposta: ciclo e devoluções por gate (o log segue append-only)
+                if e.get("type") == "gate" and e.get("id") in rules.gate_meta:
+                    for k, v in rules.gate_meta[e["id"]].items():
+                        e.setdefault(k, v)
             return self._json({
-                "now": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                "log": enrich_log(read_jsonl(LOG), runs),
-                "gates": collect_gates(),
+                "now": extra["now"],
+                "log": log,
+                "gates": gates_cached(),
                 "runs": runs,
                 "handoffs": collect_handoffs(),
                 "github": github_issues(),
+                "usage": collect_usage(),
+                # D14 — só acréscimos (contrato §9.2)
+                "version": extra["version"], "thresholds": extra["thresholds"], "summary": extra["summary"],
+                "alerts": extra["alerts"], "alertsHistory": extra["alertsHistory"], "agents": extra["agents"],
+                "serverMs": extra["serverMs"],
+                "testEnv": extra["testEnv"],   # D15 — acréscimo (formato de GET /api/test-env)
             })
+        if self.path.startswith("/api/test-env"):
+            return self._json(test_env_view())
+        if self.path.startswith("/api/usage"):
+            return self._json({"usage": collect_usage()})
         if self.path.startswith("/api/project"):
             # Portas locais podem variar (.env do compose): placeholders {{VAR}} são resolvidos aqui.
             pj = ROOT / "docs/squad/project.json"
@@ -574,6 +1082,26 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if self.path.startswith("/api/test-env/request"):
+            # D15: só o humano pede; o servidor grava `test-env-request` e dispara o testenv.py em segundo plano.
+            data = json.loads(raw or b"{}")
+            action, demand = data.get("action"), data.get("demand")
+            if demand and not any(e.get("id") == demand and e.get("type") == "task" for e in read_jsonl(LOG)):
+                return self._json({"error": "demanda não encontrada"}, 404)
+            try:
+                res = te.request(demand, action, data.get("confirm"))
+            except te.RequestError as e:
+                return self._json({"error": str(e)}, e.status)
+            if not res.get("duplicate"):
+                if action == "release":
+                    te_spawn("release", "--demand", demand, "--reason", "human")
+                elif action == "down":
+                    te_spawn("down")
+                elif action == "reset-data":
+                    te_spawn("reset-data")
+                else:
+                    te_spawn("reconcile")
+            return self._json({k: v for k, v in res.items() if v is not None}, 202)
         if self.path.startswith("/api/demand/clarify"):
             data = json.loads(raw or b"{}")
             rows = read_jsonl(LOG)
@@ -607,6 +1135,10 @@ class Handler(SimpleHTTPRequestHandler):
             entry = self._append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": data.get("id"),
                                       "action": action, "priority": data.get("priority"),
                                       "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
+            if action == "cancel":
+                s = te.derive(read_jsonl(LOG))   # D15: cancelada libera o teste / sai da fila (reconcile)
+                if s["demand"] == data.get("id") or any(q["demand"] == data.get("id") for q in s["queue"]):
+                    te_spawn("reconcile")
             return self._json(entry, 201)
         if self.path.startswith("/api/demand/edit"):
             data = json.loads(raw or b"{}")
@@ -739,6 +1271,8 @@ def main():
     ap.add_argument("--port", type=int, default=int(os.environ.get("SQUAD_PORT") or 7070))
     port = ap.parse_args().port
     print(f"Squad Control em http://localhost:{port}  (transcrições: {transcripts_root()})")
+    # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
+    threading.Thread(target=lambda: compute(full=False), daemon=True).start()
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 

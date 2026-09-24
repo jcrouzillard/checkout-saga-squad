@@ -3,6 +3,14 @@ name: checkout-saga
 # Configuração comum aos 5 serviços de aplicação (Spring Boot). Cada serviço
 # sobrescreve build.args, image, ports, healthcheck e as chaves específicas
 # de environment (SERVER_PORT, SPRING_DATASOURCE_URL, OTEL_SERVICE_NAME).
+#
+# Portas do host e namespace das imagens de aplicação são variáveis com default
+# igual ao produtivo (projeto checkout-saga). O ambiente de teste (ADR-018,
+# docs/contracts/ambiente-de-teste.md) usa este mesmo arquivo com
+#   docker compose -p checkout-teste --env-file infra/teste/teste.env ...
+# (portas = produtivo + 10000, imagens checkout-teste/*). Só o lado do host
+# muda; portas internas e URLs entre containers (kafka:9092, jaeger:4318,
+# postgres:5432) resolvem pela rede do próprio projeto.
 x-service: &service-base
   build:
     context: .
@@ -39,7 +47,7 @@ services:
   postgres:
     image: postgres:17-alpine
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: checkout
       POSTGRES_PASSWORD: checkout
@@ -57,15 +65,17 @@ services:
   kafka:
     image: apache/kafka:3.8.0
     ports:
-      - "29092:29092"
+      - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       # Os listeners fazem bind em 0.0.0.0 (necessário para o healthcheck via
       # localhost dentro do próprio container); o endereço anunciado aos
       # clientes é que diferencia interno (kafka:9092) de externo (localhost:29092).
+      # A porta anunciada acompanha a publicada: no teste (39092) um cliente do
+      # host não pode ser redirecionado ao Kafka do produtivo.
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT:-29092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -108,9 +118,9 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:1.62.0
     ports:
-      - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
+      - "${JAEGER_UI_PORT:-16686}:16686"
+      - "${OTLP_GRPC_PORT:-4317}:4317"
+      - "${OTLP_HTTP_PORT:-4318}:4318"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     healthcheck:
@@ -126,7 +136,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.54.1
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     healthcheck:
@@ -167,9 +177,9 @@ services:
       context: .
       args:
         MODULE: saga-orchestrator
-    image: checkout-saga/saga-orchestrator:local
+    image: ${IMAGE_NAMESPACE:-checkout-saga}/saga-orchestrator:local
     ports:
-      - "8080:8080"
+      - "${SAGA_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 10s
@@ -188,9 +198,9 @@ services:
       context: .
       args:
         MODULE: order-service
-    image: checkout-saga/order-service:local
+    image: ${IMAGE_NAMESPACE:-checkout-saga}/order-service:local
     ports:
-      - "8081:8081"
+      - "${ORDER_PORT:-8081}:8081"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
       interval: 10s
@@ -209,9 +219,9 @@ services:
       context: .
       args:
         MODULE: inventory-service
-    image: checkout-saga/inventory-service:local
+    image: ${IMAGE_NAMESPACE:-checkout-saga}/inventory-service:local
     ports:
-      - "8082:8082"
+      - "${INVENTORY_PORT:-8082}:8082"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
       interval: 10s
@@ -230,9 +240,9 @@ services:
       context: .
       args:
         MODULE: payment-service
-    image: checkout-saga/payment-service:local
+    image: ${IMAGE_NAMESPACE:-checkout-saga}/payment-service:local
     ports:
-      - "8083:8083"
+      - "${PAYMENT_PORT:-8083}:8083"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
       interval: 10s
@@ -251,9 +261,9 @@ services:
       context: .
       args:
         MODULE: shipping-service
-    image: checkout-saga/shipping-service:local
+    image: ${IMAGE_NAMESPACE:-checkout-saga}/shipping-service:local
     ports:
-      - "8084:8084"
+      - "${SHIPPING_PORT:-8084}:8084"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
       interval: 10s

@@ -1,0 +1,31 @@
+{
+  "gate": "G2",
+  "demand": "efe387a35d71",
+  "from": "frontend",
+  "to": "qa",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Página servida e fluxo navegável contra dados reais", "status": "pass", "weight": 3, "blocking": true,
+     "source": "server.py do worktree na 7111 com SQUAD_ROOT_DATA real + Puppeteer (Docker): 16 rotas abertas (#/painel, #/demandas, ?f=todas, #/demandas/D13, #/demandas/efe387a35d71/gates, D999 -> 'Demanda não encontrada', #/auditoria/gates|eventos|politicas, #/squad, ?agente=frontend -> gaveta com foco em Fechar, #/produto -> #/produto/grafana, #/decisoes -> #/auditoria/eventos, #/execucoes -> #/demandas/D13/execucao, #/painel#squad-base -> #/painel/squad-base, #/xyz -> Painel). Único erro de console: 404 /favicon.ico (pré-existente). aria-current no menu correto em todas; document.title por rota; .tabs removidas; Voltar funciona."},
+    {"name": "Nenhuma chamada nova de API nem dependência nova", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff 2390913..HEAD: conjunto de fetch() idêntico ao da base (/api/state, project, policy, demand, demand/start|edit|clarify|control, human); nenhum <script src>/<link> novo (só as fontes já existentes); nenhum POST disparado ao navegar (interceptação Puppeteer: 0). Diff toca só squad-control/index.html."},
+    {"name": "X11 corrigido e ressalvas do G1", "status": "pass", "weight": 3, "blocking": true,
+     "source": "latestGate() removida (0 usos); latestGateFor(demand) filtra por demanda (null = só gates sem demand, l.441-450); botões [data-human] com data-gate/data-demand/data-note do gate exibido e nota note-<demand|base>-<gate> (l.609-616); POST /api/human monta {action,gate,demand,note} só do dataset (l.1511-1517). Verificado no DOM: D13 -> G1/efe387a35d71/note-efe387a35d71-G1; squad base -> G3//note-base-G3. Ressalva 3: gateNeedsHuman = human_required || conf<70 || risco alto (mesma condição da l.445 antiga). Ressalva 4: pipelineStatus e latestGateFor(null) filtram !demand. Ressalva 5: descrição, motivo do cancelamento, 'Sugestão do Arquiteto' e VREASON na página da demanda. Ressalva 6: scroll/foco só em afterRouteChange; refresh não redesenha route.view==='produto' (iframe preservado após 7 s: true); data-keep e focusKey preservados (nota digitada no gate sobreviveu a 2 ciclos com foco mantido). Ressalva 7: #/painel/squad-base e normalização de '##'. Ressalva 8: rota aceita D13 e id do log. Ressalva 10: runPill e #srv-down. #ai-usage preservada (visível fora de Produto)."},
+    {"name": "Acessibilidade e responsividade", "status": "pass", "weight": 2, "blocking": false,
+     "source": "foco no h1 após troca de rota (ou na nota do gate/1ª resposta quando a rota aponta a seção), anúncio no #sr-live, aria-current=page/location/step; 390 px: scrollWidth = 390 em #/painel, #/demandas/D13, #/auditoria/eventos."},
+    {"name": "Aderência ao contrato", "status": "validate", "weight": 1, "blocking": false,
+     "source": "Divergência: filtro de agente em Auditoria › Eventos usa ?autor= (l.1049/1056), contrato §5 diz ?agente=. Rótulo da ordem 1 é sempre 'intervenção obrigatória' (não há variante 'recomendada' porque a condição adotada já é a obrigatória; devoluções comuns ficam como decisão opcional na seção Gates). Extras entregues: 'Entregues recentemente' e stepper compacto."}
+  ],
+  "open_risks": [
+    "?autor= x contrato: a escolha é tecnicamente correta — o contrato reserva '?agente=' para abrir a gaveta em QUALQUER rota (§5 última linha), então usar o mesmo parâmetro como filtro em #/auditoria/eventos faria o filtro abrir a gaveta (ambiguidade do contrato). Não bloqueia; o Arquiteto deve publicar errata no contrato (§5 e §6.2) trocando o filtro para ?autor= — o código não volta para ?agente=.",
+    "T2 (cenário X11) não foi exercitado com fixture de 2 demandas ativas + RETURN na que não é a última; a correção está verificada por leitura e pelo DOM, mas o QA deve provar pelo evento human no log de fixture.",
+    "Badge 'Precisa de você' não inclui RETURN comum (≤2 ciclos de autocorreção) — alinhado à ressalva 3 do G1, mas diverge do texto literal da §4.3 ordem 1; registrar na errata junto com ?autor=.",
+    "Contador do título '(30)' é o de notificações não lidas (regra anterior), não o de 'Precisa de você' (1 item hoje: Revisar PR #104 da D12) — QA confirmar que é o comportamento esperado.",
+    "tests/ui/d9-screenshots.js e d11-screenshots.js usam nav a[data-view]/.tabs e VIEWS antigas — QA deve migrar para as rotas novas (aliases ajudam)."
+  ],
+  "human_required": false,
+  "rationale": "Verifiquei o diff 2390913..HEAD (só squad-control/index.html, +673/-260) e rodei o painel do worktree com os dados reais via Puppeteer. O defeito X11 está corrigido na origem: não existe mais gate global; cada botão de decisão carrega gate, demanda e nota do gate exibido e o POST usa só esses dados. As ressalvas 1-10 do G1 foram atendidas (regra de intervenção igual à antiga, squad base só sem demand, polling sem rolar/roubar foco, iframe de Produto não recarrega, data-keep preservado, rotas antigas redirecionam). Sem API nova, sem dependência nova, sem erro de console além do favicon. O '?autor=' é um desvio justificado por uma colisão real no contrato (?agente= abre a gaveta em qualquer rota) e deve virar errata do Arquiteto. Confiança = (3+2+3+2+0.5)/11 = 0.95, descontada para 0.88 porque T2 com fixture ainda não foi executado; risco moderado por ser reescrita de navegação num arquivo único com polling de 3 s."
+}

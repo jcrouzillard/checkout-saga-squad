@@ -1,0 +1,97 @@
+{
+  "gate": "G1",
+  "demand": "1e3d3c894630",
+  "code": "D14",
+  "from": "arquiteto",
+  "to": [
+    "orquestrador",
+    "frontend"
+  ],
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.84,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "Respostas do humano refletidas (C1 primeira tela, C2 3 s, C3 Nielsen tela a tela, tema+usabilidade, dados/eventos novos, detalhe do integrante com espera e ação humana explícita)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "contrato §0 (cabeçalho), §6.1-6.2 (C1), §8 (C2), §13.5 (C3), §7.1-7.4 (integrante, espera, 'O que o humano precisa fazer'), §10 (tema)"
+    },
+    {
+      "name": "Definição de bloqueio/aviso aderente à resposta 2",
+      "status": "validate",
+      "weight": 3,
+      "blocking": true,
+      "source": "§5.2 B1-B4/A1-A3 cobrem todos os casos aprovados. Conciliação B2×A1 (conf<70% sem decisão = bloqueio; após decisão = aviso) é coerente com AGENTS.md 'Limites de autonomia' (conf<70% => intervenção obrigatória; hierarquia de verdade nº 2) e com o gateNeedsHuman atual (index.html l.451), mas diverge da letra da resposta do humano; precisa ser comunicada explicitamente ao humano (não só no contrato). 3º ciclo = returns>=3 coerente com 'máx. 2 ciclos, no 3º escala'"
+    },
+    {
+      "name": "Premissas técnicas conferidas contra o código",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "curl /api/state (7070): 1.290.125 B, 0,32-0,68 s (3 medições); setInterval(refresh,3000) l.1547; gateNeedsHuman l.451 × classify l.1262 com regras diferentes (classify trata RETURN como ação); cycle só nos arquivos de gate (G1-1, G1-D1, G1-D10...); server.py parse_run delegations_only l.253/348, 'parado' após 900 s l.319; --dim #7A7B80 = 4,22:1 recalculado"
+    },
+    {
+      "name": "Viabilidade do /api/live (<=64 KB, p95<=300 ms, poll 1,5 s)",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "Arquitetura viável (stdlib, ThreadingHTTPServer, sem enrich_log). Riscos: (a) §9.3 lê a sessão principal do Orquestrador inteira e a maior transcrição tem 33 MB/15.253 linhas (só json.loads = 0,10 s); o mtime muda a cada ação, então cache por mtime não evita reparse — exige leitura incremental por offset; (b) agents[].recent 8×20 itens de até 600 caracteres ≈ 96 KB > 64 KB — truncar no live"
+    },
+    {
+      "name": "--step opcional no log.py sem quebra",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "log.py l.60-90: entry filtra None/[]/'' — argumento opcional ausente não altera o formato; CA-S6 cobre o diff"
+    },
+    {
+      "name": "Limiar A2 = 10 min justificado",
+      "status": "validate",
+      "weight": 1,
+      "blocking": false,
+      "source": "Contrato §5.3 usa p99,9=501 s da DURAÇÃO de ferramentas; A2 mede o intervalo sem atividade, que inclui geração/raciocínio do modelo entre ferramentas (não medido). Valor aceitável e ajustável (SQUAD_STALLED_S), mas medir também o gap entre atividades consecutivas na implementação"
+    },
+    {
+      "name": "Tema Grafite próprio com contraste AA e sem identidade do Itaú",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "Recalculei os 16 tokens: texto >= 4,82:1 no pior fundo (--dim sobre --raised claro), line-strong >= 3,04:1, soft 5,6-7,3:1, on-accent/on-danger >= 7,26:1; accent petróleo #0B5F6A, warn ocre #8A5300 — sem #EC7000 nem azul institucional; CA-T4"
+    },
+    {
+      "name": "Preservação D13 (rotas/ADR-016) e D11 (#ai-usage)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "§12 paridade; §6.1 mantém #ai-usage sticky e --usage-h; §6.3 só acrescenta sub-rotas (#/painel/alertas, #/auditoria/alertas); CA-T5 repassa checklist D13"
+    },
+    {
+      "name": "Critérios de aceite verificáveis",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "§13: CA-S1..S8 com log sintético (SQUAD_LOG/SQUAD_ROOT_DATA existem em server.py l.30-31), CA-U1..U4 com Playwright e medidas, CA-I1..I3, CA-T1..T5, C3 em matriz tela×heurística, tarefas T1-T6 com cliques/tempo"
+    },
+    {
+      "name": "Ownership e tamanho da entrega",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "§14: Orquestrador = tools/squad/** (+ AGENTS.md/docs/squad para --step), Frontend = squad-control/**, QA = tests/**; ADR-017 numeração correta (015 reservado D12). Entrega grande: recomendado fatiar em sequência"
+    }
+  ],
+  "open_risks": [
+    "B2×A1: o humano classificou 'confiança < 70%' como aviso; o contrato a trata como BLOQUEIO até a decisão humana (AGENTS.md prevalece). Coerente, mas o Orquestrador deve informar isso ao humano de forma explícita (no início da execução ou na revisão do PR), com a opção de mudar a política via ADR.",
+    "Desempenho do /api/live: a sessão principal do Orquestrador chega a 33 MB; ler 'por inteiro' a cada 1,5 s não cabe em 300 ms de p95 de forma sustentável. Implementar leitura incremental (offset + estado acumulado por arquivo) e medir serverMs com a sessão real.",
+    "Tamanho do /api/live: agents[].recent (8×20×até 600 caracteres) pode passar de 64 KB; truncar textos no live (ex.: 160 caracteres) ou deixar 'recent' só no /api/state/gaveta.",
+    "C2 para mudanças de etapa da demanda depende de refetch do /api/state (0,3-0,7 s) após mudança de version: orçamento real ≈ 1,5 + 0,3 + 0,7 + render ≈ 2,7 s — margem estreita; o CA-U2 deve medir exatamente esse caminho.",
+    "A2 = 600 s calibrado com duração de ferramentas, não com o intervalo entre atividades (inclui raciocínio do modelo); validar falsos positivos com os dados reais.",
+    "Gates históricos de squad base (demand null) com conf < 70% e sem evento human podem abrir B2 permanente: hoje os 2 gates < 70% têm demanda (48b6ace91207, c6f83b5bb5c7), mas CA-S8 deve confirmar que o painel real abre sem bloqueios fantasmas.",
+    "Entrega grande (server + UI inteira + tema + auditoria): fatiar em F1 servidor (§9 + testes por regra, entregável sozinho, /api/state compatível) → F2 Frontend (tema + barra global + central + cartões/gaveta) → F3 Auditoria/Alertas e legenda; G2 por fatia."
+  ],
+  "human_required": false,
+  "rationale": "Contrato e ADR-017 cobrem todas as respostas do humano com regras exatas, API aditiva, tema com contrastes que recalculei e CAs mensuráveis. Premissas técnicas conferidas no código e no servidor da 7070. Ressalvas não bloqueantes: conciliação B2×A1 precisa ser dita ao humano; /api/live exige leitura incremental da sessão do Orquestrador e truncagem para caber em 300 ms/64 KB; limiar A2 a validar com gaps reais; recomenda-se fatiar. Confiança 0.84 (>= 0,70), risco moderado — intervenção humana opcional."
+}

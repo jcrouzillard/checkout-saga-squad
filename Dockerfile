@@ -57,4 +57,11 @@ COPY --from=build --chown=checkout:checkout /workspace/services/${MODULE}/target
 
 USER checkout
 
+# Commit de origem da imagem (D15, R2): baseline do tools/squad/prod.py para
+# saber o que está implantado. Opcional; vazio quando não informado, ex.:
+#   docker compose build --build-arg REVISION=$(git rev-parse HEAD) order-service
+# Fica no fim para não invalidar o cache das camadas anteriores.
+ARG REVISION=""
+LABEL org.opencontainers.image.revision="${REVISION}"
+
 ENTRYPOINT ["java","-javaagent:/otel/opentelemetry-javaagent.jar","-XX:MaxRAMPercentage=75","-jar","/app/app.jar"]

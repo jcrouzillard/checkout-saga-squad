@@ -1,0 +1,62 @@
+{
+  "gate": "G3",
+  "demand": "1e3d3c894630",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.95,
+  "risk": "baixo",
+  "evidences": [
+    {
+      "name": "Checklist de governança e ciclos do QA",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "tests/ui/checklist-governanca-d14.md + tests/ui/d14-governanca.js. 1º ciclo 81a96ee (QA-1..4) -> correções e33a092/608aeaf -> revalidação b4de5d3 (QA-1..4 pass; QA-5/QA-6) -> correções 0e31c1c/66344b6 -> checagem final 012fa62 / handoff 8262d08d9c08: nenhum defeito aberto; U2 máx 1.620 ms, axe 0 violações, T1-T6."
+    },
+    {
+      "name": "Testes de servidor e regressão",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "Rodados pelo Auditor: python3 -m unittest tests/squad/test_alertas_d14.py (20 OK), tests/squad/test_governanca_d14_qa.py (19 OK), python3 tests/squad/test_entrega_por_pr.py (todas as verificações passaram). Nenhum expectedFailure restante nos testes D14."
+    },
+    {
+      "name": "Verificação própria com dados reais (somente leitura)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "server.py do worktree na 7152 (SQUAD_ROOT_DATA real), derrubado ao fim; 7070 intacto. /api/live 23.129 bytes em ~3 ms (5 amostras). Puppeteer em Docker: #/painel, #/squad?agente=orquestrador, #/auditoria/alertas em claro e escuro (data-theme correto), 0 requisições não-GET (interceptadas), único erro de console 404 /favicon.ico (pré-existente, também registrado no G3-D13). Capturas conferidas: próxima ação e central Bloqueios/Avisos na 1ª dobra, cartões ao vivo com 'Aguarda', gaveta com Espera de ação e O que o humano precisa fazer, tabela de Alertas com aberto/fechado/por quem/evento."
+    },
+    {
+      "name": "Critérios de aceite do humano (1ª tela sem clicar, atualização <= 3 s, heurísticas tela a tela, tema + usabilidade, detalhe por integrante)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": true,
+      "source": "inbox/done/1e3d3c894630.json; polling do /api/live a 1,5 s (index.html poll()), U2 medido <= 1,62 s; checklist de heurísticas; capturas d14-primeira-tela-390/1440, d14-painel-claro/escuro, d14-gaveta-*."
+    },
+    {
+      "name": "Escopo do diff",
+      "status": "pass",
+      "weight": 1,
+      "blocking": true,
+      "source": "git diff origin/develop...HEAD --stat: somente docs/contracts (ui-governanca), docs/adr (ADR-017), docs/squad/gates (G1/G2-D14), tools/squad/{alerts,server,transcripts,log}.py, tests/**, squad-control/index.html."
+    },
+    {
+      "name": "Rastreabilidade e divergência 'confiança < 70% = bloqueio até a decisão'",
+      "status": "validate",
+      "weight": 1,
+      "blocking": false,
+      "source": "Errata §16 item 4 do contrato registra a divergência com a 1ª resposta do humano (que classificou como aviso) e que mudá-la exige novo ADR; evento b0766656b7bd (arquiteto -> orquestrador). Não há evento dirigido ao humano: a comunicação deve ir explícita na descrição do PR."
+    }
+  ],
+  "open_risks": [
+    "Divergência B2/A1 (confiança < 70% é bloqueio até a decisão humana) prevalece sobre a 1ª resposta do humano por AGENTS.md; ainda não foi comunicada diretamente ao humano — o Orquestrador deve destacá-la no corpo do PR.",
+    "Ícones dos integrantes aparecem como glifo ausente no Chromium do container (fontes de emoji); em navegadores de desktop devem renderizar, mas vale conferir na revisão humana.",
+    "Gaveta do integrante lista caminhos absolutos locais em 'Arquivos recentes' (inclui scratchpads /private/tmp): exposição apenas local, sem impacto de segurança no escopo atual.",
+    "404 de /favicon.ico no console (pré-existente)."
+  ],
+  "human_required": false,
+  "rationale": "Todos os critérios bloqueantes cumpridos com evidência verificada no repositório e em execução própria: 39 testes D14 verdes + regressão D8, /api/live leve e rápido com dados reais, UI em claro e escuro sem erros de console nem POSTs, bloqueios/avisos e próxima ação na primeira tela, atualização a 1,5 s (<= 3 s pedido), detalhe por integrante com espera de ação e o que o humano precisa fazer. Seis defeitos do QA fechados em dois ciclos. Escopo restrito ao previsto. Única ressalva de processo: a divergência da regra de 70% está registrada na errata §16 e no log, mas deve ser comunicada ao humano no PR. Confiança 0.95, risco baixo; intervenção humana opcional (revisão do PR)."
+}

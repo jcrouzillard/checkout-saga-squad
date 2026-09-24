@@ -15,8 +15,10 @@ por PR; o Auditor aprova o G3 antes do merge; releases e hotfixes são do Orques
 """
 import argparse
 import json
+import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 from datetime import date
@@ -226,6 +228,27 @@ def feature_finish(a):
     print(url)
 
 
+def after_review(delivered: bool):
+    """D15 (ADR-018): após o merge, primeiro atualiza o produtivo só nos serviços alterados (desligável com
+    SQUAD_PROD_AUTOUPDATE=0) e só depois libera o ambiente de teste e publica o próximo da fila (reconcile). Roda em
+    segundo plano (log em .squad/after-review.log) para o review-sync não ficar preso a builds longos. Só age onde o
+    ambiente existe (cópias sem compose/teste.env são ignoradas)."""
+    steps = []
+    if (delivered and current() == "develop" and os.environ.get("SQUAD_PROD_AUTOUPDATE", "1") != "0"
+            and (ROOT / "docker-compose.yml").exists() and (ROOT / "tools/squad/prod.py").exists()):
+        steps.append(["python3", "tools/squad/prod.py", "update", "--auto"])
+    if (ROOT / "infra/teste/teste.env").exists() and (ROOT / "tools/squad/testenv.py").exists():
+        steps.append(["python3", "tools/squad/testenv.py", "reconcile"])
+    if not steps:
+        return
+    (ROOT / ".squad").mkdir(exist_ok=True)
+    script = " ; ".join(" ".join(shlex.quote(x) for x in cmd) for cmd in steps)
+    with (ROOT / ".squad/after-review.log").open("a", encoding="utf-8") as log_file:
+        subprocess.Popen(["sh", "-c", script], cwd=ROOT, stdout=log_file, stderr=subprocess.STDOUT,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    print("pós-revisão em segundo plano: " + " → ".join(" ".join(c[2:]) for c in steps) + " (log em .squad/after-review.log)")
+
+
 def review_sync(a):
     """Consulta o PR em revisão e registra o desfecho (merge humano ou fechamento)."""
     key = "release" if a.release else "demand"
@@ -255,11 +278,15 @@ def review_sync(a):
         if rv.get("branch", "").startswith("feature/"):
             sh("git", "branch", "-q", "-D", rv["branch"], check=False)
         print(f"entregue ({commit})")
+        if a.demand:
+            after_review(delivered=True)
     elif info["state"] == "CLOSED":
         notes = [c.get("body", "") for c in info.get("comments", [])] + [r.get("body", "") for r in info.get("reviews", [])]
         event("review-rejected", f"Devolvida pelo revisor: PR #{rv['pr']} fechado sem merge", demand=a.demand,
               release=a.release, pr=rv["pr"], url=rv["url"], detail=" | ".join(n for n in notes if n)[:1500])
         print("devolvida pelo revisor")
+        if a.demand:
+            after_review(delivered=False)
     else:
         print("ainda em revisão")
 
