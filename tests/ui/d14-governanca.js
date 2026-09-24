@@ -233,6 +233,21 @@ const ROUTES = ['#/painel', '#/demandas', '#/demandas/D15', '#/squad', '#/audito
     R('sem-F1', { ok: same && !res.live.undefinedIn.length && !res.noLive.undefinedIn.length, same, ...res });
   });
 
+  // ===== Revalidação D14-QA-1: percentual com casa decimal só perto do limite e barra da recomendação proporcional =====
+  await scenario('pct-reco', async () => {
+    const p = await newPage(1440, { readOnly: true });
+    const res = {};
+    for (const [code, expect] of [['D15', 62], ['D17', 69.5]]) {
+      await go(p, `#/demandas/${code}`); await sleep(1500);
+      res[code] = await p.evaluate(() => { const r = document.querySelector('.reco'); const bar = r?.querySelector('.bar > div');
+        return r && { conf: r.querySelector('.conf')?.textContent, style: bar.getAttribute('style'), ratio: bar.getBoundingClientRect().width / bar.parentElement.getBoundingClientRect().width }; });
+      res[code].barOk = !!res[code] && Math.abs(res[code].ratio * 100 - expect) <= 1;
+      if (code === 'D15') { const el = await p.$('.reco'); if (el) await el.screenshot({ path: '/shots/d14-reco-barra-1440.png' }); }
+    }
+    R('pct-reco', { ok: res.D15.barOk && res.D17.barOk && /^69,5%/.test(res.D17.conf) && /^62%/.test(res.D15.conf), ...res });
+    await p._ctx.close();
+  });
+
   // ===== Contraste com axe-core (claro/escuro x 1440/390 x 7 telas) + CA-T2 persistência do tema =====
   await scenario('axe', async () => {
     const res = {};

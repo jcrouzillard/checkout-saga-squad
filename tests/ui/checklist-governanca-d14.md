@@ -14,12 +14,12 @@ Branch `feature/D14-tema-e-usabilidade-do-squad-control`, 2026-09-24. Legenda: �
 ## CA-S — regras e servidor (log sintético)
 | CA | Evidência | Status |
 |---|---|---|
-| S1 abrir/fechar B1–B4, A1–A3 | `test_alertas_d14.py` (17 OK) + `tests/squad/test_governanca_d14_qa.py` (17: 15 OK + 2 falhas esperadas = defeitos): B1 fecha com novo gate/OVERRIDE/cancelar/**delivered**; B2 fecha com decisão (APPROVE/**RETURN**); B3 com decisão/**cancelar**; B4 com clarification/override/cancelar, **`start` sem override não fecha**; A1 fecha com gate ≥ 70% e **cancelar**; A2 fecha com **nova atividade**; A3 com delivered/rejected/**cancelar** | ✓ |
+| S1 abrir/fechar B1–B4, A1–A3 | `test_alertas_d14.py` (revalidação: 20 OK) + `tests/squad/test_governanca_d14_qa.py` (revalidação: 19 = 18 OK + 1 falha esperada, D14-QA-5): B1 fecha com novo gate/OVERRIDE/cancelar/**delivered**; B2 fecha com decisão (APPROVE/**RETURN**); B3 com decisão/**cancelar**; B4 com clarification/override/cancelar, **`start` sem override não fecha**; A1 fecha com gate ≥ 70% e **cancelar**; A2 fecha com **nova atividade**; A3 com delivered/rejected/**cancelar** | ✓ |
 | S2 3º RETURN | B3 `owner: humano`, `returns` volta a 0 depois do `human`; RETURN em outra chave (G3) não soma | ✓ |
-| S3 62% B2 → A1 → fecha | ✓. **0,695** é baixa no servidor e no cliente (B2 aberto; 0,700 não abre nada). Texto: "B2 — confiança **70% < 70%**" e título "G2 exige sua decisão · **70%**" (servidor e fallback) | ~ D14-QA-1 |
+| S3 62% B2 → A1 → fecha | ✓. **0,695** é baixa no servidor e no cliente (B2 aberto; 0,700 não abre nada). Revalidação: "B2 — confiança **69,5% < 70%**" e "G2 exige sua decisão · **69,5%**" no live e no modo sem F1; 62%, 70%, 90% seguem inteiros. Borda 0,6996 no servidor lê "70,0% < 70%" (D14-QA-5) | ✓ QA-1 · ~ QA-5 |
 | S4 601 × 599 s | 601 s ⇒ A2 + `sem-progresso`; 599 s ⇒ nada; ferramenta pendente 200 s ⇒ `current.long` sem A2; **3601 s ⇒ sem A2 e não "trabalhando"** (STALLED_MAX_S); 3590 s ⇒ A2 | ✓ |
 | S4b precedência | run externa com pid morto há 11 min ⇒ um único A2 ("interrompido") e estado `interrompido` (não `sem-progresso`) | ✓ |
-| S4c G3 APPROVE sem PR | 62% sem decisão ⇒ B2 aberto com a demanda encerrada; decisão fecha o B2. **Mas o A1 do G3 fica aberto para sempre** numa demanda encerrada | ✗ D14-QA-2 |
+| S4c G3 APPROVE sem PR | 62% sem decisão ⇒ B2 aberto com a demanda encerrada; decisão fecha o B2 e, na revalidação, **nada fica aberto** (A1 fecha com a demanda encerrada) | ✓ QA-2 |
 | S5 esperas do Orquestrador | `test_orquestrador_espera_subagente_e_humano` ✓; no navegador (7128): cartão "Aguarda: Você, Backend, Frontend — Decidir G2 (D15)" e gaveta lista cada subagente | ✓ |
 | S6 desempenho/compatibilidade | 7127 (dados reais), 20 GETs `/api/live`: p50 3,0 ms, **p95 3,6 ms**, máx 15 ms, 19.675 B (≤ 64 KB), `serverMs` ≤ 5. `/api/state` mantém `now,log,gates,runs,handoffs,github,usage` + chaves novas; `log.py` sem `--step` grava o mesmo formato (teste); `thresholds.stalledMaxSeconds = 3600` em live e state | ✓ |
 | S7 segredos | `ghp_…`, `sk-…`, `password=`, `token=`, `Bearer` mascarados em `recentCommands`, em `/api/live` e em `/api/state` (corpo HTTP inteiro) | ✓ |
@@ -49,7 +49,7 @@ Branch `feature/D14-tema-e-usabilidade-do-squad-control`, 2026-09-24. Legenda: �
 | T2 | "Sistema" segue `prefers-color-scheme: dark`; clique → "Claro"; após F5 o tema já é `light` no `DOMContentLoaded` (sem flash) e `sc-theme=light` | ✓ |
 | T3 | Toda `.sev` tem SVG + palavra; todo `.state` tem ícone + rótulo; `prefers-reduced-motion` zera animações (l.443) | ✓ |
 | T4 | Sem `#EC7000`, sem "Itaú"; paleta = tokens do contrato (o `color: "#1F3A5F"` de `AGENTS` no JS não é usado) | ✓ |
-| T5 | D13 `d13-navegacao.js`: 28 rotas × 1440/390 sem erro, menu/título/usage/sem rolagem horizontal; T1–T10, DEF-1..5 e cancelar-polling ✓. D11 `d11-screenshots.js`: `#ai-usage` logo abaixo do cabeçalho (top 56 = fim do header) em 1440; alturas ≤ 72 px ≥ 600 px; foco/texto preservados. **Mas:** a faixa só atualiza a cada 15 s e, em 390 px, flutua a 94 px do topo com o cabeçalho já rolado | ✗ D14-QA-3, D14-QA-4 |
+| T5 | D13 `d13-navegacao.js`: 28 rotas × 1440/390 sem erro, menu/título/usage/sem rolagem horizontal; T1–T10, DEF-1..5 e cancelar-polling ✓. D11 `d11-screenshots.js`: `#ai-usage` logo abaixo do cabeçalho (top 56 = fim do header) em 1440; alturas ≤ 72 px ≥ 600 px; foco/texto preservados. Revalidação: faixa atualiza em ≤ 1,6 s e, a 390 px rolada, fica em top 0 sem conteúdo acima | ✓ QA-3, QA-4 |
 
 Ajustes de teste (premissas mudaram por contrato, não defeitos): `d13-navegacao.js` T9 e cancelar-polling contam
 `/api/live` (12 polls em 10,5 s); T4 aceita rótulo em maiúsculas; a volta do navegador usa a 1ª demanda listada (a D13 real
@@ -77,11 +77,33 @@ já foi entregue). `d11-screenshots.js` mede `belowHeader` (top da faixa = `--hd
 | Nova demanda (`nova-demanda`) | ✓ | ✓ tipos | ✓ | — | ✓ obrigatórios | — | — | — | ✓ | ✓ |
 
 ## Defeitos
-| Id | Dono | Severidade | Descrição / reprodução |
-|---|---|---|---|
-| D14-QA-1 | Orquestrador + Frontend | baixa | Confiança 0,695: `pct()` arredonda (servidor `alerts.py` e fallback `index.html`) e o texto vira "confiança 70% < 70%" / "G2 exige sua decisão · 70%". Mostrar uma casa decimal quando o valor arredondado for 70% (ex.: "69,5% < 70%"). Teste: `test_texto_da_regra_0695_nao_contraditorio` (falha esperada) |
-| D14-QA-2 | Orquestrador | média | G3 APPROVE 62% sem PR → humano APPROVE: o A1 do G3 fica aberto numa demanda encerrada (a errata só abre exceção para B2). Teste: `test_g3_approve_baixa_confianca_nada_aberto_apos_decisao` (falha esperada) |
-| D14-QA-3 | Orquestrador (ou Frontend) | média | Regressão da D11 CA9: `#ai-usage` atualiza só a cada 15 s. O `version` não inclui `.squad/usage/claude.json` nem os rollouts do Codex, e o `/api/state` só vem com mudança de versão. `d11-screenshots.js` focus-*: API 88% e faixa em 30% por mais de 10 s |
-| D14-QA-4 | Frontend | baixa | ≤ 600 px: o cabeçalho deixa de ser sticky, mas `.ai-usage` segue `top: var(--hdr-h)` (94 px). Ao rolar, a faixa flutua a 94 px e o conteúdo aparece por cima dela (`d11-real-execucoes-scroll-390.png`). Sugestão: `top: 0` quando o header não for sticky |
+| Id | Dono | Severidade | Descrição / reprodução | Situação |
+|---|---|---|---|---|
+| D14-QA-1 | Orquestrador + Frontend | baixa | Confiança 0,695 aparecia como "70% < 70%" | **corrigido** (e33a092 + 608aeaf) |
+| D14-QA-2 | Orquestrador | média | A1 do G3 ficava aberto numa demanda encerrada | **corrigido** (e33a092) |
+| D14-QA-3 | Orquestrador | média | `#ai-usage` só atualizava a cada 15 s | **corrigido** (e33a092: consumo na `version`) |
+| D14-QA-4 | Frontend | baixa | A 390 px a faixa flutuava a 94 px com conteúdo por cima | **corrigido** (608aeaf: `--hdr-stick: 0px`) |
+| D14-QA-5 | Orquestrador | baixa | `alerts.pct_text` usa `:.1f` (arredonda): 0,6996 lê "confiança 70,0% < 70%" no servidor, enquanto o front trunca e mostra "69,9%". Só afeta [0,6995; 0,7). Trocar por truncamento como no front. Teste: `test_pct_text_06996_nao_vira_70` (falha esperada) | aberto (novo) |
+| D14-QA-6 | Frontend | média | Regressão do 608aeaf: `recoHtml` usa o texto de `pct()` (que já traz "%") no estilo da barra: `style="width:62%%"` é CSS inválido e a barra "RECOMENDAÇÃO DO AUDITOR" fica **cheia (100%) para qualquer confiança** (62% e 69,5% medidos). Usar o número (`g.confidence * 100`) na largura. `d14-governanca.js` cenário `pct-reco`; `d14-reco-barra-1440.png` | aberto (novo) |
 
-Veredito QA: CA-S, CA-U, CA-I, T1–T4 da D14 cumpridos. 2 defeitos médios (QA-2, QA-3) e 2 baixos. Nenhum é bloqueio de segurança.
+## Revalidação (2026-09-24, após e33a092 e 608aeaf)
+Ambiente limpo em `$SCRATCH/rv14`: **7141** = cópia do log/gates/inbox/runs da cópia principal (só leitura, POSTs abortados);
+**7142** = cópia + fixtures D15–D19 da D14 (vigia de stop/start para CA-U3); **7143** = cópia reaproveitada da D13/D11
+(`w13`, snapshot do Claude e rollout do Codex de teste); **7144** = cópia cortada antes da D14 real para o `d13-navegacao.js`
+(a `w13` já tinha as fixtures D17/OVERRIDE consumidas pela rodada anterior, o que fazia T2-sino-390 e T6-1440 não acharem o botão:
+estado da cópia, não defeito). Todos derrubados ao final; 7070 intocado.
+
+| Defeito | Evidência | Status |
+|---|---|---|
+| QA-1 | Servidor: regra "B2 — confiança 69,5% < 70% …", título "G2 exige sua decisão · 69,5%"; `pct_text` inteiro para 0,62/0,70/0,90/0,694. Navegador (live e sem F1, D17): mesmas frases; gates "69,5% confiança"; D15 "62%" | ✓ |
+| QA-2 | `test_g3_approve_baixa_confianca_nada_aberto_apos_decisao` passa sem `expectedFailure` (nada aberto após G3 APPROVE 62% + decisão humana) | ✓ |
+| QA-3 | `/api/live` 7143: `version` estável sem mudança, estável quando só `collectedAt` muda, muda quando o percentual muda. Navegador (`d11-screenshots.js` foco-*): do write do snapshot até o medidor do Claude mostrar o valor: **772 / 1.568 / 1.535 ms** (1440) e **796 / 1.586 / 1.545 ms** (390) — ≤ 3 s; foco e texto digitado preservados | ✓ |
+| QA-4 | `d11-screenshots.js` real × 6 telas roladas: 390 px ⇒ faixa em top 0 (`--hdr-stick` 0), `contentAbove` vazio; 1440 ⇒ top 56 = fim do cabeçalho fixo, `contentAbove` vazio; sem rolagem horizontal (`d11-real-*-scroll-390.png`) | ✓ |
+| Suítes | `test_governanca_d14_qa.py` 19 (18 OK + 1 falha esperada QA-5), `test_alertas_d14.py` 20 OK, `test_entrega_por_pr.py` tudo OK. `d14-governanca.js`: CA-U1 1440/390 ✓, CA-U2 máx **1.618 ms** ✓, CA-U3 atrasado 5,1 s / sem conexão 15,1 s ✓, sem F1 ✓, axe 32 páginas 0 violações ✓, T1–T6 ✓. `d13-navegacao.js` (7144): 25 cenários sem erro, T1–T10 ✓, DEF-1..5 e cancelar-polling ✓, 28 rotas × 2 larguras ✓. `d11-screenshots.js`: alturas 68–69 px ≥ 600 px ✓ | ✓ |
+| Novo | `pct-reco` (novo cenário do `d14-governanca.js`): barra da recomendação com `width:62%%` e 100% de largura | ✗ D14-QA-6 |
+
+Capturas regeneradas: `d14-*`, `d13-*`, `d11-*` e a nova `d14-reco-barra-1440.png`.
+
+Veredito QA (revalidação): QA-1..QA-4 corrigidos e verificados; sem regressão nas suítes D11/D13/D14. Dois defeitos novos:
+D14-QA-6 (média, Frontend — barra de confiança sempre cheia, regressão do 608aeaf) e D14-QA-5 (baixa, Orquestrador — borda 0,6996).
+Nenhum é de segurança.

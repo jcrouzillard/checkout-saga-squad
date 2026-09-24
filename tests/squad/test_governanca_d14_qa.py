@@ -147,7 +147,7 @@ class ErrataG2(unittest.TestCase):
         write_log(rows)
         self.assertFalse(open_by_kind(state(), "human-required"))
 
-    @unittest.expectedFailure   # DEFEITO D14-QA-2 (orquestrador): A1 do G3 fica aberto com a demanda já encerrada
+    # D14-QA-2 corrigido em e33a092 (A1 fecha com a demanda encerrada).
     def test_g3_approve_baixa_confianca_nada_aberto_apos_decisao(self):
         rows = base_rows() + [gate("G2", "APPROVE", 0.9, 1, to="qa"), gate("G3", "APPROVE", 0.62, 5, to="orquestrador")]
         write_log(rows)
@@ -182,12 +182,28 @@ class Confianca(unittest.TestCase):
         write_log(base_rows() + [gate("G2", "APPROVE", 0.70, 5, to="qa")])
         self.assertFalse(state()["alerts"])
 
-    @unittest.expectedFailure   # DEFEITO D14-QA-1 (orquestrador): pct() arredonda 69,5% e a regra lê "70% < 70%"
+    # D14-QA-1 corrigido em e33a092 (pct_text: casa decimal só quando o arredondamento esconderia o valor abaixo do limite).
     def test_texto_da_regra_0695_nao_contraditorio(self):
-        """Registro do defeito: pct() arredonda 69,5% para 70% e a regra lê 'confiança 70% < 70%'."""
+        """0,695 aparece como '69,5%' na regra e no título; nunca 'confiança 70% < 70%'."""
         write_log(base_rows() + [gate("G2", "APPROVE", 0.695, 5, to="qa")])
-        rule = open_by_kind(state(), "human-required")[0]["rule"]
-        self.assertNotIn("70% < 70%", rule)
+        b2 = open_by_kind(state(), "human-required")[0]
+        self.assertNotIn("70% < 70%", b2["rule"])
+        self.assertIn("69,5% < 70%", b2["rule"])
+        self.assertIn("69,5%", b2["title"])
+
+    def test_pct_text_inteiro_nos_demais_casos(self):
+        self.assertEqual(al.pct_text(0.62), "62")
+        self.assertEqual(al.pct_text(0.70), "70")
+        self.assertEqual(al.pct_text(0.9), "90")
+        self.assertEqual(al.pct_text(0.694), "69")
+        self.assertEqual(al.pct_text(0.695), "69,5")
+        self.assertIsNone(al.pct_text(None))
+
+    @unittest.expectedFailure   # DEFEITO D14-QA-5 (orquestrador): pct_text usa :.1f (arredonda) e 0,6996 lê "70,0% < 70%"; o front trunca (69,9%)
+    def test_pct_text_06996_nao_vira_70(self):
+        """Valor baixo que arredonda para 70,0 com 1 casa: o texto não pode ler '70,0% < 70%' (o front mostra 69,9%)."""
+        txt = al.pct_text(0.6996)
+        self.assertNotIn(txt, ("70", "70,0"))
 
 
 class ApiHttp(unittest.TestCase):

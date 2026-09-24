@@ -61,7 +61,11 @@ function codexRollout(p, s) {
         max: m.getAttribute('aria-valuemax'), label: m.getAttribute('aria-label'), text: m.getAttribute('aria-valuetext') })),
       text: el.innerText.replace(/\s+/g, ' ').trim(), titles: [...el.querySelectorAll('[title]')].map(x => x.title),
       scrollWidth: de.scrollWidth, clientWidth: de.clientWidth,
-      clipped: [...el.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && !e.classList.contains('u-meter')).length };
+      clipped: [...el.querySelectorAll('*')].filter(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && !e.classList.contains('u-meter')).length,
+      // D14-QA-4: nenhum conteúdo da página visível acima da faixa (só o cabeçalho, quando fixo, pode estar lá).
+      contentAbove: (() => { const hits = []; if (r.top > 1) for (const x of [0.1, 0.5, 0.9]) for (const y of [0.25, 0.75]) {
+        const t = document.elementFromPoint(innerWidth * x, r.top * y); if (t && !hdr.contains(t) && t !== de && t !== document.body) hits.push(t.tagName + (t.id ? '#' + t.id : '')); }
+        return hits; })() };
   });
   const scrollBottom = async p => { await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await sleep(250); };
   const scrollTop = async p => { await p.evaluate(() => window.scrollTo(0, 0)); await sleep(150); };
@@ -79,7 +83,8 @@ function codexRollout(p, s) {
       const s1 = await strip(p);
       res[v] = { atTop: { visible: s0.visible, top: s0.top, height: s0.height }, scrolledY: scrolled,
         afterScroll: { visible: s1.visible, top: s1.top, hdrBottom: s1.hdrBottom, stickyTop: s1.stickyTop, hdrSticky: s1.hdrSticky,
-          inViewport: s1.top >= 0 && s1.top < 900, belowHeader: Math.abs(s1.top - s1.stickyTop) <= 4 && (!s1.hdrSticky || Math.abs(s1.top - s1.hdrBottom) <= 4) },
+          inViewport: s1.top >= 0 && s1.top < 900, belowHeader: Math.abs(s1.top - s1.stickyTop) <= 4 && (!s1.hdrSticky || Math.abs(s1.top - s1.hdrBottom) <= 4),
+          contentAbove: s1.contentAbove, noContentAbove: s1.contentAbove.length === 0 },
         position: s0.position, provs: s0.provs, provTops: s0.provTops, sw: s1.scrollWidth, cw: s1.clientWidth, clipped: s1.clipped };
       if (v === 'execucoes' || v === 'demandas') { await p.screenshot({ path: `/shots/d11-real-${v}-scroll-${w}.png` }); }
       await scrollTop(p);
@@ -166,14 +171,21 @@ function codexRollout(p, s) {
     await p.focus('#dem-title'); await p.keyboard.type('Titulo digitado pelo QA');
     await p.focus('#dem-detail'); await p.keyboard.type('Detalhe em edição — não pode sumir');
     const before = await strip(p);
-    claudeSnap(88, 50);           // muda o valor do Claude
-    await sleep(7000);             // >= 2 ciclos de 3 s
+    // D14-QA-3: do write do snapshot no disco até o medidor do Claude mostrar o novo valor (meta <= 3 s).
+    const claudeNow = () => p.evaluate(() => [...document.querySelectorAll('#ai-usage [role=meter]')].find(m => /claude/i.test(m.getAttribute('aria-label') || ''))?.getAttribute('aria-valuenow'));
+    const lat = [];
+    for (const v of [88, 64, 91]) {
+      claudeSnap(v, 50); const t0 = Date.now(); let ms = null;
+      while (Date.now() - t0 < 16000) { if (+(await claudeNow()) === v) { ms = Date.now() - t0; break; } await sleep(50); }
+      lat.push(ms);
+    }
+    claudeSnap(88, 50); await sleep(3500);
     const mid = await strip(p);
     await p.keyboard.type(' +mais');
     claudeSnap(96, 51); await sleep(3500);
     const after = await strip(p);
     const f = await p.evaluate(() => ({ active: document.activeElement && document.activeElement.id, title: document.querySelector('#dem-title').value, detail: document.querySelector('#dem-detail').value }));
-    out['focus-' + w] = { before: before.meters.map(m => m.now), mid: mid.meters.map(m => m.now), after: after.meters.map(m => m.now), ...f };
+    out['focus-' + w] = { usageLatencyMs: lat, before: before.meters.map(m => m.now), mid: mid.meters.map(m => m.now), after: after.meters.map(m => m.now), ...f };
     await p.screenshot({ path: `/shots/d11-foco-demanda-${w}.png` });
     await p.close();
   }
