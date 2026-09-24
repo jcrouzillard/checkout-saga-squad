@@ -1,0 +1,30 @@
+{
+  "gate": "G3",
+  "demand": "efe387a35d71",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Tarefas T1-T10, X11 e paridade PA-1..23 / CA-1..16", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-navegacao-d13.md + tests/ui/d13-navegacao.js (1º ciclo f89e082ad198: 5 defeitos; correção 89e5834 / e2eb4f62c464; revalidação 64c7b099ccbd: DEF-1..5 corrigidos, 28 rotas em 1440/390, 0 POST no log real). Capturas d13-painel, d13-t2-decisao-390 conferidas: Precisa de você/Em andamento/Entregues com links ↗; decisão humana por ciclo e nota do gate exibido."},
+    {"name": "Verificação própria contra dados reais (somente leitura)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "server.py do worktree na 7118 (SQUAD_ROOT_DATA real) + Puppeteer em Docker, 17 rotas x 1440/390: h1, document.title e aria-current corretos; aliases #/decisoes -> #/auditoria/eventos, #execucoes -> #/demandas/D13/execucao, #/produto -> #/produto/grafana, #/xyz -> #/painel, D999 -> 'Demanda não encontrada', ?agente=qa abre a gaveta; scrollWidth = largura da janela em todas; Voltar do navegador ok; 0 requisições não-GET (interceptadas); único erro de console 404 /favicon.ico (pré-existente)."},
+    {"name": "Escopo da branch", "status": "pass", "weight": 1, "blocking": true,
+     "source": "git diff origin/develop...HEAD --stat: só artefatos da D13 (ADR-016, contrato + errata, G1/G2, squad-control/index.html, tests/ui/** do QA). Sem API nova, sem dependência nova; single-writer respeitado por commit (Arquiteto/Frontend/QA/Auditor)."},
+    {"name": "Rastreabilidade demanda -> contrato -> gates -> handoffs", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Commits D13 (aad017e..6442ac5) ligados a efe387a35d71; handoffs f89e082ad198, e2eb4f62c464, 64c7b099ccbd no log com --demand; errata do contrato (§5 ?autor=, regra de Precisa de você) resolve os open_risks do G2. Pedido do humano (inbox/done/efe387a35d71.json) atendido: menu único por tarefa, página por demanda com Próxima ação, rotas estáveis, sem perda de função (paridade)."},
+    {"name": "Evidências de regressão D9/D11 regeneradas", "status": "validate", "weight": 1, "blocking": false,
+     "source": "d9/d11 migrados para rotas e executados; porém tests/ui/d11-claude-{none,fresh,atencao,critico,corrompido}-1440.png são idênticas (md5 0de2ca86...) e mostram só o cabeçalho, não a faixa #ai-usage: o clip usa getBoundingClientRect (coordenadas da viewport) e a rota aberta rola a página, então y cai em 0. As asserções numéricas da faixa e d11-largura-* estão corretas; só as capturas por estado perderam valor."}
+  ],
+  "open_risks": [
+    "QA: corrigir o clip em tests/ui/d11-screenshots.js (l.127: somar scrollY ou rolar ao topo / usar elementHandle.screenshot) e regenerar d11-claude-*-{1440,390}.png — hoje 10 capturas não mostram a faixa de consumo. Não afeta o produto (faixa verificada visível em todas as rotas, exceto Produto).",
+    "A 390 px o menu horizontal corta 'Produto' sem indicação de rolagem (scrollWidth da página ok); melhoria de affordance, não bloqueia.",
+    "Ícones dos agentes aparecem como '▯' nas capturas do Puppeteer em Docker (fonte ausente no container); conferir num navegador real antes da release.",
+    "tests/TRACEABILITY.md não cita a D13 (demandas de UI usam checklist próprio em tests/ui/); manter o padrão ou incluir linha na release."
+  ],
+  "human_required": false,
+  "rationale": "O ciclo QA -> Frontend -> QA fechou os 5 defeitos sem regressão, e a revalidação cobre T1-T10, X11, paridade e 28 rotas em duas larguras. Minha própria rodada contra os dados reais confirmou rotas, aliases, títulos, aria-current, gaveta, responsividade, Voltar e ausência de POST e de erros de console (só o favicon pré-existente). O escopo da branch é só da D13 e a rastreabilidade demanda -> contrato/ADR -> G1/G2 -> handoffs -> checklist está íntegra. Os critérios G3 de checkout (e2e dos 7 cenários, Jaeger) não se aplicam a uma demanda só de UI do Squad Control; foram substituídos pelo checklist de tarefas do contrato. Única falha de evidência: as capturas d11-claude-* regeneradas estão erradas (clip), o que é defeito de artefato de teste e não do produto. Confiança = (3+2+1+2+0.5)/9 = 0.94, descontada para 0.90 pelas capturas inválidas; risco baixo."
+}
