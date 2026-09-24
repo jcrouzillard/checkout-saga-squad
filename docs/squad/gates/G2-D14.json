@@ -1,0 +1,54 @@
+{
+  "gate": "G2",
+  "demand": "1e3d3c894630",
+  "code": "D14",
+  "from": ["orquestrador", "frontend"],
+  "to": "qa",
+  "cycle": 1,
+  "slices": {"F1": "fdb548a (handoff 63177bfe3e1a)", "F2/F3": "8d57fc8 (handoff b459e0223c17)"},
+  "recommendation": "APPROVE",
+  "confidence": 0.82,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "F1: testes das regras B1-B4/A1-A3 e compatibilidade", "status": "pass", "weight": 3, "blocking": true,
+     "source": "python3 tests/squad/test_alertas_d14.py: 17 testes OK (0,74 s); tests/squad/test_entrega_por_pr.py: todas as verificações passaram (sem regressão)"},
+    {"name": "F1: ressalvas 2-6 do G1 no código", "status": "pass", "weight": 3, "blocking": true,
+     "source": "transcripts.py l.86-129 leitura incremental por offset (reinicia se inode muda ou arquivo encolhe); server.py l.54/638 LIVE_MAX_BYTES=64 KB com corte progressivo; alerts.compact_agent remove recent[] e trunca em 160 caracteres; alerts.py l.12 STALLED_S=600 (SQUAD_STALLED_S); rules._closed + filtros de demanda encerrada; real: 0 bloqueios fantasmas"},
+    {"name": "F1: /api/live com dados reais (servidor do worktree, porta 7126, só leitura)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "12 curl: 24.150 B, 3,4-5,0 ms (serverMs 3) — folga de 60x no p95 de 300 ms e 2,7x no teto de 64 KB; /api/state 1,50 MB. Resumo real: 0 bloqueios, 1 aviso (A3 PR #104 D12), Frontend 'aguardando parecer do Auditor (G2)', Auditor 'trabalhando' — coerente com o momento"},
+    {"name": "F1: decisões de política fora da letra do contrato", "status": "validate", "weight": 2, "blocking": false,
+     "source": "(a) STALLED_MAX_S=3600 (alerts.py l.13/395/435, server.py l.579): contrato §5.2 A2 não tem teto — ERRATA. (b) interrompido antes de sem-progresso (alerts.py l.517): contrato §7.3 lista sem-progresso primeiro, mas a regra A2 inclui a run interrompida, então na ordem do contrato 'interrompido' seria inalcançável — código correto, ERRATA no §7.3. (c) Orquestrador aguardando o humano com qualquer item owner=humano aberto: é literalmente a 3ª linha do §7.4 — sem errata (efeito visto: Orquestrador em D14 'Aguarda: Você' por PR #104 da D12). (d) G3 APPROVE sem PR encerra a demanda mas ainda avalia B2 do G3 (alerts.py l.213-218): contraria §5.1 'itens de demanda encerrada fecham'; a escolha é mais segura (AGENTS.md: conf<70%/risco alto exige humano) — ERRATA no §5.1/§5.2"},
+    {"name": "F2: tema Grafite (tokens, claro/escuro, AA, sem identidade do Itaú)", "status": "pass", "weight": 2, "blocking": false,
+     "source": "index.html l.20-35: tokens iguais ao contrato §10; recalculei: pior texto 4,82:1 (claro, --dim/--raised) e 5,56:1 (escuro); --line-strong 3,43/3,90:1; *-soft 5,6-7,3:1; sem #EC7000 nem azul institucional; prefers-color-scheme + data-theme + seletor 'Tema: Sistema'; prefers-reduced-motion l.443"},
+    {"name": "F2/F3: barra ao vivo, central, cartões, gaveta de 7 seções, aba Alertas, legenda", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Puppeteer (Docker) 1440x900 em #/painel, #/squad?agente=orquestrador, #/auditoria/alertas, claro e escuro: 'Ao vivo · atualizado há 0 s', contadores bloqueios/avisos/Você, 'Sua próxima ação', central Bloqueios|Avisos com 'Quem age' e 'Por quê?', 8 cartões com estado/espera, gaveta com as 7 seções (Agora, Espera de ação, O que o humano precisa fazer, Arquivos, Comandos, Linha do tempo, Execuções anteriores), aba Alertas com histórico; legenda em #/auditoria/politicas (#legenda) com link a partir do Squad; sem 'undefined/NaN'; 0 erros de console (exceto um 404 de recurso estático no 1º carregamento, provável favicon)"},
+    {"name": "F2: /api/live 1,5 s e /api/state só na mudança de versão ou 15 s; fallback sem F1", "status": "pass", "weight": 2, "blocking": true,
+     "source": "index.html l.1952-1990 (poll sem sobreposição, 10 s oculto, 404 no /api/live => modo compatível /api/state a cada 3 s); medido: 7 /api/live e 1 /api/state em ~10 s por página. ruleNeedsHuman única (l.691) só no fallback; classify (l.1810) virou só 'novidade'"},
+    {"name": "Preservação D13 e D11", "status": "validate", "weight": 2, "blocking": false,
+     "source": "Rotas D13 e sub-rotas novas funcionam; #ai-usage presente e sticky em top: var(--hdr-h) (§6.1 do contrato). Declarado pelo Frontend e aceitável: d13-navegacao.js T9 e cancelar-polling contam /api/state (a premissa mudou por contrato §8.2) e a checagem da D11 assume #ai-usage no topo 0 — testes a ajustar, não regressão de comportamento"},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 1, "blocking": true,
+     "source": "git diff bb2083c..HEAD --stat: squad-control/index.html, tests/squad/test_alertas_d14.py, tools/squad/{alerts,log,server,transcripts}.py — só donos declarados (§14); worktree limpo"}
+  ],
+  "errata_required": [
+    "§5.2 A2: acrescentar o teto STALLED_MAX_S = 3600 s (run sem atividade há >= 1 h é tratada como sessão morta: sai do A2 e o cartão cai para concluído/ocioso) e expô-lo em thresholds.",
+    "§7.3: inverter a precedência para interrompido > sem-progresso (a regra A2 abrange a run interrompida; na ordem atual 'interrompido' é inalcançável).",
+    "§5.1/§5.2: G3 APPROVE sem PR encerra a demanda, mas B2/B3 do próprio G3 continuam abertos até decisão humana (exceção explícita ao 'itens de demanda encerrada fecham')."
+  ],
+  "open_risks": [
+    "Política (c) é conforme o contrato, mas faz o Orquestrador de uma demanda aparecer 'Aguarda: Você' por item de outra demanda (PR #104 da D12). Sugestão (não bloqueante): mostrar o código da demanda no texto da espera — já aparece 'Revisar PR #104 (D12)'; avaliar com o humano se basta.",
+    "Ressalva 5 do G1 (A2=600 s medido pelo gap entre atividades) não tem evidência de falsos positivos com dados reais; hoje o painel real está sem A2.",
+    "Ressalva 1 do G1 (B2×A1 comunicada ao humano) depende do Orquestrador na revisão do PR.",
+    "Fallback ruleNeedsHuman arredonda a confiança (Math.round(c*100) < 70): 0,695 não é baixo no cliente e é no servidor — só no modo sem F1; alinhar para c < 0.70.",
+    "Avatares aparecem como glifo vazio no Chrome do Docker (sem fonte de emoji) — artefato do ambiente de teste, conferir em navegador real.",
+    "Fontes IBM Plex vêm do Google Fonts; offline cai no fallback declarado (sem quebra)."
+  ],
+  "qa_priorities": [
+    "CA-S1..S8 e CA-S4 (601 s => A2; 599 s => nada) + casos de borda das políticas (a), (b) e (d) com log sintético (SQUAD_LOG/SQUAD_ROOT_DATA).",
+    "CA-U2 (≤ 3 s do fato ao DOM, 10 repetições) medindo o caminho /api/live -> mudança de version -> /api/state -> render; CA-U3 dados defasados > 15 s desabilitam decisões e reabilitam ao reconectar.",
+    "Ajustar tests/ui/d13-navegacao.js T9 e cancelar-polling para contar /api/live (e /api/state só em mudança de version/15 s), e a checagem da D11 para esperar #ai-usage com top = --hdr-h; rodar o checklist D13 completo (rotas, X11, foco/rolagem preservados) e D11.",
+    "Fallback sem F1 (servidor antigo: /api/live 404) com as mesmas contagens do servidor em fixture; alinhar arredondamento da confiança.",
+    "Contraste AA automatizado (axe) claro/escuro e 390 px; tarefas T1-T6 de usabilidade (C3)."
+  ],
+  "human_required": false,
+  "rationale": "F1 cumpre as ressalvas técnicas do G1: leitura incremental, /api/live de 24 KB em ~4 ms com dados reais, A2=600 s ajustável, sem bloqueios herdados; 17 testes de regra verdes e suíte da D8 sem regressão. F2/F3 entregam tema Grafite AA (recalculado), barra ao vivo, central, cartões, gaveta de 7 seções e aba Alertas, verificados no navegador em claro e escuro sem erros de console, com o polling do §8.2 medido. Três decisões de política do servidor divergem da letra do contrato (teto de 1 h do A2, precedência interrompido, B2 do G3 em demanda encerrada) — todas defensáveis e (b) corrige inconsistência interna do contrato — exigem errata do Arquiteto, sem retrabalho de código. As quebras de testes D11/D13 decorrem da mudança contratada de polling e posição do #ai-usage: ajuste do QA. Confiança 0,82, risco moderado; intervenção humana opcional."
+}
