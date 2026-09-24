@@ -155,7 +155,9 @@ QA = r"""\\*["'`]"""
 # passwordHash). Chaves que só CONTÊM a palavra (tokenizer, tokenCount, totalTokens, maxTokens, passwordPolicy,
 # passwordMinLength, secretsManager) não são segredo — mesma leitura do mínimo do contrato §8.2, `palavra\s*[=:]`.
 SECRET_WORDS = (r"(?:password|passwd|senha|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|"
-                r"credentials?)")
+                r"credentials?|passphrase|"
+                # palavras curtas só valem como chave inteira ou depois de separador (card_pin, x-otp), nunca "spin"
+                r"(?:(?<=[_.-])|(?<![\w.-]))(?:cvv|cvc|pin|otp))")
 SECRET_SUFFIX = r"(?:[_.-]?(?:key|value|hash|b64|base64|enc|encoded|encrypted|plain))?"
 _SECRET_KEY = r"(?<![\w.-])[\w.-]{0,80}?" + SECRET_WORDS + SECRET_SUFFIX + r"(?![\w-])"
 _QUOTED_VALUE = (r"(?P<bs>\\*)(?P<q>[\"'`])(?!\[MASCARADO)(?!(?P=bs)(?P=q))(?P<val>.*?)"
@@ -224,7 +226,7 @@ PII_PATTERNS = [
     ("endereco", re.compile("(" + Q + STREET_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
     ("cep", re.compile("(" + Q + ZIP_KEYS + Q + r"\s*:\s*)" + Q + r"?[\d.\s-]{5,10}" + Q + r"?")),
     ("nome", re.compile("(" + Q + NAME_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
-    ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
+    ("email", re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}")),
     ("cnpj", re.compile(r"(?<![\w./-])\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}(?![\w-])")),
     ("cpf", re.compile(r"(?<![\w.-])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\w-])")),
     # separadores opcionais (529982247-25, 529 982 247 25, 52998224725): só com dígito verificador válido.
