@@ -124,7 +124,10 @@ function codexRollout(p, s) {
       const api = await p.evaluate(async () => (await fetch('/api/state').then(r => ({ status: r.status, j: r })).then(async x => ({ status: x.status, usage: (await x.j.json()).usage }))));
       res[name] = { height: s.height, provTops: s.provTops, text: s.text, titles: s.titles, meters: s.meters, provClasses: s.provClasses, sw: s.scrollWidth, cw: s.clientWidth,
         apiStatus: api.status, api: api.usage.providers.map(x => ({ id: x.id, status: x.status, reason: x.reason, five: x.fiveHour && x.fiveHour.usedPercent, week: x.week && x.week.usedPercent })) };
-      const clip = await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: Math.max(0, r.top - 4), width: innerWidth, height: r.height + 8 }; });
+      // G3-D13 ressalva 1: a rota pode rolar a página; o clip do puppeteer é em coordenadas da página, então rola ao topo
+      // e soma window.scrollY ao top do getBoundingClientRect (coordenada absoluta da faixa).
+      await scrollTop(p);
+      const clip = await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: Math.max(0, r.top + window.scrollY - 4), width: innerWidth, height: r.height + 8 }; });
       await p.screenshot({ path: `/shots/d11-claude-${name}-${w}.png`, clip });
     }
     out['fix-' + w] = res;
@@ -145,7 +148,7 @@ function codexRollout(p, s) {
       const s = await strip(p);
       out.heights[w][name] = { height: s.height, stacked: s.provTops.length === 2 && s.provTops[0] !== s.provTops[1], overflowX: s.scrollWidth > s.clientWidth,
         text: s.text, titles: s.titles, valuetext: s.meters.map(m => m.text) };
-      if (name === 'longo' && [600, 700, 900].includes(w)) await p.screenshot({ path: `/shots/d11-largura-${w}.png`, clip: await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: r.bottom + 8 }; }) });
+      if (name === 'longo' && [600, 700, 900].includes(w)) { await scrollTop(p); await p.screenshot({ path: `/shots/d11-largura-${w}.png`, clip: await p.evaluate(() => { const r = document.querySelector('#ai-usage').getBoundingClientRect(); return { x: 0, y: 0, width: innerWidth, height: r.bottom + window.scrollY + 8 }; }) }); }
     }
     await p.close();
   }
