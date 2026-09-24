@@ -8,7 +8,7 @@ executor falso do `docker compose logs`). Nenhum POST ao servidor real (:7070) n
   arquivo, diagnóstico preservado, e o arquivo gravado em bugs/ é IDÊNTICO à prévia confirmada (bytes e sha256).
 - PRÉVIA: limite de 200 linhas da prévia versus o arquivo inteiro que vai ao git.
 - DESEMPENHO: `.log` de ~1 MB com uma linha longa (base64) → prévia em < 3 s (servidor inteiro); e-mail sem
-  retrocesso (1 MB); casos quadráticos remanescentes documentados como `expectedFailure` (defeito registrado).
+  retrocesso (1 MB); casos antes quadráticos (QA-D16-2, corrigido) agora em tempo linear.
 - CHAVES CURTAS: pin/otp/cvv/cvc/passphrase (adendo do Orquestrador) sem pegar spin/pinned/otpEnabled.
 - CA-13 REAL: `gitflow.py feature-start` (CLI) e `align_memory` num CLONE temporário com origin nu temporário e a
   pasta bugs/ ainda não rastreada.
@@ -108,14 +108,11 @@ class Q01Corpus(unittest.TestCase):
     def test_linhas_json_continuam_json(self):
         """JSON do logback continua JSON após a máscara (payload escapado 1–2 vezes, stack trace, SQL)."""
         masked, _ = er.mask_text(corpus_text(), KEY)
-        for i, ln in enumerate(masked.splitlines()):
-            if i == 8:          # linha com customerName="..." sem aspas de JSON: ver o teste abaixo (defeito)
-                continue
+        for ln in masked.splitlines():
             json.loads(ln)
 
-    @unittest.expectedFailure
     def test_nome_sem_aspas_nao_atravessa_a_string_json(self):
-        """DEFEITO (QA-D16-4): `customerName=\\"Ana\\" cpf=...` dentro do `message` → o padrão `nome=` sem aspas
+        """CORRIGIDO em e565020 — era o defeito (QA-D16-4): `customerName=\\"Ana\\" cpf=...` dentro do `message` → o padrão `nome=` sem aspas
         consome a aspa de fechamento do JSON; nada vaza (mascara a mais), mas a linha deixa de ser JSON válido."""
         masked, _ = er.mask_text(corpus.lines()[8], KEY)
         json.loads(masked)
@@ -151,9 +148,8 @@ class Q06ExtractedSummary(unittest.TestCase):
         for s in ("Rua das Acacias Ficticias", "ana.ficticia@exemplo.com.br", "529.982.247-25", "hunter2-inventado"):
             self.assertNotIn(s, snap)
 
-    @unittest.expectedFailure
     def test_resumo_extraido_no_bug_json_mascarado(self):
-        """DEFEITO (QA-D16-1): `extracted` (mensagem da exceção e status do span) é gravado em bug.json SEM máscara
+        """CORRIGIDO em e565020 — era o defeito (QA-D16-1): `extracted` (mensagem da exceção e status do span) é gravado em bug.json SEM máscara
         — endereço, e-mail, CPF e senha da mensagem da exceção vão para o git público; o arquivo 01-trace está
         mascarado, mas o resumo não. Também aparece na resposta do rascunho (prévia) e na página do bug."""
         _, doc, d = self.draft_and_create()
@@ -201,15 +197,13 @@ class Q03Performance(unittest.TestCase):
         er.mask_text(text, KEY)
         return time.monotonic() - t0
 
-    @unittest.expectedFailure
     def test_barras_invertidas_em_sequencia(self):
-        """DEFEITO (QA-D16-2): `chave_valor` começa com `\\\\*` sem âncora → quadrático numa sequência de barras:
+        """CORRIGIDO em e565020 — era o defeito (QA-D16-2): `chave_valor` começa com `\\\\*` sem âncora → quadrático numa sequência de barras:
         20 KB de `\\` levam ~22 s (1 MB: horas). Correção sugerida: `(?<!\\\\)` antes do `\\\\*` inicial."""
         self.assertLess(self._quick("\\" * 5_000), 0.5)
 
-    @unittest.expectedFailure
     def test_pontos_e_digitos_em_sequencia(self):
-        """DEFEITO (QA-D16-2): `_REC_START` (`(?<![\\w$])[\\w$.]*[Aa]ddress`) recomeça a cada caractere depois de
+        """CORRIGIDO em e565020 — era o defeito (QA-D16-2): `_REC_START` (`(?<![\\w$])[\\w$.]*[Aa]ddress`) recomeça a cada caractere depois de
         `.` → quadrático em `....`, `1.1.1.` ou domínios longos: 40 KB ~4–9 s. Correção: `(?<![\\w$.])`."""
         self.assertLess(self._quick("." * 20_000), 0.5)
 
@@ -229,13 +223,51 @@ class Q04ShortKeys(unittest.TestCase):
             m, _ = er.mask_text(s, KEY)
             self.assertEqual(m, s, s)
 
-    @unittest.expectedFailure
     def test_chaves_camel_case_de_cartao(self):
-        """DEFEITO (QA-D16-3): chaves camelCase com as palavras curtas não são mascaradas: `"cardCvv":"123"`,
+        """CORRIGIDO em e565020 — era o defeito (QA-D16-3): chaves camelCase com as palavras curtas não são mascaradas: `"cardCvv":"123"`,
         `"cardPin"`, `"pinCode"`, `"otpCode"` (cvv é dado de cartão; PCI). `card_pin`/`x-otp` funcionam."""
         for s in ['"cardCvv":"123"', '"cardPin":"1111"', '"pinCode":"4321"', '"otpCode":"998877"']:
             m, _ = er.mask_text(s, KEY)
             self.assertIn("[MASCARADO:segredo]", m, s)
+
+
+class Q07Revalidacao(unittest.TestCase):
+    """Revalidação após e565020: resumo de painel/alerta mascarado, entradas patológicas de 1 MB lineares, camelCase
+    e falsos positivos, efeitos colaterais declarados (`"auth":{...}` por campo; `mapPin` mascarado)."""
+    PII = ("ana.ficticia@exemplo.com.br", "529.982.247-25", "hunter2-inventado", "tok_live_inventado")
+
+    def test_resumo_de_painel_e_alerta_mascarado(self):
+        h.DASHBOARD["panels"].append({"id": 97, "type": "stat", "title": "Pedidos de ana.ficticia@exemplo.com.br senha=hunter2-inventado",
+                                      "targets": [{"expr": 'sum(rate(x{email="ana.ficticia@exemplo.com.br"}[5m]))'}]})
+        h.Prod.rules["r-pii"] = {"uid": "r-pii", "title": "Falha cpf 529.982.247-25 password=hunter2-inventado", "condition": "C",
+                                 "for": "1m", "labels": {}, "annotations": {}, "data": [{"model": {"expr": 'up{token="tok_live_inventado"}'}}]}
+        for link in ("http://localhost:3001/d/checkout-saga/x?viewPanel=97&from=now-1h&to=now",
+                     "http://localhost:3001/alerting/grafana/r-pii/view"):
+            st, d, _ = h.draft("operacao", link=link)
+            self.assertEqual(st, 201, d)
+            self.assertEqual([x for x in self.PII if x in json.dumps(d, ensure_ascii=False)], [], link)
+
+    def test_entradas_patologicas_1mb(self):
+        for name, text in (("barras", "\\" * 1_000_000), ("pontos", "." * 1_000_000), ("1.1.", "1.1." * 250_000),
+                           ("dominio", "a" + ".sub-dominio" * 85_000), ("Address[", "Address[" * 125_000),
+                           ("aspas escapadas", '\\"' * 500_000), ("customerName", 'customerName=\\"' * 60_000)):
+            t0 = time.monotonic()
+            er.mask_text(text, KEY)
+            self.assertLess(time.monotonic() - t0, 1.0, name)
+
+    def test_camel_case_e_falsos_positivos(self):
+        for s in ['"pwd":"abc"', "userPwd=abc", "DB_PWD=abc", '"auth":"Basic dXNlcjpwYXNz"', "x-auth: abc", "cvv_number=1"]:
+            self.assertIn("[MASCARADO:segredo]", er.mask_text(s, KEY)[0], s)
+        for s in ['"author":"ana"', "oauth2Client=web", "PWD=/home/app", "authorId=7", "authType=BASIC", '"pinCount":3',
+                  '"authenticated":true', '"otpauth":"x"']:
+            self.assertEqual(er.mask_text(s, KEY)[0], s, s)
+
+    def test_efeitos_colaterais_declarados(self):
+        m, _ = er.mask_text('{"auth":{"user":"ana","password":"hunter2-inventado","token":"tok_live_inventado"}}', KEY)
+        json.loads(m)
+        self.assertNotIn("hunter2-inventado", m)
+        self.assertNotIn("tok_live_inventado", m)
+        self.assertEqual(er.mask_text("mapPin=1", KEY)[0], "mapPin=[MASCARADO:segredo]")   # a mais: aceitável
 
 
 class Q05CA13Real(unittest.TestCase):

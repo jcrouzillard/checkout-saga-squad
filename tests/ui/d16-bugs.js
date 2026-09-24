@@ -1,4 +1,6 @@
 // D16 (841f9a27e64a) — demandas de bug: fluxo da UI ponta a ponta (QA). Checklist: tests/ui/checklist-bugs-d16.md.
+// Revalidação (após e565020/6ec999a): QA-D16-5 (aviso da máscara, "Mostrando 200 de N linhas", arquivo inteiro mascarado)
+// e QA-D16-6 (409 com o verbo certo) viram condição de `ok`; `exigeLeitura` só registra a recomendação ao Frontend.
 // Servidor do WORKTREE com dados TEMPORÁRIOS (nunca o :7070 nem o log real), Jaeger/Grafana/Prometheus SIMULADOS e
 // `docker compose logs` SIMULADO (tests/ui/d16_simulados.py, tests/ui/d16-docker-simulado):
 //   S=<scratch>; mkdir -p $S/data/docs/squad/memory $S/main $S/trans; cp docs/squad/memory/decisions.jsonl $S/data/docs/squad/memory/
@@ -100,7 +102,8 @@ function relay(port, host = 'host.docker.internal') {
     await shot(p, `previa-produto-${w}`);
     // clareza: a UI diz que a máscara é por padrão (pode deixar passar) e que a prévia precisa ser LIDA?
     const clarity = await p.evaluate(() => { const t = document.querySelector('#main').innerText;
-      return { porPadrao: /por padr(ão|ões)|padrões conhecidos|automátic|pode (deixar )?passar|não (pega|detecta|reconhece)|chaves? desconhecid/i.test(t), leiaPrevia: /leia|revise|confira/i.test(t), revisei: /Revisei a prévia mascarada/.test(t) }; });
+      return { porPadrao: /por padr(ão|ões)|padrões conhecidos|automátic|pode (deixar )?passar|não (pega|detecta|reconhece)|chaves? desconhecid/i.test(t), leiaPrevia: /leia|revise|confira/i.test(t), revisei: /Revisei a prévia mascarada/.test(t),
+        aviso: document.querySelector('#main [id$="-maskwarn"]')?.textContent || null }; });
     const dfile = (p._draft?.evidences || []).find(e => /order-service\.log$/.test(e.file))?.file;
     const draftLog = dfile ? await p.evaluate(async (d, f) => { const r = await fetch(`/api/bug/draft/${d}/${f}`); return r.ok ? r.text() : null; }, p._draft.draft, dfile) : null;
     const draftPreview = (p._draft?.evidences || []).find(e => e.file === dfile)?.preview;
@@ -118,7 +121,7 @@ function relay(port, host = 'host.docker.internal') {
     const logServed = served.find(x => /order-service\.log$/.test(x.u));
     created[w] = { id, code: page.hash.split('/')[2] };
     await shot(p, `pagina-bug-${w}`);
-    R(`produto-${w}`, { ok: before.dis && s0.dis && s1.dis && !s2.dis && prev.masked && !prev.leaked.length && !prev.imgInsidePre && !prev.xss && prev.imgs.every(i => i.ok) && post[0]?.s === 201 && page.bugtag && served.every(x => x.s === 200 && x.nosniff === 'nosniff') && stored === draftLog && logServed?.txt === stored,
+    R(`produto-${w}`, { ok: clarity.porPadrao && /padrões conhecidos/.test(clarity.aviso || '') && before.dis && s0.dis && s1.dis && !s2.dis && prev.masked && !prev.leaked.length && !prev.imgInsidePre && !prev.xss && prev.imgs.every(i => i.ok) && post[0]?.s === 201 && page.bugtag && served.every(x => x.s === 200 && x.nosniff === 'nosniff') && stored === draftLog && logServed?.txt === stored,
       before: before.why, s0: s0.why, s1: s1.why, s2: s2.why, prev: { ...prev, consent: prev.consent?.slice(0, 200) }, clarity, post, page, served: served.map(({ txt, ...x }) => x), files: (p._draft?.evidences || []).map(e => e.file), storedEqualsPreviewDraft: stored === draftLog, previewIsFileHead: draftPreview === (stored || '').split('\n').slice(0, 200).join('\n').replace(/\n$/, ''), servedEqualsStored: logServed?.txt === stored });
     await p.close();
   }
@@ -129,13 +132,14 @@ function relay(port, host = 'host.docker.internal') {
     await fill(p, { kind: 'operacao', title: 'Squad Control devolve 500 ao registrar demanda' });
     await upload(p, 'dem-bug-files', ['squad-control.log', 'tela-erro.png']);
     await click(p, '[data-bug-draft="new"].btn:not(.sm)'); await waitPreview(p, 'new'); await sleep(600);
-    const pv = await p.evaluate(() => ({ pre: document.querySelector('#main pre.buglog')?.textContent, extracted: document.querySelector('#main .bugprev dl')?.innerText }));
+    const pv = await p.evaluate(() => ({ pre: document.querySelector('#main pre.buglog')?.textContent, extracted: document.querySelector('#main .bugprev dl')?.innerText,
+      red: document.querySelector('#main .evl .red')?.textContent, aviso: document.querySelector('#main [id$="-maskwarn"]')?.textContent || null }));
     await shot(p, 'previa-operacao-chave-desconhecida-1440');
     await click(p, '#dem-bug-cprod'); await click(p, '#dem-bug-cpub'); await sleep(200);
     await click(p, '[data-bug-submit="new"]');
     await p.waitForFunction(() => document.querySelector('#sec-bug'), { timeout: 15000, polling: 100 }).catch(() => null); await sleep(1200);
     const sec = await text(p, '#sec-bug');
-    R('operacao', { ok: p._res.some(r => r.u === '/api/demand' && r.s === 201) && /declaração humana/.test(sec) && /produtivo/.test(sec), pwdAuthEmClaro: /abc123|xyz789/.test(pv.pre || ''), pre: pv.pre, sec: sec.slice(0, 400), hash: await p.evaluate(() => location.hash) });
+    R('operacao', { ok: p._res.some(r => r.u === '/api/demand' && r.s === 201) && /declaração humana/.test(sec) && /produtivo/.test(sec) && !/abc123|xyz789/.test(pv.pre || '') && /padrões conhecidos/.test(pv.aviso || ''), pwdAuthEmClaro: /abc123|xyz789/.test(pv.pre || ''), red: pv.red, aviso: pv.aviso, pre: pv.pre, sec: sec.slice(0, 400), hash: await p.evaluate(() => location.hash) });
     created.op = { code: (await p.evaluate(() => location.hash)).split('/')[2] };
     await p.close();
   }
@@ -167,7 +171,7 @@ function relay(port, host = 'host.docker.internal') {
     const m409 = await p.evaluate(() => ({ msg: [...document.querySelectorAll('#main p.fail')].map(x => x.textContent), prev: !!document.querySelector('#dem-bug-prev'), hash: location.hash }));
     await p.evaluate(() => document.querySelector('#main .fail[role=status]')?.scrollIntoView({ block: 'center' }));
     await shot(p, `409-tipo-${w}`, false);
-    R(`409-${w}`, { ok: p._res.some(r => r.u === '/api/demand' && r.s === 409) && m409.msg.some(t => /diverge/.test(t) && /prévia de novo/.test(t)), verboAcrescentar: m409.msg.some(t => /acrescentar/i.test(t)), btnAntes: st, swapped, res: p._res.slice(-2), ...m409 });
+    R(`409-${w}`, { ok: p._res.some(r => r.u === '/api/demand' && r.s === 409) && m409.msg.some(t => /diverge/.test(t) && /prévia de novo/.test(t) && /registrar o bug/.test(t)) && !m409.msg.some(t => /acrescentar/i.test(t)), verboAcrescentar: m409.msg.some(t => /acrescentar/i.test(t)), btnAntes: st, swapped, res: p._res.slice(-2), ...m409 });
     await p.close();
   }
 
@@ -193,15 +197,25 @@ function relay(port, host = 'host.docker.internal') {
     await upload(p, `bugx-${c.id}-files`, ['longo.log']);
     await click(p, `[data-bug-draft="${c.id}"].btn:not(.sm)`); await waitPreview(p, c.id); await sleep(700);
     const lp = await p.evaluate(id => { const pre = document.querySelector(`#bugadd-${id} pre.buglog`)?.textContent || ''; const t = document.getElementById(`bugadd-${id}`).innerText;
-      return { linhas: pre.split('\n').length, mostraLinha501: /SEGREDO_NA_LINHA_501/.test(pre), avisaTruncamento: /200 (primeiras )?linhas|primeiras 200|de 501|truncad|mostrando/i.test(t), abrirArquivo: !!document.querySelector(`#bugadd-${id} .evl a`) }; }, c.id);
+      return { linhas: pre.split('\n').length, mostraLinha501: /SEGREDO_NA_LINHA_501/.test(pre), avisaTruncamento: /200 (primeiras )?linhas|primeiras 200|de 501|truncad|mostrando/i.test(t), abrirArquivo: !!document.querySelector(`#bugadd-${id} .evl a`),
+        mostrando: document.querySelector(`#bugadd-${id} [data-bug-trunc]`)?.textContent || null, linkInteiro: [...document.querySelectorAll(`#bugadd-${id} .evl a`)].map(a => ({ t: a.textContent, href: a.getAttribute('href') })),
+        verInteiro: document.querySelector(`#bugadd-${id} details[id$="-full"] summary`)?.textContent || null }; }, c.id);
+    // recomendação ao Frontend: com a prévia truncada, o botão só deveria habilitar depois de abrir o arquivo inteiro.
+    // Aqui só MEDIMOS: marca as 2 confirmações ANTES de abrir o arquivo inteiro e vê se o botão já habilita.
     await click(p, `#bugx-${c.id}-cprod`); await click(p, `#bugx-${c.id}-cpub`); await sleep(200);
+    const semLer = await btnState(p, `[data-bug-append="${c.id}"]`);
+    lp.exigeLeitura = semLer.dis ? { exige: 'sim', motivo: semLer.why } : { exige: 'não', obs: 'habilita com as 2 caixas sem abrir o arquivo inteiro' };
+    // o arquivo inteiro (mascarado) chega à tela: abre o "Ver o arquivo inteiro" e lê a linha 501
+    lp.inteiro = await p.evaluate(async id => { const d = document.querySelector(`#bugadd-${id} details[id$="-full"]`); if (!d) return null; d.open = true; d.dispatchEvent(new Event('toggle')); await new Promise(r => setTimeout(r, 900));
+      const pre = d.querySelector('pre.buglog')?.textContent || ''; const u = d.getAttribute('data-bug-log'); const srv = u ? await (await fetch(u)).text() : null;
+      return { linhas: pre.replace(/\n$/, '').split('\n').length, linha501: pre.split('\n').find(l => /SEGREDO_NA_LINHA_501/.test(l)) || null, segredoEmClaro: /nao-aparece-na-previa/.test(pre + (srv || '')), igualAoServidor: srv != null && pre === srv }; }, c.id);
     await shot(p, `acrescentar-previa-${w}`);
     await click(p, `[data-bug-append="${c.id}"]`); await sleep(2000);
     const after = await p.evaluate(id => ({ msg: document.querySelector(`#bugadd-${id} .ok-msg, #sec-bug .ok-msg`)?.textContent || [...document.querySelectorAll('#sec-bug [role=status]')].map(x => x.textContent).join(' | '),
       files: [...document.querySelectorAll('#sec-bug .evl .fn')].map(x => x.textContent) }), c.id);
     await shot(p, `acrescentar-feito-${w}`);
     const bj = JSON.parse(fs.readFileSync(`${DATA}/docs/squad/produto/bugs/${c.id}/bug.json`, 'utf8'));
-    R(`acrescentar-${w}`, { ok: p._res.some(r => r.u === '/api/bug/evidence' && r.s === 201) && bj.evidences.length === n0.length + 1 && JSON.stringify(bj.evidences.slice(0, n0.length)) === JSON.stringify(n0), previaLonga: lp, after, evidencesNoBugJson: bj.evidences.map(e => e.file) });
+    R(`acrescentar-${w}`, { ok: p._res.some(r => r.u === '/api/bug/evidence' && r.s === 201) && /Mostrando 200 de 501 linhas/.test(lp.mostrando || '') && /arquivo inteiro/i.test(lp.verInteiro || '') && lp.inteiro?.linhas === 501 && /\[MASCARADO:segredo\]/.test(lp.inteiro?.linha501 || '') && !lp.inteiro?.segredoEmClaro && lp.inteiro?.igualAoServidor && !lp.mostraLinha501 && bj.evidences.length === n0.length + 1 && JSON.stringify(bj.evidences.slice(0, n0.length)) === JSON.stringify(n0), previaLonga: lp, after, evidencesNoBugJson: bj.evidences.map(e => e.file) });
     await p.close();
   }
   // demanda comum: sem "Acrescentar evidência"; POST direto → 409 (CA-18)

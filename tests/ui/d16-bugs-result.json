@@ -5,9 +5,6 @@
       "dem": [
         "Registrar bug",
         "+ Nova demanda",
-        "Ver validação na D19",
-        "Ver validação na D18",
-        "Ver validação na D17",
         "Responder na D16",
         "Revisar PR #104 (abre em nova aba)",
         "Ver D12"
@@ -26,9 +23,6 @@
       "dem": [
         "Registrar bug",
         "+ Nova demanda",
-        "Ver validação na D19",
-        "Ver validação na D18",
-        "Ver validação na D17",
         "Responder na D16",
         "Revisar PR #104 (abre em nova aba)",
         "Ver D12"
@@ -62,8 +56,8 @@
         "xss": null,
         "red": [
           "Mascarado: endereços 1",
-          "Mascarado: segredos 9 · dados pessoais 2 · endereços 5 · pseudônimos 4",
-          "Mascarado: segredos 9 · dados pessoais 2 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
           "Mascarado: metadados da imagem 1"
         ],
         "extracted": "Origem\nTrace do Jaeger\nLink\nhttp://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\nVerificado por\nJaeger do produtivo (o trace existe em :16686)\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">",
@@ -74,9 +68,10 @@
         ]
       },
       "clarity": {
-        "porPadrao": false,
+        "porPadrao": true,
         "leiaPrevia": true,
-        "revisei": true
+        "revisei": true,
+        "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara."
       },
       "post": [
         {
@@ -86,15 +81,15 @@
         }
       ],
       "page": {
-        "hash": "#/demandas/D23",
-        "head": "BUG D23 · EM VALIDAÇÃO · ANALISANDO…",
+        "hash": "#/demandas/D17",
+        "head": "BUG D17 · EM VALIDAÇÃO · ANALISANDO…",
         "bugtag": true,
-        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/509b1edec3f6\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
+        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/5c592485a143\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
         "links": [
-          "/api/bug/509b1edec3f6/file/01-trace-4bf92f35.log",
-          "/api/bug/509b1edec3f6/file/02-logs-4bf92f35.log",
-          "/api/bug/509b1edec3f6/file/03-order-service.log",
-          "/api/bug/509b1edec3f6/file/04-tela-erro.png"
+          "/api/bug/5c592485a143/file/01-trace-4bf92f35.log",
+          "/api/bug/5c592485a143/file/02-logs-4bf92f35.log",
+          "/api/bug/5c592485a143/file/03-order-service.log",
+          "/api/bug/5c592485a143/file/04-tela-erro.png"
         ],
         "toc": [
           "Bug",
@@ -106,7 +101,7 @@
       },
       "served": [
         {
-          "u": "/api/bug/509b1edec3f6/file/01-trace-4bf92f35.log",
+          "u": "/api/bug/5c592485a143/file/01-trace-4bf92f35.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
@@ -114,23 +109,23 @@
           "n": 1292
         },
         {
-          "u": "/api/bug/509b1edec3f6/file/02-logs-4bf92f35.log",
+          "u": "/api/bug/5c592485a143/file/02-logs-4bf92f35.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
           "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
-          "n": 8086
+          "n": 8135
         },
         {
-          "u": "/api/bug/509b1edec3f6/file/03-order-service.log",
+          "u": "/api/bug/5c592485a143/file/03-order-service.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
           "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
-          "n": 7885
+          "n": 7934
         },
         {
-          "u": "/api/bug/509b1edec3f6/file/04-tela-erro.png",
+          "u": "/api/bug/5c592485a143/file/04-tela-erro.png",
           "s": 200,
           "ct": "image/png",
           "nosniff": "nosniff",
@@ -168,8 +163,8 @@
         "xss": null,
         "red": [
           "Mascarado: endereços 1",
-          "Mascarado: segredos 9 · dados pessoais 2 · endereços 5 · pseudônimos 4",
-          "Mascarado: segredos 9 · dados pessoais 2 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
           "Mascarado: metadados da imagem 1"
         ],
         "extracted": "Origem\nTrace do Jaeger\nLink\nhttp://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\nVerificado por\nJaeger do produtivo (o trace existe em :16686)\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">",
@@ -180,9 +175,10 @@
         ]
       },
       "clarity": {
-        "porPadrao": false,
+        "porPadrao": true,
         "leiaPrevia": true,
-        "revisei": true
+        "revisei": true,
+        "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara."
       },
       "post": [
         {
@@ -192,15 +188,15 @@
         }
       ],
       "page": {
-        "hash": "#/demandas/D24",
-        "head": "BUG D24 · EM VALIDAÇÃO · ANALISANDO…",
+        "hash": "#/demandas/D18",
+        "head": "BUG D18 · EM VALIDAÇÃO · ANALISANDO…",
         "bugtag": true,
-        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/c6871477ab5d\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
+        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/d7a4179fc0bf\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
         "links": [
-          "/api/bug/c6871477ab5d/file/01-trace-4bf92f35.log",
-          "/api/bug/c6871477ab5d/file/02-logs-4bf92f35.log",
-          "/api/bug/c6871477ab5d/file/03-order-service.log",
-          "/api/bug/c6871477ab5d/file/04-tela-erro.png"
+          "/api/bug/d7a4179fc0bf/file/01-trace-4bf92f35.log",
+          "/api/bug/d7a4179fc0bf/file/02-logs-4bf92f35.log",
+          "/api/bug/d7a4179fc0bf/file/03-order-service.log",
+          "/api/bug/d7a4179fc0bf/file/04-tela-erro.png"
         ],
         "toc": [
           "Bug",
@@ -212,7 +208,7 @@
       },
       "served": [
         {
-          "u": "/api/bug/c6871477ab5d/file/01-trace-4bf92f35.log",
+          "u": "/api/bug/d7a4179fc0bf/file/01-trace-4bf92f35.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
@@ -220,23 +216,23 @@
           "n": 1292
         },
         {
-          "u": "/api/bug/c6871477ab5d/file/02-logs-4bf92f35.log",
+          "u": "/api/bug/d7a4179fc0bf/file/02-logs-4bf92f35.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
           "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
-          "n": 8086
+          "n": 8135
         },
         {
-          "u": "/api/bug/c6871477ab5d/file/03-order-service.log",
+          "u": "/api/bug/d7a4179fc0bf/file/03-order-service.log",
           "s": 200,
           "ct": "text/plain; charset=utf-8",
           "nosniff": "nosniff",
           "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
-          "n": 7885
+          "n": 7934
         },
         {
-          "u": "/api/bug/c6871477ab5d/file/04-tela-erro.png",
+          "u": "/api/bug/d7a4179fc0bf/file/04-tela-erro.png",
           "s": 200,
           "ct": "image/png",
           "nosniff": "nosniff",
@@ -256,10 +252,12 @@
     },
     "operacao": {
       "ok": true,
-      "pwdAuthEmClaro": true,
-      "pre": "{\"level\":\"ERROR\",\"message\":\"POST /api/demand 500\",\"pwd\":\"abc123\",\"auth\":\"xyz789\"}",
-      "sec": "Bug\nAmbiente\nprodutivo · verificado por declaração humana (sem prova técnica)\nSeveridade\nMédia\nOrigem\nsó arquivos enviados (sem link)\nPasta no git\ndocs/squad/operacao/bugs/11ea67f08e9c\nConfirmações\nprodutivo ✓ · repositório público ✓\nEVIDÊNCIAS (2)\n01-squad-control.log\nlog\n82 B\nenviado por você\nAbrir o arquivo\n(abre em nova aba)\nNada precisou ser mascarado\nVer o log (texto)\n02-tela-erro.png\nimagem",
-      "hash": "#/demandas/D25"
+      "pwdAuthEmClaro": false,
+      "red": "Mascarado: segredos 2",
+      "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara.",
+      "pre": "{\"level\":\"ERROR\",\"message\":\"POST /api/demand 500\",\"pwd\":\"[MASCARADO:segredo]\",\"auth\":\"[MASCARADO:segredo]\"}",
+      "sec": "Bug\nAmbiente\nprodutivo · verificado por declaração humana (sem prova técnica)\nSeveridade\nMédia\nOrigem\nsó arquivos enviados (sem link)\nPasta no git\ndocs/squad/operacao/bugs/26f9348752f4\nConfirmações\nprodutivo ✓ · repositório público ✓\nEVIDÊNCIAS (2)\n01-squad-control.log\nlog\n108 B\nenviado por você\nAbrir o arquivo\n(abre em nova aba)\nMascarado: segredos 2\nVer o log (texto)\n02-tela-erro.png\nimagem\n74 B",
+      "hash": "#/demandas/D19"
     },
     "422-1440": {
       "ok": true,
@@ -270,7 +268,7 @@
     },
     "409-1440": {
       "ok": true,
-      "verboAcrescentar": true,
+      "verboAcrescentar": false,
       "btnAntes": {
         "dis": false,
         "why": ""
@@ -289,7 +287,7 @@
         }
       ],
       "msg": [
-        "Não foi possível acrescentar (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
+        "Não foi possível registrar o bug (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
       ],
       "prev": true,
       "hash": "#/demandas/bug"
@@ -303,7 +301,7 @@
     },
     "409-390": {
       "ok": true,
-      "verboAcrescentar": true,
+      "verboAcrescentar": false,
       "btnAntes": {
         "dis": false,
         "why": ""
@@ -322,7 +320,7 @@
         }
       ],
       "msg": [
-        "Não foi possível acrescentar (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
+        "Não foi possível registrar o bug (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
       ],
       "prev": true,
       "hash": "#/demandas/bug"
@@ -330,16 +328,16 @@
     "filtro-1440": {
       "ok": true,
       "seg": [
-        "Ativas 11",
-        "Com ação sua 5",
+        "Ativas 5",
+        "Com ação sua 2",
         "Na fila 0",
         "Backlog 0",
         "Entregues 14",
         "Canceladas 0",
-        "Bugs 9",
-        "Todas 25"
+        "Bugs 3",
+        "Todas 19"
       ],
-      "rows": 9,
+      "rows": 3,
       "tags": [
         {
           "t": "BUG",
@@ -363,16 +361,16 @@
     "filtro-390": {
       "ok": true,
       "seg": [
-        "Ativas 11",
-        "Com ação sua 5",
+        "Ativas 5",
+        "Com ação sua 2",
         "Na fila 0",
         "Backlog 0",
         "Entregues 14",
         "Canceladas 0",
-        "Bugs 9",
-        "Todas 25"
+        "Bugs 3",
+        "Todas 19"
       ],
-      "rows": 9,
+      "rows": 3,
       "tags": [
         {
           "t": "BUG",
@@ -398,8 +396,26 @@
       "previaLonga": {
         "linhas": 200,
         "mostraLinha501": false,
-        "avisaTruncamento": false,
-        "abrirArquivo": false
+        "avisaTruncamento": true,
+        "abrirArquivo": true,
+        "mostrando": "Mostrando 200 de 501 linhas. O restante também vai para o git: leia o arquivo inteiro já mascarado antes de confirmar.",
+        "linkInteiro": [
+          {
+            "t": "Abrir o arquivo inteiro (mascarado) (abre em nova aba)",
+            "href": "/api/bug/draft/4894a09674694de2b2db09118d09b8a0/01-longo.log"
+          }
+        ],
+        "verInteiro": "Ver o arquivo inteiro (mascarado, 501 linhas)",
+        "exigeLeitura": {
+          "exige": "não",
+          "obs": "habilita com as 2 caixas sem abrir o arquivo inteiro"
+        },
+        "inteiro": {
+          "linhas": 501,
+          "linha501": "SEGREDO_NA_LINHA_501 senha=[MASCARADO:segredo]",
+          "segredoEmClaro": false,
+          "igualAoServidor": true
+        }
       },
       "after": {
         "msg": "Evidência acrescentada (1 arquivo(s)).",
@@ -424,8 +440,26 @@
       "previaLonga": {
         "linhas": 200,
         "mostraLinha501": false,
-        "avisaTruncamento": false,
-        "abrirArquivo": false
+        "avisaTruncamento": true,
+        "abrirArquivo": true,
+        "mostrando": "Mostrando 200 de 501 linhas. O restante também vai para o git: leia o arquivo inteiro já mascarado antes de confirmar.",
+        "linkInteiro": [
+          {
+            "t": "Abrir o arquivo inteiro (mascarado) (abre em nova aba)",
+            "href": "/api/bug/draft/d6ea77e8a633a8042ddf621416f02acb/01-longo.log"
+          }
+        ],
+        "verInteiro": "Ver o arquivo inteiro (mascarado, 501 linhas)",
+        "exigeLeitura": {
+          "exige": "não",
+          "obs": "habilita com as 2 caixas sem abrir o arquivo inteiro"
+        },
+        "inteiro": {
+          "linhas": 501,
+          "linha501": "SEGREDO_NA_LINHA_501 senha=[MASCARADO:segredo]",
+          "segredoEmClaro": false,
+          "igualAoServidor": true
+        }
       },
       "after": {
         "msg": "Evidência acrescentada (1 arquivo(s)).",

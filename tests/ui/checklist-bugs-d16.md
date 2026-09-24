@@ -1,7 +1,7 @@
 # Checklist QA — D16 demandas de bug (`841f9a27e64a`)
 
 Contrato `docs/contracts/demandas-de-bug.md` (§13), ADR-019, G2-D16-3 (prioridades do QA). Worktree
-`feature/D16-demandas-de-bug` @ `9abadb7`. Tudo isolado: servidor do worktree na porta 7161 com `SQUAD_ROOT_DATA`/
+`feature/D16-demandas-de-bug` @ `9abadb7` (revalidação @ `e565020`). Tudo isolado: servidor do worktree na porta 7161 com `SQUAD_ROOT_DATA`/
 `SQUAD_LOG` em uma cópia temporária, Jaeger/Grafana/Prometheus e `docker compose logs` simulados
 (`tests/ui/d16_simulados.py`, `tests/ui/d16-docker-simulado`). Nenhum POST ao :7070 nem ao log real; nenhum container
 tocado (só `docker logs` para ler o formato real, sem gravar dados reais). Servidores derrubados ao fim.
@@ -10,7 +10,7 @@ tocado (só `docker logs` para ler o formato real, sem gravar dados reais). Serv
 | Suíte | Resultado |
 |---|---|
 | `tests/squad/test_bugs_d16.py` (assumida pelo QA) | 38 OK |
-| `tests/squad/test_bugs_d16_qa.py` (nova) | 14 testes: 9 OK + 5 `expectedFailure` = defeitos QA-D16-1..4 (viram "unexpected success" quando corrigidos) |
+| `tests/squad/test_bugs_d16_qa.py` (nova) | 18 OK na revalidação (antes: 9 OK + 5 `expectedFailure` = QA-D16-1..4) |
 | `test_alertas_d14` 20 OK · `test_governanca_d14_qa` 19 OK · `test_ambiente_teste_d15` 41 OK · `test_e2e_compose_seguro_d15` 11 OK · `test_entrega_por_pr` OK | sem regressão |
 | `tests/ui/d16-bugs.js` (Puppeteer em Docker) | 16/16 cenários `ok` (`tests/ui/d16-bugs-result.json`) |
 
@@ -45,14 +45,30 @@ tocado (só `docker logs` para ler o formato real, sem gravar dados reais). Serv
 | D14 "sem-F1" falso positivo | CORRIGIDO | `tests/ui/d14-governanca.js`: `uiOnlyBad` ignora ocorrências cujo contexto está em strings de `/api/state`; na cópia do log real o regex antigo acusava `#/auditoria/eventos` (8 literais), o novo acusa 0 e detecta um `undefined`/`NaN` injetado |
 
 ## Defeitos
-| Id | Dono | Sev. | Resumo | Teste |
-|---|---|---|---|---|
-| QA-D16-1 | orquestrador | alta | `extracted.errorSpans[].exceptionMessage`/`statusDescription` gravados em `bug.json` (git público) sem máscara | `Q06…test_resumo_extraido_no_bug_json_mascarado` |
-| QA-D16-2 | orquestrador | média | regex quadráticas: `chave_valor` (`\\*` inicial sem âncora) e `_REC_START` (`(?<![\w$])[\w$.]*`); prévia prende `bugs.LOCK` | `Q03…barras…`, `Q03…pontos…` |
-| QA-D16-3 | orquestrador | média | `cardCvv`, `cardPin`, `pinCode`, `otpCode` (camelCase) sem máscara; `pwd`, `auth` também | `Q04…camel_case…` |
-| QA-D16-4 | orquestrador | baixa | `customerName=\"…\"` sem aspas consome o fim da string JSON (JSON inválido, sem vazamento) | `Q01…nome_sem_aspas…` |
-| QA-D16-5 | frontend | média | UI não comunica máscara por padrão; prévia de log truncada em 200 linhas sem aviso/link | `d16-bugs.js` (`clarity`, `previaLonga`) |
-| QA-D16-6 | frontend | baixa | 409 no Registrar bug diz "acrescentar" | `d16-bugs.js` (`verboAcrescentar`) |
+| Id | Dono | Sev. | Resumo | Teste | Situação |
+|---|---|---|---|---|---|
+| QA-D16-1 | orquestrador | alta | `extracted.errorSpans[].exceptionMessage`/`statusDescription` gravados em `bug.json` (git público) sem máscara | `Q06…resumo_extraido…`, `Q07…painel_e_alerta…` | **corrigido** (e565020) |
+| QA-D16-2 | orquestrador | média | regex quadráticas (`chave_valor`, `_REC_START`); prévia prendia `bugs.LOCK` | `Q03…barras…`, `Q03…pontos…`, `Q07…1mb` | **corrigido** (e565020) |
+| QA-D16-3 | orquestrador | média | `cardCvv`, `cardPin`, `pinCode`, `otpCode`, `pwd`, `auth` sem máscara | `Q04…camel_case…`, `Q07…camel_case…` | **corrigido** (e565020) |
+| QA-D16-4 | orquestrador | baixa | `customerName=\"…\"` consumia o fim da string JSON | `Q01…nome_sem_aspas…`, `Q01…linhas_json…` (sem exceção de linha) | **corrigido** (e565020) |
+| QA-D16-5 | frontend | média | UI não comunicava máscara por padrão; prévia truncada sem aviso/link | `d16-bugs.js` (`produto-*`, `operacao`, `acrescentar-*`) | **corrigido** (6ec999a) |
+| QA-D16-6 | frontend | baixa | 409 no Registrar bug dizia "acrescentar" | `d16-bugs.js` (`409-*`) | **corrigido** (6ec999a) |
+| QA-D16-7 | orquestrador | baixa | chaves `pass`, `passcode`, `db.pass`, `mysqlPass` e `"auth":{"pass":…,"key":…}` não são mascaradas (fora do mínimo do §8.2; o aviso da UI cobre) | reval (scratchpad) | novo, aberto |
+| QA-D16-8 | frontend | baixa (recomendação) | com prévia truncada, o botão habilita só com as 2 caixas, sem abrir o arquivo inteiro; sugerido exigir abrir "Ver o arquivo inteiro" antes | `d16-bugs.js` (`exigeLeitura`) | recomendação, aberto |
+
+## Revalidação após as correções (e565020 Orquestrador, 6ec999a Frontend)
+| Item | Resultado | Evidência |
+|---|---|---|
+| Suítes `tests/squad/` | PASS | `test_bugs_d16_qa` 18 OK (5 `expectedFailure` removidos + 4 novos em `Q07`), `test_bugs_d16` 38 OK, `test_alertas_d14` 20, `test_governanca_d14_qa` 19, `test_ambiente_teste_d15` 41, `test_e2e_compose_seguro_d15` 11, `test_entrega_por_pr` OK |
+| QA-D16-1 | PASS | trace com e-mail/token no `operationName`, `customerName=` numa tag de correlação, e-mail+senha no `status_description`, `Address[...]`+CPF+senha+e-mail na exceção: nada sobra na resposta do rascunho, `bug.json`, `GET /api/bug/<id>`, evidências e log; painel (título/expr) e alerta (título/expr) também mascarados |
+| QA-D16-2 | PASS | `mask_text`: `\` 20 KB 0,01 s / 1 MB 0,5 s; `.` 40 KB 0,01 s / 1 MB 0,35 s; `1.1.` 1 MB 0,31 s; domínio 1 MB 0,29 s; `Address[` 1 MB 0,42 s; `\"`, `customerName=\"`, `{"auth":` 1 MB ≤ 0,6 s. Concorrência: rascunho com trace lento (3 s) + log de 1 MB (3,5 s no total) e, durante ele, 3 rascunhos pequenos + GET do arquivo em ≤ 0,02 s; outro rascunho durante a confirmação de 1 MB em 0,25 s |
+| QA-D16-3 | PASS | `cardCvv`/`cardPin`/`pinCode`/`otpCode`/`pwd`/`userPwd`/`DB_PWD`/`auth`/`x-auth`/`spring.auth`/`cvv_number` mascarados; `spin`/`author`/`authorId`/`authority`/`authType`/`oauth2Client`/`PWD=/home/app`/`OLDPWD=/tmp`/`pinCount`/`authenticated`/`otpauth`/`checkpoint` preservados |
+| QA-D16-4 | PASS | as 10 linhas do corpus continuam JSON válido após a máscara |
+| Efeitos colaterais | aceitáveis | `"auth":{...}`: campos internos com palavra-chave são mascarados e o JSON continua válido — mas `pass`/`key` internos passam (QA-D16-7, baixa, não é regressão: antes `auth` não era chave); `mapPin=1`/`dropPin=5` mascarados a mais (lado seguro). Ressalva: `pwd`/`userPwd` com valor começando por `/` não são mascarados (troca consciente por `PWD=/caminho`) |
+| QA-D16-5 | PASS | UI 1440/390: aviso "A máscara é automática e reconhece apenas padrões conhecidos…" na prévia; contagem "Nenhum padrão conhecido encontrado — revise o conteúdo" quando nada é mascarado; log de 501 linhas → "Mostrando 200 de 501 linhas…", "Ver o arquivo inteiro (mascarado, 501 linhas)" com a linha 501 `senha=[MASCARADO:segredo]` idêntica ao servidor, e link "Abrir o arquivo inteiro (mascarado)" (`d16-acrescentar-previa-*.png`) |
+| QA-D16-6 | PASS | 409: "Não foi possível registrar o bug (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto." (`d16-409-tipo-*.png`) |
+| Corpus completo | PASS | enviado e gerado do link (01-trace + 02-logs): arquivo gravado == rascunho (bytes e sha256), prévia == 200 primeiras linhas, 0 de 17 valores sensíveis no arquivo, `bug.json` e log; diagnóstico preservado |
+| Fluxo de UI | 16/16 `ok`, 0 erros JS | `tests/ui/d16-bugs-result.json` (condições de QA-D16-5/6 agora exigidas no `ok`) |
 
 ## Como rodar
 `python3 tests/squad/test_bugs_d16.py && python3 tests/squad/test_bugs_d16_qa.py`; fluxo de UI: cabeçalho de
