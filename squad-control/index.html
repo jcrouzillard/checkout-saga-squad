@@ -487,6 +487,42 @@
   .te-box h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
   .te-stale { color: var(--warn); font-weight: 600; }
   @media (max-width: 900px) { .te-grid { grid-template-columns: minmax(0, 1fr); } }
+  /* ================= D16 (ADR-019, contrato demandas-de-bug §10): demandas de bug ================= */
+  .bugtag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .08em; line-height: 1.5; padding: 0 6px; border: 1px solid var(--danger); border-radius: 2px; color: var(--danger); background: var(--danger-soft); white-space: nowrap; }
+  .code + .bugtag, .bugtag + .code { margin-left: 0; }
+  .ttl .bugtag { margin-right: 8px; vertical-align: 1px; }
+  .bugf { max-width: 760px; margin-top: 20px; }
+  .bugf .f { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin: 14px 0 4px; }
+  .bugf input[type=text], .bugf input[type=url], .bugf select { width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 2px; font: inherit; }
+  .bugf .hint { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  .bugf .linkrow { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  .bugf .linkrow input { flex: 1 1 260px; min-width: 0; }
+  .drop { margin-top: 6px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: 4px; background: var(--raised); font-size: 13px; }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop input[type=file] { max-width: 100%; margin-top: 6px; font: inherit; font-size: 13px; }
+  .flist { list-style: none; margin: 8px 0 0; padding: 0; font-size: 13px; }
+  .flist li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line2); min-width: 0; }
+  .flist li .fn { font-family: "IBM Plex Mono", monospace; font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
+  .ferr { list-style: none; margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--danger); background: var(--danger-soft); font-size: 13px; }
+  .ferr li + li { margin-top: 4px; }
+  .bugprev { margin-top: 16px; border-top: 1px solid var(--line-strong); padding-top: 10px; }
+  .bugprev h3, .bugsec h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+  .kvl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 13px; margin: 0; }
+  .kvl dt { color: var(--muted); } .kvl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .evl { list-style: none; margin: 0; padding: 0; }
+  .evl > li { padding: 10px 0; border-bottom: 1px solid var(--line2); min-width: 0; }
+  .evl .eh { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 13px; }
+  .evl .eh .fn { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; min-width: 0; }
+  .evl .red { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  pre.buglog { max-height: 320px; overflow: auto; margin: 6px 0 0; font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .evimg { display: block; max-width: 100%; max-height: 360px; height: auto; margin-top: 6px; border: 1px solid var(--line); background: var(--raised); }
+  .consent { margin-top: 14px; padding: 10px 12px; border-left: 3px solid var(--danger); background: var(--danger-soft); border-radius: 0 4px 4px 0; font-size: 13px; }
+  .consent label { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; padding: 6px 0; cursor: pointer; min-height: 40px; }
+  .consent input { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--danger); }
+  .consent .why { margin: 4px 0 0; }
+  .warnl { list-style: none; margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); font-size: 13px; }
+  .bugsec .te-box { margin-top: 12px; }
+  .srcbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -966,7 +1002,7 @@ function alertActionHtml(a, cls = "btn xs") {
 function alertItemHtml(a, seen) {
   const code = alertCode(a), info = code ? findDemand(code) : null;
   const isSeen = a.severity === "aviso" && seen.has(a.id);
-  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : /^prod/.test(a.kind || "") ? "Produtivo local" : /^test-env/.test(a.kind || "") ? "Ambiente de teste" : "Squad"}</b>`;
+  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${info?.bug ? bugTag() : ""}${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : /^prod/.test(a.kind || "") ? "Produtivo local" : /^test-env/.test(a.kind || "") ? "Ambiente de teste" : "Squad"}</b>`;
   const auditHref = `#/auditoria/alertas?${new URLSearchParams(Object.entries({ demanda: code || "", tipo: a.kind || "" }).filter(([, v]) => v))}`;
   return `<li class="${esc(a.severity)} ${isSeen ? "seen" : ""}" data-alert="${esc(a.id)}"><div class="t">${sevHtml(a.severity)} ${where}
       <div><b>${esc(a.title || "")}</b></div>
@@ -979,7 +1015,7 @@ function myNextHtml() {
   if (!a) return "";
   const code = alertCode(a);
   return `<div class="mynext ${esc(a.severity)}" role="region" aria-labelledby="h-mynext"><div><small>SUA PRÓXIMA AÇÃO</small>
-    <h2 id="h-mynext">${sevHtml(a.severity)} ${code ? `${esc(code)} · ` : ""}${esc(a.action?.label || a.title)} · ${ageSpan(a.openedAt)}</h2>
+    <h2 id="h-mynext">${sevHtml(a.severity)} ${code && findDemand(code)?.bug ? `${bugTag()} ` : ""}${code ? `${esc(code)} · ` : ""}${esc(a.action?.label || a.title)} · ${ageSpan(a.openedAt)}</h2>
     <p>${esc(a.title || "")} · ${esc(a.rule || "")}</p></div><div class="act">${alertActionHtml(a, "btn sm")}</div></div>`;
 }
 const otherActions = () => { const items = []; for (const info of allInfos()) { const a = nextAction(info); if (a && a.order >= 4) items.push({ ...a, info }); } return items.sort((a, b) => a.order - b.order || String(a.info.d.ts).localeCompare(String(b.info.d.ts))); };
@@ -993,7 +1029,7 @@ function centralHtml() {
   const others = f && f !== "voce" ? [] : otherActions();
   return `<div class="central">${f === "aviso" ? "" : list("bloqueio", "Nenhum bloqueio")}${f === "bloqueio" ? "" : list("aviso", "Nenhum aviso")}</div>
     ${others.length ? `<h3 style="margin-top:16px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Outras ações suas (${others.length})</h3>
-      <ul class="alist">${others.map(a => `<li class="other"><div class="t"><a class="ttl" href="#/demandas/${a.info.code}"><span class="code">${a.info.code}</span>${esc(a.info.eff.title)}</a>
+      <ul class="alist">${others.map(a => `<li class="other"><div class="t"><a class="ttl" href="#/demandas/${a.info.code}"><span class="code">${a.info.code}</span>${a.info.bug ? bugTag() : ""}${esc(a.info.eff.title)}</a>
         <div class="who"><span class="validate" style="font-weight:600">${esc(a.label)}</span><span>Quem age: <b><span class="you">Você</span></b></span><span>Desde: ${ageSpan(a.info.d.ts)}</span></div></div><div class="act">${actionButtons(a)}</div></li>`).join("")}</ul>` : ""}`;
 }
 
@@ -1330,7 +1366,7 @@ function renderPainel() {
   const nb = al.filter(a => a.severity === "bloqueio").length, na = al.filter(a => a.severity === "aviso").length;
   return `${routeNotice ? `<p class="notice">${esc(routeNotice)}</p>` : ""}
   <div class="page-head"><div><h1 tabindex="-1">Painel</h1><div class="sub">O que foge do normal sobe; o que depende de você vem primeiro.</div></div>
-    <a class="btn primary sm" href="#/demandas/nova" style="flex-grow:0">+ Nova demanda</a></div>
+    <div class="actions" style="margin-top:0">${bugSupported ? `<a class="btn sm" href="#/demandas/bug">Registrar bug</a>` : ""}<a class="btn primary sm" href="#/demandas/nova" style="flex-grow:0">+ Nova demanda</a></div></div>
   ${myNextHtml()}
   <section class="dsec" id="alertas" aria-labelledby="h-precisa" style="margin-top:16px"><h2 id="h-precisa" tabindex="-1">Bloqueios e avisos <span class="squad-sum">(${nb} bloqueio${nb === 1 ? "" : "s"} · ${na} aviso${na === 1 ? "" : "s"})</span></h2>
     ${f && FL[f] ? `<p style="font-size:13px;margin:0">Filtro: ${FL[f]} · <a href="#/painel/alertas">ver todos</a></p>` : ""}
@@ -1340,7 +1376,7 @@ function renderPainel() {
   <section class="dsec" aria-labelledby="h-andamento"><h2 id="h-andamento">Em andamento <span class="muted" style="font-weight:400">(${active.length})</span></h2>
     ${active.length ? `<ul class="rows">${active.map(x => { const now = demandSteps(x).find(p => p.st === "now"); const w = workingOn(x.d.id); const { steps, idx } = stageOf(x); const xa = alertsFor(x.d.id);
       const nbx = xa.filter(a => a.severity === "bloqueio").length, nax = xa.filter(a => a.severity === "aviso").length;
-      return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>
+      return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${x.bug ? bugTag() : ""}${esc(x.eff.title)}</a>
         <div class="meta"><span class="${statusCls(x.status)}" style="font-weight:600">${esc(x.status)}</span><span class="tag">etapa: ${esc(steps[Math.min(idx, steps.length - 1)])}</span>${w.length ? `<span class="tag pass">trabalhando: ${esc(w.join(", "))}</span>` : ""}
           ${nbx ? `<span class="sev bloqueio">${ICON.bloqueio}${nbx} bloqueio${nbx === 1 ? "" : "s"}</span>` : ""}${nax ? `<span class="sev aviso">${ICON.aviso}${nax} aviso${nax === 1 ? "" : "s"}</span>` : ""}</div>
         <div class="muted" style="font-size:12.5px;margin-top:3px">${esc(now ? `Agora: ${now.title}` : "Aguardando o próximo passo do Orquestrador.")}</div></div>
@@ -1349,7 +1385,7 @@ function renderPainel() {
   </section>
   ${envSectionHtml("painel")}
   <section class="dsec" aria-labelledby="h-entregues"><h2 id="h-entregues">Entregues recentemente</h2>
-    ${delivered.length ? `<ul class="rows">${delivered.map(x => `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>${reviewHtml(x)}</div>
+    ${delivered.length ? `<ul class="rows">${delivered.map(x => `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${x.bug ? bugTag() : ""}${esc(x.eff.title)}</a>${reviewHtml(x)}</div>
       <div class="act">${x.delivered.pr ? extLink(x.delivered.url, `PR #${esc(x.delivered.pr)}`, "btn sm") : ""}</div></li>`).join("")}</ul>` : `<p class="muted">Nenhuma entrega por PR ainda.</p>`}
     <p style="font-size:13px"><a href="#/demandas?f=entregues">Ver todas as entregues</a></p>
   </section>
@@ -1418,7 +1454,7 @@ function renderDemanda(ref) {
   const evs = info.related.slice().reverse();
   return `${crumbs([["Demandas", "#/demandas"], [`${code} · ${eff.title}`, ""]])}
   <div class="page-head"><div style="min-width:0">
-    <div class="mono muted overline">${esc(code)} · ${esc(info.status.toUpperCase())}</div>
+    <div class="mono muted overline">${info.bug ? `${bugTag()} ` : ""}${esc(code)} · ${esc(info.status.toUpperCase())}</div>
     <h1 tabindex="-1">${esc(eff.title)}</h1>
     <div class="meta" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px">
       <span class="tag">registrada ${hhmm(d.ts)}</span>
@@ -1441,7 +1477,8 @@ function renderDemanda(ref) {
   ${stepperHtml(info)}
   ${alertsFor(id).length ? `<div class="dem-alerts" role="region" aria-label="Bloqueios e avisos da ${esc(code)}"><ul class="alist">${alertsFor(id).map(x => alertItemHtml(x, seenAlerts.get())).join("")}</ul></div>` : ""}
   ${next}
-  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${SECTIONS.map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${(info.bug ? [["bug", "Bug"], ...SECTIONS] : SECTIONS).map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  ${info.bug ? bugSectionHtml(info) : ""}
   <section class="dsec" id="sec-execucao" aria-labelledby="h-execucao"><h2 id="h-execucao" tabindex="-1">Execução</h2>
     <div class="sub" style="margin-top:0">${esc(now ? `Agora: ${now.title}` : isClosed(info) ? `Demanda ${info.status.toLowerCase()}.` : info.preStart || info.inBacklog ? "Ainda não iniciada." : "Aguardando o próximo passo do Orquestrador.")}</div>
     ${involved.length ? `<div class="mrow" style="margin:10px 0 0"><span class="lbl">Agentes envolvidos:</span></div><div class="squad" style="margin-bottom:12px">${involved.filter(ag => ROLES.includes(ag)).map(ag => agentCard(agentOf(ag))).join("")}</div>` : ""}
@@ -1550,7 +1587,7 @@ function demandInfo(d, index) {
   const status = canceled ? "Cancelada" : delivered ? "Entregue" : legacyDone ? "Concluída" : paused ? "Pausada"
     : inReview ? teStatusLabel(teInfo, inReview) : approvedOpeningPR ? "Aprovada pelo Auditor · abrindo PR" : rejectedIdle ? "Devolvida pelo revisor"
     : work.length ? (returned ? "Devolvida" : "Em andamento") : start ? "Iniciada · na fila do Orquestrador" : inBacklog ? "Backlog" : vinfo ? VSTATUS[vinfo.st] : "Registrada";
-  return { code, te: teInfo, tested, readyLog, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
+  return { code, bug: isBugTask(d), te: teInfo, tested, readyLog, related, start, work, gates, status, paused, canceled, priority, last: work.at(-1), issue: state.github?.[d.id], vinfo, preStart, eff, inBacklog, queued, cancelNote: cancelEv ? (cancelEv.note || cancelEv.detail || "") : "", inReview, delivered, rejected: rejectedIdle ? rejected : null };
 }
 // Confirmação pendente de "Cancelar demanda" (em andamento): fica no estado, não no nó, para sobreviver ao polling.
 const ctlConfirm = new Set();
@@ -1571,7 +1608,7 @@ function backlogItemHtml(info) {
   const sel = "width:100%;padding:7px 8px;border:1px solid var(--line-strong);border-radius:2px;font:inherit;background:var(--surface)";
   const editing = blEditing.has(id);
   return `<div class="bl-item" data-bl="${id}">
-    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${esc(eff.title)}</b><span class="tag backlog">Backlog</span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><b><span class="mono muted" style="font-size:12px;margin-right:8px">${code}</span>${info.bug ? bugTag() : ""}${esc(eff.title)}</b><span class="tag backlog">Backlog</span></div>
     ${eff.detail ? `<div class="muted" style="font-size:13px;margin-top:4px">${esc(eff.detail)}</div>` : ""}
     <div style="font-size:12px;margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
       <span class="tag">criada ${hhmm(d.ts)}</span>
@@ -1653,7 +1690,7 @@ function applyOverride(id) {
 }
 
 // ---- Demandas (#/demandas?f=…) e Nova demanda (#/demandas/nova) ----
-const FILTERS = [["ativas", "Ativas"], ["acao", "Com ação sua"], ["fila", "Na fila"], ["backlog", "Backlog"], ["entregues", "Entregues"], ["canceladas", "Canceladas"], ["todas", "Todas"]];
+const FILTERS = [["ativas", "Ativas"], ["acao", "Com ação sua"], ["fila", "Na fila"], ["backlog", "Backlog"], ["entregues", "Entregues"], ["canceladas", "Canceladas"], ["bugs", "Bugs"], ["todas", "Todas"]];
 function filterDemands(f) {
   const all = allInfos(), { queue, backlog } = queueData();
   if (f === "fila") return queue;
@@ -1662,6 +1699,7 @@ function filterDemands(f) {
   if (f === "acao") return rev.filter(x => nextAction(x) || alertsFor(x.d.id).some(a => a.owner === "humano"));
   if (f === "entregues") return rev.filter(x => x.delivered || x.status === "Concluída");
   if (f === "canceladas") return rev.filter(x => x.canceled);
+  if (f === "bugs") return rev.filter(x => x.bug);
   if (f === "todas") return rev;
   return rev.filter(x => !isClosed(x) && !x.inBacklog);
 }
@@ -1673,7 +1711,7 @@ function renderDemandas() {
   const rows = f === "backlog"
     ? (list.length ? list.map(x => `<div style="border-top:1px solid var(--line2)"><a class="ttl" href="#/demandas/${x.code}" style="display:inline-block;margin-top:10px;font-size:13px">Abrir ${x.code} ›</a>${backlogItemHtml(x)}</div>`).join("") : `<p class="muted">Backlog vazio.</p>`)
     : list.length ? `<ul class="rows">${list.map(x => { const a = nextAction(x); const pr = x.inReview || x.delivered || x.rejected;
-      return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${esc(x.eff.title)}</a>
+      return `<li><div class="t"><a class="ttl" href="#/demandas/${x.code}"><span class="code">${x.code}</span>${x.bug ? bugTag() : ""}${esc(x.eff.title)}</a>
         <div class="meta"><span class="${statusCls(x.status)}" style="font-weight:600">${esc(x.status)}</span>
           ${(() => { const xa = alertsFor(x.d.id), b = xa.filter(a => a.severity === "bloqueio").length, v = xa.filter(a => a.severity === "aviso").length;
             return `${b ? `<span class="sev bloqueio">${ICON.bloqueio}${b} bloqueio${b === 1 ? "" : "s"}</span>` : ""}${v ? `<span class="sev aviso">${ICON.aviso}${v} aviso${v === 1 ? "" : "s"}</span>` : ""}`; })()}
@@ -1684,8 +1722,8 @@ function renderDemandas() {
         ${x.last ? `<div class="muted" style="font-size:12px;margin-top:3px">último passo: ${esc(AGENTS[x.last.agent]?.label || x.last.agent)} — ${esc(x.last.title)}</div>` : ""}</div>
         <div class="act">${a ? actionButtons({ ...a, info: x }) : ""}</div></li>`; }).join("")}</ul>`
     : `<p class="muted">Nenhuma demanda neste filtro.</p>`;
-  return `<div class="page-head"><div><h1 tabindex="-1">Demandas</h1><div class="sub">Cada demanda tem uma página com etapas, próxima ação, execução, gates e registro.</div></div><a class="btn primary" href="#/demandas/nova">+ Nova demanda</a></div>
-  <nav class="seg" aria-label="Filtros de demandas">${FILTERS.map(([k, t]) => `<a href="#/demandas?f=${k}" ${k === f ? `aria-current="page"` : ""}>${t} <span class="n">${filterDemands(k).length}</span></a>`).join("")}</nav>
+  return `<div class="page-head"><div><h1 tabindex="-1">Demandas</h1><div class="sub">Cada demanda tem uma página com etapas, próxima ação, execução, gates e registro.</div></div><div class="actions" style="margin-top:0">${bugSupported ? `<a class="btn" href="#/demandas/bug">Registrar bug</a>` : ""}<a class="btn primary" href="#/demandas/nova">+ Nova demanda</a></div></div>
+  <nav class="seg" aria-label="Filtros de demandas">${FILTERS.filter(([k]) => k !== "bugs" || k === f || bugsVisible()).map(([k, t]) => `<a href="#/demandas?f=${k}" ${k === f ? `aria-current="page"` : ""}>${t} <span class="n">${filterDemands(k).length}</span></a>`).join("")}</nav>
   ${f === "fila" ? `<p class="muted" style="font-size:12px">Na ordem de consumo do Orquestrador (prioridade e ordem de início).</p>` : f === "backlog" ? `<p class="muted" style="font-size:12px">Ordenado por prioridade e, empatado, pela criação mais antiga. Sem validação; o Orquestrador ignora o backlog.</p>` : ""}
   ${flash && f === "backlog" ? `<p class="${flashErr ? "fail" : "ok-msg"}">${esc(flash)}</p>` : ""}
   ${rows}
@@ -1713,6 +1751,358 @@ function renderNova() {
       <p class="muted" style="font-size:12px;margin-top:14px">Registrar cria a issue e guarda a demanda no log. Iniciar (na página da demanda) define prioridade e rota e coloca a demanda na fila do Orquestrador.</p>
     </section>`;
 }
+
+// ================= D16 (ADR-019, contrato demandas-de-bug §9–§10): demandas de bug =================
+// Tudo aditivo: sem o recurso no servidor (/api/bug/* respondendo JSON) nenhuma ação de bug aparece; o selo BUG e os
+// metadados vêm do próprio evento task (nature: "bug", objeto bug) e aparecem sempre.
+let bugSupported = false, bugCheckedAt = 0, bugPrioTouched = false;
+const isBugTask = d => d?.nature === "bug";
+const bugTag = () => `<span class="bugtag" title="Demanda de bug: falha observada no produtivo">BUG</span>`;
+const bugsVisible = () => bugSupported || (state ? demandTasks().some(isBugTask) : false);
+// Detecção do recurso: o servidor com a D16 responde JSON em /api/bug/* (mesmo 404 rascunho_expirado ou 400);
+// o servidor antigo cai no arquivo estático e devolve 404 em HTML.
+async function fetchBugSupport() {
+  if (bugSupported || (bugCheckedAt && Date.now() - bugCheckedAt < 60000)) return;
+  bugCheckedAt = Date.now();
+  try {
+    const r = await fetch("/api/bug/draft/_/_", { cache: "no-store" });
+    bugSupported = /json/i.test(r.headers.get("content-type") || "") && ![405, 501].includes(r.status);
+  } catch (e) { /* rede: tenta de novo no próximo ciclo */ bugCheckedAt = 0; }
+}
+const BUG_SEV = { critica: "Crítica", alta: "Alta", media: "Média", baixa: "Baixa" };
+const BUG_VERIFIED = { "jaeger-produtivo": "Jaeger do produtivo (o trace existe em :16686)", "grafana-produtivo": "Grafana do produtivo (painel/regra e séries do :9090)", "declaracao-humana": "declaração humana (sem prova técnica)" };
+const BUG_SRC = { "jaeger-trace": "Trace do Jaeger", "grafana-painel": "Painel do Grafana", "grafana-alerta": "Alerta do Grafana" };
+const BUG_ORIGIN = { upload: "enviado por você", jaeger: "gerado do Jaeger", grafana: "gerado do Grafana", "compose-logs": "logs dos containers" };
+const BUG_RED = { secret: "segredos", segredo: "segredos", pii: "dados pessoais", email: "e-mails", cpf: "CPF", cnpj: "CNPJ", telefone: "telefones", cartao: "cartões", ip: "IPs públicos",
+  customerId: "customerId (pseudônimo)", pseudonym: "pseudônimos", pseudonimo: "pseudônimos", metadata: "metadados da imagem", endereco: "endereços" };
+const BUG_ERR = {
+  ambiente_de_teste: "o link é do ambiente de teste; bugs só vêm do produtivo", host_nao_permitido: "host não permitido: só links do produtivo local (localhost/127.0.0.1)",
+  link_sem_trace: "link de busca do Jaeger: abra o trace e copie o link dele", link_sem_painel: "link do dashboard sem painel: abra o painel e copie o link com viewPanel",
+  trace_nao_encontrado_no_produtivo: "o trace não existe no Jaeger do produtivo (:16686)", painel_nao_encontrado: "o painel não existe no Grafana do produtivo",
+  alerta_nao_encontrado: "a regra de alerta não existe no Grafana do produtivo", evidencia_obrigatoria: "o bug precisa de ao menos uma evidência (log ou imagem)",
+  evidencia_do_teste: "o log é do ambiente de teste; bugs só vêm do produtivo", confirmacao_obrigatoria: "marque as duas confirmações",
+  rascunho_expirado: "o rascunho expirou (24 h); gere a prévia de novo", tipo_nao_permitido: "tipo de arquivo não permitido",
+  armazenamento_de_bugs_cheio: "o armazenamento de bugs no git está cheio (200 MB); fale com o responsável", natureza_invalida: "natureza inválida", bug_sem_natureza: "objeto bug sem nature: bug",
+};
+// Erros do servidor: { error: "<mensagem em português>", code: "<código>" } (evidence_rules.EvidenceError.payload).
+const bugErr = j => { const e = j && typeof j === "object" ? j : {}; return String(e.message || (typeof e.error === "string" && !BUG_ERR[e.error] ? e.error : "") || BUG_ERR[e.code] || BUG_ERR[e.error] || e.code || "erro no servidor"); };
+const bugCode = j => (j && typeof j === "object" ? j.code || j.error : null) || null;
+const BUG_IMG = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" }, BUG_LOG = ["log", "txt", "json"];
+const BUG_LIM = { image: 5 * 1024 * 1024, log: 1024 * 1024, files: 10, total: 15 * 1024 * 1024, body: 22 * 1024 * 1024 };
+const BUG_ACCEPT = ".png,.jpg,.jpeg,.webp,.log,.txt,.json";
+const BUG_REPO = "jcrouzillard/checkout-saga-squad";
+const bugComp = {};      // escopo ("new" ou id da demanda) → { files, errors, draft, draftKey, busy, msg }
+const comp = sc => bugComp[sc] || (bugComp[sc] = { files: [], errors: [], draft: null, draftKey: null, busy: false, msg: null });
+const bugDocs = {};      // id da demanda → { st: loading|ok|err, doc } (GET /api/bug/<id> = bug.json)
+const logTexts = {};     // chave → { st, text } — logs sempre exibidos por textContent (nunca innerHTML)
+const fmtSize = n => { n = Number(n) || 0; return n >= 1048576 ? `${(n / 1048576).toFixed(1).replace(".", ",")} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`; };
+const bugIds = sc => { const p = sc === "new" ? "dem-bug" : `bugx-${sc}`; return { p, link: `${p}-link`, files: `${p}-files`, cprod: `${p}-cprod`, cpub: `${p}-cpub`, why: `${p}-why`, prev: `${p}-prev` }; };
+const bugKindOf = sc => sc === "new" ? document.querySelector('input[name="dem-bug-kind"]:checked')?.value || null : (findDemand(sc)?.eff.kind || null);
+const bugLinkVal = sc => (document.getElementById(bugIds(sc).link)?.value || "").trim();
+const bugKey = sc => JSON.stringify([bugKindOf(sc), bugLinkVal(sc), comp(sc).files.map(f => [f.name, f.size])]);
+const b64 = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const bugGrafanaPort = () => { try { return Number(new URL(product?.observability?.grafana || "").port) || null; } catch (e) { return null; } };
+// Validação do link no cliente (o servidor é a autoridade: §4/§5). Recusa host externo, portas do teste e links sem trace/painel.
+function bugLinkCheck(raw) {
+  let u; try { u = new URL(raw); } catch (e) { return { error: "Link inválido: cole o endereço completo (http://localhost:…)." }; }
+  if (!/^https?:$/.test(u.protocol)) return { error: "Só links http(s) do produtivo local são aceitos." };
+  if (!["localhost", "127.0.0.1"].includes(u.hostname)) return { error: "Host não permitido: só links do produtivo local (localhost ou 127.0.0.1)." };
+  const port = Number(u.port || (u.protocol === "https:" ? 443 : 80)), gp = bugGrafanaPort() || 3000;
+  const prod = [16686, 9090, gp, 3000, 8080, 8081, 8082, 8083, 8084, 8090];
+  if ([26686, 13001, 13000, 19090].includes(port) || (port >= 18080 && port <= 18090) || prod.some(p => p + 10000 === port))
+    return { error: `Link do ambiente de teste (porta ${port}): recusado. Bugs só vêm do produtivo — abra o trace no Jaeger :16686 ou o painel no Grafana :${gp}.` };
+  if (port === 16686) {
+    if (/^\/trace\/([0-9a-f]{16}|[0-9a-f]{32})\/?$/i.test(u.pathname)) return { ok: true, fonte: "jaeger" };
+    if (/^\/search/.test(u.pathname)) return { error: "Link de busca do Jaeger: abra o trace e copie o link dele (…:16686/trace/<id>)." };
+    return { error: "Link do Jaeger sem trace: use …:16686/trace/<id>." };
+  }
+  if (/^\/alerting\/grafana\/[^/]+\/view\/?$/.test(u.pathname)) return { ok: true, fonte: "grafana" };
+  if (/^\/d\/[^/]+/.test(u.pathname)) return u.searchParams.get("viewPanel") ? { ok: true, fonte: "grafana" } : { error: "Link do dashboard sem painel: abra o painel (menu do painel › Ver) e copie o link com viewPanel=…" };
+  return { error: "Link não reconhecido: use um trace do Jaeger (:16686/trace/<id>) ou um painel/alerta do Grafana do produtivo." };
+}
+// Tipos e limites (§8.1) conferidos antes do envio: extensão, assinatura, UTF-8 sem NUL, JSON válido, tamanho e quantidade.
+function bugCheckBytes(type, ext, b) {
+  const is = (off, arr) => arr.every((v, i) => b[off + i] === v);
+  if (type === "image") {
+    if (ext === "png") return is(0, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) ? null : "o conteúdo não é PNG (assinatura inválida)";
+    if (ext === "webp") return is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50]) ? null : "o conteúdo não é WEBP (assinatura inválida)";
+    return is(0, [0xFF, 0xD8, 0xFF]) ? null : "o conteúdo não é JPEG (assinatura inválida)";
+  }
+  if (is(0, [0x89, 0x50, 0x4E, 0x47]) || is(0, [0xFF, 0xD8, 0xFF])) return "é uma imagem renomeada como log";
+  if (b.includes(0)) return "o log tem byte nulo (arquivo binário?)";
+  let text; try { text = new TextDecoder("utf-8", { fatal: true }).decode(b); } catch (e) { return "o log não é UTF-8 válido"; }
+  if (type === "log" && ext === "json") { try { JSON.parse(text); } catch (e) { return "o .json não é um JSON válido"; } }
+  if (/checkout-teste/.test(text)) return "o log é do ambiente de teste (contém “checkout-teste”): bugs só vêm do produtivo";
+  return null;
+}
+async function bugAddFiles(sc, list) {
+  const c = comp(sc); c.errors = [];
+  for (const f of list) {
+    const ext = (String(f.name).split(".").pop() || "").toLowerCase(), type = BUG_IMG[ext] ? "image" : BUG_LOG.includes(ext) ? "log" : null;
+    const bad = t => c.errors.push(`${f.name}: ${t}.`);
+    if (!type) { bad("tipo não permitido (aceitos: .png .jpg .jpeg .webp .log .txt .json; SVG, GIF, PDF, HAR, vídeo e zip ficam de fora)"); continue; }
+    if (c.files.length >= BUG_LIM.files) { bad(`limite de ${BUG_LIM.files} arquivos por envio`); continue; }
+    if (!f.size) { bad("arquivo vazio"); continue; }
+    if (f.size > BUG_LIM[type]) { bad(`passa do limite de ${type === "image" ? "5 MB por imagem" : "1 MB por log"} (${(f.size / 1048576).toFixed(2).replace(".", ",")} MB)`); continue; }
+    if (c.files.reduce((a, x) => a + x.size, 0) + f.size > BUG_LIM.total) { bad("a soma dos arquivos passaria de 15 MB por envio"); continue; }
+    if (c.files.some(x => x.name === f.name && x.size === f.size)) { bad("já foi adicionado"); continue; }
+    let buf; try { buf = new Uint8Array(await f.arrayBuffer()); } catch (e) { bad("não foi possível ler o arquivo"); continue; }
+    const why = bugCheckBytes(type, ext, buf); if (why) { bad(why); continue; }
+    c.files.push({ name: String(f.name), size: f.size, type, b64: b64(buf) });
+  }
+}
+function normDraft(j) {
+  const o = j && typeof j === "object" ? j : {};
+  return { id: String(o.draft || o.id || ""), source: o.source && typeof o.source === "object" ? o.source : null, extracted: o.extracted && typeof o.extracted === "object" ? o.extracted : null,
+    evidences: (Array.isArray(o.evidences) ? o.evidences : []).filter(e => e && typeof e === "object" && e.file),
+    warnings: (Array.isArray(o.warnings) ? o.warnings : []).map(w => typeof w === "string" ? w : w?.message || w?.text || "").filter(Boolean),
+    verifiedBy: o.verifiedBy || o.source?.verifiedBy || null, expiresAt: o.expiresAt || null,
+    repo: o.repo && typeof o.repo === "object" ? o.repo : o.repoVisibility ? { visibility: String(o.repoVisibility) } : null };
+}
+const redHtml = r => { const e = Object.entries(r && typeof r === "object" ? r : {}).filter(([, n]) => Number(n) > 0);
+  return e.length ? `Mascarado: ${e.map(([k, n]) => `${esc(BUG_RED[k] || k)} ${Number(n)}`).join(" · ")}` : "Nada precisou ser mascarado"; };
+const evIsImage = ev => ev.type === "image" || /^image\//.test(ev.mime || "") || /\.(png|jpe?g|webp)$/i.test(ev.file || "");
+const safeApiUrl = u => typeof u === "string" && /^\/api\/bug\/[^?#]*$/.test(u) && !u.includes("..") ? u : null;
+// Uma evidência: cabeçalho, contagens de máscara e o conteúdo (imagem como <img>; log como texto, preenchido por textContent).
+function evItemHtml(ev, { url, logKey, logText, detailsId, open }) {
+  const img = evIsImage(ev), file = String(ev.file || "");
+  if (!img && logText != null && !logTexts[logKey]) logTexts[logKey] = { st: "ok", text: logText };
+  const head = `<div class="eh"><span class="fn">${esc(file)}</span><span class="tag">${img ? "imagem" : "log"}</span>${ev.size ? `<span class="muted">${fmtSize(ev.size)}</span>` : ""}${ev.origin ? `<span class="muted">${esc(BUG_ORIGIN[ev.origin] || ev.origin)}</span>` : ""}${url ? extLink(url, "Abrir o arquivo") : ""}</div>`;
+  const red = ev.redactions ? `<div class="red">${redHtml(ev.redactions)}</div>` : "";
+  const body = img ? (url ? `<img class="evimg" src="${esc(url)}" alt="${esc(file)}" loading="lazy">` : "")
+    : logText != null ? `<pre class="buglog" data-logkey="${esc(logKey)}" tabindex="0" aria-label="Prévia mascarada de ${esc(file)}"></pre>`
+    : url ? `<details id="${esc(detailsId)}" data-bug-log="${esc(url)}" ${open ? "open" : ""}><summary style="cursor:pointer;color:var(--accent);font-size:13px;min-height:24px">Ver o log (texto)</summary><pre class="buglog" data-logkey="${esc(url)}" tabindex="0" aria-label="Conteúdo de ${esc(file)}"></pre></details>` : "";
+  return `<li>${head}${red}${body}</li>`;
+}
+const bugVal = v => esc(Array.isArray(v) ? (v.every(x => !x || typeof x !== "object" || x.name || x.title) ? v.map(x => x && typeof x === "object" ? x.name || x.title : x).join(", ") : `${v.length} itens`)
+  : typeof v === "object" && v ? (v.title || v.name || JSON.stringify(v).slice(0, 300)) : v);
+// Resumo extraído do trace/painel/alerta (§4): chaves conhecidas com rótulo; as demais, como vierem (sempre escapadas).
+function bugExtractedHtml(x, src, verifiedBy) {
+  const rows = [], add = (k, v) => { if (v != null && v !== "" && !(Array.isArray(v) && !v.length)) rows.push(`<dt>${esc(k)}</dt><dd>${v}</dd>`); };
+  if (src) { add("Origem", esc(BUG_SRC[src.type] || src.type || "")); if (src.url) add("Link", /^https?:\/\//.test(src.url) ? extLink(src.url, esc(src.url)) : esc(src.url)); }
+  if (verifiedBy) add("Verificado por", esc(BUG_VERIFIED[verifiedBy] || verifiedBy));
+  const o = x && typeof x === "object" ? x : {}, seen = new Set();
+  const K = [["traceId", "Trace"], ["services", "Serviços"], ["spanCount", "Spans"], ["spans", "Spans"], ["rootOperation", "Operação raiz"], ["start", "Início (UTC)"], ["startTime", "Início (UTC)"],
+    ["duration", "Duração"], ["durationMs", "Duração (ms)"], ["orderId", "orderId"], ["sagaId", "sagaId"], ["dashboard", "Dashboard"], ["dashboardTitle", "Dashboard"], ["panel", "Painel"], ["panelTitle", "Painel"],
+    ["expr", "PromQL"], ["exprs", "PromQL"], ["rule", "Regra"], ["ruleTitle", "Regra"], ["state", "Estado"], ["activeAt", "Ativo desde"], ["value", "Valor"], ["values", "Valores"], ["window", "Janela"], ["from", "De"], ["to", "Até"],
+    ["dashboardUid", "UID do dashboard"], ["panelId", "Id do painel"], ["ruleUid", "UID da regra"], ["unit", "Unidade"], ["thresholds", "Limites"]];
+  for (const [k, l] of K) if (k in o && o[k] != null && !seen.has(l)) { add(l, bugVal(o[k])); seen.add(k); seen.add(l); }
+  const spans = Array.isArray(o.errorSpans) ? o.errorSpans : []; seen.add("errorSpans");
+  if ("errorSpans" in o) add("Spans com erro", spans.length ? `<ul style="margin:0;padding-left:18px">${spans.map(s => { const ex = s.exception && typeof s.exception === "object" ? s.exception : {};
+    const et = s.exceptionType || s["exception.type"] || ex.type, em = s.exceptionMessage || s["exception.message"] || ex.message, st = s.statusDescription || s["otel.status_description"] || s.status;
+    return `<li><b>${esc(s.service || "?")}</b> · ${esc(s.operation || s.operationName || "")}${s.httpStatus ? ` · HTTP ${esc(s.httpStatus)}` : ""}${st ? ` — ${esc(st)}` : ""}${et ? `<div><code>${esc(et)}</code>${em ? `: ${esc(String(em).slice(0, 300))}` : ""}</div>` : ""}</li>`; }).join("")}</ul>` : "nenhum (descreva o sintoma)");
+  const series = Array.isArray(o.series) ? o.series : []; seen.add("series");
+  if (series.length) add("Séries", `<ul style="margin:0;padding-left:18px">${series.slice(0, 20).map(s => `<li><code>${esc(typeof s.labels === "object" && s.labels ? Object.entries(s.labels).map(([k, v]) => `${k}=${v}`).join(", ") : s.labels || s.name || "")}</code> mín. ${esc(s.min ?? "—")} · máx. ${esc(s.max ?? "—")} · último ${esc(s.last ?? "—")}${s.firstAbove ? ` · acima do limite desde ${esc(s.firstAbove)}` : ""}</li>`).join("")}</ul>`);
+  for (const [k, v] of Object.entries(o)) if (!seen.has(k) && !K.some(([kk]) => kk === k) && v != null && typeof v !== "object") add(k, esc(v));
+  return rows.length ? `<dl class="kvl">${rows.join("")}</dl>` : "";
+}
+function bugConsentHtml(sc, repo) {
+  const ids = bugIds(sc), vis = String(repo?.visibility || "public").toLowerCase(), pub = vis !== "private" && vis !== "privado";
+  return `<fieldset class="consent" style="border:none;margin-top:14px"><legend style="font-weight:600;padding:0">Confirmações obrigatórias</legend>
+    <label for="${ids.cprod}"><input type="checkbox" id="${ids.cprod}" data-keep data-bug-consent="${esc(sc)}"><span>O erro ocorreu no <b>produtivo</b> (não no ambiente de teste).</span></label>
+    <label for="${ids.cpub}"><input type="checkbox" id="${ids.cpub}" data-keep data-bug-consent="${esc(sc)}" aria-describedby="${ids.p}-imgnote"><span>Revisei a prévia mascarada. Entendo que estes arquivos vão para o <b>git</b> de um repositório <b>${pub ? "público" : "privado (hoje)"}</b> (<code>${esc(repo?.name || BUG_REPO)}</code>), ficam no <b>histórico permanente</b> e não contêm segredos, dados pessoais nem dados reais de clientes sem máscara.</span></label>
+    <p class="why" id="${ids.p}-imgnote"><b>Imagens não são analisadas</b> (só os metadados são removidos): recorte ou tarje antes qualquer dado sensível visível — nomes, e-mails, endereços, tokens, dados de clientes.${repo?.visibility ? "" : " Visibilidade do repositório não informada pelo servidor: tratada como pública."}</p></fieldset>`;
+}
+// Composição de evidências (formulário novo e "Acrescentar evidência"): link, arquivos, prévia mascarada do rascunho e confirmações.
+function bugComposerHtml(sc, opts = {}) {
+  const c = comp(sc), ids = bugIds(sc), d = c.draft, stale = d && c.draftKey !== null && c.draftKey !== bugKey(sc);
+  const fonte = opts.fonte === "jaeger" ? "trace" : opts.fonte === "grafana" ? "painel ou alerta" : null;
+  return `<label class="f" for="${ids.link}">Link do erro (opcional)</label>
+    ${fonte ? `<p class="notice" style="margin:4px 0 6px">Copie o link do ${fonte} aberto em Produto › ${opts.fonte === "jaeger" ? "Jaeger" : "Grafana"} e cole aqui. O quadro é de outra origem, então o Squad Control não consegue lê-lo sozinho.</p>` : ""}
+    <div class="linkrow"><input type="text" inputmode="url" autocomplete="off" spellcheck="false" id="${ids.link}" data-keep data-bug-link="${esc(sc)}" placeholder="http://localhost:16686/trace/…" aria-describedby="${ids.p}-linkhelp">
+      <button class="btn sm" type="button" data-bug-draft="${esc(sc)}">Extrair</button></div>
+    <p class="hint" id="${ids.p}-linkhelp">Trace do Jaeger do <b>produtivo</b> (<code>:16686/trace/&lt;id&gt;</code>) ou painel/alerta do Grafana do produtivo (<code>:${bugGrafanaPort() || 3000}/d/…?viewPanel=…</code> ou <code>/alerting/grafana/&lt;uid&gt;/view</code>). <b>Links do ambiente de teste são recusados</b> (portas +10 000, ex.: :26686, :13001).</p>
+    <label class="f" for="${ids.files}">Evidências: logs e imagens</label>
+    <div class="drop" data-bug-drop="${esc(sc)}"><span id="${ids.p}-filehelp">Arraste para cá ou escolha. Imagens <code>.png .jpg .jpeg .webp</code> até 5 MB; logs <code>.log .txt .json</code> (UTF-8) até 1 MB; até 10 arquivos e 15 MB por envio.</span><br>
+      <input type="file" id="${ids.files}" multiple accept="${BUG_ACCEPT}" data-bug-files="${esc(sc)}" aria-describedby="${ids.p}-filehelp"></div>
+    ${c.files.length ? `<ul class="flist" aria-label="Arquivos escolhidos">${c.files.map((f, i) => `<li><span class="fn">${esc(f.name)}</span><span class="tag">${f.type === "image" ? "imagem" : "log"}</span><span class="muted">${fmtSize(f.size)}</span><button class="linkbtn" type="button" data-bug-rm="${esc(sc)}" data-i="${i}" aria-label="Remover ${esc(f.name)}">Remover</button></li>`).join("")}</ul>` : ""}
+    ${c.errors.length ? `<ul class="ferr" role="alert">${c.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+    <div class="actions"><button class="btn" type="button" data-bug-draft="${esc(sc)}" ${c.busy ? "disabled" : ""}>${c.busy ? "Gerando prévia…" : d ? "Gerar a prévia de novo" : "Gerar prévia mascarada"}</button></div>
+    ${c.busy ? `<p class="muted" role="status" style="font-size:13px">Validando e mascarando no servidor…</p>` : ""}
+    ${d ? `<section class="bugprev" aria-labelledby="${ids.prev}"><h3 id="${ids.prev}" tabindex="-1">Prévia mascarada (rascunho, fora do git)</h3>${d.expiresAt ? `<p class="hint" style="margin:0 0 6px">O rascunho expira em ${esc(new Date(d.expiresAt).toLocaleString("pt-BR"))}.</p>` : ""}
+      <p class="notice" id="${ids.p}-stale" ${stale ? "" : "hidden"}>O link, os arquivos ou o tipo mudaram depois desta prévia: gere a prévia de novo antes de ${sc === "new" ? "registrar" : "acrescentar"}.</p>
+      ${bugExtractedHtml(d.extracted, d.source, d.verifiedBy)}
+      ${d.warnings.length ? `<ul class="warnl">${d.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${d.evidences.length ? `<ul class="evl" aria-label="Evidências do rascunho">${d.evidences.map((ev, i) => evItemHtml(ev, { url: evIsImage(ev) ? (safeApiUrl(ev.preview?.url) || safeApiUrl(ev.preview) || safeApiUrl(ev.url) || `/api/bug/draft/${encodeURIComponent(d.id)}/${encodeURIComponent(ev.file)}`) : null,
+          logKey: `draft:${d.id}:${ev.file}`, logText: evIsImage(ev) ? null : Array.isArray(ev.preview) ? ev.preview.join("\n") : typeof ev.preview === "string" ? ev.preview : null,
+          detailsId: `${ids.p}-dl-${i}` })).join("")}</ul>` : `<p class="fail" style="font-size:13px">O rascunho não tem evidência: adicione um log ou uma imagem.</p>`}
+    </section>${bugConsentHtml(sc, d.repo)}` : ""}`;
+}
+// Motivo (em texto) de o botão final estar desabilitado; "" = pronto.
+function bugWhy(sc) {
+  const c = comp(sc), ids = bugIds(sc), miss = [];
+  if (sc === "new") { if (!bugKindOf(sc)) miss.push("escolha o tipo"); if (!(document.getElementById("dem-bug-title")?.value || "").trim()) miss.push("informe o título"); }
+  if (!c.draft) miss.push("gere a prévia mascarada");
+  else if (!c.draft.evidences.length) miss.push("inclua ao menos uma evidência");
+  else if (c.draftKey !== bugKey(sc)) miss.push("gere a prévia de novo (algo mudou)");
+  else if (!document.getElementById(ids.cprod)?.checked || !document.getElementById(ids.cpub)?.checked) miss.push("marque as duas confirmações");
+  return miss.length ? `Para ${sc === "new" ? "registrar" : "acrescentar"}: ${miss.join("; ")}.` : "";
+}
+function updateBugButtons() {
+  document.querySelectorAll("#main [data-bug-submit],#main [data-bug-append]").forEach(b => {
+    const sc = b.dataset.bugSubmit || b.dataset.bugAppend, why = bugWhy(sc), c = comp(sc);
+    if (!b.dataset.staleDis) b.disabled = !!why || c.busy;
+    const w = document.getElementById(bugIds(sc).why); if (w && w.textContent !== why) w.textContent = why;
+    const st = document.getElementById(`${bugIds(sc).p}-stale`); if (st) st.hidden = !(c.draft && c.draftKey !== bugKey(sc));
+  });
+}
+function fillBugLogs() {
+  document.querySelectorAll("#main pre[data-logkey]").forEach(pre => { const t = logTexts[pre.dataset.logkey];
+    const txt = !t ? "" : t.st === "ok" ? t.text : t.st === "loading" ? "Carregando…" : `Não foi possível carregar o log (${t.err}).`;
+    if (pre.textContent !== txt) pre.textContent = txt; });
+}
+async function loadLog(url) {
+  logTexts[url] = { st: "loading" }; fillBugLogs();
+  try { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(`HTTP ${r.status}`); const t = await r.text();
+    logTexts[url] = { st: "ok", text: t.length > 1048576 ? `${t.slice(0, 1048576)}\n… (exibição truncada em 1 MB)` : t };
+  } catch (e) { logTexts[url] = { st: "err", err: String(e.message || e) }; }
+  fillBugLogs();
+}
+async function loadBugDoc(id) {
+  bugDocs[id] = { st: "loading" };
+  try { const r = await fetch(`/api/bug/${encodeURIComponent(id)}`, { cache: "no-store" }); const j = r.ok ? await r.json() : null;
+    bugDocs[id] = j && typeof j === "object" ? { st: "ok", doc: j } : { st: "err" };
+  } catch (e) { bugDocs[id] = { st: "err" }; }
+  if (route.view === "demandas" && findDemand(route.parts[0])?.d.id === id && !editing()) render();
+}
+// Seção "Bug" da página da demanda (§10): ambiente + verificação, origem, resumo, severidade, evidências e "Acrescentar evidência".
+function bugSectionHtml(info) {
+  const id = info.d.id, meta = info.d.bug && typeof info.d.bug === "object" ? info.d.bug : {};
+  if (bugSupported && !bugDocs[id]) loadBugDoc(id);
+  const doc = bugDocs[id]?.st === "ok" ? bugDocs[id].doc : null, b = doc || meta;
+  const extra = info.related.filter(e => e.type === "bug-evidence").flatMap(e => Array.isArray(e.evidences) ? e.evidences : []);
+  const all = doc && Array.isArray(doc.evidences) ? doc.evidences : [...(Array.isArray(meta.evidences) ? meta.evidences : []), ...extra];
+  const evs = all.filter((e, i) => e && e.file && all.findIndex(x => x && x.file === e.file) === i);
+  const src = b.source && typeof b.source === "object" ? b.source : null, consent = b.consent && typeof b.consent === "object" ? b.consent : null;
+  const canAdd = bugSupported && !isClosed(info);
+  const fileUrl = f => bugSupported ? `/api/bug/${encodeURIComponent(id)}/file/${encodeURIComponent(f)}` : null;
+  const summary = bugExtractedHtml(b.extracted || b.summary, null, null);
+  return `<section class="dsec bugsec" id="sec-bug" aria-labelledby="h-bug"><h2 id="h-bug" tabindex="-1">Bug</h2>
+    <dl class="kvl">
+      <dt>Ambiente</dt><dd><b>${esc(b.environment || "produtivo")}</b>${b.verifiedBy ? ` · verificado por ${esc(BUG_VERIFIED[b.verifiedBy] || b.verifiedBy)}` : ""}</dd>
+      <dt>Severidade</dt><dd>${esc(BUG_SEV[b.severity] || b.severity || "Média (padrão)")}</dd>
+      <dt>Origem</dt><dd>${src ? `${esc(BUG_SRC[src.type] || src.type || "link")}${src.url ? ` · ${/^https?:\/\//.test(src.url) ? extLink(src.url, esc(src.url)) : esc(src.url)}` : ""}${src.traceId ? ` · trace <code>${esc(src.traceId)}</code>` : ""}` : "só arquivos enviados (sem link)"}</dd>
+      ${b.dir ? `<dt>Pasta no git</dt><dd><code>${esc(b.dir)}</code></dd>` : ""}
+      ${consent ? `<dt>Confirmações</dt><dd>produtivo ${consent.production ? "✓" : "—"} · repositório público ${consent.public ? "✓" : "—"}</dd>` : ""}
+    </dl>
+    ${summary ? `<h3>Resumo extraído</h3>${summary}` : ""}
+    ${Array.isArray(b.warnings) && b.warnings.length ? `<ul class="warnl">${b.warnings.map(w => `<li>${esc(typeof w === "string" ? w : w?.message || "")}</li>`).join("")}</ul>` : ""}
+    <h3>Evidências (${evs.length})</h3>
+    ${evs.length ? `<ul class="evl">${evs.map((ev, i) => evItemHtml(ev, { url: fileUrl(ev.file), logKey: null, logText: null, detailsId: `bugl-${id}-${i}` })).join("")}</ul>` : `<p class="muted" style="font-size:13px">Nenhuma evidência registrada no log.</p>`}
+    ${!bugSupported && evs.length ? `<p class="muted" style="font-size:12px">Os arquivos ficam disponíveis aqui quando o servidor oferecer <code>/api/bug</code>.</p>` : ""}
+    ${canAdd ? `<details class="te-box" id="bugadd-${id}"><summary style="cursor:pointer;color:var(--accent);font-weight:600;min-height:32px">Acrescentar evidência</summary>
+      <p class="muted" style="font-size:12.5px;margin:6px 0 0">Só acrescenta: as evidências atuais nunca são alteradas nem removidas.</p>
+      ${bugComposerHtml(id)}
+      <div class="actions"><button class="btn primary" type="button" data-bug-append="${id}" aria-describedby="${bugIds(id).why}" style="flex-grow:0" disabled>Acrescentar evidência</button></div>
+      <p class="why" id="${bugIds(id).why}"></p>
+      ${comp(id).msg ? `<p class="${comp(id).msg.ok ? "ok-msg" : "fail"}" role="status" style="font-size:13px">${esc(comp(id).msg.text)}</p>` : ""}</details>`
+      : !bugSupported || !isClosed(info) ? "" : `<p class="muted" style="font-size:12.5px">Demanda ${esc(info.status.toLowerCase())}: não recebe novas evidências.</p>`}
+  </section>`;
+}
+// Formulário "Registrar bug" (#/demandas/bug[?kind=produto&fonte=jaeger|grafana]).
+function renderBug() {
+  routeTitle = "Registrar bug";
+  const head = `${crumbs([["Demandas", "#/demandas"], ["Registrar bug", ""]])}<h1 tabindex="-1">Registrar bug</h1><div class="sub">Falha observada no <b>produtivo</b>, com ao menos uma evidência (log ou imagem). A squad reproduz o bug com um teste que falha antes de corrigir.</div>`;
+  if (!bugSupported) return `${head}<p class="notice" style="margin-top:16px">O servidor do Squad Control ainda não oferece o registro de bugs (rotas <code>/api/bug/*</code>). Atualize-o para usar este formulário; demandas comuns continuam em <a href="#/demandas/nova">+ Nova demanda</a>.</p>`;
+  const c = comp("new"), P = route.params, kindP = KINDS[P.get("kind")] ? P.get("kind") : null, fonte = ["jaeger", "grafana"].includes(P.get("fonte")) ? P.get("fonte") : null;
+  if (pendingFocus && kindP) { for (const k of Object.keys(KINDS)) keepStore[`dem-bug-kind-${k}`] = k === kindP; }
+  return `${head}
+    <section class="card bugf">
+      <fieldset class="kind"><legend>Tipo (obrigatório)</legend>
+        ${Object.entries(KINDS).map(([k, v]) => `<label class="kind-opt" for="dem-bug-kind-${k}"><input type="radio" name="dem-bug-kind" id="dem-bug-kind-${k}" value="${k}" data-keep ${kindP === k ? "checked" : ""}><span><b>${esc(v.name)}</b> — ${k === "produto" ? "falha no checkout (serviços, Saga, Console)" : "falha na fábrica (Squad Control, tools/squad)"}</span></label>`).join("")}
+      </fieldset>
+      <label class="f" for="dem-bug-title">Título</label>
+      <input type="text" id="dem-bug-title" data-keep maxlength="200" placeholder="Ex.: pagamento devolve 500 ao confirmar pedido">
+      <label class="f" for="dem-bug-detail">Descrição</label>
+      <textarea id="dem-bug-detail" data-keep rows="4" placeholder="Sintoma, o que era esperado, frequência e impacto." style="margin-top:0"></textarea>
+      <p class="hint">Título e descrição não são mascarados: não cole segredos nem dados de clientes aqui.</p>
+      ${bugComposerHtml("new", { fonte })}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0 16px">
+        <div><label class="f" for="dem-bug-sev">Severidade (opcional)</label><select id="dem-bug-sev" data-keep><option value="">Não informada (média)</option>${Object.entries(BUG_SEV).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <div><label class="f" for="dem-bug-priority">Prioridade</label><select id="dem-bug-priority" data-keep aria-describedby="dem-bug-prio-hint">${Object.entries(PRIORITIES).map(([k, v]) => `<option value="${k}" ${k === "normal" ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      </div>
+      <p class="hint" id="dem-bug-prio-hint">Severidade crítica ou alta sugere prioridade Alta (você pode mudar).</p>
+      <fieldset class="kind" style="margin-top:12px"><legend>Quando iniciar</legend>
+        <label class="when-opt" for="dem-bug-when-imediato"><input type="radio" name="dem-bug-when" id="dem-bug-when-imediato" value="imediato" data-keep checked><span><b>Iniciar agora</b> — passa pela triagem do Arquiteto</span></label>
+        <label class="when-opt" for="dem-bug-when-backlog"><input type="radio" name="dem-bug-when" id="dem-bug-when-backlog" value="backlog" data-keep><span><b>Guardar no backlog</b> — sem validação</span></label>
+      </fieldset>
+      <div class="actions"><button class="btn primary" type="button" data-bug-submit="new" aria-describedby="dem-bug-why" disabled>Registrar bug</button></div>
+      <p class="why" id="dem-bug-why"></p>
+      ${c.msg ? `<p class="${c.msg.ok ? "ok-msg" : "fail"}" role="status" style="font-size:13px">${esc(c.msg.text)}</p>` : ""}
+    </section>`;
+}
+function bugClearConsent(sc) { const ids = bugIds(sc); for (const k of [ids.cprod, ids.cpub]) { delete keepStore[k]; const el = document.getElementById(k); if (el) el.checked = false; } }
+async function bugMakeDraft(sc) {
+  const c = comp(sc), ids = bugIds(sc), link = bugLinkVal(sc), kind = bugKindOf(sc), fail = async (text, focusId) => { c.msg = { ok: false, text }; announce(text); await render(); document.getElementById(focusId)?.focus(); };
+  if (!kind) return fail("Escolha o tipo do bug (Produto ou Operação) antes de gerar a prévia.", "dem-bug-kind-produto");
+  if (!link && !c.files.length) return fail("Cole o link do erro ou adicione ao menos um log ou imagem.", ids.link);
+  if (link) { const lc = bugLinkCheck(link); if (lc.error) return fail(lc.error, ids.link); }
+  const body = { kind, includeLogs: true, files: c.files.map(f => ({ name: f.name, contentBase64: f.b64 })) }; if (link) body.link = link;
+  const json = JSON.stringify(body);
+  if (json.length > BUG_LIM.body) return fail("O envio passa de 22 MB: remova arquivos.", ids.files);
+  const key = bugKey(sc);
+  c.busy = true; c.msg = null; await render();
+  let res = null, j = {};
+  try { res = await fetch("/api/bug/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: json }); j = await res.json().catch(() => ({})); } catch (e) { res = null; }
+  c.busy = false;
+  if (res && res.ok) { c.draft = normDraft(j); c.draftKey = key; bugClearConsent(sc);
+    c.msg = c.draft.id ? null : { ok: false, text: "O servidor não devolveu o identificador do rascunho." };
+    announce(`Prévia gerada: ${c.draft.evidences.length} evidência${c.draft.evidences.length === 1 ? "" : "s"}. Revise e marque as confirmações.`);
+    await render(); document.getElementById(ids.prev)?.focus(); return; }
+  c.msg = { ok: false, text: res ? `Não foi possível gerar a prévia (${res.status}): ${bugErr(j)}.` : "Falha de rede ao gerar a prévia." };
+  announce(c.msg.text); await render(); document.querySelector(`[data-bug-draft="${CSS.escape(sc)}"].btn:not(.sm)`)?.focus();
+}
+async function bugSubmit(btn) {
+  const sc = btn.dataset.bugSubmit || btn.dataset.bugAppend, c = comp(sc), why = bugWhy(sc);
+  if (why) { c.msg = { ok: false, text: why }; announce(why); return render(); }
+  btn.disabled = true;
+  const consent = { production: true, public: true };
+  const sev = sc === "new" ? $("#dem-bug-sev")?.value || "" : "";
+  const [url, body] = sc === "new"
+    ? ["/api/demand", { title: $("#dem-bug-title").value.trim(), detail: $("#dem-bug-detail")?.value || "", kind: bugKindOf(sc), when: document.querySelector('input[name="dem-bug-when"]:checked')?.value || "imediato",
+        priority: $("#dem-bug-priority")?.value || "normal", nature: "bug", bug: { draft: c.draft.id, consent, ...(sev ? { severity: sev } : {}) } }]
+    : ["/api/bug/evidence", { demand: sc, draft: c.draft.id, consent }];
+  let res = null, j = {};
+  try { res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); j = await res.json().catch(() => ({})); } catch (e) { res = null; }
+  if (res && res.ok) {
+    delete bugComp[sc]; bugClearConsent(sc);
+    if (sc === "new") {
+      for (const k of Object.keys(keepStore)) if (k.startsWith("dem-bug")) delete keepStore[k];
+      document.querySelectorAll("#main [id^='dem-bug']").forEach(el => el.removeAttribute("data-keep"));
+      bugPrioTouched = false;
+      const text = "Bug registrado: evidências gravadas no repositório e demanda criada (vira issue com a label tipo:bug).";
+      if (j.id) { cardMsg[j.id] = { ok: true, text }; await refresh(); location.hash = `#/demandas/${demandCode(j.id) || j.id}`; setTimeout(() => announce(text), 400); return; }
+      comp("new").msg = { ok: true, text }; announce(text); return refresh();
+    }
+    delete bugDocs[sc]; const ok = `Evidência acrescentada (${(Array.isArray(j.evidences) ? j.evidences.length : c.draft.evidences.length)} arquivo(s)).`;
+    comp(sc).msg = { ok: true, text: ok }; announce(ok); document.getElementById(bugIds(sc).link)?.removeAttribute("data-keep"); delete keepStore[bugIds(sc).link];
+    await refresh(); return;
+  }
+  const code = res ? res.status : "sem conexão";
+  if (res && ["rascunho_expirado", "rascunho_alterado"].includes(bugCode(j))) { c.draft = null; c.draftKey = null; bugClearConsent(sc); }
+  c.msg = { ok: false, text: res && res.status === 409 ? `Não foi possível acrescentar (409): ${bugErr(j) === "erro no servidor" ? "a demanda não é bug, foi entregue ou cancelada" : bugErr(j)}.` : `Não foi possível ${sc === "new" ? "registrar o bug" : "acrescentar a evidência"} (${code}): ${bugErr(j)}.` };
+  announce(c.msg.text); await render();
+  updateBugButtons();
+}
+async function bugOnClick(ev) {
+  const dr = ev.target.closest("[data-bug-draft]"); if (dr) { if (!comp(dr.dataset.bugDraft).busy) await bugMakeDraft(dr.dataset.bugDraft); return true; }
+  const rm = ev.target.closest("[data-bug-rm]");
+  if (rm) { const sc = rm.dataset.bugRm, c = comp(sc); c.files.splice(Number(rm.dataset.i), 1); c.errors = []; announce("Arquivo removido."); await render(); document.getElementById(bugIds(sc).files)?.focus(); return true; }
+  const sb = ev.target.closest("[data-bug-submit],[data-bug-append]"); if (sb) { await bugSubmit(sb); return true; }
+  return false;
+}
+async function bugOnFiles(sc, files, focusEl) {
+  const c = comp(sc); await bugAddFiles(sc, files);
+  announce(c.errors.length ? `${c.errors.length} arquivo(s) recusado(s): ${c.errors.join(" ")}` : `${c.files.length} arquivo(s) prontos para a prévia.`);
+  await render(); document.getElementById(focusEl)?.focus();
+}
+document.addEventListener("toggle", ev => { const d = ev.target; if (!d || d.tagName !== "DETAILS" || !d.open || !d.dataset.bugLog) return; const url = d.dataset.bugLog, t = logTexts[url];
+  if (t && (t.st === "ok" || t.st === "loading")) return fillBugLogs(); loadLog(url); }, true);
+document.addEventListener("input", ev => { if (ev.target.closest?.("#main") && (ev.target.dataset?.bugLink || ev.target.id === "dem-bug-title")) updateBugButtons(); });
+document.addEventListener("dragover", ev => { const z = ev.target.closest?.("[data-bug-drop]"); if (!z) return; ev.preventDefault(); z.classList.add("over"); });
+document.addEventListener("dragleave", ev => { const z = ev.target.closest?.("[data-bug-drop]"); if (z && !z.contains(ev.relatedTarget)) z.classList.remove("over"); });
+document.addEventListener("drop", ev => { const z = ev.target.closest?.("[data-bug-drop]"); if (!z) return; ev.preventDefault(); z.classList.remove("over");
+  const sc = z.dataset.bugDrop; bugOnFiles(sc, [...(ev.dataTransfer?.files || [])], bugIds(sc).files); });
 
 // ---- Squad (#/squad) — D14: grade de cartões (§7.1) + tabela "Esperas"; o detalhe fica na gaveta (§7.2). ----
 function renderSquad() {
@@ -1822,6 +2212,8 @@ function renderProduto() {
   </div>
   <div id="te-slot">${envSectionHtml("produto")}</div>
   <nav class="seg" aria-label="Ferramentas de observabilidade"><a href="#/produto/grafana${q}" ${tool === "grafana" ? `aria-current="page"` : ""}>Grafana · métricas</a><a href="#/produto/jaeger${q}" ${tool === "jaeger" ? `aria-current="page"` : ""}>Jaeger · traces</a></nav>
+  ${bugSupported && url ? `<div class="srcbtns"><a class="btn sm" id="bug-from-${tool}" href="#/demandas/bug?kind=produto&amp;fonte=${tool}" aria-describedby="bug-from-hint">${tool === "jaeger" ? "Abrir bug a partir deste trace" : "Abrir bug a partir deste painel ou alerta"}</a>
+    <span class="muted" id="bug-from-hint">Só do produtivo. O quadro abaixo é de outra origem: abra o ${tool === "jaeger" ? "trace" : "painel ou alerta"}, copie o link dele e cole no formulário.</span></div>` : ""}
   ${url ? `<iframe src="${esc(url)}" title="${esc(tname)} · ${esc(prod.name)}" style="width:100%;height:calc(100vh - 300px);min-height:520px;border:1px solid var(--line);margin-top:14px;background:var(--surface)"></iframe>`
         : `<p class="muted" style="margin-top:18px">Este produto não tem ${esc(tool)} configurado em docs/squad/project.json.</p>`}
   <h3 style="margin-top:22px">Links do produto</h3>
@@ -1942,12 +2334,13 @@ function afterRouteChange() {
   pendingFocus = false;
   const sec = route.view === "demandas" ? route.parts[1] : route.view === "painel" ? route.parts[0] : null;
   let target = null, scrollTo = null;
-  if (route.view === "demandas" && sec) {
+  if (route.view === "demandas" && sec && route.parts[0] !== "bug") {
     scrollTo = document.getElementById(`sec-${sec}`);
     if (sec === "gates") target = document.querySelector('#main .next-box.urgent textarea[id^="note-"]') || document.querySelector('#sec-gates textarea[id^="note-"]');
     if (sec === "validacao") target = document.querySelector("#sec-validacao [data-ans]");
     if (sec === "gates" && target && target.closest(".next-box")) scrollTo = target.closest(".next-box");
     target ||= scrollTo?.querySelector("h2");
+  } else if (route.view === "demandas" && route.parts[0] === "bug") { if (route.params.get("fonte")) target = document.getElementById("dem-bug-link");
   } else if (route.view === "painel" && sec === "alertas") { scrollTo = document.getElementById("alertas"); target = scrollTo?.querySelector("h2");
   } else if (route.view === "painel" && sec === "squad-base") { scrollTo = document.getElementById("squad-base"); target = document.querySelector('#squad-base textarea[id^="note-"]') || scrollTo?.querySelector("h2"); }
   if (scrollTo) scrollTo.scrollIntoView({ block: "start" }); else window.scrollTo(0, 0);
@@ -1963,7 +2356,7 @@ async function render() {
   if (route.view === "auditoria" && route.parts[0] === "politicas" && !policy) policy = await fetch("/api/policy").then(r => r.json()).catch(() => null);
   updateCounts();
   const v = route.view;
-  const html = v === "demandas" ? (route.parts[0] === "nova" ? renderNova : route.parts[0] ? () => renderDemanda(route.parts[0]) : renderDemandas)
+  const html = v === "demandas" ? (route.parts[0] === "nova" ? renderNova : route.parts[0] === "bug" ? renderBug : route.parts[0] ? () => renderDemanda(route.parts[0]) : renderDemandas)
     : v === "squad" ? renderSquad : v === "auditoria" ? renderAuditoria : v === "produto" ? renderProduto : renderPainel;
   // Campos com data-keep sobrevivem ao redesenho do polling; o rascunho de Nova demanda (dem-*) sobrevive também à troca de tela.
   const sameRoute = !pendingFocus;
@@ -1984,6 +2377,7 @@ async function render() {
     if (Math.abs(window.scrollY - scroll) > 2) window.scrollTo(0, scroll);
   }
   document.querySelectorAll("#main [data-ovc]").forEach(cb => applyOverride(cb.dataset.ovc));
+  fillBugLogs(); updateBugButtons();   // D16: logs por textContent; botões de bug conforme prévia e confirmações
   if (pendingFocus) afterRouteChange();
   else if (fk) { const el = document.querySelector(fk); if (el && !el.disabled) el.focus({ preventScroll: true }); }
   renderDrawer();
@@ -2191,6 +2585,7 @@ async function fetchState() {
   state = st; lastStateAt = Date.now();
   if (st.now && liveSupported !== true) syncClock(st.now);
   await fetchTestEnv();   // D15: antes de desenhar (o status da demanda depende dele)
+  await fetchBugSupport();   // D16: ações de bug só com o recurso no servidor
   infoCache = { log: null, list: null };
   lastVersion = live?.version ?? st.version ?? lastVersion;
 }
@@ -2227,7 +2622,7 @@ async function poll() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 // Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
-const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register]";
+const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append]";
 function applyStale() {
   const stale = isStale();
   document.querySelectorAll(STALE_SEL).forEach(el => {
@@ -2330,6 +2725,7 @@ document.addEventListener("click", async ev => {
     if (route.view === "produto") updateTeSlot(true);
     return;
   }
+  if (await bugOnClick(ev)) return;   // D16: prévia, remover arquivo, registrar bug, acrescentar evidência
   const pco = ev.target.closest("[data-precancel-open]");
   if (pco) { const id = pco.dataset.precancelOpen; cancelOpen.add(id); delete cardMsg[id]; await render(); document.getElementById(`cn-${id}`)?.focus(); return; }
   const pcb = ev.target.closest("[data-precancel-back]");
@@ -2448,7 +2844,13 @@ document.addEventListener("click", async ev => {
     document.getElementById(h.dataset.note)?.focus({ preventScroll: true });
   }
 });
-document.addEventListener("change", async ev => { if (ev.target.id === "drawer-msgs") { drawerMsgs = ev.target.checked; drawerKey = null; renderDrawer(); document.getElementById("drawer-msgs")?.focus(); return; } if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { location.hash = hrefWith({ produto: ev.target.value }); return; } if (ev.target.dataset?.filter) { location.hash = hrefWith({ [ev.target.dataset.filter]: ev.target.value || null }); } });
+document.addEventListener("change", async ev => {
+  // D16: arquivos do bug, confirmações, tipo e sugestão de prioridade pela severidade.
+  if (ev.target.dataset?.bugFiles) { const inp = ev.target, sc = inp.dataset.bugFiles, fl = [...(inp.files || [])]; inp.value = ""; return bugOnFiles(sc, fl, inp.id); }
+  if (ev.target.id === "dem-bug-priority") bugPrioTouched = true;
+  if (ev.target.id === "dem-bug-sev" && ["critica", "alta"].includes(ev.target.value) && !bugPrioTouched) { const p = $("#dem-bug-priority"); if (p && p.value !== "alta") { p.value = "alta"; announce("Prioridade sugerida: Alta, pela severidade."); } }
+  if (ev.target.closest?.("#main") && (ev.target.dataset?.bugConsent || /^(dem-bug|bugx-)/.test(ev.target.id || ""))) updateBugButtons();
+  if (ev.target.id === "drawer-msgs") { drawerMsgs = ev.target.checked; drawerKey = null; renderDrawer(); document.getElementById("drawer-msgs")?.focus(); return; } if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { location.hash = hrefWith({ produto: ev.target.value }); return; } if (ev.target.dataset?.filter) { location.hash = hrefWith({ [ev.target.dataset.filter]: ev.target.value || null }); } });
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   if (notifOpen) { notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell(); $("#bell").focus(); return; }
