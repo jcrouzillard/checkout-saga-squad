@@ -333,7 +333,17 @@
   "6a0787fecbfa",
   "2e3898549a5c",
   "26c145749ecf",
-  "16be406cc34f"
+  "16be406cc34f",
+  "bbbe0562b2a9",
+  "efe387a35d71",
+  "48542e4e0bc3",
+  "5378eaaa0347",
+  "c4d1fe4a6c2d",
+  "40d7469e2802",
+  "bbebad787657",
+  "893d8feb166b",
+  "a57a47b16471",
+  "b4eb5241f176"
  ],
  "issues": {
   "_diario": {
@@ -1335,6 +1345,28 @@
    "phase": "F3",
    "handed": true,
    "closed": true,
+   "kind": "task"
+  },
+  "efe387a35d71": {
+   "number": 107,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/107",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8cGyA",
+   "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "task"
+  },
+  "a57a47b16471": {
+   "number": 108,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/108",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8ikr0",
+   "agent": "arquiteto",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
    "kind": "task"
   }
  },
