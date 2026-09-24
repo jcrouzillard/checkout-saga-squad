@@ -18,6 +18,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const iso = (ms = Date.now()) => new Date(ms).toISOString().replace(/\.\d+Z$/, '+00:00');
 const readLog = () => fs.readFileSync(LOG, 'utf8').trim().split('\n').map(l => JSON.parse(l));
 const append = evs => fs.appendFileSync(LOG, evs.map(e => JSON.stringify(e)).join('\n') + '\n');
+// Ocorrências de undefined/NaN/[object Object] GERADAS pela UI (as que vêm como texto literal dos dados são ignoradas).
+const uiOnlyBad = p => p.evaluate(async () => {
+  const data = [];
+  const walk = v => { if (typeof v === 'string') { if (/undefined|NaN|\[object Object\]/.test(v)) data.push(v.replace(/\s+/g, ' ')); } else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x); };
+  try { walk(await (await fetch('/api/state', { cache: 'no-store' })).json()); } catch (e) { /* sem estado: tudo conta */ }
+  const hits = [], t = document.body.innerText, re = /\bundefined\b|\bNaN\b|\[object Object\]/g;
+  let m;
+  while ((m = re.exec(t))) {
+    const ls = t.lastIndexOf('\n', m.index) + 1, le = (t.indexOf('\n', m.index) + 1 || t.length + 1) - 1;
+    const left = t.slice(Math.max(ls, m.index - 12), m.index + m[0].length).replace(/\s+/g, ' ');
+    const right = t.slice(m.index, Math.min(le, m.index + m[0].length + 12)).replace(/\s+/g, ' ');
+    const fromData = data.some(d => (left.length > m[0].length && d.includes(left)) || (right.length > m[0].length && d.includes(right)));
+    if (!fromData) hits.push(t.slice(Math.max(ls, m.index - 30), Math.min(le, m.index + 30)));
+  }
+  return hits;
+});
 const rid = p => `${p}${Math.random().toString(16).slice(2, 12)}`;
 const out = { errors: [], results: {} };
 const R = (k, v) => { out.results[k] = v; console.error(`[${k}] ${JSON.stringify(v).slice(0, 600)}`); };
@@ -223,9 +239,11 @@ let ROUTES = [];
       const bad = [];
       for (const h of ROUTES.concat(['#/squad?agente=orquestrador', '#/squad?agente=backend', '#/auditoria/eventos'])) {
         await go(p, h); await sleep(400);
-        const t = await p.evaluate(() => document.body.innerText);
-        // "sem undefined" aparece em textos reais do log (handoffs antigos do QA): não é defeito de renderização.
-        if (/(?<!sem |0 )\bundefined\b|\bNaN\b|\[object Object\]/.test(t)) bad.push(h);
+        // D16 (QA): "undefined"/"NaN" aparecem como TEXTO LITERAL em eventos antigos do log ("sem undefined",
+        // "nunca 'undefined'"...). Só conta o que a UI gerou: cada ocorrência cujo contexto na linha (12 caracteres de
+        // um lado ou do outro) existe em alguma string de /api/state vem dos dados e é ignorada.
+        const hits = await uiOnlyBad(p);
+        if (hits.length) bad.push({ h, hits });
       }
       res[mode].undefinedIn = bad;
       await go(p, `#/demandas/${C[D17]}/gates`); await sleep(500);
