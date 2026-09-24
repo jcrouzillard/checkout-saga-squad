@@ -1,0 +1,55 @@
+{
+  "gate": "G2",
+  "demand": "518f89f27ae8",
+  "from": "devops+orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "handoffs": ["2ab9dbbf31f2", "91ee4966ac66", "0c6324e3bd07"],
+  "commits": ["e62c257", "e8348cb", "501a93c"],
+  "recommendation": "APPROVE",
+  "confidence": 0.84,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Suítes da squad", "status": "pass", "weight": 3, "blocking": true,
+     "source": "python3 -m unittest tests.squad.test_ambiente_teste_d15 (31 OK), test_alertas_d14 (20 OK), test_governanca_d14_qa (19 OK); python3 tests/squad/test_entrega_por_pr.py (todas as verificações passaram). pytest não está instalado; as suítes são unittest/script. docker ps depois: os 11 containers do checkout-saga seguem Up 19-20 h (nada foi tocado)"},
+    {"name": "CA1: config do produtivo idêntico", "status": "pass", "weight": 3, "blocking": true,
+     "source": "compose de origin/develop (08ffcef) e da branch com -p checkout-saga -f <tmp> --project-directory plankton/ (.env da cópia principal): 'config' byte-idêntico (481 linhas) e 'config --hash *' idêntico; os 11 hashes são iguais ao com.docker.compose.config-hash dos containers em execução (prod-fingerprint configHashMatchesMain=true em todos). Merge da D15 não recria nada por mudança de compose"},
+    {"name": "CA2: config do teste isolado", "status": "pass", "weight": 3, "blocking": true,
+     "source": "docker compose -p checkout-teste --env-file infra/teste/teste.env config: name checkout-teste (também sem -p, via COMPOSE_PROJECT_NAME); imagens checkout-teste/*:local só nos 5 de aplicação; portas 13001,14317,14318,15432,18080-18084,18090,19090,26686,39092; volume checkout-teste_pgdata; rede checkout-teste_default; KAFKA_ADVERTISED_LISTENERS EXTERNAL://localhost:39092. testenv.py check-ports real: ok, sem conflitos (lsof + docker ps)"},
+    {"name": "CA16: nada destrutivo no produtivo; todo compose com -p", "status": "pass", "weight": 3, "blocking": true,
+     "source": "prod.py: todo comando passa por assert_safe (proíbe down, -v, --volumes, prune, rm, rmi, kill, --remove-orphans, --force-recreate, docker volume/system/network, compose sem '-p checkout-saga', menção a checkout-teste); up sempre '-d --no-deps --wait <lista>'; restart só de checkout-console/prometheus/grafana. testenv.py: todo comando mutável passa por _run_test/assert_test_only (exige '-p checkout-teste --env-file infra/teste/teste.env' e recusa 'checkout-saga'); '-v' só em do_reset (exige pedido humano com APAGAR + guard repetido); down sem -v; sem prune/--remove-orphans. Único compose do produtivo em testenv é 'config --hash' (leitura). Postgres/Kafka do produtivo só são recriados se o config --hash deles mudar (R5), o que o contrato §8.7 permite explicitamente. test_zz_CA16 cobre os comandos gerados"},
+    {"name": "R1-R9 do G1 no código", "status": "pass", "weight": 2, "blocking": false,
+     "source": "R1 check_config: prefixo checkout-teste/ só em serviço com build, terceiros não podem usar checkout-saga/*; R2 prod.py baseline + LABEL org.opencontainers.image.revision (ARG REVISION no fim do Dockerfile) + fallback image_revision; R3 rollback_points via 'docker inspect {{.Image}}' do container em execução; R4 MIGRATION_RE (^|/)db/(migration|common)/; R5 compose_changed_services compara config --hash do compose implantado × HEAD e nunca faz up global; R6 pendente (F4 QA — ver riscos); R7 é regra do G3; R8 host_listeners via lsof; R9 Kafka do teste sem volume (aceito, documentado no G1)"},
+    {"name": "Leitura real (status, fingerprint, servidor)", "status": "pass", "weight": 2, "blocking": false,
+     "source": "testenv.py status (SQUAD_ROOT_DATA=cópia principal): livre, fila vazia, health {}; prod-fingerprint 2x: identical=true, digest b80841ef7cc18130, 11 containers, checkout-saga_pgdata CreatedAt 2026-09-23T18:56:12-03:00; servidor do worktree em :7161 com dados reais: GET /api/test-env 200 324 B ~2 ms; /api/live 200 22,7 kB ~6 ms, serverMs 5, testEnv resumido {state,demand,code,stale,queueSize}; /api/state 200; servidor derrubado, :7070 intacto. Nenhum POST enviado"},
+    {"name": "Telas: ações só do humano, APAGAR, estados, stepper, alertas", "status": "pass", "weight": 2, "blocking": false,
+     "source": "squad-control/index.html: único POST é /api/test-env/request dentro do handler de clique; reset-data exige digitar APAGAR (campo, sem confirm()); estados publicando/ocupado/divergente/falhou/livre com ícone+texto; stepper '... Revisão (PR) → Pronto para testar → Entregue' com 'pulado'; rótulos B5/A4/A5; botão 'Sair da fila' (cancel) — server.py aceita cancel (te.ACTIONS, request() exige estar na fila, senão duplicate)"},
+    {"name": "Integração no review-sync", "status": "validate", "weight": 2, "blocking": false,
+     "source": "gitflow.after_review: reconcile sempre; prod.py update --auto só se delivered, current()=='develop', SQUAD_PROD_AUTOUPDATE!='0' e arquivos presentes; prod.py repete o guard (ROOT == worktree em develop, HEAD==origin/develop após fetch, sem sujeira fora de docs/squad/**, projeto resolvido checkout-saga) e lock .squad/prod-update.lock. O merge da própria D15 roda o gitflow antigo (já carregado) — o primeiro auto-update acontece no merge seguinte. Execução síncrona sem timeout no review-sync (build até 30 min)"},
+    {"name": "Escopo e ownership", "status": "validate", "weight": 1, "blocking": false,
+     "source": "git diff b5abfe2..HEAD: 14 arquivos. DevOps só Dockerfile/Makefile/compose/infra/teste; Frontend só squad-control; Orquestrador tools/squad + AGENTS.md, mas também tests/squad/test_ambiente_teste_d15.py (novo) e 1 linha de test_alertas_d14.py — tests/** é do QA"}
+  ],
+  "open_risks": [
+    "R6 ainda aberto e agora exposto: 'make e2e-teste' passa E2E_COMPOSE_PROJECT/E2E_COMPOSE_ENV_FILE, mas tests/e2e/run.sh:729/732 ignora e roda 'docker compose kill/up -d saga-orchestrator' SEM -p — rodado da cópia principal ou de um worktree de feature, mata e recria o saga-orchestrator do PRODUTIVO. Até o QA (F4) corrigir, ninguém roda 'make e2e-teste' sem SKIP_RESTART=1. Condição bloqueante para o G3.",
+    "R2 — sequência obrigatória: rodar 'python3 tools/squad/prod.py baseline' na cópia principal DEPOIS do merge da D15 (commit de merge da D15) e ANTES de qualquer outro merge. Baseline antes do merge faria o diff seguinte incluir o Dockerfile (rebuild dos 5); sem baseline, image_revision() devolve None (imagens atuais não têm o rótulo) e o próximo merge reconstrói e recria os 5 serviços. Verificado: imagens checkout-saga/*:local criadas 2026-09-23 17:45, depois do último commit em services/ (e2d66c5 17:42), então o baseline no HEAD é verdadeiro.",
+    "review-sync fica bloqueado durante o reconcile (pode publicar o próximo da fila: build até 15 min + up 5 min) e depois durante o prod.py update (build até 30 min + up); o teste roda ANTES do produtivo. Recomendação ao Orquestrador: inverter a ordem (produtivo primeiro, pois tem prioridade) ou disparar em segundo plano.",
+    "§4.6 do contrato manda o plantão chamar 'testenv.py reconcile' a cada ciclo; tools/squad/plantao.sh e docs/squad/prompts/plantao.md não chamam. Um reset-data/down/release disparado pelo servidor enquanto o lock está tomado fica pendente até o próximo pedido ou review-sync. Correção de uma linha (Orquestrador).",
+    "B5 (bloqueio) também abre para prod-update-failed phase=guard (ex.: cópia principal com mudança rastreada fora de docs/squad/** ou push do snapshot falhou): comportamento seguro, mas o humano precisa saber que 'nada foi tocado' nesse caso — o título já traz a fase.",
+    "Ownership: o Orquestrador escreveu em tests/squad/** (do QA). A mudança em test_alertas_d14.py (set(live) - {'testEnv'}) é mínima e autorizada pelo contrato §5.1 (testEnv em /api/live); o QA deve ratificar/adotar as duas no G3.",
+    "make down continua 'docker compose down -v' sem -p (pré-existente; recomendação do contrato §5 fora dos CAs) — o humano ou um agente que rode 'make down' apaga checkout-saga_pgdata.",
+    "R10 do G1 segue válido: mudanças em tools/squad/** ou squad-control/** não reiniciam o servidor da 7070 — após o merge da D15 o humano reinicia o Squad Control."
+  ],
+  "errata": [
+    "Recomendada (documental, Arquiteto, não bloqueia): §3.1/§8 do contrato — locks em '.squad/test-env.lock' e '.squad/prod-update.lock' (ignorado pelo git) em vez de 'docs/squad/memory/.test-env.lock' — a implementação cumpre melhor a intenção 'fora do git', pois docs/squad/memory/ é commitado pelo snapshot_state.",
+    "Recomendada (documental): §3.1/§4.5/§5.1 — 'down' mantém o ocupante com stopped=true (estado ocupado, não divergente) em vez de liberar a vaga; e os campos extras aditivos do GET /api/test-env (code, prHead, startedAt, stopped, health, warning, lastReleased, project).",
+    "Não exige errata: 'cópia principal' = worktree em develop (o contrato já diz plankton/ em develop; a detecção por git worktree list só generaliza); a linha em test_alertas_d14.py (acréscimo previsto no §5.1)."
+  ],
+  "qa_priorities": [
+    "1. F4 (R6): tests/e2e/run.sh — usar E2E_COMPOSE_PROJECT/E2E_COMPOSE_ENV_FILE em todo docker compose (kill+start, que não recriam) e recusar rodar o cenário 6 sem -p explícito; teste que prove que o comando gerado leva -p checkout-teste. Até lá, SKIP_RESTART=1.",
+    "2. Revisar e adotar tests/squad/test_ambiente_teste_d15.py (docker/gh simulados): acrescentar casos de reset-data/down com lock tomado, cancel pela API (202 e duplicate), e after_review do gitflow (delivered fora da develop não chama prod.py; SQUAD_PROD_AUTOUPDATE=0).",
+    "3. CA1/CA4 como evidência repetível sem subir nada: comparar config/config --hash do compose da develop × branch com --project-directory da cópia principal e prod-fingerprint antes/depois de toda a suíte.",
+    "4. O QA NÃO sobe, para, recria nem faz build de containers do produtivo; um teste real do checkout-teste (CA6-CA10, CA13/CA15 reais, make e2e-teste) só com autorização humana explícita e com prod-fingerprint --compare antes/depois provando produtivo intacto."
+  ],
+  "human_required": false,
+  "rationale": "Os critérios bloqueantes aplicáveis a esta entrega de ferramentas/infra (suítes verdes, CA1 produtivo idêntico com hashes iguais aos dos containers em execução, CA2 teste isolado, CA16 sem comando destrutivo e com -p em tudo) têm evidência verificada no repositório e em leitura real do Docker, sem tocar containers. R1-R5 e R8 estão implementados como pedido no G1. Riscos moderados remanescentes: R6 (run.sh sem -p, que torna 'make e2e-teste' perigoso até o F4 do QA — condição bloqueante do G3), a sequência de baseline do R2 após o merge, o review-sync síncrono e a falta do reconcile no plantão. Os desvios declarados são justificados; duas erratas documentais recomendadas ao Arquiteto. A mudança de opacidade do #ai-usage (texto do .u-win em var(--dim) em vez de opacity .55; o medidor mantém a opacidade) é aceitável: melhora o contraste, está em squad-control/** (dono Frontend) e não muda comportamento."
+}
