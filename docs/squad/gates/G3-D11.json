@@ -1,0 +1,35 @@
+{
+  "gate": "G3",
+  "demand": "642a73cb38e5",
+  "from": "qa",
+  "to": "humano (revisão do PR)",
+  "cycle": 2,
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Pedido do humano atendido (faixa fixa, Claude Code e Codex separados, só fonte real, atualiza com a tela, indisponível → último valor + alerta)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/642a73cb38e5.json x capturas tests/ui/d11-real-execucoes-scroll-1440.png (faixa no topo após rolar; Claude 'Indisponível — sem fonte real'; Codex stale com 9%/22% esmaecidos + ícone + 'Indisponível · coletado às'), d11-claude-stale-1440.png, d11-largura-600.png (dois blocos lado a lado, níveis ATENÇÃO/CRÍTICO em texto). Nenhum valor somado nem estimado."},
+    {"name": "API §3 e isolamento por provedor (CA1, CA5, CA6, CA7, CA11) — verificação própria", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Servidor do worktree na 7100 (SQUAD_ROOT_DATA=plankton), derrubado depois; 7070 intacto: /api/usage providers = [claude, codex]; /api/state.usage idêntico (comparação em Python); claude none 'Statusline não instalada' com números null; codex stale 'Janela de 5 h renovada' com 9,0%/22,0%, plan plus; grep session|/Users|transcript|@ vazio. CA11 coberto pelo QA (snapshot corrompido → claude none 'Snapshot ilegível', /api/state 200)."},
+    {"name": "Tee da statusline (CA4, CA5) e caminho snapshot→API (base do CA3) — verificação própria", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Scratchpad (--data-root temporário, sem --install): stdin com session_id/transcript_path/cwd + rate_limits e --next com aspas simples e exit 3 → stdout idêntico ao comando direto (cmp) e rc 3/3; snapshot só collectedAt/fiveHour/sevenDay; JSON inválido → rc 0, stderr vazio, snapshot inalterado (cmp); server.usage_claude() com SQUAD_ROOT_DATA temporário → fresh 42,5%/61%. .squad/usage está no .gitignore. Diretório temporário removido; nada criado em plankton/.squad/usage."},
+    {"name": "CA8 faixa sticky e altura ≤ 72 px (defeito D11-QA-1 corrigido)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Handoff QA 26c145749ecf e checklist tests/ui/checklist-consumo-da-ia-d11.md: 68–69 px de 600 a 1440 px em todos os estados; sticky top=0 após rolar em 4 telas a 1440 e 6 a 390; oculta em Observabilidade. Correção 0f5b205 só em squad-control/index.html. Captura d11-largura-600.png confere."},
+    {"name": "CA9 atualização por polling sem perder foco/texto; CA10 390 px e acessibilidade; defeitos QA-2/QA-3", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Checklist: 30→88→96 em ciclos de 3 s mantendo foco e texto em #dem-detail a 1440 e 390; 390 px sem rolagem horizontal nas telas da faixa; 4 role=meter com aria-valuetext; painel de notificações 16–374 px (d11-real-sino-390.png conferida); espaço 'coletado às · plano plus' corrigido (d11-claude-stale-1440.png)."},
+    {"name": "Escopo, ownership e rastreabilidade", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff origin/develop...HEAD --stat: ADR-014 e contrato (Arquiteto), G1/G2 (Auditor), tools/squad/server.py e statusline_usage.py (Orquestrador), squad-control/index.html (Frontend), tests/ui/** (QA). Nada em services/ ou infra/. Log com ADR 4a7c59c8c0a3, handoffs 913e6ee76dbf, 0408c4ef3878, 91cf7ae6a490, 187a5ae4e53f, 2e3898549a5c, 26c145749ecf; gates G1 2149535091ee e G2 b168d3c4d723; defeitos 4c25f9a37cd3, 830e8531a0b1, f9e575a63952 fechados na revalidação. Commits por passo em português."},
+    {"name": "CA3 — sessão interativa real com o tee instalado", "status": "validate", "weight": 2, "blocking": false,
+     "source": "Depende de o humano rodar --install a partir da cópia principal (plankton) após o merge. O caminho tee→snapshot→API→tela está provado com stdin no formato documentado e com fixtures; falta só confirmar que o Claude Code real entrega rate_limits.five_hour/seven_day nesse formato. Condição pós-merge."}
+  ],
+  "open_risks": [
+    "Condição pós-merge (CA3): o humano roda 'python3 tools/squad/statusline_usage.py --install' a partir de plankton (não do worktree, que será removido), faz uma interação numa sessão interativa e confere .squad/usage/claude.json e o bloco Claude Code em fresh. Se o Claude Code não entregar rate_limits nesse formato, a faixa fica em 'Indisponível — sem fonte real' (comportamento seguro, sem número inventado); reabrir como defeito. Reverter: --uninstall (backup datado).",
+    "O motivo do stale ('Janela de 5 h renovada às HH:MM') é formatado no fuso local do servidor, e os demais horários no fuso do navegador. Nas capturas (Puppeteer em Docker/UTC) aparecem 18:35 e 21:35 lado a lado; no uso normal (mesma máquina) coincidem. Baixo.",
+    "Codex: sessões de vários dias iniciadas antes das 3 pastas de data mais recentes não são lidas; pode mostrar stale indevido. Aceito pelo contrato.",
+    "Em ≤ 700 px os rótulos encurtam ('↻', '7 d'); o texto completo fica em title/aria-valuetext. Sugestão, não defeito.",
+    "Pré-existentes, fora da D11: rolagem horizontal em Evidências a 390 px; 404 /favicon.ico; glifos dos ícones dos agentes como caixas no Chromium do container."
+  ],
+  "human_required": false,
+  "rationale": "O G3 padrão (e2e do checkout, Jaeger) não se aplica a uma demanda do Squad Control; foram avaliados os CA1–CA11 do contrato. Após o 2º ciclo, o QA revalidou CA8 e os três defeitos com o mesmo script, e as capturas conferem. Refiz por conta própria o que é verificável fora do navegador: a API na 7100 (formato, separação, none/stale, sem segredos, /api/state igual) e o tee no scratchpad (saída e rc idênticos, snapshot mínimo, JSON inválido inócuo, snapshot lido pela API como fresh). Só o CA3 depende de ação humana (--install) e fica como condição pós-merge não bloqueante: o caminho snapshot→API→tela está coberto e, se a fonte real não vier, a UI mostra 'Indisponível' em vez de um número falso. Risco moderado porque o --install mexe em ~/.claude/settings.json fora do repositório (mitigado: ação humana, backup datado, uninstall testado no G2). Confiança = (3+3+2+2+2+2+1)/16 ≈ 0,94, reduzida para 0,88 pelo CA3 não observado em sessão real e pelas medições de navegador feitas só pelo QA."
+}

@@ -1,0 +1,35 @@
+{
+  "gate": "G1",
+  "demand": "642a73cb38e5",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.85,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/642a73cb38e5.json → contrato: provedores separados sem soma (§3 ordem fixa claude/codex, §4 'nada soma', CA1); só fonte real, estimativa por tokens vetada (§1, ADR-014 Alternativas, CA6); atualização a cada polling de 3 s inclusive em edição (§4, CA9); indisponível = último valor + ícone de alerta + hora da coleta (§3 status stale, §4, CA7); faixa fixa no topo de Operação e Governança, fora de Produto (§4, CA8)"},
+    {"name": "Premissas técnicas conferidas em artefatos reais", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Rollout Codex mais recente (~/.codex/sessions/2026/09/23, ts 2026-09-23T21:24:49Z): token_count.rate_limits com limit_id='codex', primary{used_percent 9.0, window_minutes 300, resets_at epoch}, secondary{used_percent 22.0, window_minutes 10080, resets_at}, plan_type 'plus' — idêntico ao exemplo do §3. Claude Code: ~/.claude/statusline-command.sh:58-60 já lê .rate_limits.five_hour.used_percentage/resets_at e .seven_day.used_percentage (statusline ativa em settings.json: 'bash ~/.claude/statusline-command.sh'); binário 2.1.280 contém os campos five_hour/seven_day. Não foi capturado um stdin real ao vivo (só leitura) — premissa sustentada pela statusline em uso"},
+    {"name": "Segurança: settings do usuário, encadeamento e credenciais", "status": "validate", "weight": 2, "blocking": true,
+     "source": "§2: --install/--uninstall só pelo humano, com backup e idempotência; tee engole erros e repassa o mesmo stdin ao --next; snapshot com whitelist (collectedAt, fiveHour, sevenDay) e CA5 grep de segredos; .squad/ está no .gitignore. Parcial: (1) montar --next '<comando anterior>' por interpolação quebra se o comando tiver aspas simples — exigir shlex.quote ou guardar o comando anterior em arquivo lateral; (2) local/nome do backup não definido; (3) timeout de 1 s aplica-se só ao tee, mas o contrato não diz explicitamente que --next herda o timeout/código de saída do original"},
+    {"name": "Critérios de aceite verificáveis", "status": "validate", "weight": 2, "blocking": false,
+     "source": "CA1–CA11 com curl/fixture/grep/DevTools objetivos. Parcial: CA3 exige sessão interativa com o tee instalado (ação humana); no worktree DATA_ROOT é a raiz do plankton-d11, não a cópia principal — validar com SQUAD_ROOT_DATA explícito; CA6 usa CODEX_HOME vazio (ok)"},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 2, "blocking": false,
+     "source": "server.py e statusline_usage.py em tools/squad/** → Orquestrador; squad-control/index.html → Frontend; commit 6bdfead toca só docs/contracts/ui-consumo-da-ia.md e docs/adr/014 (Arquiteto)"},
+    {"name": "Limitação honesta e custo do polling", "status": "pass", "weight": 1, "blocking": false,
+     "source": "ADR-014 Consequências: dados só se renovam com sessões ativas (Codex por token_count; Claude só sessão interativa, claude -p não aciona); UI mostra hora da coleta e stale > 15 min. §1: ler ≤ 512 KiB do fim e cachear por (caminho, mtime, tamanho); hoje 74 rollouts no total"}
+  ],
+  "open_risks": [
+    "--install: nenhum agente executa; o Orquestrador entrega o comando ao humano. Montar o comando com shlex.quote (ou guardar o anterior em <DATA_ROOT>/.squad/usage/statusline.prev) e gravar backup com timestamp (ex.: ~/.claude/settings.json.bak-squad-<ts>); --uninstall restaura só a chave statusLine, sem sobrescrever outras mudanças do usuário feitas depois; recusar instalar se statusLine não for type=command.",
+    "Encadeamento: o --next deve rodar sem o timeout de 1 s do tee, repassar stdout sem alteração e propagar o código de saída; o tee grava o snapshot antes ou em paralelo, nunca bloqueando a statusline. CA4 com o stdin de fixture comparando byte a byte contra 'bash ~/.claude/statusline-command.sh'.",
+    "Polling 3 s: descobrir os 5 rollouts de maior mtime sem varrer toda a árvore a cada chamada (listar só os diretórios de data mais recentes ou cachear a listagem por mtime do diretório); a pasta cresce indefinidamente.",
+    "Snapshot do Claude grava a cada redesenho da statusline (frequente): escrita atômica ok; evitar reescrever quando os valores não mudaram.",
+    "status stale quando resetsAt passou: exibir o texto do reason (ex.: 'Janela de 5 h renovada às HH:MM') para o humano entender que o número antigo não vale mais.",
+    "Várias sessões/worktrees: o snapshot vai para o DATA_ROOT do script instalado; documentar que o painel deve ler o mesmo DATA_ROOT (SQUAD_ROOT_DATA) para funcionar a partir de worktrees.",
+    "Formatos internos dos CLIs podem mudar: leitura tolerante (campo ausente → none), como já previsto."
+  ],
+  "human_required": false,
+  "rationale": "Contrato e ADR-014 traduzem fielmente as respostas do humano (separado, só fonte real, polling, último valor com alerta) e as premissas técnicas foram confirmadas em artefatos reais: o rollout do Codex tem exatamente os campos e janelas 300/10080 descritos, e a statusline do usuário já consome rate_limits.five_hour/seven_day. A limitação de renovação só com sessões ativas está declarada e a UI mostra hora da coleta. Ownership correto. Risco moderado (não alto) porque o --install altera ~/.claude/settings.json fora do repo — mitigado por ser ação exclusivamente humana, com backup e --uninstall — e porque um erro no encadeamento degradaria a statusline do usuário; ressalvas de quoting/backup/timeout devem ser resolvidas na implementação e verificadas no G2. Confiança = (3+3+1+1+2+1)/13 = 0.85 (dois critérios 'validar' contam 50%)."
+}
