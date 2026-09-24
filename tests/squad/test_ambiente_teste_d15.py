@@ -752,24 +752,17 @@ class TestQaAfterReview(unittest.TestCase):
             os.environ["SQUAD_PROD_AUTOUPDATE"] = auto
 
     def call(self, delivered):
-        """Chama after_review. O Popen acontece ANTES do print final; o IndexError do print (defeito registrado
-        pelo QA, ver test_defeito_print_nao_quebra) é isolado aqui para que os casos abaixo verifiquem só O QUE é
-        disparado. Qualquer outra exceção falha o teste."""
-        try:
-            self.gf.after_review(delivered=delivered)
-        except IndexError:
-            pass
+        self.gf.after_review(delivered=delivered)
 
     def script(self):
         self.assertEqual(len(self.popen), 1, self.popen)
         return self.popen[0][-1]
 
-    @unittest.expectedFailure
     def test_defeito_print_nao_quebra(self):
-        """DEFEITO (QA, D15): gitflow.after_review faz c[3] em ['python3', 'tools/squad/testenv.py', 'reconcile']
-        (3 itens) -> IndexError depois do Popen; o review-sync termina com traceback em TODO merge/fechamento.
-        Quando o Orquestrador corrigir, este teste passa a 'unexpected success': remova o expectedFailure."""
-        self.gf.after_review(delivered=True)
+        """Regressão do defeito f6ed87f48c62 (corrigido pelo Orquestrador): o print final do after_review fazia c[3]
+        em ['python3', 'tools/squad/testenv.py', 'reconcile'] (3 itens) -> IndexError em todo merge/fechamento."""
+        for delivered in (True, False):
+            self.gf.after_review(delivered=delivered)
 
     def test_develop_delivered_chama_prod_e_reconcile(self):
         self.call(True)

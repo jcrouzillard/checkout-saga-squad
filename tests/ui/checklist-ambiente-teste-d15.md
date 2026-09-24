@@ -34,7 +34,8 @@ Legenda: **OK** = verificado com teste automatizado/leitura real · **A VALIDAR 
   fica pendente e roda no próximo `reconcile` (`TestQaLock`).
 - `cancel` pela API → 202 + spawn `reconcile`; repetido → 202 `duplicate`; demanda inexistente 404 (`TestQaCancelApi`).
 - `gitflow.after_review`: `prod.py update --auto` só com delivered + develop + `SQUAD_PROD_AUTOUPDATE != 0`,
-  e antes do `reconcile` (`TestQaAfterReview`). **Defeito** registrado: `IndexError` no `print` final (ver log).
+  e antes do `reconcile` (`TestQaAfterReview`). Defeito `f6ed87f48c62` (`IndexError` no `print` final)
+  **CORRIGIDO** pelo Orquestrador (`" ".join(c[2:])`); `test_defeito_print_nao_quebra` agora é teste de regressão e passa.
 
 ## Roteiro para a validação humana (CA3, CA6–CA10, CA13/CA15 reais, CA17)
 1. `bash tests/squad/prova_produtivo_intacto.sh /tmp/fp-antes.json`
