@@ -1,0 +1,40 @@
+{
+  "demand": "841f9a27e64a",
+  "title": "Demandas para Bugs",
+  "detail": "Preciso ter um tipo de deamnda para bugs\nPossibilidade de criar uma demanda do tipo BUG, agregando os anexos do BUG, link e ou gerar um bug a partir de um link de erro.\nIsso tanto para o Produto ou Operação da Squad",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-24T20:29:44+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "O que é o 'link de erro' usado para gerar um bug: um trace do Jaeger, um painel/alerta do Grafana, uma issue do GitHub ou qualquer URL? A squad deve abrir o link e extrair dados (trace_id, orderId, mensagem, stack) para preencher o bug, ou só guardar o link como referência?",
+      "dimension": "objetivo",
+      "answer": "Seria um trace do Jeager ou um painel de alerta do Grafana. A squad vai evidenciar o que ocorreu e junto com o arquiteto, propor uma solução para o problema."
+    },
+    {
+      "question": "Quais anexos devem ser aceitos (imagens, logs, HAR, qualquer arquivo) e com qual tamanho máximo? Onde eles ficam: versionados no repositório (ex.: docs/squad/memory/…) ou fora do Git, só referenciados?",
+      "dimension": "escopo",
+      "answer": "Para esse somente logs e imagens. Vamos guardar em docs/squad/[produto ou operação]/bugs. Depois vamos colcoar isso tudo em um NOSql."
+    },
+    {
+      "question": "Um bug deve ter campos obrigatórios próprios, diferentes de uma demanda comum (passos para reproduzir, comportamento esperado × observado, severidade, ambiente produtivo/teste)? Se sim, quais são obrigatórios para o registro ser aceito?",
+      "dimension": "aceite",
+      "answer": "O Bug somente do ambiente produtivo. O campos obrigatorio é a propria evidencia do erro, log ou imagem,"
+    },
+    {
+      "question": "O fluxo de trabalho de um bug muda em relação ao de uma demanda (ex.: o QA reproduz e escreve um teste que falha antes da correção, branch hotfix/* quando o bug está em produção), ou basta um novo tipo/rótulo que segue o mesmo protocolo e os mesmos gates?",
+      "dimension": "escopo",
+      "answer": "Vamos pela opção e escreve o que falha."
+    },
+    {
+      "question": "'Bug' passa a ser uma classificação independente de Produto/Operação (bug de produto ou bug de operação), mantendo o campo de tipo atual e as demandas já registradas sem alteração? Confirme que as demandas já existentes e a validação atual do tipo (Produto ou Operação) não podem quebrar.",
+      "dimension": "restricoes",
+      "answer": "O bug pode ser do produto ou da operação de forma independente."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
