@@ -14,6 +14,8 @@ Nada aqui acessa rede; a única escrita em disco é a chave HMAC (`key_path`).
 """
 from __future__ import annotations
 
+import bisect
+import functools
 import hashlib
 import hmac
 import ipaddress
@@ -149,20 +151,31 @@ def looks_like_test_env(text: str) -> bool:
 # Aspas: qualquer nível de escape (`"`, `\"`, `\\\"` ... — JSON logado como texto uma ou mais vezes) e aspas
 # simples/crase (toString, SQL, YAML). Valor entre aspas é mascarado até a aspa de fechamento do MESMO nível de
 # escape (inclui espaços, nunca atravessa a linha); sem aspa de fechamento, cai no valor sem aspas (\S sem separadores).
-QA = r"""\\*["'`]"""
+# `(?<!\\)` ancora o `\\*` na PRIMEIRA barra de uma sequência (QA-D16-2): sem ela, cada posição de uma sequência
+# longa de barras recomeçava o `\\*` e a regra ficava quadrática (20 KB de `\\` ≈ 22 s).
+QA = r"""(?<!\\)\\*["'`]"""
 # Palavra-chave de segredo só quando TERMINA a chave (accessToken, bearer_token, X-Auth-Token, client_secret,
 # spring.datasource.password), opcionalmente seguida de um sufixo da lista abaixo (secretKey, tokenValue,
 # passwordHash). Chaves que só CONTÊM a palavra (tokenizer, tokenCount, totalTokens, maxTokens, passwordPolicy,
 # passwordMinLength, secretsManager) não são segredo — mesma leitura do mínimo do contrato §8.2, `palavra\s*[=:]`.
+# Palavras curtas (QA-D16-3): valem como chave inteira, depois de separador (card_pin, x-otp) ou em fronteira
+# camelCase — maiúscula logo após minúscula/dígito (cardCvv, cardPin, userPwd) —, nunca no meio de palavra
+# (spin, mapping, shopping). Podem ter o sufixo camelCase/separado code|number|num (pinCode, otpCode, cvv_number).
+# `pwd` não vale quando o valor começa por `/` (PWD=/caminho do shell); `auth` só como chave inteira ou depois de
+# separador (x-auth, spring.auth), nunca author/authority/oauth2Client.
+_NOT_PATH = r"""(?!(?:\\*["'`])?\s*[=:]\s*(?:\\*["'`])?/)"""
+_SHORT_WORD = (r"(?:(?:(?<=[_.-])|(?<![\w.-]))(?:cvv|cvc|pin|otp|pwd" + _NOT_PATH + r"|auth)"
+               r"|(?-i:(?<=[a-z0-9])(?:Cvv|CVV|Cvc|CVC|Pin|PIN|Otp|OTP|Pwd" + _NOT_PATH + r"|PWD" + _NOT_PATH + r")))")
+_SHORT_SUFFIX = r"(?:(?:[_.-]|(?-i:(?<=[a-z])(?=[A-Z])))(?:code|number|num))?"
 SECRET_WORDS = (r"(?:password|passwd|senha|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|"
-                r"credentials?|passphrase|"
-                # palavras curtas só valem como chave inteira ou depois de separador (card_pin, x-otp), nunca "spin"
-                r"(?:(?<=[_.-])|(?<![\w.-]))(?:cvv|cvc|pin|otp))")
+                r"credentials?|passphrase|" + _SHORT_WORD + _SHORT_SUFFIX + ")")
 SECRET_SUFFIX = r"(?:[_.-]?(?:key|value|hash|b64|base64|enc|encoded|encrypted|plain))?"
 _SECRET_KEY = r"(?<![\w.-])[\w.-]{0,80}?" + SECRET_WORDS + SECRET_SUFFIX + r"(?![\w-])"
 _QUOTED_VALUE = (r"(?P<bs>\\*)(?P<q>[\"'`])(?!\[MASCARADO)(?!(?P=bs)(?P=q))(?P<val>.*?)"
                  r"(?<!\\)(?P=bs)(?P=q)")
-_BARE_VALUE = r"""(?P<bq>\\*["'`])?(?!\[MASCARADO)(?P<bare>[^\s"'`\\,;&}]+)"""
+# valor sem aspas nunca começa por `{`/`[`: objeto/lista aninhados ("auth":{...}) não são mascarados de uma vez (o JSON
+# continuaria inválido); os campos internos passam pelas regras normalmente
+_BARE_VALUE = r"""(?P<bq>\\*["'`])?(?!\[MASCARADO)(?![{\[])(?P<bare>[^\s"'`\\,;&}]+)"""
 SECRET_PATTERNS = [
     ("chave_privada", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.S)),
     ("jwt", re.compile(r"\beyJ[\w-]+\.[\w-]+\.[\w-]+")),
@@ -203,6 +216,7 @@ def _cpf_ok(d: str) -> bool:
     return True
 
 
+@functools.lru_cache(maxsize=4096)   # `ipaddress` é caro (~5 µs): repetições numa linha longa não reavaliam (QA-D16-2)
 def _public_ip(value: str) -> bool:
     try:
         return ipaddress.ip_address(value).is_global
@@ -214,15 +228,21 @@ ADDRESS_KEYS = r"(?:shippingAddress|shipping_address|billingAddress|endereco|end
 NAME_KEYS = r"(?:customerName|recipient|recipientName|destinatario|fullName|nomeCompleto|nome)"
 ZIP_KEYS = r"(?:zipCode|zip_code|zip|cep|postalCode|postal_code)"
 STREET_KEYS = r"(?:street|logradouro|rua|complement|complemento)"
-Q = r"\\*\""   # aspas com qualquer nível de escape (JSON logado como texto 1, 2 ou mais vezes)
+Q = r"(?<!\\)\\*\""   # aspas com qualquer nível de escape (JSON logado 1, 2+ vezes); âncora linear (QA-D16-2)
+# Valor de `chave=` (toString): entre aspas de qualquer nível de escape até a aspa de fechamento do MESMO nível
+# (≤ 500 caracteres, QA-D16-4: `customerName=\"Ana\"` dentro do `message` JSON não consome o fim da string);
+# sem aspas, até `,`/`]`/`}`/`)`/fim de linha, mas nunca engolindo a aspa que fecha uma string JSON (`"` ou `\"`
+# seguidos de `,` `}` `]` `:` ou fim de linha).
+_KV_VALUE = (r"(?:(?P<qq>(?<!\\)\\*[\"'])(?!\[MASCARADO)(?:(?!(?P=qq)).){0,500}?(?<!\\)(?P=qq)"
+             r"|(?:[^,\]})\n\\\"]|\"(?!\s*(?:[,}\]:]|$))|\\+(?!\"\s*(?:[,}\]:]|$)))+)")
 
 PII_PATTERNS = [
     # endereço de entrega inteiro (JSON, JSON escapado e toString Java) — ressalva 1
     ("endereco", re.compile("(" + Q + ADDRESS_KEYS + Q + r"\s*:\s*)\{[^{}]*\}")),
     # `address=Address[...]` e o toString de record/classe (Address[...], ShippingAddress{...}): ver _mask_records
-    ("endereco", re.compile(r"((?<![\w.])" + STREET_KEYS + r"=)[^,\]})\n]+")),
+    ("endereco", re.compile(r"((?<![\w.])" + STREET_KEYS + r"=)" + _KV_VALUE, re.M)),
     ("cep", re.compile(r"((?<![\w.])" + ZIP_KEYS + r"=)[\d.\s-]{5,10}(?=[,\]})\s]|$)")),
-    ("nome", re.compile(r"((?<![\w.])" + NAME_KEYS + r"=)[^,\]})\n]+")),
+    ("nome", re.compile(r"((?<![\w.])" + NAME_KEYS + r"=)" + _KV_VALUE, re.M)),
     ("endereco", re.compile("(" + Q + STREET_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
     ("cep", re.compile("(" + Q + ZIP_KEYS + Q + r"\s*:\s*)" + Q + r"?[\d.\s-]{5,10}" + Q + r"?")),
     ("nome", re.compile("(" + Q + NAME_KEYS + Q + r"\s*:\s*)" + Q + r"[^\"\\]*" + Q)),
@@ -261,39 +281,53 @@ def _cpf_match(m: re.Match) -> bool:
     return bool(_CPF_CONTEXT.search(m.string[max(0, m.start() - 40):m.start()]))
 
 
-_REC_START = re.compile(r"((?<![\w$])[\w$.]*[Aa]ddress)(?=[\[{])|(\b" + ADDRESS_KEYS + r"\s*=\s*\w*)(?=[\[{(])")
+# `(?<![\w$.])`: o nome qualificado começa uma vez por sequência de `[\w$.]` (antes, cada `.` recomeçava a busca e
+# `....`, `1.1.1.` ou domínios longos ficavam quadráticos — QA-D16-2)
+_REC_START = re.compile(r"((?<![\w$.])[\w$.]*[Aa]ddress)(?=[\[{])|(\b" + ADDRESS_KEYS + r"\s*=\s*\w*)(?=[\[{(])")
 _OPEN, _CLOSE = "[{(", "]})"
 
 
-def _balanced_end(text: str, i: int) -> int:
-    """Fim (exclusivo) do bloco que abre em text[i], com balanceamento simples de []{}(); sem fechamento na linha,
-    vai até o fim da linha (lado seguro: record truncado)."""
-    depth = 0
-    for j in range(i, len(text)):
-        c = text[j]
+_BRACKET = re.compile(r"[\[\]{}()\n]")
+
+
+def _bracket_ends(text: str) -> dict[int, int]:
+    """Uma passada (QA-D16-2): para cada `[`/`{`/`(`, o fim (exclusivo) do bloco com balanceamento simples de []{}()
+    (mesma contagem de profundidade de antes, sem distinguir o tipo); sem fechamento na linha, o fim da linha (lado
+    seguro: record truncado). Antes, cada início varria o resto da linha — quadrático em `Address[Address[...`."""
+    ends: dict[int, int] = {}
+    stack: list[int] = []
+    for m in _BRACKET.finditer(text):
+        c, j = m.group(0), m.start()
         if c == "\n":
-            return j
-        if c in _OPEN:
-            depth += 1
-        elif c in _CLOSE:
-            depth -= 1
-            if depth == 0:
-                return j + 1
-    return len(text)
+            for i in stack:
+                ends[i] = j
+            stack.clear()
+        elif c in _OPEN:
+            stack.append(j)
+        elif stack:
+            ends[stack.pop()] = j + 1
+    for i in stack:
+        ends[i] = len(text)
+    return ends
 
 
 def _mask_records(text: str, bump) -> str:
     """Endereço em toString Java (Address[street=Rua [bloco 2], number=3], ShippingAddress{...}) e em
     `address=Address[...]`: o bloco inteiro, com colchetes/chaves internos."""
     out, pos = [], 0
+    ends = eqs = None
     for m in _REC_START.finditer(text):
         if m.start() < pos:
             continue
+        if ends is None:                     # só calculado se houver candidato (custo linear, uma vez)
+            ends = _bracket_ends(text)
+            eqs = [x.start() for x in re.finditer("=", text)]
         key = m.group(1) or m.group(2)
         i = m.end()
-        end = _balanced_end(text, i)
-        inner = text[i + 1:end]
-        if inner.startswith("MASCARADO:") or (m.group(1) and "=" not in inner):
+        end = ends.get(i, len(text))
+        k = bisect.bisect_right(eqs, i)
+        has_eq = k < len(eqs) and eqs[k] < end
+        if text.startswith("MASCARADO:", i + 1) or (m.group(1) and not has_eq):
             continue
         bump("endereco", "endereco")
         out.append(text[pos:m.start()] + key + "[MASCARADO:endereco]")
@@ -363,6 +397,9 @@ def mask_text(text: str, key: bytes) -> tuple[str, dict]:
             bump(cat, typ)
             if not key:
                 return label
+            qq = m.groupdict().get("qq")
+            if qq:                       # valor entre aspas (`nome=\"Ana\"`): o rótulo vai entre as mesmas aspas
+                return key + qq + label + qq
             q = re.match(r'\\*"', key)   # JSON (escapado n vezes): o rótulo vai entre aspas do mesmo nível
             return key + (q.group(0) + label + q.group(0) if q else label)
         text = rx.sub(rep, text)
@@ -375,6 +412,23 @@ def mask_text(text: str, key: bytes) -> tuple[str, dict]:
             return m.group(1) + pseudonym(v, key) + m.group(3)
         text = rx.sub(rep, text)
     return text, {**counts, "byType": by_type}
+
+
+def mask_obj(obj, key: bytes, counts: dict | None = None):
+    """Máscara em todo texto livre de uma estrutura JSON (QA-D16-1): o resumo `extracted` do trace/painel/alerta,
+    `source` e `warnings` vão para o `bug.json` (git público) e para a resposta do rascunho. Mascara cada string
+    (valores; as chaves são nossas), preserva números/booleanos/None e a forma da estrutura. Idempotente."""
+    if isinstance(obj, str):
+        masked, c = mask_text(obj, key)
+        if counts is not None:
+            for k in ("secret", "pii", "endereco", "pseudonimo"):
+                counts[k] = counts.get(k, 0) + c[k]
+        return masked
+    if isinstance(obj, dict):
+        return {k: mask_obj(v, key, counts) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [mask_obj(v, key, counts) for v in obj]
+    return obj
 
 
 def find_secrets(text: str) -> list[str]:

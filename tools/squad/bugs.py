@@ -649,7 +649,8 @@ def build_draft(data_root: pathlib.Path, data: dict) -> dict:
         raise EvidenceError(400, "arquivos_invalidos", "files deve ser uma lista de {name, contentBase64}")
     if not link and not files:
         raise EvidenceError(422, "evidencia_obrigatoria", "informe um link do produtivo ou ao menos um arquivo (log ou imagem)")
-    key = er.load_key(data_root)
+    with LOCK:                                      # a chave HMAC é criada uma única vez (sem corrida)
+        key = er.load_key(data_root)
     # 1) arquivos enviados (baratos: validados antes de qualquer consulta ao produtivo)
     decoded = []
     for f in files:
@@ -693,10 +694,17 @@ def build_draft(data_root: pathlib.Path, data: dict) -> dict:
     allf = generated + prepared
     if not allf:
         raise EvidenceError(422, "evidencia_obrigatoria", "nenhuma evidência gerada ou enviada")
-    purge_drafts(data_root)
-    draft = secrets.token_hex(16)
-    d = drafts_dir(data_root) / draft
-    (d / "files").mkdir(parents=True)
+    # QA-D16-1: o resumo extraído (mensagem da exceção, status do span, títulos de painel/regra), a origem e os
+    # avisos são texto livre que vai à prévia e ao bug.json (git público) — mesma máscara dos arquivos
+    extracted, source, warnings = (er.mask_obj(extracted, key), er.mask_obj(source, key),
+                                   er.mask_obj(warnings, key))
+    # QA-D16-2: consultas ao produtivo e máscara acima rodam SEM a trava global; ela só cobre a limpeza de
+    # rascunhos vencidos e a criação da pasta (o id do rascunho é aleatório, sem colisão entre requisições)
+    with LOCK:
+        purge_drafts(data_root)
+        draft = secrets.token_hex(16)
+        d = drafts_dir(data_root) / draft
+        (d / "files").mkdir(parents=True)
     evidences, used = [], set()
     for i, (base, blob, item) in enumerate(allf, 1):
         fname = f"{i:02d}-{base}"
@@ -729,8 +737,10 @@ def draft_response(d: pathlib.Path, meta: dict) -> dict:
             "repoVisibility": repo_visibility()}
 
 
-def verify_draft(data_root: pathlib.Path, draft: str) -> tuple[pathlib.Path, dict, list[tuple[str, bytes]]]:
-    """Na confirmação: sha256 de cada arquivo confere e a máscara, reaplicada, não muda nada (defesa em profundidade)."""
+def verify_draft(data_root: pathlib.Path, draft: str,
+                 remask: bool = True) -> tuple[pathlib.Path, dict, list[tuple[str, bytes]]]:
+    """Na confirmação: sha256 de cada arquivo confere e a máscara, reaplicada, não muda nada (defesa em profundidade).
+    `remask=False` só confere os sha256 (barato): usado sob a trava depois de uma verificação completa fora dela."""
     d, meta = load_draft(data_root, draft)
     if not meta.get("evidences"):
         raise EvidenceError(422, "evidencia_obrigatoria", "o rascunho não tem evidência (log ou imagem)")
@@ -741,6 +751,9 @@ def verify_draft(data_root: pathlib.Path, draft: str) -> tuple[pathlib.Path, dic
         blob = p.read_bytes() if p else b""
         if not p or er.sha256(blob) != ev["sha256"]:
             raise EvidenceError(409, "rascunho_alterado", f"{ev['file']}: o rascunho foi alterado; gere a prévia de novo")
+        if not remask:
+            blobs.append((ev["file"], blob))
+            continue
         er.classify(ev["file"], blob, generated=True)
         if ev["type"] == "log":
             again, _ = er.mask_text(blob.decode("utf-8"), key)
@@ -751,6 +764,10 @@ def verify_draft(data_root: pathlib.Path, draft: str) -> tuple[pathlib.Path, dic
             if n:
                 raise EvidenceError(422, "rascunho_alterado", f"{ev['file']}: a imagem voltou a ter metadados")
         blobs.append((ev["file"], blob))
+    # resumo, origem e avisos reapresentados à máscara (rascunhos gravados antes da correção QA-D16-1 incluídos)
+    for k in ("extracted", "source", "warnings"):
+        if meta.get(k) is not None:
+            meta[k] = er.mask_obj(meta[k], key)
     return d, meta, blobs
 
 

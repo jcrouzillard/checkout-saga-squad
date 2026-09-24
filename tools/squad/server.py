@@ -1098,8 +1098,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "bug é só do ambiente produtivo", "code": "ambiente_de_teste"}, 422)
         store = bugs.GitDirStore(DATA_ROOT)
         try:
+            bugs.verify_draft(DATA_ROOT, bug["draft"])          # revarredura (cara) fora da trava — QA-D16-2
             with bugs.LOCK:
-                d, meta, blobs = bugs.verify_draft(DATA_ROOT, bug["draft"])
+                d, meta, blobs = bugs.verify_draft(DATA_ROOT, bug["draft"], remask=False)   # só sha256
                 consent = bugs.check_consent(bug.get("consent"))
                 er.check_submission([len(b) for _, b in blobs], global_total=store.total_size())
                 demand = uuid.uuid4().hex[:12]
@@ -1140,8 +1141,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "demanda já entregue", "code": "demanda_entregue"}, 409)
         store = bugs.GitDirStore(DATA_ROOT)
         try:
+            bugs.verify_draft(DATA_ROOT, data.get("draft"))     # revarredura (cara) fora da trava — QA-D16-2
             with bugs.LOCK:
-                d, meta, blobs = bugs.verify_draft(DATA_ROOT, data.get("draft"))
+                d, meta, blobs = bugs.verify_draft(DATA_ROOT, data.get("draft"), remask=False)   # só sha256
                 bugs.check_consent(data.get("consent"))
                 current = store.get(task["id"])
                 if current is None:
@@ -1171,9 +1173,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not isinstance(data, dict):
             return self._json({"error": "JSON inválido", "code": "json_invalido"}, 400)
         if path == "/api/bug/draft":
-            try:
-                with bugs.LOCK:
-                    return self._json(bugs.build_draft(DATA_ROOT, data), 201)
+            try:          # sem a trava global: build_draft só a toma para criar a pasta (QA-D16-2)
+                return self._json(bugs.build_draft(DATA_ROOT, data), 201)
             except er.EvidenceError as e:
                 return self._bug_err(e)
         if path == "/api/bug/evidence":
