@@ -689,7 +689,10 @@ const alertCode = a => a.code || (a.demand ? demandCode(a.demand) : null);
 const alertHref = a => { const h = a.action?.href || ""; return h.startsWith("?") ? hrefWith(Object.fromEntries(new URLSearchParams(h))) : h || "#/painel/alertas"; };
 
 // ---- Regra única de "precisa do humano" (§5.1 needsHuman). No servidor quando existe; aqui só no fallback e no texto do gate.
-const ruleNeedsHuman = (g, returns = 0) => !!g && (!!g.human_required || (g.confidence != null && Math.round(g.confidence * 100) < Math.round(thresholds().lowConfidence * 100)) || g.risk === "alto" || returns > thresholds().maxAutoCycles);
+// Baixa confiança = mesma condição de tools/squad/alerts.py (is_low): valor bruto c < 0,70 (AGENTS.md "confiança < 70%"),
+// com folga de 1e-9 para 0,7 vindo de conta de ponto flutuante. A exibição em % continua arredondada (pct).
+const isLowConf = c => typeof c === "number" && c < 0.70 - 1e-9;
+const ruleNeedsHuman = (g, returns = 0) => !!g && (!!g.human_required || isLowConf(g.confidence) || g.risk === "alto" || returns > thresholds().maxAutoCycles);
 const pct = c => c == null ? "—" : `${Math.round(c * 100)}%`;
 function demandEndEvent(info) {
   if (!info) return null;
@@ -725,7 +728,7 @@ function deriveAlerts() {
       const f = !next ? gateFileFor(g) : null;
       const cycle = Math.max(i + 1, Number(f?.cycle) || 0);
       const dec = humans.find(h => String(h.ts) > String(g.ts) && (!next || String(h.ts) < String(next.ts)));
-      const conf = pct(g.confidence), low = g.confidence != null && g.confidence < th.lowConfidence;
+      const conf = pct(g.confidence), low = isLowConf(g.confidence);
       const human = returns > th.maxAutoCycles ? "cycle-limit" : ruleNeedsHuman({ ...g, human_required: g.human_required ?? f?.human_required }) ? "human-required" : null;
       const ret = g.recommendation === "RETURN";
       const base = { demand, code, gate: g.gate, cycle, returns, confidence: g.confidence ?? null, risk: g.risk || null, agent: ret ? b1Owner(g) : g.agent,
@@ -754,7 +757,7 @@ function deriveAlerts() {
           rule: `B1 — você aceitou a devolução de ${g.gate}; aguardando a correção e a reauditoria`, title: `${verb} · aguardando correção`, detail: dec.detail || "", owner: b1Owner(g), openedAt: dec.ts,
           action: { label: `Ver parecer de ${g.gate}`, href: gatesHref(demand, code), external: null }, closedAt: c?.ts || null, closedBy: c?.by || null, closedByEvent: c?.ev || null });
         else if (low && (dec.recommendation === "APPROVE" || dec.recommendation === "OVERRIDE")) {
-          const cc = [next && next.confidence != null && next.confidence >= th.lowConfidence ? { ts: next.ts, by: next.agent, ev: next.id } : null, end ? { ts: end.ts, by: end.agent || "humano", ev: end.id } : null].filter(Boolean)[0] || null;
+          const cc = [next && next.confidence != null && !isLowConf(next.confidence) ? { ts: next.ts, by: next.agent, ev: next.id } : null, end ? { ts: end.ts, by: end.agent || "humano", ev: end.id } : null].filter(Boolean)[0] || null;
           items.push({ ...base, id: `low-confidence:${g.id || g.gate}`, severity: "aviso", kind: "low-confidence", kinds: ["low-confidence"], rule: `A1 — ${g.gate} seguiu com confiança ${conf} < ${Math.round(th.lowConfidence * 100)}% por decisão humana (risco aceito)`,
             title: `Seguiu com ${g.gate} a ${conf}`, detail: dec.detail || "", owner: "squad", openedAt: dec.ts, action: { label: "Ver parecer", href: gatesHref(demand, code), external: null },
             closedAt: cc?.ts || null, closedBy: cc?.by || null, closedByEvent: cc?.ev || null });
