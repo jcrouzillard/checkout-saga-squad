@@ -80,6 +80,12 @@ Ao terminar sua tarefa, todo agente:
 - Mudança de contrato de evento/API → exige ADR do Arquiteto.
 - Gate com confiança < 70% ou risco "alto" → intervenção humana **obrigatória**; caso contrário é opcional.
 - Máximo de 2 ciclos de autocorreção por gate; no 3º, escala para o humano.
+- **Produtivo inquebrável** (ADR-018): nenhum agente roda `docker compose` sem `-p <projeto>` explícito. O produtivo
+  (`checkout-saga`, cópia principal em `develop`) só é alterado por `tools/squad/prod.py` (atualização incremental
+  após o merge, sem `down`/`-v`/`prune`/`--remove-orphans`/`--force-recreate`); o ambiente de teste (`checkout-teste`,
+  portas = produtivo + 10 000) só por `tools/squad/testenv.py`, e só por pedido do humano (`test-env-request`).
+  Agentes nunca gravam `test-env-request` nem apagam dados do teste; para verificar isolamento usam
+  `testenv.py prod-fingerprint` (só leitura).
 
 ## Convenções de código
 - Mensagens de commit e documentação em português; identificadores em inglês.

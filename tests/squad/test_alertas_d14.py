@@ -386,7 +386,8 @@ class Compatibilidade(unittest.TestCase):
             self.assertLessEqual(len(body), 64 * 1024)
             self.assertEqual(resp.headers["Cache-Control"], "no-store")
             live = json.loads(body)
-            self.assertEqual(set(live), {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents"})
+            # D15 (ADR-018, contrato ambiente-de-teste §5.1): `testEnv` resumido é acréscimo permitido ao /api/live.
+            self.assertEqual(set(live) - {"testEnv"}, {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents"})
             self.assertEqual([a["agent"] for a in live["agents"]], al.ROLES)
             self.assertEqual(live["summary"]["bloqueios"], 1)
             self.assertEqual(live["alerts"][0]["kinds"], ["human-required", "gate-return"])

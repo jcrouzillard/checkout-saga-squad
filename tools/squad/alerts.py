@@ -26,9 +26,12 @@ LABEL = {"orquestrador": "Orquestrador", "arquiteto": "Arquiteto", "devops": "De
          "auditor": "Auditor", "humano": "Você", "squad": "Squad"}
 SEV_RANK = {"bloqueio": 0, "aviso": 1}
 KIND_RULE = {"cycle-limit": "B3", "human-required": "B2", "gate-return": "B1", "triage-open": "B4",
-             "low-confidence": "A1", "agent-stalled": "A2", "pr-waiting": "A3"}
+             "low-confidence": "A1", "agent-stalled": "A2", "pr-waiting": "A3",
+             # D15 (ADR-018, contrato ambiente-de-teste §6)
+             "prod-update-failed": "B5", "test-env-failed": "A4", "test-env-divergent": "A5"}
 KIND_SEV = {"cycle-limit": "bloqueio", "human-required": "bloqueio", "gate-return": "bloqueio",
-            "triage-open": "bloqueio", "low-confidence": "aviso", "agent-stalled": "aviso", "pr-waiting": "aviso"}
+            "triage-open": "bloqueio", "low-confidence": "aviso", "agent-stalled": "aviso", "pr-waiting": "aviso",
+            "prod-update-failed": "bloqueio", "test-env-failed": "aviso", "test-env-divergent": "aviso"}
 GATE_KIND_ORDER = ["cycle-limit", "human-required", "gate-return", "low-confidence"]
 
 
@@ -343,6 +346,15 @@ def natural(item: dict | None) -> str:
     return trunc(f"{tool} · {s}" if s else tool)
 
 
+def ready_to_test(rows: list[dict], d: str | None) -> bool:
+    """D15: "Pronto para testar" = último evento do ambiente de teste da demanda é `test-env-published`."""
+    if not d:
+        return False
+    last = next((e.get("type") for e in reversed(rows) if e.get("demand") == d and e.get("type") in
+                 ("test-env-publishing", "test-env-published", "test-env-failed", "test-env-released")), None)
+    return last == "test-env-published"
+
+
 def stage_of(rules: Rules, rows: list[dict], d: str | None) -> str | None:
     if not d:
         return None
@@ -351,7 +363,7 @@ def stage_of(rules: Rules, rows: list[dict], d: str | None) -> str | None:
     if d in rules.canceled:
         return "Cancelada"
     if any((d, rv.get("pr")) not in rules.pr_closed for _, rv in rules.reviews.get(d, [])):
-        return "Revisão (PR)"
+        return "Pronto para testar" if ready_to_test(rows, d) else "Revisão (PR)"
     if any(k[0] == d for k in rules.gates):
         return "Gates"
     evs = [e for e in rows if e.get("demand") == d]
@@ -611,4 +623,51 @@ def compact_agent(a: dict) -> dict:
     out["recentCommands"] = [{**c, "command": trunc(c["command"], LIVE_TEXT)} for c in a["recentCommands"]]
     if out.get("current"):
         out["current"] = {**out["current"], "target": trunc(out["current"].get("target"), LIVE_TEXT)}
+    return out
+
+
+# =============================================================== D15: B5, A4, A5 (contrato ambiente-de-teste §6)
+def env_alerts(rows: list[dict], test_env: dict | None, codes: dict | None = None) -> list[dict]:
+    """B5 `prod-update-failed` sem `prod-updated` posterior (humano); A4 falha ao publicar do ocupante;
+    A5 ambiente de teste divergente (log diz ocupado, containers não saudáveis)."""
+    codes = codes if codes is not None else demand_codes(rows)
+    out = []
+    last_prod = next((e for e in reversed(rows) if e.get("type") in ("prod-updated", "prod-update-failed")), None)
+    if last_prod and last_prod.get("type") == "prod-update-failed":
+        svcs = ", ".join(last_prod.get("services") or []) or "—"
+        rb = "revertido para a imagem anterior" if last_prod.get("rolledBack") else "SEM rollback automático"
+        out.append({"id": f"prod-update-failed:{last_prod.get('id')}", "severity": "bloqueio",
+                    "kind": "prod-update-failed", "kinds": ["prod-update-failed"], "demand": None, "code": None,
+                    "gate": None, "owner": "humano", "agent": "orquestrador",
+                    "rule": "B5 — atualização do produtivo falhou sem `prod-updated` posterior (ADR-018 §8)",
+                    "title": f"Produtivo não atualizado ({last_prod.get('phase')}) · {rb}",
+                    "detail": trunc(f"serviços: {svcs} · {last_prod.get('detail') or ''}", 300),
+                    "action": {"label": "Ver falha do produtivo", "href": "#/auditoria/eventos?tipo=prod-update-failed",
+                               "external": None},
+                    "openedAt": last_prod.get("ts"), "source": {"event": last_prod.get("id"), "file": None}})
+    te = test_env or {}
+    d = te.get("demand")
+    code = codes.get(d) if d else None
+    href = f"#/demandas/{code or d}" if d else "#/painel"
+    if te.get("state") == "falhou" and te.get("lastError"):
+        err = te["lastError"]
+        hint = " · sugestão: apagar dados do teste" if err.get("hint") == "reset-data" else ""
+        out.append({"id": f"test-env-failed:{d}:{err.get('at')}", "severity": "aviso", "kind": "test-env-failed",
+                    "kinds": ["test-env-failed"], "demand": d, "code": code, "gate": None, "owner": "humano",
+                    "agent": "orquestrador", "rule": "A4 — `test-env-failed` do ocupante do ambiente de teste",
+                    "title": f"Falha ao publicar no teste ({err.get('phase')}){hint}",
+                    "detail": trunc(err.get("detail"), 300),
+                    "action": {"label": "Tentar de novo", "href": href, "external": None},
+                    "openedAt": err.get("at"), "source": {"event": None, "file": None}})
+    if te.get("state") == "divergente":
+        bad = [k for k, v in (te.get("health") or {}).items()
+               if v.get("state") != "running" or v.get("health") not in ("healthy", None)]
+        out.append({"id": f"test-env-divergent:{d}", "severity": "aviso", "kind": "test-env-divergent",
+                    "kinds": ["test-env-divergent"], "demand": d, "code": code, "gate": None, "owner": "humano",
+                    "agent": "orquestrador",
+                    "rule": "A5 — ambiente de teste ocupado no log, mas containers do checkout-teste não saudáveis",
+                    "title": "Ambiente de teste divergente",
+                    "detail": trunc("não saudáveis: " + (", ".join(bad) or "nenhum container no ar"), 300),
+                    "action": {"label": "Republicar", "href": href, "external": None},
+                    "openedAt": te.get("publishedAt"), "source": {"event": None, "file": None}})
     return out
