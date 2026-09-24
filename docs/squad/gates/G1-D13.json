@@ -1,0 +1,38 @@
+{
+  "gate": "G1",
+  "demand": "efe387a35d71",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.77,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "inbox/done/efe387a35d71.json -> contrato: escopo só squad-control/index.html (§10); boas práticas citadas com fonte (§1, P1-P15 Nielsen/WCAG/NN-g/OOUX); agrupamento e 'uma coisa leva a outra' (§4 menu de 5 itens por tarefa, §6 links contextuais, §6.3 jornada); reagrupar/renomear/remover sem perda (§2 inventário + §9.2 paridade PA-1..23)"},
+    {"name": "Inventário completo e correto contra o código", "status": "validate", "weight": 3, "blocking": true,
+     "source": "squad-control/index.html @ aad017e: I1-I31 conferidos (tabs l.243, nav l.249-261, renderExecucoes l.436, renderDemandas l.607, backlogItemHtml l.668, preStart/preCancel l.718-746, renderDecisoes/Evidencias/Politicas l.755-778, drawer l.780, notificações l.844-898, #ai-usage l.900-965, project-links l.1111). Lacunas menores não listadas: descrição da demanda (eff.detail) e motivo do cancelamento na página da demanda (a §4.2 não os cita e a §4.4 os tira da lista); 'Sugestão do Arquiteto' de tipo (questionsHtml); mensagens de validação 'validando/atrasada' (VREASON); pílula 'Em execução/Aguardando' (l.450); estado 'Servidor indisponível' (l.968); regra de não redesenhar a tela de Observabilidade no polling para não recarregar o iframe (l.967)"},
+    {"name": "Problemas X1-X12 existem no código", "status": "pass", "weight": 2, "blocking": false,
+     "source": "X1 l.243 x l.249-259; X2 l.987 (tabs marcam execucoes fora de politicas/demandas/observabilidade) e l.980-981 (data-goto não atualiza .tabs); X3 view em memória, sem hash; X4 activeDemand() .at(-1) l.410-414; X6 classify() view por tela l.844-867; X11 CONFIRMADO l.1096-1098: gate = latestGate() (global, l.366-372) enquanto a tela mostra o gate da demanda ativa (l.441) — POST /api/human pode registrar gate de outra demanda/da squad base; X12 CSS @media 900px l.233 + .tabs no header"},
+    {"name": "Nova estrutura cobre a paridade e é implementável só no index.html sem mudar API", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tools/squad/server.py l.879-919: POST /api/demand devolve a entrada com id (201) -> navegar para a demanda nova é viável; POST /api/human já aceita {action, gate, demand, note} -> CA-9 corrigível no cliente; hash routing dispensa servidor (ADR-016 Alternativas). PA-1..PA-23 mapeiam I1-I31 com destino e nº de cliques; aliases das rotas antigas definidos (§5)"},
+    {"name": "CAs e tarefas verificáveis", "status": "validate", "weight": 2, "blocking": false,
+     "source": "CA-1..CA-16 objetivos (seletores, aria-current, document.title, scrollWidth, rotas). Parcial: T2 exige fixture com 2 demandas ativas e um gate RETURN na que não é a última; regra 1 da §4.3 não inclui human_required/3º ciclo (a UI atual usa g.human_required || conf<70 || risco alto, l.445); regra 6 (gate da squad base) depende de filtrar gates sem demand — pipelineStatus() hoje pega o último gate de qualquer demanda (l.381)"},
+    {"name": "Escopo realista e ownership", "status": "validate", "weight": 2, "blocking": false,
+     "source": "commit aad017e toca só docs/contracts e docs/adr (Arquiteto); implementação só em squad-control/** (Frontend); testes tests/ui/** (QA; d9/d11-screenshots.js usam nav a[data-view]/.tabs e precisam migrar). Escopo grande para um único arquivo de 1131 linhas (roteador + Painel + página da demanda + filtros da Auditoria + notificações por item + responsivo): viável numa entrega, mas com commits fatiados"}
+  ],
+  "open_risks": [
+    "Fatiar a implementação em commits verificáveis na mesma branch: (1) roteador hash + menu único + aliases + aria-current/breadcrumb + correção X11; (2) página da demanda (stepper, Próxima ação, Execução, Gates, Validação, Registro) reaproveitando questionsHtml/preStartHtml/controlsHtml/reviewHtml/demandSteps sem reescrever regras; (3) Painel 'Precisa de você' + lista de Demandas com filtros; (4) Auditoria com filtros na URL + notificações/toasts por item; (5) 390 px e teclado. Se o G2 apertar, 'Entregues recentemente' e o stepper compacto <600 px são os cortes aceitáveis — nunca a paridade PA.",
+    "X11/CA-9: o botão de decisão deve carregar data-gate e data-demand do gate EXIBIDO (e o id da nota por gate, ex. note-<demand>-<gate>, não o #note único) — o Painel e a página podem mostrar mais de um gate; humanFor(gate, demand, g.ts) já casa por demanda.",
+    "Regra 1 da §4.3: usar a mesma condição da UI atual (g.human_required || confiança < 70% || risco alto) além de RETURN, senão uma devolução comum (autocorreção da squad, ≤2 ciclos) acende o badge vermelho sem exigir humano; rotular 'recomendada' x 'obrigatória' conforme essa condição.",
+    "Regra 6 e bloco Squad base: filtrar gates/handoffs sem demand (pipelineStatus hoje não filtra e mistura gates de demandas).",
+    "Página da demanda deve mostrar também a descrição (eff.detail), o motivo do cancelamento, a sugestão de tipo do Arquiteto e as mensagens de validação em andamento/atrasada — hoje estão no card e sairiam da lista (§4.4).",
+    "Polling (CA-11): não rolar para a seção a cada 3 s (só na troca de rota); não redesenhar #/produto/* (iframe recarregaria, como já evitado em l.967); manter data-keep/focusKey nas novas telas e o 'editing()' que bloqueia o redesenho.",
+    "Rota '#/painel#squad-base' tem dois '#' — preferir '#/painel/squad-base' ou âncora por id sem novo hash para não confundir o parser/hashchange.",
+    "Código Dn = índice do evento task no log (demandCode): estável porque o log é append-only; aceitar também o id do log na rota, como previsto.",
+    "QA deve migrar tests/ui/d9-screenshots.js e d11-screenshots.js (nav a[data-view], .tabs) — dono QA; os aliases facilitam.",
+    "Pílula 'Em execução/Aguardando' e 'Servidor indisponível' precisam de lugar explícito (sugestão: pílula no Painel/Squad; aviso global acima de #main)."
+  ],
+  "human_required": false,
+  "rationale": "Contrato e ADR-016 respondem fielmente ao pedido (só Squad Control, boas práticas citadas, agrupamento por tarefa, fluxo contínuo, remoção sem perda). Verifiquei no index.html todas as linhas citadas: os problemas existem, e o defeito X11 é real (l.1096-1098 envia latestGate() global enquanto a tela exibe o gate da demanda ativa, e o demand vem de activeDemand() — combinação que pode registrar decisão humana no gate errado). A estrutura de 5 itens + página por demanda + hash routing cobre PA-1..PA-23 e é implementável só no cliente: o servidor já devolve o id da demanda nova e /api/human já aceita gate+demand. Ressalvas não bloqueantes: pequenas lacunas de inventário (descrição/motivo de cancelamento/sugestão de tipo na página da demanda, pílula de execução, erro de servidor, não redesenhar o iframe), regra de 'Precisa de você' mais estreita que a condição atual de intervenção obrigatória, filtro de gates sem demanda na squad base, e escopo grande que pede commits fatiados. Risco moderado: reescrita de navegação num arquivo único com polling de 3 s e preservação de foco/campos; sem mudança de API nem de regras de estado. Confiança = (3 + 1.5 + 2 + 3 + 1 + 1)/15 = 0.77."
+}
