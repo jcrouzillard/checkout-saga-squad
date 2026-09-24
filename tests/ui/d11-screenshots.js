@@ -50,7 +50,10 @@ function codexRollout(p, s) {
   const strip = p => p.evaluate(() => {
     const el = document.querySelector('#ai-usage'); const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
     const de = document.documentElement;
+    // D14 (§6.1): a faixa fica sticky logo abaixo do cabeçalho fixo (top: var(--hdr-h)), não mais no topo 0.
+    const hdr = document.querySelector('#hdr'), hr = hdr.getBoundingClientRect();
     return { visible: !el.hidden && cs.display !== 'none' && r.height > 0, top: Math.round(r.top), height: Math.round(r.height),
+      stickyTop: Math.round(parseFloat(cs.top) || 0), hdrBottom: Math.round(hr.bottom), hdrSticky: getComputedStyle(hdr).position === 'sticky',
       position: cs.position, ariaLive: el.getAttribute('aria-live'), provs: el.querySelectorAll('.u-prov').length,
       provClasses: [...el.querySelectorAll('.u-prov')].map(x => x.className),
       provTops: [...el.querySelectorAll('.u-prov')].map(x => Math.round(x.getBoundingClientRect().top)),
@@ -75,7 +78,8 @@ function codexRollout(p, s) {
       const scrolled = await p.evaluate(() => window.scrollY);
       const s1 = await strip(p);
       res[v] = { atTop: { visible: s0.visible, top: s0.top, height: s0.height }, scrolledY: scrolled,
-        afterScroll: { visible: s1.visible, top: s1.top, inViewport: s1.top >= 0 && s1.top < 5 },
+        afterScroll: { visible: s1.visible, top: s1.top, hdrBottom: s1.hdrBottom, stickyTop: s1.stickyTop, hdrSticky: s1.hdrSticky,
+          inViewport: s1.top >= 0 && s1.top < 900, belowHeader: Math.abs(s1.top - s1.stickyTop) <= 4 && (!s1.hdrSticky || Math.abs(s1.top - s1.hdrBottom) <= 4) },
         position: s0.position, provs: s0.provs, provTops: s0.provTops, sw: s1.scrollWidth, cw: s1.clientWidth, clipped: s1.clipped };
       if (v === 'execucoes' || v === 'demandas') { await p.screenshot({ path: `/shots/d11-real-${v}-scroll-${w}.png` }); }
       await scrollTop(p);

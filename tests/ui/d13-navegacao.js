@@ -151,7 +151,7 @@ async function scenario(name, fn) {
       }
     }
     // Voltar do navegador entre telas
-    await go(p, REAL, '#/painel'); await clk(p, '#menu a[data-nav="demandas"]'); await clk(p, '#main a.ttl', 'D13'); await clk(p, '#menu a[data-nav="auditoria"]');
+    await go(p, REAL, '#/painel'); await clk(p, '#menu a[data-nav="demandas"]'); await clk(p, '#main a.ttl'); await clk(p, '#menu a[data-nav="auditoria"]');   // D14: a D13 real já foi entregue e saiu da lista padrão; vale a 1ª demanda listada
     const back = []; for (let i = 0; i < 3; i++) { await p.goBack(); await sleep(700); back.push((await loc(p)).hash); }
     R(`CA-rotas-${w}`, { struct, routes: res, back, posts: p._posts, reqs: [...p._reqs] });
     await p._ctx.close();
@@ -268,7 +268,8 @@ async function scenario(name, fn) {
     await p.focus('#dem-detail'); await p.keyboard.type('Descrição pela metade, ainda sendo escr');
     const before = await p.evaluate(() => ({ sel: document.activeElement.selectionStart, id: document.activeElement.id }));
     append([{ id: `qa${Date.now()}`, ts: iso(), agent: 'qa', type: 'progress', title: 'QA: evento durante o T9 (força mudança no /api/state)', demand: D16 }]);
-    const reqs0 = [...p._reqs].length; let polls = 0; p.on('request', r => { if (r.url().includes('/api/state')) polls++; });
+    // D14 (§8.2): o polling agora é GET /api/live a cada 1,5 s; /api/state só quando a versão muda ou a cada 15 s.
+    const reqs0 = [...p._reqs].length; let polls = 0; p.on('request', r => { if (r.url().includes('/api/live')) polls++; });
     await sleep(10500);
     await p.keyboard.type('evendo');
     const after = await p.evaluate(() => ({ hash: location.hash, title: document.querySelector('#dem-title').value, detail: document.querySelector('#dem-detail').value, kind: document.querySelector('#dem-kind-operacao').checked,
@@ -375,7 +376,7 @@ async function scenario(name, fn) {
     const l = await loc(p);
     if (w === 1440) { await go(p, FIX, '#/demandas/D14?agente=backend'); await p.screenshot({ path: '/shots/d13-gaveta-1440.png' }); }
     R(`T4-${w}`, { now, clicks: p._clicks, n: p._clicks.length, drawer: dr, landed: { hash: l.hash, drawer: l.drawer, menu: l.menu, h1: l.h1 },
-      ok: dr.open && /Executando agora|trabalhando/.test(dr.text) && l.hash === '#/demandas/D14' && !l.drawer && p._clicks.length <= 3 });
+      ok: dr.open && /Executando agora|trabalhando/i.test(dr.text)   /* D14: rótulos de estado em maiúsculas (CSS) */ && l.hash === '#/demandas/D14' && !l.drawer && p._clicks.length <= 3 });
     await p._ctx.close();
   });
 
@@ -612,7 +613,7 @@ async function scenario(name, fn) {
     await clk(c, '#main [data-ctl="cancel"]', 'Cancelar demanda', 'Cancelar demanda (D14)');
     const t0 = await c.evaluate(() => document.querySelector('#main [data-ctl="cancel"]')?.textContent.trim());
     append([{ id: `qapoll${Date.now()}`, ts: iso(), agent: 'qa', type: 'progress', title: 'QA: evento durante a confirmação de cancelar', demand: D16 }]);
-    let polls = 0; c.on('request', x => { if (x.url().includes('/api/state')) polls++; });
+    let polls = 0; c.on('request', x => { if (x.url().includes('/api/live')) polls++; });   // D14: polling por /api/live
     await sleep(8000);
     const t1 = await c.evaluate(() => ({ txt: document.querySelector('#main [data-ctl="cancel"]')?.textContent.trim(), confirm: document.querySelector('#main [data-ctl="cancel"]')?.dataset.confirm }));
     await go(c, FIX, '#/demandas/D16'); await go(c, FIX, '#/demandas/D14'); await sleep(500);
