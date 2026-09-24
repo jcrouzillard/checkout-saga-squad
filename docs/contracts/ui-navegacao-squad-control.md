@@ -124,7 +124,7 @@ Derivada do estado atual (`/api/state`), sem campo novo. Ordem de urgência:
 
 | Ordem | Condição (já calculável hoje) | Rótulo | Destino |
 |---|---|---|---|
-| 1 | último gate da demanda com `RETURN`, confiança < 70% ou risco alto, sem evento `human` posterior | "Decidir G<n> — intervenção obrigatória/recomendada" | `#/demandas/Dn/gates` (foco no campo de nota) |
+| 1 | último gate da demanda **que exige humano** — `human_required`, ou confiança < 70%, ou risco alto (mesma condição da tela anterior) — sem evento `human` posterior; um `RETURN` comum, que a squad corrige sozinha, **não** entra | "Decidir G<n> — intervenção obrigatória/recomendada" | `#/demandas/Dn/gates` (foco no campo de nota) |
 | 2 | `vinfo.st === "perguntas"` | "Responder N pergunta(s) do Arquiteto" | `#/demandas/Dn/validacao` (foco na 1ª resposta) |
 | 3 | `inReview` (e `review` de release sem `delivered` posterior) | "Revisar PR #n ↗" + "ver demanda" | link do PR (nova aba) e `#/demandas/Dn` |
 | 4 | `preStart` e validação pronta (ou sem `kind`) | "Iniciar" | `#/demandas/Dn` (Próxima ação com prioridade/rota/agente) |
@@ -153,7 +153,7 @@ O contador do item **Painel** no menu = nº de linhas desta lista (badge vermelh
 | `#/demandas/nova` | Nova demanda | |
 | `#/demandas/<ref>[/execucao\|/gates\|/validacao\|/registro]` | Demanda (rolada até a seção) | `<ref>` = código `D13` (canônico) **ou** id do log (`efe387a35d71`); inexistente → mensagem "Demanda não encontrada" + link para Demandas |
 | `#/squad` | Squad | |
-| `#/auditoria/eventos[?demanda=Dn&agente=<papel>&tipo=<type>]` | Auditoria › Eventos | filtros combináveis; cada linha com demanda tem link para ela |
+| `#/auditoria/eventos[?demanda=Dn&autor=<papel>&tipo=<type>]` | Auditoria › Eventos | filtros combináveis; o filtro de agente usa `?autor=` (`?agente=` é reservado à gaveta, abaixo); cada linha com demanda tem link para ela |
 | `#/auditoria/gates[?demanda=Dn]` · `#/auditoria/handoffs` · `#/auditoria/politicas` | Auditoria | |
 | `#/produto/grafana\|jaeger[?produto=<id>]` | Produto | |
 | qualquer rota + `?agente=<papel>` | abre a gaveta do agente por cima | fechar remove o parâmetro |
@@ -362,3 +362,10 @@ Painel, Demandas, página da demanda (ativa, backlog, entregue), Auditoria e Pro
 - Notificações continuam com `localStorage` (`sc.notif.*`); rota não é gravada em `localStorage` (a URL é a fonte).
 - Fora de escopo: Console de Checkout; qualquer mudança em `tools/squad/**` (se o Frontend precisar de dado novo, abre
   solicitação ao **Orquestrador**; este contrato não exige nenhuma).
+
+## 11. Histórico de alterações
+- **Errata pós-G2 (D13)** — alinha o contrato ao comportamento aprovado pelo Auditor (`docs/squad/gates/G2-D13.json`):
+  (a) §5: o filtro de agente em Auditoria › Eventos é `?autor=<papel>`, pois `?agente=` é reservado, em qualquer rota,
+  para abrir a gaveta do agente; (b) §4.3, ordem 1: vale só para gates que exigem humano (`human_required`, confiança
+  < 70% ou risco alto), como na tela anterior — `RETURN` comum não entra (ressalva 3 do G1); (c) "Entregues
+  recentemente" no Painel (§4.1) e as etapas compactas abaixo de 600 px (§8.2), antes opcionais, foram **entregues**.
