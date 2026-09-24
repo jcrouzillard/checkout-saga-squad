@@ -1,0 +1,40 @@
+{
+  "demand": "518f89f27ae8",
+  "title": "Criar ambiente de teste.",
+  "detail": "A Squad precisa ter um ambiente para subir as suas demandas localmente e para que o ser humano possa testar antes de aprovar o PR. Quando aprovado o PR, é atualizado o que seria nosso ambiente local produtivo.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-24T16:59:32+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "É um ambiente de teste por demanda/PR, com vários rodando ao mesmo tempo (isolados em portas, bancos e project name do compose), ou um único ambiente de teste compartilhado que sobe a branch do PR em revisão naquele momento?",
+      "dimension": "escopo",
+      "answer": "É um ambiente compartilhado, e ele tem que estar em revisão naquele momento. Caso tenha um outro, ele fica na fila, aguardando o PR que está sendo testado no momento ser aprovado. Claro que a gente vai ter a opção, naquela demanda, quando ela tiver disponível para teste, de publicar no nosso ambiente compartilhado de teste. Aí o ser humano que escolhe."
+    },
+    {
+      "question": "O ambiente de teste precisa rodar ao mesmo tempo que o 'ambiente local produtivo'? Hoje o `docker-compose.yml` fixa as portas (8080–8084, Postgres, Kafka, Grafana, Jaeger), o que obriga a remapeá-las. Se precisar, quais faixas de porta ou convenção de URL o humano espera usar?",
+      "dimension": "restricoes",
+      "answer": "O ambiente produtivo tem que ser esse: monte esse em que a gente está trabalhando aqui agora. Aí precisa subir em outras faixas de porta, sim. Pode escolher o que for melhor, não sendo as mesmas que produtiva. Ter isso como regra forte, tá ótimo."
+    },
+    {
+      "question": "O que dispara cada ambiente? O de teste sobe sozinho quando o `gitflow.py feature-finish` abre o PR, ou sob demanda do humano (botão no Squad Control / `make`)? E o produtivo é atualizado automaticamente ao detectar o merge (ex.: pelo polling do `github_sync.py`, já que o ADR-011 descarta webhook), ou por um comando manual depois do merge?",
+      "dimension": "objetivo",
+      "answer": "Para o ambiente de teste compartilhado, o ser humano vai pedir para publicar assim que a demanda estiver disponível para testar. Ele publica o ambiente, parece que está tudo ok, e aí ele entra no ambiente de teste para testar, para verificar. Nesse momento, vamos deixar o `detectar o merge` com o `develop`."
+    },
+    {
+      "question": "O que o ambiente de teste inclui: só a stack do checkout (serviços + Kafka + Postgres + observabilidade + Checkout Console) ou também o Squad Control da branch? E os dados: sobem sempre limpos ou podem ser copiados/preservados do produtivo? E o produtivo deve manter seus volumes (pedidos existentes) quando for atualizado?",
+      "dimension": "escopo",
+      "answer": "O produtivo tem que se montar inalterado e inquebrável, né? Então, o ambiente de teste vai ser apartado totalmente. A questão de Kafka, Kafka Postgres, observabilidade: tudo isolado, tudo à parte também, tá? Os dados não precisam ser apagados a cada subida de nova versão no mês de teste. Eles podem ficar, e o ser humano, se precisar, apaga."
+    },
+    {
+      "question": "Qual critério observável define 'pronto'? Proposta: (1) um comando/ação sobe o ambiente de teste da branch X e retorna as URLs; (2) o e2e (`make e2e`) passa contra ele; (3) ele é derrubado ao fechar/integrar o PR; (4) depois do merge, o produtivo roda o código da `develop` (ou da `main`?) sem perder dados. Qual branch alimenta o 'produtivo local': `develop` ou `main`/tag de release?",
+      "dimension": "aceite",
+      "answer": "Vamos ter o pronto para testar e o conluido/entregue.\n- Pronto para testar e quando o PR esta aberto e dipsonibilizado no nosso ambiente de teste\n- Conluido ou Entrgue e quando o merge foi feito na develop."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
