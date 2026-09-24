@@ -1,0 +1,35 @@
+{
+  "demand": "efe387a35d71",
+  "title": "Uma melhoria visual de UX",
+  "detail": "Acho que ainda está um pouco perdida a forma de se encontrar entre as funcionalidades. Gostaria de revisar isso.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-24T11:53:10+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "A revisão é só da navegação do Squad Control (`squad-control/index.html`), ou inclui também o Console de Checkout (`checkout-console/`), que seria uma demanda de produto?",
+      "dimension": "escopo",
+      "answer": "É só no Squad Control."
+    },
+    {
+      "question": "Hoje existem dois menus que se sobrepõem: as abas no topo (Execução, Política, Demandas) e o menu lateral (Execuções, Decisões, Evidências, Políticas, Agentes, Demandas, Observabilidade). Onde você mais se perde? É essa duplicação, os nomes das seções, a ordem delas ou a falta de indicação de onde você está?",
+      "dimension": "objetivo",
+      "answer": "Na verdade, eu gostaria que você procurasse e buscasse também as melhores práticas de usabilidade de X e Y e aplicasse aqui, que fosse mais aderente."
+    },
+    {
+      "question": "Como saberemos que a navegação está boa? Por exemplo: um único menu sem itens repetidos, cada funcionalidade a no máximo 1 clique, a seção atual sempre destacada ou uma lista de tarefas que você precisa concluir sem se perder. Escolha uma dessas opções ou descreva a sua.",
+      "dimension": "aceite",
+      "answer": "Eu acho que talvez, se as funcionalidades tivessem mais inteligidas ou agrupadas para ficar de uma forma fluída, uma navegação fluída, o objetivo é você não se perder em várias opções do menu, nem que seja automático. A forma de você navegar: uma coisa vai levando a outra."
+    },
+    {
+      "question": "Podemos reagrupar, renomear ou remover telas e itens do menu? Ou a mudança deve ficar só no visual (layout, estilo, destaque), mantendo as mesmas telas e os mesmos nomes?",
+      "dimension": "restricoes",
+      "answer": "Pode reagrupar, renomear, remover também, desde que não perca as funcionalidades, né?"
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
