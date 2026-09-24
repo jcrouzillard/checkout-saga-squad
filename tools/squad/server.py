@@ -534,10 +534,23 @@ def _dir_sig(d: pathlib.Path, pattern="*") -> tuple:
         return ()
 
 
+def usage_sig() -> str:
+    """Assinatura do consumo da IA (D11) para a `version` do /api/live — D14-QA-3.
+
+    Usa o objeto `usage` já calculado (snapshot do Claude + cauda dos rollouts do Codex, com o cache por
+    (caminho, mtime, tamanho) de `_codex_last_rate_limits`): muda quando percentuais, janelas ou estado mudam, e não a
+    cada gravação dos rollouts. `collectedAt` fica fora para não forçar recarga do /api/state a cada tique da statusline."""
+    try:
+        providers = collect_usage()["providers"]
+        return repr([{k: v for k, v in p.items() if k != "collectedAt"} for p in providers])
+    except Exception:
+        return ""
+
+
 def data_version() -> str:
-    """Muda quando log, gates, handoffs, inbox ou .squad/runs mudam (contrato §9.1)."""
+    """Muda quando log, gates, handoffs, inbox, .squad/runs ou o consumo da IA mudam (contrato §9.1)."""
     parts = (_sig(LOG), _dir_sig(GATES_DIR, "*.json"), _dir_sig(HANDOFFS_DIR, "*.md"),
-             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"))
+             _dir_sig(DATA_ROOT / "docs/squad/inbox", "*.json"), _dir_sig(RUNS_DIR, "*.json"), usage_sig())
     return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
 
 
@@ -582,7 +595,7 @@ def orchestrator_view(runs: list[dict], rules, now: float) -> dict | None:
             continue
         role = (run or {}).get("agent")
         if role in (None, "outro"):   # subagente fora dos 8 papéis nomeados: tenta o 1º termo da descrição
-            head = re.split(r"[\s·:]", (use.get("description") or "").strip().lower(), 1)[0]
+            head = re.split(r"[\s·:]", (use.get("description") or "").strip().lower(), maxsplit=1)[0]
             role = next((r for r in al.ROLES if head.startswith(r[:5])), role)
         subs.append({"runId": agent_id, "description": use.get("description"), "since": use.get("since"),
                      "agent": role})

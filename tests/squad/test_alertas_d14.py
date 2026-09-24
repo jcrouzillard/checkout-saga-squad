@@ -406,6 +406,62 @@ class Compatibilidade(unittest.TestCase):
         self.assertFalse([k for k in run if k.startswith("_")])
 
 
+class DefeitosQA(unittest.TestCase):
+    """Correções do servidor para D14-QA-1, QA-2 e QA-3 (checklist tests/ui/checklist-governanca-d14.md)."""
+
+    def setUp(self):
+        reset_data()
+
+    def test_qa2_a1_do_g3_fecha_com_demanda_encerrada(self):
+        rows = base_rows() + [gate("G3", "APPROVE", 0.62, 5, to="orquestrador")]
+        write_log(rows)
+        self.assertEqual([a["kind"] for a in state()["alerts"]], ["human-required"])   # errata: B2 segue aberto
+        rows.append(human("G3", "APPROVE", 6))
+        write_log(rows)
+        data = state()
+        self.assertFalse(data["alerts"])
+        self.assertIn("human-required", {h["kind"] for h in data["alertsHistory"]})
+        # G2 com 62% decidido vira A1 e fecha quando o G3 APPROVE sem PR encerra a demanda
+        reset_data()
+        rows = base_rows() + [gate("G2", "APPROVE", 0.62, 1, to="qa"), human("G2", "APPROVE", 2)]
+        write_log(rows)
+        self.assertEqual([a["kind"] for a in state()["alerts"]], ["low-confidence"])
+        rows.append(gate("G3", "APPROVE", 0.9, 3, to="orquestrador"))
+        write_log(rows)
+        self.assertFalse(state()["alerts"])
+
+    def test_qa1_percentual_nao_contraditorio(self):
+        self.assertEqual(al.pct_text(0.695), "69,5")
+        self.assertEqual(al.pct_text(0.62), "62")
+        self.assertEqual(al.pct_text(0.70), "70")
+        self.assertEqual(al.pct_text(0.8), "80")
+        write_log(base_rows() + [gate("G2", "APPROVE", 0.695, 5, to="qa")])
+        b2 = open_by_kind(state(), "human-required")[0]
+        self.assertIn("69,5% < 70%", b2["rule"])
+        self.assertTrue(b2["title"].endswith("69,5%"))
+
+    def test_qa3_version_muda_com_o_consumo(self):
+        os.environ["CODEX_HOME"] = str(TMP / "codex")
+        try:
+            write_log(base_rows())
+            snap = server.claude_snapshot_path()
+            snap.parent.mkdir(parents=True, exist_ok=True)
+
+            def put(used, collected):
+                snap.write_text(json.dumps({"collectedAt": collected,
+                                            "fiveHour": {"usedPercent": used, "resetsAt": iso_ago(-3600)},
+                                            "sevenDay": {"usedPercent": 10, "resetsAt": iso_ago(-86400)}}))
+            put(30, iso_ago(5))
+            v1 = server.data_version()
+            put(30, iso_ago(1))                      # só nova coleta: sem recarga do /api/state
+            self.assertEqual(server.data_version(), v1)
+            put(88, iso_ago(0))                      # percentual mudou: nova versão
+            self.assertNotEqual(server.data_version(), v1)
+        finally:
+            os.environ.pop("CODEX_HOME", None)
+            shutil.rmtree(TMP / ".squad/usage", ignore_errors=True)
+
+
 if __name__ == "__main__":
     try:
         unittest.main(verbosity=2)

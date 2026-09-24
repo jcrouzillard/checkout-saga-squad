@@ -62,6 +62,17 @@ def pct(conf) -> int | None:
     return round(conf * 100) if isinstance(conf, (int, float)) else None
 
 
+def pct_text(conf) -> str | None:
+    """Percentual para textos: inteiro, exceto quando o arredondamento esconderia que o valor está abaixo do limite
+    (0,695 -> "69,5", nunca "70% < 70%"). D14-QA-1."""
+    p = pct(conf)
+    if p is None:
+        return None
+    if is_low(conf) and p >= round(LOW_CONFIDENCE * 100):
+        return f"{conf * 100:.1f}".replace(".", ",")
+    return str(p)
+
+
 def is_low(conf) -> bool:
     """Confiança < 70% (AGENTS.md) pelo valor bruto: 0,695 (69,5%) é baixa. A folga de 1e-9 evita que um 0,7 vindo
     de conta de ponto flutuante (0,69999999…) seja tratado como baixo."""
@@ -140,7 +151,7 @@ class Rules:
         return code, f"#/demandas/{code or d}/{tab}" if tab else f"#/demandas/{code or d}"
 
     # ---------------- avaliação de uma chave de gate
-    def _eval_gate(self, key) -> dict | None:
+    def _eval_gate(self, key, closed: bool = False) -> dict | None:
         gl = self.gates.get(key) or []
         if not gl:
             return None
@@ -166,8 +177,12 @@ class Rules:
             kinds.append("human-required")
         if low and any(h.get("recommendation") in ("APPROVE", "OVERRIDE") for h in after):
             kinds.append("low-confidence")
+        if closed:
+            # Demanda encerrada (G3 APPROVE sem PR): só a intervenção humana ainda pendente segue aberta (errata
+            # G2-D14, §5.1); A1 fecha com o encerramento (§5.2) — D14-QA-2.
+            kinds = [k for k in kinds if k in ("human-required", "cycle-limit")]
         if low:
-            reasons.append(f"confiança {pct(conf)}% < {round(LOW_CONFIDENCE * 100)}%")
+            reasons.append(f"confiança {pct_text(conf)}% < {round(LOW_CONFIDENCE * 100)}%")
         if risk == "alto":
             reasons.append("risco alto")
         if human_req:
@@ -185,7 +200,7 @@ class Rules:
             origin or "orquestrador") if main == "gate-return" else "squad"
         code, href = self._where(d, "gates")
         who = code or "Squad base"
-        c = f" · {pct(conf)}%" if pct(conf) is not None else ""
+        c = f" · {pct_text(conf)}%" if pct(conf) is not None else ""
         if main == "cycle-limit":
             title = f"{gname} devolvido {returns} vezes — 3º ciclo"
             rule = f"B3 — {returns} devoluções de {gname} sem decisão humana (máx. {MAX_AUTO_CYCLES} ciclos; AGENTS.md, Limites de autonomia)"
@@ -199,8 +214,8 @@ class Rules:
             rule = f"B1 — último parecer de {gname} é RETURN; {LABEL.get(owner, owner)} corrige e reenvia ao Auditor"
             label = f"Ver parecer de {gname}"
         else:
-            title = f"Seguiu com {pct(conf)}% em {gname}"
-            rule = f"A1 — confiança {pct(conf)}% < {round(LOW_CONFIDENCE * 100)}% aceita pelo humano (risco aceito)"
+            title = f"Seguiu com {pct_text(conf)}% em {gname}"
+            rule = f"A1 — confiança {pct_text(conf)}% < {round(LOW_CONFIDENCE * 100)}% aceita pelo humano (risco aceito)"
             label = "Ver parecer"
         return {"id": f"{main}:{g.get('id')}", "severity": min((KIND_SEV[k] for k in kinds), key=SEV_RANK.get),
                 "kind": main, "kinds": kinds, "rule": rule, "demand": d, "code": code, "gate": gname,
@@ -218,7 +233,7 @@ class Rules:
             # G3 APPROVE sem PR encerra a demanda (is_done), mas o próprio G3 ainda pode exigir decisão humana.
             if hard_closed or (closed and key[1] != "G3"):
                 continue
-            a = self._eval_gate(key)
+            a = self._eval_gate(key, closed)
             if a:
                 out[a["id"]] = a
         if not closed:
