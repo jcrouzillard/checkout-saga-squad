@@ -7,6 +7,9 @@ Sessão dedicada, somente leitura, fora do plantão e fora de `run_agent.py`:
 - o histórico é gravado por nós em `<DATA_ROOT>/.squad/conversas/<id>.jsonl` (append-only, fora do git, sem demanda);
 - o modelo só PROPÕE destravar (bloco ```destravar); o servidor valida contra a lista fechada do §6.1 e só grava no
   `decisions.jsonl` na confirmação do humano, pela mesma função de `/api/human` e `/api/demand/control`.
+- D19 (ADR-022): o modelo também pode PROPOR delegar (bloco ```delegar) uma tarefa pontual para uma demanda
+  existente; `validate_delegation` confere tipo (lista fechada), pré-condição, alvo, limites de tentativa e define
+  agente e piso de risco; na confirmação o servidor revalida e grava UM evento `delegation` (quem executa é o plantão).
 
 Nada aqui chama `log.py`, `run_agent.py`, `github_sync.py`, `gitflow.py`, `testenv.py` nem `prod.py`.
 Somente stdlib. `SQUAD_CHAT_RUNNER=fake` + `SQUAD_CHAT_FAKE=<script>` roda um runner simulado com os argumentos do
@@ -59,8 +62,21 @@ CODEX_WARNING = ("Com o runner codex o Orquestrador pode ler qualquer arquivo de
                  "Codex não restringe leitura). Segredos são filtrados da resposta, mas prefira o runner claude.")
 MARK = "```destravar"
 UNLOCK_KINDS = {"gate-return", "human-required", "cycle-limit"}
+DELEGABLE_KINDS = {"pr-conflict", "handoff-stalled", "change-request-open", "agent-stalled", "test-env-failed",
+                   "test-env-divergent"}
 REASONS = ("nao_destravavel", "acao_nao_permitida", "alvo_inexistente", "ja_decidido", "formato_invalido")
+MARK_DELEGAR = "```delegar"
+MARKS = (MARK, MARK_DELEGAR)
 REASON_TEXT = {"nao_destravavel": "este item não pode ser destravado pela conversa",
+               # D19 (contrato delegacao-pela-conversa §6.3)
+               "tipo_invalido": "tipo de delegação fora da lista",
+               "demanda_encerrada": "a demanda está cancelada ou entregue",
+               "delegacao_ativa": "já há uma delegação em andamento nesta demanda",
+               "limite_tentativas": "limite de tentativas atingido: volta para você decidir",
+               "alvo_de_outra_demanda": "o alvo pertence a outra demanda",
+               "acao_proibida": "ação reservada ao humano (merge, cancelar, pausar, repriorizar, ambiente, nova demanda)",
+               "precondicao_falhou": "a situação que justificaria a delegação não existe agora",
+               "tarefa_invalida": "tarefa vazia ou acima de 2000 caracteres",
                "acao_nao_permitida": "ação não permitida para este item",
                "alvo_inexistente": "alerta ou demanda não encontrado",
                "ja_decidido": "o humano já decidiu este gate",
@@ -232,13 +248,27 @@ def build_context(state: dict, data_root: pathlib.Path | None = None) -> str:
                 "pausada": p}
         if p:
             item.update(destravavel=True, acoes=["resume"])
+        if not closed:   # D19 §6.1: tipos delegáveis agora e delegação ativa
+            try:
+                item["delegaveis"] = delegables(state, d)
+                act = al.active_delegation(rows, d)
+                if act:
+                    item["delegacaoAtiva"] = {"id": act["id"], "tipo": act["category"], "estado": act["state"]}
+            except Exception:
+                item["delegaveis"] = []
         demands.append(item)
     alerts = []
     for a in state.get("alerts") or []:
         acts = gate_actions(rules, a) if a.get("kind") in UNLOCK_KINDS or set(a.get("kinds") or []) & UNLOCK_KINDS else []
-        alerts.append({"id": a.get("id"), "regra": al.KIND_RULE.get(a.get("kind"), a.get("kind")),
-                       "demanda": a.get("code"), "gate": a.get("gate"), "titulo": al.trunc(a.get("title"), TITLE_MAX),
-                       "destravavel": bool(acts), "acoes": acts})
+        item = {"id": a.get("id"), "regra": al.KIND_RULE.get(a.get("kind"), a.get("kind")),
+                "demanda": a.get("code"), "gate": a.get("gate"), "titulo": al.trunc(a.get("title"), TITLE_MAX),
+                "destravavel": bool(acts), "acoes": acts}
+        if a.get("kind") in DELEGABLE_KINDS:
+            try:
+                item["delegavel"] = alert_delegation(state, a)["delegable"]
+            except Exception:
+                item["delegavel"] = False
+        alerts.append(item)
     agents = []
     for a in state.get("agents") or []:
         task = a.get("task") or {}
@@ -371,6 +401,365 @@ def validate_proposal(raw, state: dict) -> dict:
     return {**out, "valid": True}
 
 
+# ================================================================ delegar (D19, ADR-022, contrato §2, §6)
+MAX_TASK = 2000
+DELEGATION_TYPES = ("conflito-develop", "gate-travado", "teste-quebrado", "ambiente-teste", "pendencia-handoff",
+                    "pendencia-change-request", "pendencia-agente-parado", "ajuste-pontual")
+# pedidos reservados ao humano: nunca viram delegação (contrato §2 "Proibido")
+FORBIDDEN = {"merge", "fazer-merge", "fechar-pr", "reabrir-pr", "cancelar", "cancel", "pausar", "pause", "retomar",
+             "resume", "repriorizar", "reprioritize", "nova-demanda", "abrir-demanda", "publicar", "publicar-teste",
+             "reset", "release", "liberar-teste", "test-env-request", "prod", "produtivo", "rebase", "push-force",
+             "approve", "override", "return"}
+FORBIDDEN_TARGETS = ("pr-waiting:", "gate-return:", "human-required:", "cycle-limit:", "low-confidence:",
+                     "triage-open:", "prod-update-failed:")
+RISK_RANK = {"baixo": 0, "moderado": 1, "alto": 2}
+TYPE_LABEL = {"conflito-develop": "conflito do PR com a develop", "gate-travado": "gate travado",
+              "teste-quebrado": "teste quebrado", "ambiente-teste": "falha do ambiente de teste (diagnóstico)",
+              "pendencia-handoff": "handoff sem continuidade", "pendencia-change-request": "change-request em aberto",
+              "pendencia-agente-parado": "agente parado (nova tentativa única)", "ajuste-pontual": "ajuste pontual"}
+
+
+def handoff_stalled_s() -> int:
+    return al.HANDOFF_STALLED_S
+
+
+def _open_demand(rules, d) -> bool:
+    return d not in rules.canceled and d not in rules.delivered
+
+
+def demand_branch(rows: list[dict], d: str) -> str | None:
+    """Branch da demanda: `branch` do último `review`, senão do `decision` "Branch … criada" (contrato §9.1)."""
+    rv = [e for e in rows if e.get("type") == "review" and e.get("demand") == d and e.get("branch")]
+    if rv:
+        return rv[-1]["branch"]
+    dec = [e for e in rows if e.get("type") == "decision" and e.get("demand") == d and e.get("branch")]
+    return dec[-1]["branch"] if dec else None
+
+
+def open_review(rows: list[dict], rules, d: str) -> dict | None:
+    for _, rv in reversed(rules.reviews.get(d, [])):
+        if (d, rv.get("pr")) not in rules.pr_closed:
+            return rv
+    return None
+
+
+def _event(rows: list[dict], eid) -> dict | None:
+    return next((e for e in rows if isinstance(e, dict) and e.get("id") == eid), None) if eid else None
+
+
+def _prior_delegations(rows: list[dict], key: str, keyless: bool) -> int:
+    """Tentativas já usadas na chave estável (§2): toda `delegation` com o mesmo attemptKey, qualquer resultado. Sem
+    alvo (teste-quebrado sem evidência, ajuste-pontual): só desde o último `delegation-result ok` dessa chave."""
+    dels = [e for e in rows if e.get("type") == "delegation" and e.get("attemptKey") == key]
+    if not keyless:
+        return len(dels)
+    ids = {e["id"] for e in dels}
+    ok = [i for i, e in enumerate(rows) if e.get("type") == "delegation-result" and e.get("status") == "ok"
+          and e.get("delegation") in ids]
+    since = ok[-1] if ok else -1
+    return sum(1 for i, e in enumerate(rows) if i > since and e.get("type") == "delegation" and e.get("attemptKey") == key)
+
+
+def _gate_risk(rows: list[dict], d: str) -> bool:
+    """Último parecer da demanda com confiança < 70% ou risco alto → delegação de risco alto."""
+    g = next((e for e in reversed(rows) if e.get("type") == "gate" and e.get("demand") == d), None)
+    return bool(g) and (al.is_low(g.get("confidence")) or g.get("risk") == "alto")
+
+
+def _norm_target(alvo, prefixes: tuple) -> str | None:
+    if not isinstance(alvo, str) or not alvo.strip():
+        return None
+    alvo = alvo.strip()
+    for pf in prefixes:
+        if alvo.startswith(pf):
+            return alvo[len(pf):]
+    return alvo
+
+
+def _cr_owner(cr: dict) -> str | None:
+    text = " ".join([*(cr.get("refs") or []), cr.get("title") or "", cr.get("detail") or ""])
+    if "docs/adr/" in text or "docs/contracts/" in text:
+        return "arquiteto"
+    return al._agent_of(cr.get("to"))
+
+
+def validate_delegation(raw, state: dict) -> dict:
+    """Converte o bloco ```delegar em proposta validada contra o estado atual (§2, §6.3). Agente, piso de risco,
+    alvo canônico, tentativa e chave são do servidor, nunca do modelo."""
+    rows, rules = state["rows"], state["rules"]
+    alerts = {a.get("id"): a for a in (state.get("alerts") or []) if a.get("id")}
+    for a in rules.open.values():
+        alerts.setdefault(a["id"], a)
+    out = {"kind": "delegar", "demand": None, "code": None, "category": None, "target": None, "owner": None,
+           "risk": None, "riskSuggested": None, "task": "", "attempt": None, "maxAttempts": None, "attemptKey": None,
+           "pr": None, "branch": None, "run": None, "title": None, "targetLabel": None, "valid": False,
+           "reason": None}
+    if not isinstance(raw, dict):
+        return {**out, "reason": "formato_invalido"}
+    task = raw.get("tarefa")
+    task = task.strip() if isinstance(task, str) else ""
+    out["task"] = task[:MAX_TASK]
+    tipo = raw.get("tipo") if isinstance(raw.get("tipo"), str) else None
+    risco = raw.get("risco") if raw.get("risco") in RISK_RANK else None
+    out.update(category=tipo, riskSuggested=risco)
+    acao = raw.get("acao") if isinstance(raw.get("acao"), str) else None
+    if (tipo or "").strip().lower() in FORBIDDEN or (acao and acao.strip().lower() in FORBIDDEN):
+        return {**out, "reason": "acao_proibida"}
+    if tipo not in DELEGATION_TYPES:
+        return {**out, "reason": "tipo_invalido"}
+    if not task or len(task) > MAX_TASK:
+        return {**out, "reason": "tarefa_invalida"}
+    d = _resolve_demand(raw.get("demanda"), rules.codes)
+    if d is None:
+        return {**out, "reason": "alvo_inexistente"}
+    code = rules.codes.get(d)
+    out.update(demand=d, code=code, branch=demand_branch(rows, d))
+    if not _open_demand(rules, d):
+        return {**out, "reason": "demanda_encerrada"}
+    alvo = raw.get("alvo") if isinstance(raw.get("alvo"), str) and raw.get("alvo").strip() else None
+    if alvo is not None and alvo.strip().startswith(FORBIDDEN_TARGETS):
+        return {**out, "target": alvo, "reason": "acao_proibida"}
+    # alvo de outra demanda (alerta ou evento conhecido com demanda diferente)
+    if alvo is not None:
+        a = alerts.get(alvo.strip())
+        ev = _event(rows, alvo.split(":", 1)[-1]) if a is None else None
+        if a is None and ev is None and not alvo.startswith("agent-stalled:"):
+            return {**out, "target": alvo, "reason": "alvo_inexistente"}
+        owner_d = (a or {}).get("demand") if a is not None else (ev or {}).get("demand")
+        if a is not None or ev is not None:
+            if (owner_d or None) != d:
+                return {**out, "target": alvo, "reason": "alvo_de_outra_demanda"}
+    act = al.active_delegation(rows, d)
+    if act is not None:
+        return {**out, "target": alvo, "reason": "delegacao_ativa"}
+    floor, owner, target, key, max_att, keyless = "baixo", None, None, None, 2, False
+    pr, run, label, summary = None, None, None, None
+    fail = {**out, "target": alvo, "reason": "precondicao_falhou"}
+
+    def open_of(kind, pred=lambda a: True):
+        return [a for a in alerts.values() if a.get("kind") == kind and a.get("demand") == d and pred(a)]
+    if tipo == "conflito-develop":
+        b6 = open_of("pr-conflict")
+        if alvo:
+            b6 = [a for a in b6 if a["id"] == alvo or a["id"] == f"pr-conflict:{alvo}"]
+        if not b6:
+            return fail
+        a = b6[-1]
+        target, owner, floor, pr = a["id"], "orquestrador", "moderado", a.get("pr")
+        key = f"{d}:conflito-develop:{pr}"
+        label = f"PR #{pr} em conflito com a develop"
+        summary = f"resolver o conflito do PR #{pr} com a develop"
+    elif tipo == "gate-travado":
+        hid = _norm_target(alvo, ("handoff-stalled:",))
+        a6 = open_of("handoff-stalled", lambda a: a.get("to") == "auditor" and (hid is None or a["source"]["event"] == hid))
+        if a6:
+            target, owner = a6[-1]["source"]["event"], "auditor"
+            label = "handoff para o Auditor sem parecer"
+        else:
+            # (ii) humano decidiu (APPROVE/OVERRIDE) após RETURN e o Orquestrador não agiu há >= limiar
+            now = al.ts_epoch(state.get("now")) or datetime.now(timezone.utc).timestamp()
+            cand = None
+            for i, e in enumerate(rows):
+                if e.get("type") == "human" and e.get("demand") == d and e.get("recommendation") in ("APPROVE", "OVERRIDE"):
+                    g = next((x for x in reversed(rows[:i]) if x.get("type") == "gate" and x.get("demand") == d
+                              and x.get("gate") == e.get("gate")), None)
+                    if g and g.get("recommendation") == "RETURN":
+                        cand = (i, e)
+            if cand is None or (hid and cand[1]["id"] != hid):
+                return fail
+            i, h = cand
+            if any(x.get("agent") == "orquestrador" and x.get("demand") == d for x in rows[i + 1:]):
+                return fail
+            if now - (al.ts_epoch(h.get("ts")) or now) < handoff_stalled_s():
+                return fail
+            target, owner = h["id"], "orquestrador"
+            label = f"decisão humana em {h.get('gate')} sem ação do Orquestrador"
+        key = f"{d}:gate-travado:{target}"
+        summary = "destravar o gate parado"
+    elif tipo == "teste-quebrado":
+        if not out["branch"]:
+            return fail
+        owner, floor = "a-definir", "moderado"
+        if alvo:
+            ev = _event(rows, alvo)
+            fails = [v.get("name") for v in (ev or {}).get("evidences") or [] if str(v.get("status")).lower() == "fail"]
+            still = []
+            for name in fails:
+                last = None
+                for e in rows:
+                    if e.get("demand") == d:
+                        for v in e.get("evidences") or []:
+                            if v.get("name") == name:
+                                last = str(v.get("status")).lower()
+                if last == "fail":
+                    still.append(name)
+            if not still:
+                return fail
+            target, key = alvo, f"{d}:teste-quebrado:{alvo}"
+            label = f"evidência com falha: {', '.join(still)[:80]}"
+        else:
+            key, keyless = f"{d}:teste-quebrado", True
+            label = "teste quebrado na branch da demanda"
+        summary = "corrigir teste quebrado"
+    elif tipo == "ambiente-teste":
+        a45 = [a for k in ("test-env-failed", "test-env-divergent") for a in open_of(k)]
+        if alvo:
+            a45 = [a for a in a45 if a["id"] == alvo]
+        if not a45:
+            return fail
+        target, owner = a45[-1]["id"], "devops"
+        key = f"{d}:ambiente-teste:{target}"
+        label = a45[-1].get("title")
+        summary = "diagnosticar a falha do ambiente de teste"
+    elif tipo == "pendencia-handoff":
+        hid = _norm_target(alvo, ("handoff-stalled:",))
+        a6 = open_of("handoff-stalled", lambda a: a.get("to") != "auditor" and (hid is None or a["source"]["event"] == hid))
+        if not a6:
+            return fail
+        target, owner = a6[-1]["source"]["event"], a6[-1].get("to")
+        key = f"{d}:pendencia-handoff:{target}"
+        label = f"handoff para {al.LABEL.get(owner, owner)} sem continuidade"
+        summary = f"dar continuidade ao handoff para {al.LABEL.get(owner, owner)}"
+    elif tipo == "pendencia-change-request":
+        crid = _norm_target(alvo, ("change-request-open:",))
+        a7 = open_of("change-request-open", lambda a: crid is None or a["source"]["event"] == crid)
+        if not a7:
+            return fail
+        target = a7[-1]["source"]["event"]
+        cr = _event(rows, target) or {}
+        owner = _cr_owner(cr)
+        if not owner or owner == cr.get("agent"):
+            return fail          # nunca quem pediu
+        floor = "moderado" if owner == "arquiteto" else "baixo"
+        key = f"{d}:pendencia-change-request:{target}"
+        label = f"change-request para {al.LABEL.get(owner, owner)}"
+        summary = f"resolver o change-request com {al.LABEL.get(owner, owner)}"
+    elif tipo == "pendencia-agente-parado":
+        a2 = open_of("agent-stalled", lambda a: not alvo or a["id"] == alvo or a.get("runId") == alvo)
+        if not a2:
+            return fail
+        a = a2[-1]
+        owner, run, target = a.get("agent"), a.get("runId"), a["id"]
+        started = al.ts_epoch(a.get("runStartedAt"))
+        step = "inicio"
+        for e in rows:
+            if (e.get("type") == "handoff" and e.get("demand") == d and al._agent_of(e.get("to")) == owner
+                    and (started is None or (al.ts_epoch(e.get("ts")) or 0) <= started)):
+                step = e["id"]
+        key, max_att = f"{d}:{owner}:{step}", 1
+        label = f"{al.LABEL.get(owner, owner)} parado"
+        summary = f"nova tentativa de {al.LABEL.get(owner, owner)} (agente parado)"
+        if _prior_delegations(rows, key, False) >= max_att:
+            return {**out, "target": target, "owner": owner, "run": run, "attemptKey": key, "maxAttempts": max_att,
+                    "reason": "limite_tentativas"}
+        if a.get("delegation"):
+            return {**fail, "target": target}      # run iniciada por delegação: nunca delegável de novo
+    else:   # ajuste-pontual
+        if not out["branch"]:
+            return fail
+        owner, floor = "a-definir", "moderado"
+        key, keyless = f"{d}:ajuste-pontual", True
+        label = "ajuste pontual dentro do escopo da demanda"
+        summary = "ajuste pontual: " + " ".join(task.split())[:100]
+    used = _prior_delegations(rows, key, keyless)
+    risk = max(floor, risco or floor, key=RISK_RANK.get)
+    if _gate_risk(rows, d):
+        risk = "alto"
+    rv = open_review(rows, rules, d)
+    pr = pr or (rv or {}).get("pr")
+    base = {**out, "target": target, "owner": owner, "risk": risk, "attempt": used + 1, "maxAttempts": max_att,
+            "attemptKey": key, "pr": pr, "run": run, "targetLabel": label,
+            "branch": out["branch"] or (rv or {}).get("branch"),
+            "title": al.trunc(f"{code}: {summary}", TITLE_MAX)}
+    if used >= max_att:
+        return {**base, "reason": "limite_tentativas"}
+    return {**base, "valid": True}
+
+
+def delegables(state: dict, d: str) -> list[dict]:
+    """Tipos cuja pré-condição vale agora para a demanda (contexto `delegaveis`, §6.1)."""
+    rows, rules = state["rows"], state["rules"]
+    cands = []
+    for a in list(state.get("alerts") or []) + list(rules.open.values()):
+        if a.get("demand") != d:
+            continue
+        k = a.get("kind")
+        if k == "pr-conflict":
+            cands.append(("conflito-develop", a["id"]))
+        elif k == "handoff-stalled":
+            cands.append(("gate-travado" if a.get("to") == "auditor" else "pendencia-handoff", a["id"]))
+        elif k == "change-request-open":
+            cands.append(("pendencia-change-request", a["id"]))
+        elif k == "agent-stalled":
+            cands.append(("pendencia-agente-parado", a["id"]))
+        elif k in ("test-env-failed", "test-env-divergent"):
+            cands.append(("ambiente-teste", a["id"]))
+    cands += [("gate-travado", None), ("teste-quebrado", None), ("ajuste-pontual", None)]
+    out, seen = [], set()
+    for tipo, alvo in dict.fromkeys(cands):
+        v = validate_delegation({"demanda": d, "tipo": tipo, "alvo": alvo, "tarefa": "-"}, state)
+        if v["valid"] and (tipo, v["target"]) not in seen:
+            seen.add((tipo, v["target"]))
+            out.append({"tipo": tipo, "alvo": v["target"], "agente": v["owner"], "risco": v["risk"],
+                        "tentativa": f"{v['attempt']}/{v['maxAttempts']}"})
+    return out
+
+
+def alert_delegation(state: dict, alert: dict) -> dict:
+    """Para a UI e o pedido pré-preenchido: o alerta é delegável agora? (tipo, alvo, motivo quando não)."""
+    kind = alert.get("kind")
+    tipo = {"pr-conflict": "conflito-develop", "change-request-open": "pendencia-change-request",
+            "agent-stalled": "pendencia-agente-parado", "test-env-failed": "ambiente-teste",
+            "test-env-divergent": "ambiente-teste"}.get(kind)
+    if kind == "handoff-stalled":
+        tipo = "gate-travado" if alert.get("to") == "auditor" else "pendencia-handoff"
+    if not tipo or not alert.get("demand"):
+        return {"delegable": False, "tipo": None, "reason": "tipo_invalido"}
+    v = validate_delegation({"demanda": alert["demand"], "tipo": tipo, "alvo": alert["id"], "tarefa": "-"}, state)
+    return {"delegable": v["valid"], "tipo": tipo, "reason": v["reason"], "attempt": v["attempt"],
+            "maxAttempts": v["maxAttempts"], "validation": v}
+
+
+PEDIDO_RE = re.compile(r"^(pr-conflict|handoff-stalled|change-request-open|agent-stalled|test-env-failed|"
+                       r"test-env-divergent):[A-Za-z0-9:_.-]{1,80}$")
+
+
+def pedido_text(alert: dict, info: dict) -> str:
+    """Texto pré-preenchido do botão do alerta (gerado pelo servidor; nada é gravado)."""
+    v = info["validation"]
+    code, pr = v.get("code"), v.get("pr")
+    kind = alert.get("kind")
+    if kind == "pr-conflict":
+        return (f"Delegar a correção do conflito do PR #{pr} da {code} com a develop: integrar a develop na branch da "
+                "demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR.")
+    if kind == "handoff-stalled":
+        return (f"Delegar a continuidade do handoff pendente da {code} para {al.LABEL.get(v['owner'], v['owner'])} "
+                f"(alvo {v['target']}).")
+    if kind == "change-request-open":
+        return (f"Delegar ao dono ({al.LABEL.get(v['owner'], v['owner'])}) o change-request em aberto da {code} "
+                f"(alvo {v['target']}): aceitar e fazer a mudança, ou recusar com justificativa.")
+    if kind == "agent-stalled":
+        return (f"Delegar uma nova tentativa (única) de {al.LABEL.get(v['owner'], v['owner'])} na {code}, "
+                "no mesmo passo em que a execução parou.")
+    return (f"Delegar o diagnóstico da falha do ambiente de teste da {code}: identificar a causa e corrigir na branch "
+            "da demanda, sem operar o ambiente de teste.")
+
+
+def split_action(raw_text: str) -> tuple[str, dict | str | None, str | None]:
+    """(texto exibido, bloco da 1ª ação ou "invalido"/None, tipo "destravar"|"delegar"|None). No máximo um bloco de
+    ação por resposta: o primeiro (destravar OU delegar) vale; todos os blocos saem do texto exibido."""
+    text = raw_text or ""
+    pat = re.compile(r"```(destravar|delegar)[ \t]*\n?(.*?)(?:```|\Z)", re.S)
+    m = pat.search(text)
+    if not m:
+        return text.strip(), None, None
+    try:
+        block = json.loads(m.group(2).strip())
+    except (json.JSONDecodeError, ValueError):
+        block = "invalido"
+    return pat.sub("", text).strip(), block, m.group(1)
+
+
 def split_proposal(raw_text: str) -> tuple[str, dict | None, bool]:
     """(texto exibido, bloco JSON da 1ª proposta ou None, havia bloco). Demais blocos são removidos e ignorados."""
     text, block, found = raw_text or "", None, False
@@ -387,12 +776,13 @@ def split_proposal(raw_text: str) -> tuple[str, dict | None, bool]:
 
 
 def streaming_display(raw: str) -> str:
-    """Parte já exibível durante o streaming: corta no início do bloco ```destravar e segura um prefixo parcial dele."""
-    i = raw.find(MARK)
-    if i >= 0:
-        return raw[:i]
-    for k in range(min(len(MARK) - 1, len(raw)), 0, -1):
-        if raw.endswith(MARK[:k]):
+    """Parte já exibível durante o streaming: corta no início do bloco ```destravar/```delegar e segura um prefixo
+    parcial de qualquer um deles."""
+    idx = [i for i in (raw.find(m) for m in MARKS) if i >= 0]
+    if idx:
+        return raw[:min(idx)]
+    for k in range(min(max(len(m) for m in MARKS) - 1, len(raw)), 0, -1):
+        if any(raw.endswith(m[:k]) for m in MARKS if k < len(m)):
             return raw[:-k]
     return raw
 
@@ -862,7 +1252,8 @@ class Engine:
         raw = res["raw"]
         if runner == "codex":
             raw = mask(raw, self.store.data_root)
-        text, block, found = split_proposal(raw)
+        text, block, action_kind = split_action(raw)
+        found = action_kind is not None
         if t.stop_reason:
             status = t.stop_reason
         elif res["code"] == 0 and not res["isError"]:
@@ -886,10 +1277,13 @@ class Engine:
         if found and status == "ok":
             try:
                 state = self.state_fn()
-                v = validate_proposal(block if isinstance(block, dict) else None, state)
+                if action_kind == "delegar":
+                    v = validate_delegation(block if isinstance(block, dict) else None, state)
+                else:
+                    v = {"kind": "destravar", **validate_proposal(block if isinstance(block, dict) else None, state)}
             except Exception:
-                v = {"alert": None, "demand": None, "gate": None, "action": None, "note": "", "valid": False,
-                     "reason": "formato_invalido"}
+                v = {"kind": action_kind, "alert": None, "demand": None, "gate": None, "action": None, "note": "",
+                     "valid": False, "reason": "formato_invalido"}
             msg["proposal"] = {"id": f"p-{uuid.uuid4().hex[:6]}", **v}
         t.finish(self.store.append(cid, msg))
 
@@ -904,7 +1298,11 @@ class Engine:
             raise ChatError(409, "ja_decidida", "proposta já decidida")
         return m["proposal"]
 
-    def confirm(self, cid: str, pid: str, body: dict, record_human, record_control) -> dict:
+    def confirm(self, cid: str, pid: str, body: dict, record_human, record_control, record_delegation=None) -> dict:
+        with self.store.lock:
+            p0 = self._proposal(cid, pid, self.store.records(cid))
+        if p0.get("kind") == "delegar":
+            return self._confirm_delegation(cid, pid, body, record_delegation)
         note = body.get("note") if isinstance(body, dict) and "note" in body else None
         if note is not None and not isinstance(note, str):
             raise ChatError(400, "nota_invalida", "nota inválida")
@@ -929,6 +1327,44 @@ class Engine:
                     event = record_human(p["action"], p.get("gate"), p.get("demand"), note, via="conversa")
                 else:
                     event = record_control(p["demand"], "resume", note, via="conversa")
+            self.store.append(cid, {"t": "proposal", "id": pid, "ts": now_iso(), "decision": "confirmada",
+                                    "event": event.get("id")})
+            return {"event": event}
+
+    def _confirm_delegation(self, cid: str, pid: str, body: dict, record_delegation) -> dict:
+        """D19 §6.4: `{"task"?, "riskAck"?}`; revalida sob log_lock; grava UM `delegation` (record_delegation)."""
+        body = body if isinstance(body, dict) else {}
+        task = body.get("task")
+        if task is not None and not isinstance(task, str):
+            raise ChatError(400, "tarefa_invalida", "tarefa inválida")
+        risk_ack = body.get("riskAck") is True
+        with self.store.lock:
+            recs = self.store.records(cid)
+            p = self._proposal(cid, pid, recs)
+            if not p.get("valid"):
+                raise ChatError(422, "proposta_invalida", "proposta inválida: " + REASON_TEXT.get(p.get("reason"), "—"))
+            task = (p.get("task") or "") if task is None else task
+            task = task.strip()
+            if not task:
+                raise ChatError(400, "tarefa_vazia", "tarefa vazia")
+            if len(task) > MAX_TASK:
+                raise ChatError(400, "tarefa_grande", f"tarefa acima de {MAX_TASK} caracteres")
+            if record_delegation is None:
+                raise ChatError(503, "indisponivel", "gravação de delegação indisponível")
+            with self.log_lock:
+                raw = {"demanda": p.get("demand"), "tipo": p.get("category"), "alvo": p.get("target"),
+                       "tarefa": task, "risco": p.get("riskSuggested")}
+                v = validate_delegation(raw, self.state_fn())
+                same = all(v.get(k) == p.get(k) for k in ("demand", "category", "target", "owner", "attemptKey",
+                                                          "attempt"))
+                if not v["valid"] or not same:
+                    self.store.append(cid, {"t": "proposal", "id": pid, "ts": now_iso(), "decision": "obsoleta",
+                                            "reason": v.get("reason") or "estado_mudou"})
+                    raise ChatError(409, "proposta_obsoleta",
+                                    "o estado mudou desde a proposta: " + REASON_TEXT.get(v.get("reason"), "revalide"))
+                if v["risk"] == "alto" and not risk_ack:
+                    raise ChatError(422, "risco_nao_confirmado", "risco alto: marque \"Entendo o risco\" para confirmar")
+                event = record_delegation(v, task, pid)
             self.store.append(cid, {"t": "proposal", "id": pid, "ts": now_iso(), "decision": "confirmada",
                                     "event": event.get("id")})
             return {"event": event}

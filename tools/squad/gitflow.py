@@ -9,9 +9,17 @@
   release-publish <x.y.z>              após o merge humano: tag no merge commit, GitHub Release e PR de back-merge
   hotfix-start <x.y.z> <slug>          main → hotfix/<x.y.z>-<slug>
   hotfix-finish <x.y.z>                igual ao release-finish, a partir do hotfix
+  demand-worktree --demand <id>        D19: worktree da demanda (<pai>/<cópia principal>-d<n>) na branch dela
+  feature-sync --demand <id>           D19: merge de origin/develop na branch, NO WORKTREE (sai 3 com conflitos)
+  feature-sync --demand <id> --abort   D19: `git merge --abort` no worktree (antes de delegation-result falhou)
+  review-update --demand <id> --delegation <id>   D19: push na MESMA branch do PR (nunca PR novo nem `review` novo)
 
 Regras (CLAUDE.md / AGENTS.md → "Fluxo de branches"): ninguém commita direto em main; features entram em develop
 por PR; o Auditor aprova o G3 antes do merge; releases e hotfixes são do Orquestrador, com aprovação humana.
+
+D19 (ADR-022 §3, contrato §9): os comandos da delegação rodam SEMPRE do gitflow.py da cópia principal (pelo caminho
+absoluto), mas todo `git` deles usa cwd = worktree da demanda (`--worktree`); nunca fazem switch, merge ou commit na
+cópia principal; só leem o log dela e gravam eventos nela. Sem rebase e sem --force.
 """
 import argparse
 import json
@@ -30,8 +38,8 @@ REPO = "jcrouzillard/checkout-saga-squad"
 TRAILER = "\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 
-def sh(*cmd: str, check=True, capture=True) -> str:
-    out = subprocess.run(cmd, cwd=ROOT, capture_output=capture, text=True)
+def sh(*cmd: str, check=True, capture=True, cwd=None) -> str:
+    out = subprocess.run(cmd, cwd=cwd or ROOT, capture_output=capture, text=True)
     if check and out.returncode != 0:
         sys.exit(f"falhou: {' '.join(cmd)}\n{(out.stderr or out.stdout).strip()}")
     return (out.stdout or "").rstrip()  # rstrip: o porcelain do git começa com espaço significativo
@@ -384,6 +392,197 @@ def release_publish(a, kind="release"):
     print(url)
 
 
+# ---------------------------------------------------------------- D19: delegação (worktree da demanda)
+# Dono de cada caminho (AGENTS.md, single-writer): o mais específico primeiro.
+OWNERS = [(("services/", "/src/test/"), "qa"), (("tests/",), "qa"), (("services/",), "backend"), (("pom.xml",), "backend"),
+          (("infra/observability/",), "observabilidade"), (("docs/observability.md",), "observabilidade"),
+          (("Dockerfile",), "devops"), (("docker-compose",), "devops"), (("infra/",), "devops"),
+          ((".github/",), "devops"), (("Makefile",), "devops"), (("checkout-console/",), "frontend"),
+          (("squad-control/",), "frontend"), (("docs/architecture/",), "arquiteto"), (("docs/adr/",), "arquiteto"),
+          (("docs/contracts/",), "arquiteto"), (("docs/squad/gates/",), "auditor")]
+
+
+def owner_of(path: str) -> str:
+    for keys, owner in OWNERS:
+        if len(keys) == 2:
+            if path.startswith(keys[0]) and keys[1] in path:
+                return owner
+        elif path.startswith(keys[0]) or path == keys[0]:
+            return owner
+    return "orquestrador"   # AGENTS.md, CLAUDE.md, docs/squad/**, tools/squad/** e o que não tem dono explícito
+
+
+def demand_code(demand: str) -> str:
+    n = 0
+    for e in events():
+        if e.get("type") == "task" and e.get("agent") == "humano" and e.get("id"):
+            n += 1
+            if e["id"] == demand:
+                return f"D{n}"
+    sys.exit(f"demanda {demand} não encontrada no log")
+
+
+def demand_branch(demand: str) -> str:
+    evs = events()
+    rv = [e for e in evs if e.get("type") == "review" and e.get("demand") == demand and e.get("branch")]
+    dec = [e for e in evs if e.get("type") == "decision" and e.get("demand") == demand
+           and str(e.get("branch", "")).startswith("feature/")]
+    branch = (rv or dec or [{}])[-1].get("branch")
+    if not branch:
+        sys.exit(f"demanda {demand} sem branch registrada (review ou decision \"Branch … criada\")")
+    return branch
+
+
+def default_worktree(demand: str) -> pathlib.Path:
+    return ROOT.parent / f"{ROOT.name}-{demand_code(demand).lower()}"
+
+
+def worktree_of(a) -> pathlib.Path:
+    wt = pathlib.Path(a.worktree).resolve() if getattr(a, "worktree", None) else default_worktree(a.demand)
+    if wt == ROOT.resolve() or wt.name.endswith("-teste"):
+        sys.exit(f"worktree proibido: {wt} (cópia principal/ambiente de teste — ADR-018)")
+    return wt
+
+
+def wt_dirty(wt: pathlib.Path) -> list[str]:
+    return [l for l in sh("git", "status", "--porcelain", "-uall", cwd=wt).splitlines() if not l[3:].startswith(STATE)]
+
+
+def discard_state(wt: pathlib.Path):
+    """O worktree da demanda não commita a memória da squad (§8.3): alterações locais em STATE são descartadas."""
+    for path in STATE:
+        sh("git", "checkout", "--", path, cwd=wt, check=False)
+    for l in sh("git", "status", "--porcelain", "-uall", cwd=wt).splitlines():
+        if l.startswith("??") and l[3:].startswith(STATE):
+            (wt / l[3:]).unlink(missing_ok=True)
+
+
+def demand_worktree(a):
+    branch = demand_branch(a.demand)
+    wt = worktree_of(a)
+    if wt.exists():
+        head = sh("git", "rev-parse", "--abbrev-ref", "HEAD", cwd=wt, check=False)
+        if head != branch:
+            print(f"worktree ocupado: {wt} está em {head or '(não é um repositório git)'}, não em {branch}",
+                  file=sys.stderr)
+            sys.exit(5)
+        dirty = wt_dirty(wt)
+        if dirty or (wt / ".git").exists() and sh("git", "rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=wt, check=False):
+            print("worktree ocupado: alterações alheias no worktree da demanda:\n" + "\n".join(dirty or ["merge em andamento"]),
+                  file=sys.stderr)
+            sys.exit(5)
+        print(wt)
+        return
+    sh("git", "worktree", "prune")                      # metadado de worktree removido à mão
+    sh("git", "fetch", "-q", "origin")
+    local = sh("git", "rev-parse", "-q", "--verify", f"refs/heads/{branch}", check=False)
+    if local:
+        sh("git", "worktree", "add", "-q", str(wt), branch)
+    elif sh("git", "rev-parse", "-q", "--verify", f"refs/remotes/origin/{branch}", check=False):
+        sh("git", "worktree", "add", "-q", "-b", branch, str(wt), f"origin/{branch}")
+    else:
+        sys.exit(f"branch {branch} não existe localmente nem na origin")
+    print(wt)
+
+
+def feature_sync(a):
+    """§9.2: `git merge --no-ff --no-commit origin/develop` no worktree; STATE fica com a versão da develop; conflitos de
+    código → lista com o dono de cada arquivo e sai 3 (merge em andamento). Rodar de novo após a resolução conclui o
+    merge (commit). `--abort` desfaz o merge em andamento (falha/recusa/cancelamento da delegação)."""
+    wt = worktree_of(a)
+    if not wt.exists():
+        sys.exit(f"worktree {wt} não existe: rode demand-worktree")
+    in_merge = bool(sh("git", "rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=wt, check=False))
+    if a.abort:
+        if in_merge:
+            sh("git", "merge", "--abort", cwd=wt)
+        discard_state(wt)
+        print("merge abortado; worktree limpo" if in_merge else "nenhum merge em andamento")
+        return
+    branch = sh("git", "rev-parse", "--abbrev-ref", "HEAD", cwd=wt)
+    if branch != demand_branch(a.demand):
+        sys.exit(f"worktree em {branch}, não na branch da demanda")
+    if not in_merge:
+        discard_state(wt)
+        dirty = wt_dirty(wt)
+        if dirty:
+            sys.exit("worktree com alterações não commitadas; commit antes de sincronizar:\n" + "\n".join(dirty))
+        sh("git", "fetch", "-q", "origin", cwd=wt)
+        subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "origin/develop"], cwd=wt,
+                       capture_output=True, text=True)
+        in_merge = bool(sh("git", "rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=wt, check=False))
+        if not in_merge:
+            print(f"{branch} já contém a origin/develop (nada a integrar)")
+            return
+    # memória da squad = versão da develop (mesma regra do align_memory), inclusive arquivos só da branch
+    for path in STATE:
+        sh("git", "checkout", "origin/develop", "--", path, cwd=wt, check=False)
+    for f in sh("git", "diff", "--cached", "--name-only", "origin/develop", "--", *STATE, cwd=wt, check=False).splitlines():
+        if subprocess.run(["git", "cat-file", "-e", f"origin/develop:{f}"], cwd=wt, capture_output=True).returncode:
+            sh("git", "rm", "-q", "-f", "--", f, cwd=wt, check=False)
+    unmerged = sorted(set(sh("git", "diff", "--name-only", "--diff-filter=U", cwd=wt).splitlines()) - {""})
+    unmerged = [f for f in unmerged if not f.startswith(STATE)]
+    if unmerged:
+        print("conflitos a resolver (arquivo → dono):")
+        for f in unmerged:
+            print(f"  {f} → {owner_of(f)}")
+        print(f"merge em andamento em {wt}; após resolver (git add), rode de novo feature-sync para concluir, "
+              "ou feature-sync --abort")
+        sys.exit(3)
+    msg = f"Integra a develop na {branch}" + (f" (delegação {a.delegation})" if a.delegation else "")
+    sh("git", "commit", "-q", "--no-edit", "-m", msg + TRAILER, cwd=wt)
+    print(f"merge de origin/develop commitado em {branch}: {sh('git', 'rev-parse', '--short=12', 'HEAD', cwd=wt)}")
+
+
+def review_update(a):
+    """§9.4: push da branch (sem --force) para o MESMO PR do último `review`; grava `review-updated`. Recusa (código 4)
+    se o diff da branch contra a origin/develop tocar a memória/estado da squad (STATE inteiro: memória, inbox, bugs)."""
+    evs = events()
+    dl = next((e for e in evs if e.get("id") == a.delegation and e.get("type") == "delegation"), None)
+    if dl is None or dl.get("demand") != a.demand:
+        sys.exit("delegação não encontrada para esta demanda")
+    idx = {e.get("id"): i for i, e in enumerate(evs)}
+    starts = [i for i, e in enumerate(evs) if e.get("type") == "delegation-start" and e.get("delegation") == a.delegation]
+    if not starts:
+        sys.exit("delegação sem delegation-start: nada a atualizar")
+    if any(e.get("type") == "delegation-result" and e.get("delegation") == a.delegation for e in evs):
+        sys.exit("delegação já encerrada")
+    reviews = [e for e in evs if e.get("type") == "review" and e.get("demand") == a.demand]
+    closed = {e.get("url") for e in evs if e.get("type") in ("delivered", "review-rejected")}
+    rv = reviews[-1] if reviews and reviews[-1].get("url") not in closed else None
+    if rv is None:
+        sys.exit("demanda sem PR em revisão: review-update nunca cria PR")
+    gates = [e for i, e in enumerate(evs) if e.get("type") == "gate" and e.get("demand") == a.demand and i > starts[0]]
+    ok = gates and gates[-1].get("recommendation") == "APPROVE" and gates[-1].get("gate") == "G3" \
+        and gates[-1].get("delegation") == a.delegation
+    if not ok:
+        sys.exit("sem G3 APPROVE do Auditor com --delegation posterior ao delegation-start: push recusado")
+    wt = worktree_of(a)
+    branch = sh("git", "rev-parse", "--abbrev-ref", "HEAD", cwd=wt)
+    if branch != rv.get("branch"):
+        sys.exit(f"worktree em {branch}, mas o PR #{rv.get('pr')} é da branch {rv.get('branch')}")
+    if sh("git", "rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=wt, check=False):
+        sys.exit("merge em andamento no worktree: conclua (feature-sync) ou aborte antes do push")
+    discard_state(wt)
+    dirty = wt_dirty(wt)
+    if dirty:
+        sys.exit("alterações não commitadas no worktree:\n" + "\n".join(dirty))
+    sh("git", "fetch", "-q", "origin", cwd=wt)
+    touched = sh("git", "diff", "--name-only", "origin/develop...HEAD", "--", *STATE, cwd=wt).splitlines()
+    if touched:
+        print("a branch altera a memória da squad (push recusado; ADR-022 §3):\n" + "\n".join(touched), file=sys.stderr)
+        sys.exit(4)
+    nums = sh("gh", "pr", "list", "-R", REPO, "--head", branch, "--json", "number", "-q", ".[].number").split()
+    if str(rv.get("pr")) not in nums or len(nums) != 1:
+        sys.exit(f"PR da branch ({', '.join(nums) or 'nenhum'}) difere do PR #{rv.get('pr')} do último review: "
+                 "nada é criado")
+    sh("git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}", cwd=wt)
+    sha = sh("git", "rev-parse", "HEAD", cwd=wt)
+    event("review-updated", f"PR #{rv['pr']} atualizado pela delegação {a.delegation}", demand=a.demand,
+          pr=rv["pr"], url=rv["url"], branch=branch, sha=sha, delegation=a.delegation)
+    print(f"PR #{rv['pr']} atualizado ({sha[:12]})")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -396,13 +595,19 @@ def main():
     s = sub.add_parser("hotfix-finish"); s.add_argument("version")
     s = sub.add_parser("release-publish"); s.add_argument("version")
     s = sub.add_parser("hotfix-publish"); s.add_argument("version")
+    s = sub.add_parser("demand-worktree"); s.add_argument("--demand", required=True); s.add_argument("--worktree")
+    s = sub.add_parser("feature-sync"); s.add_argument("--demand", required=True); s.add_argument("--worktree")
+    s.add_argument("--delegation"); s.add_argument("--abort", action="store_true")
+    s = sub.add_parser("review-update"); s.add_argument("--demand", required=True)
+    s.add_argument("--delegation", required=True); s.add_argument("--worktree")
     a = p.parse_args()
     {"feature-start": feature_start, "feature-finish": feature_finish,
      "release-start": release_start, "release-finish": release_finish,
      "hotfix-start": lambda x: release_start(x, source="main", kind="hotfix"),
      "hotfix-finish": lambda x: release_finish(x, kind="hotfix"),
      "review-sync": review_sync, "release-publish": release_publish,
-     "hotfix-publish": lambda x: release_publish(x, kind="hotfix")}[a.cmd](a)
+     "hotfix-publish": lambda x: release_publish(x, kind="hotfix"),
+     "demand-worktree": demand_worktree, "feature-sync": feature_sync, "review-update": review_update}[a.cmd](a)
 
 
 if __name__ == "__main__":
