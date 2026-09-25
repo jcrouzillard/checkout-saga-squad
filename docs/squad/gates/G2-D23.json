@@ -1,0 +1,85 @@
+{
+  "gate": "G2",
+  "cycle": 1,
+  "demand": "6450aecde7f9",
+  "code": "D23",
+  "phase": "F2a (ADR-024 §6)",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "commits": ["33de93e", "70b352d"],
+  "recommendation": "APPROVE",
+  "confidence": 0.92,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) Paridade D1–D24 com o painel de hoje e product.py codes --check",
+      "status": "pass",
+      "source": "verify_f2a.py (cópia em scratchpad g2-d23) sobre cópia nova do log real (679 linhas, 25 task do humano): alerts.demand_codes de origin/develop ≡ product.demand_codes (25/25), D1–D24 = tabela §4.3, codes.json D1–D24 com lastTaskId cf7a120591b0 e 4 apelidos; CA-4 (troca D7/D8) congelado não muda; CA-5 apelidos com/sem source. `product.py codes --check --log <cópia de 682 linhas>` sai 0"
+    },
+    {
+      "name": "(B,3) resolve() sem variáveis = caminhos de hoje (CA-1)",
+      "status": "pass",
+      "source": "own_checks.py (verificação própria; o verify_f2a.py NÃO cobre CA-1 apesar do brief): resolve() → checkout-saga/D/explicit=False e log/gates/handoffs/inbox/runs/memory = raiz do repo; server.LOG/GATES_DIR/RUNS_DIR, gitflow.LOG, github_sync.LOG/STATE, triage.LOG, run_agent.RUNS/MAIN_LOG e log.LOG iguais às constantes da develop"
+    },
+    {
+      "name": "(B,2) append_task sob flock, 503 trava_de_codigos, log.py grava code",
+      "status": "pass",
+      "source": "own_checks.py: com codes.lock tomado por outro processo, POST /api/demand → 503 {code: trava_de_codigos} após 5,0 s e log intacto; log.py --agent humano --type task → código 1, nada gravado; soltando a trava o POST grava D26 (201). task do orquestrador sai sem code. verify_f2a.py CA-6: POST D26/D27, log.py D28, corrida 10 log.py + 10 POST = D29…D48 distintos e consecutivos, entry com code recusado, log sintético começa em D1"
+    },
+    {
+      "name": "(B,2) Cálculo único e painel pelo código do servidor",
+      "status": "pass",
+      "source": "grep: os únicos `D{n}`/`D${index + 1}` restantes são os fallbacks (alerts.py:118, testenv.py:406, pending.py:39, gitflow.py:480 sem product.py ao lado; index.html:1418 codeOf só sem state.codes). Painel real: servidor do worktree em porta livre com SQUAD_ROOT_DATA/SQUAD_LOG em cópia + Chrome headless 1440 (ui_check.py): /api/state.codes D1–D24 = tabela; lista 'Todas' 25/25 código+título corretos; rotas #/demandas/D7, D8, D9, D10, D24 abrem 349e5b1bf818, e31bdfb73679, f2324e0f25de, 174084ec85d0, cf7a120591b0; 13 links de alertas/painel coerentes. Repetido com o log REORDENADO (linhas dos task D7/D8 trocadas): resultado idêntico — o código vem do servidor, não da posição. /api/live com as mesmas 8 chaves"
+    },
+    {
+      "name": "(2) gitflow/github_sync/triage pelo resolvedor (CA-7/CA-8/CA-9)",
+      "status": "pass",
+      "source": "verify_f2a.py: gitflow.LOG = temporário, demand_code resolve, log() grava no temporário, import_memory/snapshot_state 'ignorada', nenhum commit de memória, feature-start D99 --demand errado sai 2 sem branch; github_sync grava github-sync.json ao lado do log temporário; triage grava validation no temporário (claude falso no PATH). Log real: prefixo sha256 idêntico à cópia; eventos novos só de outros agentes (D25 start/branch, ADR-026), nenhum id/título sintético"
+    },
+    {
+      "name": "(2) Transcrições unificadas (CA-10/CA-11)",
+      "status": "pass",
+      "source": "verify_f2a.py: run_agent --worktree com HOME temporário grava metadado em data_root/.squad/runs com transcript = transcript_dir_for(worktree)/<sessionId>.jsonl e modelo efetivo lido dele; revisão de código: server.collect_runs/enrich_log/collect_external_runs varrem product.transcript_dirs (SQUAD_TRANSCRIPTS exclusivo, cache 30 s, cópia principal + worktrees)"
+    },
+    {
+      "name": "(1) Desvios declarados",
+      "status": "pass",
+      "source": "conferidos no diff: alerts/testenv/pending/gitflow/log caem na regra antiga quando copiados sem product.py; log.py e gitflow passam a honrar SQUAD_ROOT_DATA (via resolve); review_update/discard_state/feature_sync pulam memória fora do repo com a linha 'ignorada'; transcript_dirs inclui todo worktree (plankton-teste incluído)"
+    },
+    {
+      "name": "(2) CA-14 tests/squad (um a um, SQUAD_CHAT_RUNNER=fake, PATH sem claude/docker)",
+      "status": "validate",
+      "source": "8/12 arquivos verdes. Falhas: test_bugs_d16::test_demanda_comum_byte_a_byte (code/code_prefix, prevista) e test_instancia_d18::test_ca14… (chave codes, prevista) — change-request 4ad036230cd8; test_conversa_d17::T08Destravar.test_03_lista_fechada — confirmado pré-existente: num worktree temporário da origin/develop (eef4dd9) passa com o log da develop e FALHA igual com o log do worktree D23 (depende do log copiado, não do código; worktree removido). NÃO DECLARADA: test_bugs_d16_qa::Q05CA13Real.test_feature_start_e_align_memory — `feature-start D99 bug-teste --demand aaaaaaaaaaa1` num clone do HEAD agora sai 1 ('demanda aaaaaaaaaaa1 não encontrada no log'), efeito da validação nova do §5.1. Passava para o Orquestrador porque rodou antes do commit (o clone do HEAD não tinha product.py)"
+    },
+    {
+      "name": "(1) Fidelidade do handoff e da verificação",
+      "status": "validate",
+      "source": "verify_f2a.py tinha CA-6 fixo em D25 (o log já tem o task 233278d0cfa9 = D25 posicional) → 3 FAIL na cópia nova; corrigido só na cópia do Auditor (base dinâmica) → 32/32. CA-1 e o 503 não estão no script apesar do brief; bugs_d16_qa omitido do quadro de testes"
+    },
+    {
+      "name": "(1) Nada no real e sem chamada real a modelo",
+      "status": "pass",
+      "source": "sha256 do log do worktree igual antes/depois das suítes; log real só com eventos legítimos de outros agentes; nenhuma transcrição nova em ~/.claude/projects/<slug plankton-d23> nos últimos 25 min; PATH das suítes/verificações sem o binário claude. Resíduo: verify_f2a.py CA-8 (triage com só SQUAD_LOG) deixa metadados de run sintética (demanda dddddddddddd, runner claude falso) em plankton-d23/.squad/runs (gitignored) — 20260925174938/175351/175410-arquiteto-*"
+    }
+  ],
+  "qa_notes": [
+    "Estender o change-request 4ad036230cd8: test_bugs_d16_qa::Q05CA13Real.test_feature_start_e_align_memory precisa de um task do humano com id aaaaaaaaaaa1 no log do clone (ou usar o código resolvido, D1 num log só com ele); a validação do feature-start --demand é regra do contrato §5.1",
+    "test_conversa_d17::T08Destravar.test_03_lista_fechada depende do log copiado (precisa de ≥1 alerta fora de UNLOCK_KINDS): falha também na develop com o log do worktree D23 — tornar o teste autossuficiente (semear o alerta) em vez de depender do log real",
+    "test_produto_f2a.py: usar base dinâmica (nº de task do humano na cópia) no CA-6 — o log real já tem D25 (233278d0cfa9, branch feature/D25-revisao-adr-024); incluir CA-1 por comparação de Path com as constantes e o 503 trava_de_codigos (trava segura por outro processo) + log.py código 1; no CA-8 definir SQUAD_ROOT_DATA temporário para as runs do triage não caírem no .squad/runs do worktree",
+    "Cobrir CA-13 visual com o log reordenado (D7/D8 trocados): lista 'Todas', rotas #/demandas/D7…D10 e alertas continuam iguais — o teste do Frontend usou `codes` injetado",
+    "Cobrir CA-11 (varredura de worktree registrado e cópia principal por collect_runs/enrich_log) — hoje só por revisão de código"
+  ],
+  "corrections": [
+    "Orquestrador (antes do feature-finish, já previsto no §4.5): regenerar codes.json com --until no último task do humano — hoje 233278d0cfa9 (D25, já com branch feature/D25-revisao-adr-024) — e declarar o lastTaskId no PR",
+    "Orquestrador (não bloqueante): feature-start --demand com id ausente do log sai 1 via sys.exit do demand_code; alinhar ao §5.1 (código 2 e mensagem 'código X ≠ — da demanda')",
+    "Orquestrador (não bloqueante): a trava fica em data_root/.squad/locks, não junto do log; dois processos com o mesmo SQUAD_LOG e SQUAD_ROOT_DATA diferentes não se excluem. Considerar derivar a trava do log (ex.: log.parent) na F2b",
+    "Orquestrador (não bloqueante): no POST de bug, o LockTimeout ocorre depois de store.put_bug — a pasta do bug fica gravada sem o task; e o 503 segura LOG_WRITE_LOCK por até 5 s, bloqueando as demais gravações do servidor"
+  ],
+  "open_risks": [
+    "Janela da tabela: 233278d0cfa9 (D25) fora do congelado até a regeneração; coberto pela regra de lacuna (posicional = D25)",
+    "Conflito com a D24 em voo (server.py, index.html) — regra §4.11 / decisão 31400c3b82d1",
+    "Custo de transcript_dirs no /api/live (git worktree list a cada 30 s) não medido no orçamento de 300 ms do ADR-017"
+  ],
+  "human_required": false,
+  "rationale": "Entrega aderente ao contrato F2a e às ressalvas do G1, verificada no repositório e não só pelo handoff. Paridade D1–D24 e codes --check sobre cópia nova do log; resolve() sem variáveis devolve os caminhos de hoje em todos os módulos; append_task grava sob flock entre processos, com 503 trava_de_codigos e log.py código 1 confirmados com a trava segura por outro processo; cálculo posicional só resta nos fallbacks; painel do worktree servido de verdade (Chrome headless, 1440) mostra D1–D24 iguais à tabela na lista, nas rotas e nos alertas, inclusive com o log reordenado; gitflow/github_sync/triage honram o log configurado sem tocar o real; transcrições com caminho exato. Ressalvas não bloqueantes: um 3º teste quebrado não declarado (bugs_d16_qa, consequência direta do §5.1, vai para o QA), script de verificação com expectativa fixa desatualizada e sem CA-1/503, e pequenos pontos de robustez da trava. conversa_d17 test_03 confirmado pré-existente. Confiança 17,5/19 = 0,92; risco moderado (gravação do log e painel)."
+}
