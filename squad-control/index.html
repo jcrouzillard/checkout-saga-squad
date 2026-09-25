@@ -714,6 +714,78 @@
   .c-comp .row .hint { font-size: 12px; color: var(--dim); flex: 1 1 200px; }
   .c-comp .row .hint kbd { font: 11px "IBM Plex Mono", ui-monospace, monospace; padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--raised); color: var(--muted); }
   .c-comp .row .btn { height: 40px; flex: 0 0 auto; width: 96px; justify-content: center; }
+  /* ================= D21 (ADR-023, contrato imagens-na-conversa §8): imagens na conversa ================= */
+  .c-inrow { display: flex; gap: 8px; align-items: flex-end; margin-top: 4px; }
+  .c-comp .c-inrow textarea { margin-top: 0; flex: 1 1 auto; min-width: 0; }
+  /* o clipe vem DEPOIS do campo no DOM (Shift+Tab do campo segue indo ao "Ir para o fim", D20 CA-V11) e aparece à esquerda por `order` */
+  .c-attach { order: -1; flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: pointer; }
+  .c-attach:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .c-attach:focus-visible, .c-att-x:focus-visible, .c-att-retry:focus-visible, .c-img:focus-visible, .c-viewer-nav:focus-visible, .c-viewer-ft a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .c-tray { margin-top: 6px; }
+  .c-tray-list { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  .c-att { position: relative; width: 72px; height: 72px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); flex: none; }
+  .c-att > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 7px; }
+  .c-att.err { border: 2px solid var(--danger); }
+  /* véu de envio: scrim neutro sobre a miniatura (independe do tema: a foto por baixo pode ser clara ou escura) */
+  .c-att-veil { position: absolute; inset: 0; border-radius: 7px; background: rgb(0 0 0 / .58); color: #fff; display: grid; place-items: center; opacity: 1; transition: opacity .15s ease-out; }
+  .c-att.ready .c-att-veil { opacity: 0; pointer-events: none; }
+  .c-att-ring { grid-area: 1 / 1; width: 44px; height: 44px; transform: rotate(-90deg); }
+  .c-att-ring circle { fill: none; stroke-width: 3.5; }
+  .c-att-ring .bg { stroke: rgb(255 255 255 / .3); }
+  .c-att-ring .fg { stroke: #fff; stroke-linecap: round; stroke-dasharray: 100.53; transition: stroke-dashoffset .12s linear; }
+  .c-att.proc .c-att-ring { animation: c-spin .9s linear infinite; }
+  .c-att.proc .c-att-ring .fg { stroke-dashoffset: 70 !important; }
+  @keyframes c-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+  .c-att-pct { grid-area: 1 / 1; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .c-att-rm { display: none; grid-area: 1 / 1; font-size: 11px; font-weight: 600; line-height: 1.25; text-align: center; padding: 0 4px; }
+  .c-att-ok { position: absolute; left: 4px; bottom: 4px; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--ok); color: var(--surface); font-size: 11px; font-weight: 700; line-height: 1; }
+  .c-att-bad { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; background: var(--danger-soft); color: var(--danger); font-size: 20px; opacity: .92; }
+  .c-att-x { position: absolute; top: -10px; right: -10px; width: 32px; height: 32px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+  .c-att-x span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); font-size: 15px; line-height: 1; box-shadow: var(--shadow); }
+  .c-att-x:hover span { border-color: var(--danger); color: var(--danger); }
+  .c-att-retry { position: absolute; left: 50%; bottom: -2px; transform: translate(-50%, 50%); min-height: 24px; padding: 0 6px; border: 1px solid var(--danger); border-radius: 12px; background: var(--surface); color: var(--danger); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .c-tray-msg { margin-top: 6px; font-size: 12.5px; color: var(--danger); display: grid; gap: 2px; }
+  .c-tray-msg p { margin: 0; display: flex; gap: 6px; align-items: flex-start; overflow-wrap: anywhere; }
+  .c-tray-msg p.info { color: var(--muted); }
+  .c-tray-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .c-drop { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--accent-soft) 88%, transparent); border: 2px dashed var(--accent); pointer-events: none; }
+  .c-drop-in { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 30ch; text-align: center; color: var(--accent); font-size: 15px; font-weight: 600; }
+  .c-imgs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 85%; }
+  .c-img { display: block; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--raised); cursor: zoom-in; line-height: 0; }
+  .c-img img { display: block; max-width: 240px; max-height: 240px; width: auto; height: auto; object-fit: contain; }
+  .c-imgs.multi .c-img img { width: 120px; height: 120px; max-width: none; max-height: none; object-fit: cover; }
+  .c-img-na { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 120px; min-height: 72px; padding: 8px 12px; background: var(--raised); color: var(--muted); font-size: 12.5px; line-height: 1.3; border-radius: 8px; }
+  .c-imgs .c-img-na { border: 1px solid var(--line); }
+  .c-imgs.multi .c-img-na { width: 120px; height: 120px; min-width: 0; }
+  .c-viewer { border: 1px solid var(--line); border-radius: 8px; padding: 0; background: var(--surface); color: var(--text); box-shadow: var(--shadow); max-width: min(92vw, 1400px); max-height: 94vh; }
+  .c-viewer::backdrop { background: rgb(0 0 0 / .6); }
+  .c-viewer [hidden] { display: none !important; }
+  .c-viewer-hd { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .c-viewer-t { min-width: 0; }
+  .c-viewer-hd h2 { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+  .c-viewer-hd span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .c-viewer-hd .btn { height: 40px; flex: none; }
+  .c-viewer-body { display: flex; align-items: center; gap: 8px; padding: 10px; justify-content: center; }
+  .c-viewer-body img { display: block; max-width: min(90vw, 100%); max-height: min(85vh, calc(94vh - 140px)); min-width: 0; object-fit: contain; }   /* cabeçalho e rodapé sempre visíveis */
+  .c-viewer-body .c-img-na { min-width: 240px; min-height: 160px; }
+  .c-viewer-nav { flex: none; width: 44px; height: 44px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--text); font-size: 18px; cursor: pointer; }
+  .c-viewer-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .c-viewer-ft { padding: 0 14px 12px; font-size: 13px; }
+  .c-viewer-ft a { color: var(--accent); display: inline-flex; min-height: 32px; align-items: center; }
+  @media (prefers-reduced-motion: reduce) {
+    .c-att-ring, .c-att-pct { display: none; }
+    .c-att-rm { display: block; }
+    .c-att-veil, .c-att-ring .fg { transition: none; }
+  }
+  @media (max-width: 600px) {
+    .c-att-x { top: -12px; right: -12px; width: 44px; height: 44px; }
+    .c-att-retry { min-height: 32px; }
+    .c-imgs { max-width: 88%; }
+    .c-viewer-body { padding: 6px; gap: 4px; }
+    .c-viewer-body img { max-width: calc(100vw - 120px); }
+    .c-viewer-hd .btn { height: 44px; }
+  }
+  /* ================= fim D21 ================= */
   @media (max-width: 900px) { .chat { width: 100%; } .c-msgs { padding: 12px 12px 20px; } }
   @media (max-width: 480px) { .c-comp .row .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
   /* D18 × D17: de 600 a 900 px o cabeçalho divide a linha com o selo de ambiente → botão da conversa só com ícone
@@ -802,12 +874,27 @@
   <div class="c-status" id="chat-status" hidden></div>
   <form class="c-comp" id="chat-form" novalidate>
     <label for="chat-text"><span>Sua pergunta ao Orquestrador</span><span class="num" id="chat-count" hidden>0/8000</span></label>
-    <textarea id="chat-text" rows="1" aria-describedby="chat-hint" placeholder="Pergunte sobre demandas, gates, agentes…"></textarea>
+    <div class="c-tray" id="chat-tray" hidden><ul class="c-tray-list" id="chat-tray-list" aria-label="Imagens anexadas à próxima pergunta"></ul></div>
+    <div class="c-tray-msg" id="chat-tray-msg" hidden></div>
+    <p class="c-tray-note" id="chat-tray-note" hidden>Imagens vão ao fornecedor de IA. Evite prints com senhas ou dados pessoais.</p>
+    <div class="c-inrow"><textarea id="chat-text" rows="1" aria-describedby="chat-hint" placeholder="Pergunte sobre demandas, gates, agentes…"></textarea>
+    <button class="c-attach" type="button" id="chat-attach" aria-label="Anexar imagem" title="Anexar imagem (PNG, JPEG ou WEBP, até 5 MB)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"></path></svg></button></div>
+    <input type="file" id="chat-file" accept="image/png,image/jpeg,image/webp" multiple hidden tabindex="-1" aria-hidden="true">
     <div class="row"><span class="hint" id="chat-hint"><kbd>Enter</kbd> envia · <kbd>Shift+Enter</kbd> nova linha · <kbd>Esc</kbd> fecha</span>
       <button class="btn danger-outline" type="button" id="chat-stop" hidden>Parar</button>
       <button class="btn primary" type="submit" id="chat-send">Enviar</button></div>
   </form>
+  <div class="c-drop" id="chat-drop" hidden><div class="c-drop-in"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg><span>Solte para anexar — PNG, JPEG ou WEBP, até 5 MB</span></div></div>
 </aside>
+<!-- D21 (ADR-023, contrato imagens-na-conversa §8.3): visualizador das imagens enviadas na conversa. -->
+<dialog class="c-viewer" id="chat-viewer" aria-labelledby="chat-viewer-h">
+  <div class="c-viewer-hd"><div class="c-viewer-t"><h2 id="chat-viewer-h"></h2><span id="chat-viewer-sub"></span></div>
+    <button class="btn" type="button" id="chat-viewer-close">Fechar</button></div>
+  <div class="c-viewer-body"><button class="c-viewer-nav" type="button" id="chat-viewer-prev" aria-label="Imagem anterior"><span aria-hidden="true">←</span></button>
+    <img id="chat-viewer-img" alt=""><div class="c-img-na" id="chat-viewer-na" hidden><span aria-hidden="true">⚠</span> Imagem indisponível</div>
+    <button class="c-viewer-nav" type="button" id="chat-viewer-next" aria-label="Próxima imagem"><span aria-hidden="true">→</span></button></div>
+  <div class="c-viewer-ft"><a id="chat-viewer-open" target="_blank" rel="noopener noreferrer">Abrir em nova aba<span class="sr-only"> (abre em nova aba)</span></a></div>
+</dialog>
 <div id="sr-live" class="sr-only" role="status" aria-live="polite"></div>
 <div id="sr-alert" class="sr-only" aria-live="assertive"></div>
 
@@ -3126,6 +3213,7 @@ document.addEventListener("change", async ev => {
   if (ev.target.id === "drawer-msgs") { drawerMsgs = ev.target.checked; drawerKey = null; renderDrawer(); document.getElementById("drawer-msgs")?.focus(); return; } if (ev.target.dataset?.ovc) { applyOverride(ev.target.dataset.ovc); return; } if (ev.target.dataset?.ctlpr) { await fetch("/api/demand/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.target.dataset.ctlpr, action: "reprioritize", priority: ev.target.value }) }); flash = `Prioridade alterada para ${ev.target.value}.`; return refresh(); } if (ev.target.id === "obs-product") { location.hash = hrefWith({ produto: ev.target.value }); return; } if (ev.target.dataset?.filter) { location.hash = hrefWith({ [ev.target.dataset.filter]: ev.target.value || null }); } });
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
+  if (document.getElementById("chat-viewer")?.open) return;   // D21: Esc fecha só o visualizador (evento cancel do <dialog>)
   if (notifOpen) { notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell(); $("#bell").focus(); return; }
   if (chatEsc()) { e.preventDefault(); return; }
   if (drawerAgent) location.hash = hrefWith({ agente: null });
@@ -3136,7 +3224,8 @@ document.addEventListener("keydown", e => {
 // O servidor valida e grava; a UI só pergunta, mostra e pede a confirmação humana da proposta de destravar (§6.3).
 const CHAT_ID_RE = /^c-[0-9a-f]{12}$/, CHAT_PID_RE = /^p-[0-9a-f]{6}$/, CHAT_MAX = 8000, CHAT_NOTE_MAX = 2000;
 const chat = { id: null, conv: null, msgs: [], lastSeq: 0, info: null, infoErr: null, active: null, es: null, poll: null, tick: null,
-  sending: false, status: null, gen: 0, decisions: {}, propMsg: {}, notes: {}, loadErr: null, done: null };
+  sending: false, status: null, gen: 0, decisions: {}, propMsg: {}, notes: {}, loadErr: null, done: null,
+  att: [], attMsgs: [], creating: null };   // D21: bandeja de imagens (rascunho) e criação da conversa pelo 1º anexo
 const C = id => document.getElementById(id);
 const CHAT_ERR = {
   mensagem_vazia: "Escreva uma pergunta antes de enviar.", mensagem_grande: "A mensagem passa de 8 000 caracteres.",
@@ -3162,6 +3251,310 @@ async function chatApi(method, url, body) {
   const j = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, j: j && typeof j === "object" ? j : {} };
 }
+// ================= D21 (ADR-023, contrato imagens-na-conversa §8): imagens na conversa =================
+// Cada imagem sobe sozinha (corpo binário cru, XHR para ter progresso real) assim que é colada, solta ou escolhida; a mensagem
+// leva só os ids. O navegador recusa cedo (tipo pelos bytes, 5 MB, 8000 px) com o mesmo texto do servidor, que revalida sempre.
+const ATT_MAX = 3, ATT_BYTES = 5242880, ATT_DIM = 8000, ATT_MIN_MS = 400, ATT_RING = 100.53, AID_RE = /^[0-9a-f]{64}$/;
+const ATT_TYPES = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+Object.assign(CHAT_ERR, {
+  anexos_demais: "No máximo 3 imagens por mensagem.", anexos_invalidos: "As imagens da mensagem são inválidas. Remova e anexe de novo.",
+  anexo_nao_encontrado: "Uma das imagens não está mais no servidor. Remova e anexe de novo.",
+  anexos_da_conversa_cheios: "Espaço de imagens desta conversa esgotado. Abra uma nova conversa.",
+  armazenamento_de_anexos_cheio: "Espaço de imagens das conversas esgotado." });
+let attSeq = 0;
+// Mesmo nome exibido que o servidor grava (er.sanitize_name): minúsculo, [a-z0-9._-], ≤ 80 com a extensão.
+function attName(n) {
+  const b = String(n || "").split(/[\\/]/).pop().trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-{2,}/g, "-").replace(/^[.-]+/, "") || "arquivo";
+  const k = b.lastIndexOf("."), e = k >= 0 ? b.slice(k + 1) : "", ext = e ? `.${e}` : "";
+  const stem = (k >= 0 ? b.slice(0, k) : b).replace(/^[-.]+|[-.]+$/g, "") || "arquivo";
+  return stem.slice(0, Math.max(1, 80 - ext.length)) + ext;
+}
+const attUrl = (cid, id) => `/api/conversas/${cid}/anexos/${id}`;
+const attMb = n => (n / 1048576).toFixed(1).replace(".", ",");
+function attMime(f) {
+  const t = String(f.type || "").toLowerCase();
+  if (ATT_TYPES[t]) return t;
+  const m = !t && /\.(png|jpe?g|webp)$/i.exec(f.name || "");
+  return m ? (m[1].toLowerCase() === "png" ? "image/png" : m[1].toLowerCase() === "webp" ? "image/webp" : "image/jpeg") : null;
+}
+// Tipo decidido pelos bytes (assinatura), como no servidor: `falso.png` (PDF renomeado) é recusado aqui também.
+async function attKind(f) {
+  let b; try { b = new Uint8Array(await f.slice(0, 16).arrayBuffer()); } catch (e) { return null; }
+  const at = (o, s) => [...s].every((c, i) => b[o + i] === c.charCodeAt(0));
+  if (b[0] === 0x89 && at(1, "PNG")) return "image/png";
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return "image/jpeg";
+  if (at(0, "RIFF") && at(8, "WEBP")) return "image/webp";
+  if (at(4, "ftyp") && /^(heic|heix|hevc|heim|heis|mif1|msf1|avif)$/.test(String.fromCharCode(...b.slice(8, 12)))) return "heic";
+  return null;
+}
+const attDims = url => new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res(null); im.src = url; });
+async function attCheck(f, name) {
+  const t = String(f.type || "").toLowerCase();
+  if (/^image\/hei[cf]/.test(t) || /\.hei[cf]$/i.test(f.name || "")) return [`${name}: HEIC não é aceito. Exporte como JPEG ou PNG.`];
+  if (!attMime(f)) return [`${name}: formato não aceito. Envie PNG, JPEG ou WEBP.`];
+  if (f.size > ATT_BYTES) return [`${name}: imagem acima de 5 MB (${attMb(f.size)} MB).`];
+  if (!f.size) return [`${name}: a imagem está corrompida ou incompleta.`];
+  const kind = await attKind(f);
+  if (kind === "heic") return [`${name}: HEIC não é aceito. Exporte como JPEG ou PNG.`];
+  if (!kind) return [`${name}: formato não aceito. Envie PNG, JPEG ou WEBP.`];
+  const url = URL.createObjectURL(f), d = await attDims(url);   // sem decodificar (d = null) quem decide é o servidor (422)
+  if (d && (d.w > ATT_DIM || d.h > ATT_DIM)) { URL.revokeObjectURL(url); return [`${name}: imagem acima de 8000 px de largura ou altura.`]; }
+  return [null, kind, url];
+}
+const attBusy = () => chat.att.some(x => x.state === "enviando" || x.state === "processando");
+const attHasErr = () => chat.att.some(x => x.state === "erro");
+// Sem conversa aberta ("nova"), o primeiro anexo cria a conversa (§8.1); o envio da mensagem usa o mesmo caminho.
+function chatEnsureConv() {
+  if (chat.id) return Promise.resolve({ ok: true, id: chat.id });
+  if (!chat.creating) {
+    const g = chat.gen;
+    chat.creating = chatApi("POST", "/api/conversas", {}).then(r => {
+      if (g !== chat.gen) return { ok: false, stale: true };
+      chat.creating = null;
+      if (!r.ok || !CHAT_ID_RE.test(r.j.id || "")) return { ok: false, r: r.ok ? { ok: false, status: r.status, j: { error: "Resposta inesperada do servidor ao criar a conversa." } } : r };
+      if (!chat.id) {
+        chat.id = r.j.id; chat.conv = { id: r.j.id, createdAt: r.j.createdAt, runner: r.j.runner, messages: [] };
+        const h = chatHref(chat.id); history.replaceState(null, "", h); route = parseHash(h);
+        C("chat-new").setAttribute("href", chatHref("nova")); chatRenderHead();
+      }
+      return { ok: true, id: chat.id };
+    });
+  }
+  return chat.creating;
+}
+async function chatAddFiles(list) {
+  const files = [...(list || [])].filter(Boolean); if (!files.length) return;
+  const g = chat.gen, errs = [], ok = [];
+  for (const f of files) {
+    const name = attName(f.name || `imagem${ATT_TYPES[attMime(f)] || ""}`), [e, kind, url] = await attCheck(f, name);
+    if (e) errs.push(e); else ok.push({ f, name, kind, url });
+  }
+  if (g !== chat.gen) { ok.forEach(o => URL.revokeObjectURL(o.url)); return; }
+  const room = Math.max(0, ATT_MAX - chat.att.length), take = ok.slice(0, room), extra = ok.length - take.length;
+  ok.slice(room).forEach(o => URL.revokeObjectURL(o.url));
+  if (extra > 0) errs.push(`No máximo 3 imagens por mensagem — ${extra} ${extra === 1 ? "não foi anexada" : "não foram anexadas"}.`);
+  const batch = { n: take.length, ok: 0, done: 0 };
+  const items = take.map(o => ({ key: `a${++attSeq}`, file: o.f, name: o.name, mime: o.kind, url: o.url, state: "enviando", progress: 0, batch, t0: performance.now() }));
+  chat.att.push(...items); chat.attMsgs = errs;
+  chatTrayRender();
+  if (errs.length) announceErr(errs.join(" "));
+  if (!items.length) return;
+  const c = await chatEnsureConv();
+  for (const it of items) {
+    if (!chat.att.includes(it)) continue;
+    if (!c.ok) { attSettle(it, 0, {}); continue; }
+    it.cid = c.id; attUpload(it);
+  }
+}
+function attUpload(it) {
+  Object.assign(it, { state: "enviando", progress: 0, err: null, retry: false, t0: performance.now() });
+  const xhr = new XMLHttpRequest(); it.xhr = xhr;
+  xhr.open("POST", attUrl(it.cid, "").replace(/\/$/, ""));
+  xhr.setRequestHeader("Content-Type", it.mime);
+  xhr.setRequestHeader("X-Filename", encodeURIComponent(it.file.name || it.name));
+  xhr.upload.onprogress = e => {
+    if (it.xhr !== xhr || !e.lengthComputable || !e.total) return;
+    it.progress = Math.min(100, Math.round(e.loaded / e.total * 100)); if (it.progress >= 100) it.state = "processando"; attCard(it);
+  };
+  xhr.upload.onload = () => { if (it.xhr !== xhr) return; it.progress = 100; it.state = "processando"; attCard(it); };
+  xhr.onload = () => {
+    let j = {}; try { j = JSON.parse(xhr.responseText || "{}") || {}; } catch (e) {}
+    if (it.xhr === xhr) return attSettle(it, xhr.status, j);
+    // removido depois de o corpo ter subido: o servidor gravou mesmo assim → apaga (nenhum pendente novo, CA-I6)
+    if ((xhr.status === 200 || xhr.status === 201) && AID_RE.test(j.id || "") && !chat.att.some(x => x.id === j.id)) chatApi("POST", `${attUrl(it.cid, j.id)}/remover`, {});
+  };
+  xhr.onerror = () => { if (it.xhr === xhr) attSettle(it, 0, {}); };
+  xhr.send(it.file);
+  chatTrayRender();
+}
+function attSettle(it, status, j) {
+  it.xhr = null;
+  setTimeout(() => {   // §8.2: a animação fica visível no mínimo 400 ms (upload local é quase instantâneo)
+    if (!chat.att.includes(it)) return;
+    if ((status === 200 || status === 201) && AID_RE.test(j.id || "") && chat.att.some(x => x !== it && x.id === j.id)) {
+      // a mesma imagem (mesmo hash) já está na bandeja: o servidor guardou um só arquivo; o cartão repetido sai
+      const k = chat.att.indexOf(it); chat.att.splice(k, 1); URL.revokeObjectURL(it.url); it.batch.n--;
+      chat.attMsgs = [...chat.attMsgs, `${attName(j.name || it.name)}: esta imagem já está anexada.`]; announceErr(chat.attMsgs.at(-1));
+      chatTrayRender(); return;
+    }
+    if ((status === 200 || status === 201) && AID_RE.test(j.id || "")) {
+      it.state = "pronta"; it.id = j.id; it.name = attName(j.name || it.name);
+      it.meta = { id: j.id, mime: j.mime || it.mime, size: j.size, width: j.width, height: j.height, name: it.name };
+      it.just = true; setTimeout(() => { it.just = false; attCard(it); }, 1000);
+      it.batch.ok++;
+    } else {
+      const net = status === 0 || status >= 500;
+      it.state = "erro"; it.retry = net;
+      it.err = net ? `${it.name}: falha ao enviar. Tente de novo.` : typeof j.error === "string" && j.error.trim() ? j.error.trim() : CHAT_ERR[j.code] || `${it.name}: falha ao enviar. Tente de novo.`;
+      announceErr(it.err);
+    }
+    if (++it.batch.done >= it.batch.n && it.batch.ok) { announce(it.batch.ok === 1 ? "Imagem anexada" : `${it.batch.ok} imagens anexadas`); it.batch.ok = 0; }
+    chatTrayRender();
+  }, Math.max(0, ATT_MIN_MS - (performance.now() - it.t0)));
+}
+function attDrop(it, remote) {
+  if (it.xhr) { const x = it.xhr; it.xhr = null; if (it.state === "enviando") { try { x.abort(); } catch (e) {} } }
+  if (remote && it.id && it.cid && !chat.att.some(x => x !== it && x.id === it.id)) chatApi("POST", `${attUrl(it.cid, it.id)}/remover`, {});   // 409 (já usado numa mensagem) é ignorado
+  URL.revokeObjectURL(it.url);
+  if (it.state === "enviando" || it.state === "processando") it.batch.n--;
+}
+function attRemove(key) {
+  const k = chat.att.findIndex(x => x.key === key); if (k < 0) return;
+  const [it] = chat.att.splice(k, 1); attDrop(it, true);
+  if (!chat.att.length) chat.attMsgs = [];
+  chatTrayRender(); announce("Imagem removida");
+  const next = chat.att[Math.min(k, chat.att.length - 1)];
+  (next ? C("chat-tray-list").querySelector(`[data-att-remove="${next.key}"]`) : C("chat-attach"))?.focus({ preventScroll: true });
+}
+function attRetry(key) {
+  const it = chat.att.find(x => x.key === key); if (!it || it.state !== "erro") return;
+  it.batch = { n: 1, ok: 0, done: 0 }; it.state = "enviando"; it.t0 = performance.now(); chatTrayRender();
+  chatEnsureConv().then(c => { if (!chat.att.includes(it)) return; if (!c.ok) return attSettle(it, 0, {}); it.cid = c.id; attUpload(it); });
+}
+// Troca de conversa: a bandeja é rascunho da conversa em que as imagens subiram; as de outra conversa são descartadas.
+function attClearFor(id) {
+  const keep = chat.att.filter(it => it.cid && it.cid === id);
+  for (const it of chat.att) if (!keep.includes(it)) attDrop(it, true);
+  if (keep.length !== chat.att.length) { chat.att = keep; chat.attMsgs = []; chatTrayRender(); }
+}
+function attCardEl(it) {
+  const li = mk("li", "c-att"); li.dataset.k = it.key;
+  const img = mk("img"); img.src = it.url; img.alt = ""; img.decoding = "async"; img.addEventListener("error", () => { img.style.visibility = "hidden"; });
+  const veil = mk("div", "c-att-veil");
+  veil.innerHTML = `<svg class="c-att-ring" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><circle class="bg" cx="18" cy="18" r="16"></circle><circle class="fg" cx="18" cy="18" r="16"></circle></svg><span class="c-att-pct" aria-hidden="true"></span><span class="c-att-rm" aria-hidden="true"></span>`;
+  const st = mk("span", "sr-only c-att-st");
+  const x = mk("button", "c-att-x"); x.type = "button"; x.dataset.attRemove = it.key; x.innerHTML = `<span aria-hidden="true">×</span>`;
+  li.append(img, veil, st, x);
+  return li;
+}
+function attCard(it, li = C("chat-tray-list").querySelector(`[data-k="${it.key}"]`), i = chat.att.indexOf(it)) {
+  if (!li || i < 0) return;
+  const n = i + 1, up = it.state === "enviando", proc = it.state === "processando", ready = it.state === "pronta", err = it.state === "erro";
+  const cls = `c-att${proc ? " proc" : ""}${ready ? " ready" : ""}${err ? " err" : ""}`; if (li.className !== cls) li.className = cls;
+  li.querySelector("img").alt = `Imagem ${n}: ${it.name}`;
+  const veil = li.querySelector(".c-att-veil");
+  veil.hidden = err;
+  if (up || proc) {
+    veil.setAttribute("role", "progressbar"); veil.removeAttribute("aria-hidden");
+    veil.setAttribute("aria-valuemin", "0"); veil.setAttribute("aria-valuemax", "100");
+    if (up) { veil.setAttribute("aria-valuenow", String(it.progress)); veil.setAttribute("aria-label", `Enviando imagem ${n}: ${it.progress}%`); }
+    else { veil.removeAttribute("aria-valuenow"); veil.setAttribute("aria-label", `Processando imagem ${n}`); }
+  } else { ["role", "aria-valuenow", "aria-valuemin", "aria-valuemax", "aria-label"].forEach(a => veil.removeAttribute(a)); veil.setAttribute("aria-hidden", "true"); }
+  veil.querySelector(".fg").style.strokeDashoffset = String(ATT_RING * (1 - (up ? it.progress : 100) / 100));
+  veil.querySelector(".c-att-pct").textContent = up ? `${it.progress}%` : "";
+  veil.querySelector(".c-att-rm").textContent = up ? `Enviando ${it.progress}%` : proc ? "Processando…" : "";
+  li.querySelector(".c-att-st").textContent = ready ? `Imagem ${n} anexada` : err ? `Imagem ${n} com erro` : "";
+  let ok = li.querySelector(".c-att-ok");
+  if (ready && it.just && !ok) { ok = mk("span", "c-att-ok"); ok.setAttribute("aria-hidden", "true"); ok.textContent = "✓"; li.append(ok); } else if (!(ready && it.just) && ok) ok.remove();
+  let bad = li.querySelector(".c-att-bad");
+  if (err && !bad) { bad = mk("span", "c-att-bad"); bad.setAttribute("aria-hidden", "true"); bad.textContent = "⚠"; li.querySelector(".c-att-x").before(bad); } else if (!err && bad) bad.remove();
+  let rt = li.querySelector(".c-att-retry");
+  if (err && it.retry && !rt) { rt = mk("button", "c-att-retry"); rt.type = "button"; rt.dataset.attRetry = it.key; rt.textContent = "Tentar de novo"; li.append(rt); } else if (!(err && it.retry) && rt) rt.remove();
+  if (rt) rt.setAttribute("aria-label", `Tentar de novo a imagem ${n}: ${it.name}`);
+  li.querySelector(".c-att-x").setAttribute("aria-label", `Remover imagem ${n}: ${it.name}`);
+}
+function chatTrayRender() {
+  const ul = C("chat-tray-list"), have = new Map([...ul.children].map(li => [li.dataset.k, li]));
+  chat.att.forEach((it, i) => {
+    const li = have.get(it.key) || attCardEl(it); have.delete(it.key);
+    if (ul.children[i] !== li) ul.insertBefore(li, ul.children[i] || null);
+    attCard(it, li, i);
+  });
+  for (const li of have.values()) li.remove();
+  C("chat-tray").hidden = C("chat-tray-note").hidden = !chat.att.length;
+  const m = C("chat-tray-msg"), lines = [...chat.attMsgs, ...chat.att.filter(x => x.state === "erro").map(x => x.err)], key = lines.join("\n");
+  if (m.dataset.k !== key) {
+    m.replaceChildren(...lines.map(t => { const p = mk("p"), ic = mk("span"), s = mk("span"); ic.setAttribute("aria-hidden", "true"); ic.textContent = "⚠"; s.textContent = t; p.append(ic, s); return p; }));
+    m.dataset.k = key;
+  }
+  m.hidden = !lines.length;
+  chatRenderComposer();
+}
+// Miniaturas da mensagem do humano (§8.3): 1 imagem até 240×240 com a proporção; 2–3 em 120×120 (cover). O <img> já carregado
+// é reaproveitado entre redesenhos (a lista é recriada a cada turno e o GET é no-store).
+const attImgCache = new Map();
+function chatImgsEl(m, atts) {
+  const cid = chat.id, n = atts.length, wrap = mk("div", `c-imgs${n > 1 ? " multi" : ""}`);
+  wrap.setAttribute("role", "group"); wrap.setAttribute("aria-label", n === 1 ? "Imagem enviada" : `${n} imagens enviadas`);
+  atts.forEach((a, i) => {
+    const nm = attName(a.name || `imagem-${i + 1}`), url = attUrl(cid, a.id), ck = `${cid}/${m.seq ?? "p"}/${i}/${a.id}`;
+    const w = Number(a.width) || 0, h = Number(a.height) || 0, alt = `Imagem ${i + 1} de ${n} enviada por você: ${nm}`;
+    const na = () => { const d = mk("div", "c-img-na"); d.setAttribute("role", "img"); d.setAttribute("aria-label", `Imagem ${i + 1} de ${n} indisponível: ${nm}`); d.innerHTML = `<span aria-hidden="true">⚠</span><span>Imagem indisponível</span>`; return d; };
+    let img = attImgCache.get(ck);
+    if (img === "na") { wrap.append(na()); return; }
+    if (!img) {
+      img = mk("img"); img.loading = "lazy"; img.decoding = "async";
+      if (n === 1 && w && h) { const s = Math.min(1, 240 / w, 240 / h); img.width = Math.max(1, Math.round(w * s)); img.height = Math.max(1, Math.round(h * s)); }
+      else if (n > 1) { img.width = 120; img.height = 120; }
+      img.addEventListener("error", () => { attImgCache.set(ck, "na"); const b = img.closest(".c-img"); if (b) { const had = b === document.activeElement; const d = na(); b.replaceWith(d); if (had) C("chat-text").focus({ preventScroll: true }); } });
+      img.src = url; attImgCache.set(ck, img);
+    }
+    img.alt = alt;
+    const b = mk("button", "c-img"); b.type = "button"; b.setAttribute("aria-haspopup", "dialog");
+    Object.assign(b.dataset, { chatImg: `${m.seq ?? "p"}:${i}`, url, name: nm, w: String(w || ""), h: String(h || "") });
+    b.append(img); wrap.append(b);
+  });
+  return wrap;
+}
+// Visualizador (§8.3): <dialog> modal; foco no Fechar e de volta à miniatura; ←/→ entre as imagens da mesma mensagem.
+const viewer = { list: [], i: 0, ret: null };
+function viewerShow() {
+  const a = viewer.list[viewer.i], n = viewer.list.length, img = C("chat-viewer-img");
+  C("chat-viewer-na").hidden = true; img.hidden = false;
+  img.onerror = () => { img.hidden = true; C("chat-viewer-na").hidden = false; };
+  img.src = a.url; img.alt = `Imagem ${viewer.i + 1} de ${n}: ${a.name}`;
+  C("chat-viewer-h").textContent = a.name;
+  C("chat-viewer-sub").textContent = `${a.w && a.h ? `${a.w}×${a.h} px` : ""}${n > 1 ? `${a.w && a.h ? " · " : ""}${viewer.i + 1} de ${n}` : ""}`;
+  C("chat-viewer-open").href = a.url;
+  C("chat-viewer-prev").hidden = C("chat-viewer-next").hidden = n < 2;
+}
+function viewerOpen(btn) {
+  const all = [...btn.closest(".c-imgs").querySelectorAll("[data-chat-img]")];
+  viewer.list = all.map(b => ({ url: b.dataset.url, name: b.dataset.name, w: b.dataset.w, h: b.dataset.h, key: b.dataset.chatImg }));
+  viewer.i = Math.max(0, all.indexOf(btn)); viewer.ret = btn.dataset.chatImg;
+  viewerShow(); const d = C("chat-viewer"); if (!d.open) d.showModal(); C("chat-viewer-close").focus();
+}
+const viewerStep = k => { if (viewer.list.length < 2) return; viewer.i = (viewer.i + k + viewer.list.length) % viewer.list.length; viewer.ret = viewer.list[viewer.i].key; viewerShow(); };
+C("chat-viewer-close").addEventListener("click", () => C("chat-viewer").close());
+C("chat-viewer-prev").addEventListener("click", () => viewerStep(-1));
+C("chat-viewer-next").addEventListener("click", () => viewerStep(1));
+C("chat-viewer").addEventListener("click", ev => { if (ev.target === ev.currentTarget) C("chat-viewer").close(); });   // clique no fundo
+C("chat-viewer").addEventListener("keydown", ev => {
+  if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") { if (ev.target.closest?.("a")) return; ev.preventDefault(); viewerStep(ev.key === "ArrowLeft" ? -1 : 1); }
+});
+C("chat-viewer").addEventListener("close", () => {
+  C("chat-viewer-img").removeAttribute("src");
+  const b = viewer.ret && C("chat-msgs").querySelector(`[data-chat-img="${viewer.ret}"]`);
+  (b || C("chat-text")).focus({ preventScroll: true });
+});
+// Formas de anexar (§8.1): colar em qualquer ponto do painel, arrastar e soltar, botão.
+C("chat").addEventListener("paste", ev => {
+  const cd = ev.clipboardData; if (!cd) return;
+  if ((cd.getData("text/plain") || "").trim()) return;   // Excel/Office trazem texto + imagem: cola só o texto
+  const files = cd.files?.length ? [...cd.files] : [...(cd.items || [])].filter(x => x.kind === "file").map(x => x.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  ev.preventDefault(); chatAddFiles(files);
+});
+let attDragN = 0;
+const attHasFiles = ev => [...(ev.dataTransfer?.types || [])].includes("Files");
+const attDropShow = on => { C("chat-drop").hidden = !on; if (!on) attDragN = 0; };
+C("chat").addEventListener("dragenter", ev => { if (!attHasFiles(ev)) return; ev.preventDefault(); attDragN++; attDropShow(true); });
+C("chat").addEventListener("dragleave", ev => { if (!attHasFiles(ev)) return; attDragN = Math.max(0, attDragN - 1); if (!attDragN) attDropShow(false); });
+C("chat").addEventListener("dragover", ev => { if (!attHasFiles(ev)) return; ev.preventDefault(); ev.dataTransfer.dropEffect = "copy"; });
+C("chat").addEventListener("drop", ev => { if (!attHasFiles(ev)) return; ev.preventDefault(); attDropShow(false); chatAddFiles(ev.dataTransfer.files); });
+// Painel aberto: soltar arquivo fora dele não abre a imagem na aba (o rascunho não se perde). Zonas próprias (D16) tratam antes.
+for (const t of ["dragover", "drop"]) document.addEventListener(t, ev => {
+  if (C("chat").hidden || !attHasFiles(ev) || ev.defaultPrevented) return;
+  ev.preventDefault(); if (t === "dragover") ev.dataTransfer.dropEffect = "none"; else attDropShow(false);
+});
+window.addEventListener("dragend", () => attDropShow(false));
+C("chat-attach").addEventListener("click", () => C("chat-file").click());
+C("chat-file").addEventListener("change", ev => { const fl = [...(ev.target.files || [])]; ev.target.value = ""; chatAddFiles(fl); });
+C("chat-tray").addEventListener("click", ev => {
+  const x = ev.target.closest("[data-att-remove]"); if (x) { ev.preventDefault(); attRemove(x.dataset.attRemove); return; }
+  const r = ev.target.closest("[data-att-retry]"); if (r) { ev.preventDefault(); attRetry(r.dataset.attRetry); }
+});
+// ================= fim D21 =================
 const chatRunner = () => chat.conv?.runner || chat.info?.runner || null;
 const chatCheckCmd = r => r === "codex" ? ["codex --version", "codex login status"] : ["claude --version", 'claude -p "oi"'];
 const chatHref = id => hrefWith({ conversa: id, agente: null });
@@ -3288,7 +3681,8 @@ function chatClose() {
 }
 function chatReset(id) {
   chatStopStream(); chatStopTick(); chat.gen++;
-  Object.assign(chat, { id, conv: null, msgs: [], lastSeq: 0, active: null, sending: false, status: null, loadErr: null, decisions: {}, propMsg: {}, notes: {}, done: null });
+  Object.assign(chat, { id, conv: null, msgs: [], lastSeq: 0, active: null, sending: false, status: null, loadErr: null, decisions: {}, propMsg: {}, notes: {}, done: null, creating: null });
+  attClearFor(id); attImgCache.clear();   // D21: imagens de outra conversa saem da bandeja
   chatRender();
   if (id) chatLoad(id);
 }
@@ -3327,19 +3721,25 @@ function chatMerge(recs) {
     if (m.t && m.t !== "msg") continue;
     if (typeof m.seq === "number" && chat.msgs.some(x => x.seq === m.seq)) continue;
     // a mensagem otimista do humano é trocada pelo registro do servidor
-    if (m.role === "humano") { const k = chat.msgs.findIndex(x => x.pending && x.text === m.text); if (k >= 0) chat.msgs.splice(k, 1); }
+    if (m.role === "humano") { const ids = o => (o.attachments || []).map(a => a?.id).join(), k = chat.msgs.findIndex(x => x.pending && x.text === m.text && ids(x) === ids(m)); if (k >= 0) chat.msgs.splice(k, 1); }
     chat.msgs.push(m);
   }
   chat.msgs.sort((a, b) => (a.seq ?? 1e15) - (b.seq ?? 1e15));
 }
 
 // ---- Turno: envio, streaming (SSE), fallback por polling, cancelamento ----
-async function chatSend(raw) {
+// D21: `reAtt` (lista de metadados) = "Tentar de novo" reenvia os anexos da mensagem; sem ele, vão as imagens prontas da bandeja.
+async function chatSend(raw, reAtt) {
   const text = String(raw ?? "").trim();
   if (chat.active || chat.sending) return;
-  if (!text) { chatSetStatus("err", CHAT_ERR.mensagem_vazia); announceErr(CHAT_ERR.mensagem_vazia); C("chat-text").focus(); return; }
+  const fromTray = !Array.isArray(reAtt);
+  if (fromTray && attBusy()) { chatSetStatus("warn", "Aguarde o envio das imagens."); announce(chat.status.text); return; }
+  if (fromTray && attHasErr()) { chatSetStatus("err", "Remova ou reenvie as imagens com erro antes de enviar."); announceErr(chat.status.text); return; }
+  const sent = fromTray ? chat.att.filter(x => x.state === "pronta" && x.meta) : [];
+  const atts = fromTray ? sent.map(x => x.meta) : reAtt.filter(a => a && AID_RE.test(a.id || "")).slice(0, ATT_MAX);
+  if (!text && !atts.length) { chatSetStatus("err", CHAT_ERR.mensagem_vazia); announceErr(CHAT_ERR.mensagem_vazia); C("chat-text").focus(); return; }
   if (text.length > CHAT_MAX) { chatSetStatus("err", CHAT_ERR.mensagem_grande); announceErr(CHAT_ERR.mensagem_grande); return; }
-  const g = chat.gen, opt = { t: "msg", role: "humano", text, ts: new Date().toISOString(), pending: true };
+  const g = chat.gen, opt = { t: "msg", role: "humano", text, ts: new Date().toISOString(), pending: true, ...(atts.length ? { attachments: atts } : {}) };
   chat.sending = true; chat.status = null; chat.done = null;
   chat.msgs.push(opt);
   chat.active = { turn: null, phase: "enviando", text: "", base: "", tool: null, startedAt: Date.now() };
@@ -3348,17 +3748,15 @@ async function chatSend(raw) {
   // §8: indicador "pensando" em ≤ 300 ms, sem esperar o servidor.
   setTimeout(() => { if (g === chat.gen && chat.active?.phase === "enviando") { chat.active.phase = "pensando"; chatRenderLive(); } }, 250);
   if (!chat.id) {
-    const r = await chatApi("POST", "/api/conversas", {});
-    if (g !== chat.gen) return;
-    if (!r.ok || !CHAT_ID_RE.test(r.j.id || "")) return chatSendFailed(opt, text, r.ok ? { ok: false, status: r.status, j: { error: "Resposta inesperada do servidor ao criar a conversa." } } : r);
-    chat.id = r.j.id; chat.conv = { id: r.j.id, createdAt: r.j.createdAt, runner: r.j.runner, messages: [] };
-    const h = chatHref(chat.id); history.replaceState(null, "", h); route = parseHash(h);
-    C("chat-new").setAttribute("href", chatHref("nova"));
+    const c = await chatEnsureConv();
+    if (g !== chat.gen || c.stale) return;
+    if (!c.ok) return chatSendFailed(opt, text, c.r);
   }
-  const r = await chatApi("POST", `/api/conversas/${chat.id}/mensagens`, { text, tz: CHAT_TZ || undefined });   // D20 §3.4: fuso do humano
+  const r = await chatApi("POST", `/api/conversas/${chat.id}/mensagens`, { text, ...(atts.length ? { attachments: atts.map(a => a.id) } : {}), tz: CHAT_TZ || undefined });   // D20 §3.4: fuso do humano
   if (g !== chat.gen) return;
   chat.sending = false;
   if (!r.ok) return chatSendFailed(opt, text, r);
+  if (sent.length) { for (const it of sent) { const k = chat.att.indexOf(it); if (k >= 0) { chat.att.splice(k, 1); URL.revokeObjectURL(it.url); } } chat.attMsgs = []; chatTrayRender(); }   // §8.2: bandeja esvazia após o 202
   if (r.j.message && typeof r.j.message === "object") { Object.assign(opt, r.j.message); delete opt.pending; if (opt.seq > chat.lastSeq) chat.lastSeq = opt.seq; }
   else delete opt.pending;
   chat.active.turn = r.j.turn ?? opt.turn ?? null;
@@ -3463,7 +3861,7 @@ function chatTurnEnded(fin, errText) {
     const recorded = chat.msgs.some(m => m.role === "orquestrador" && (a?.turn == null || m.turn === a.turn));
     if (!recorded) {
       const human = [...chat.msgs].reverse().find(m => m.role === "humano" && (a?.turn == null || m.turn === a.turn));
-      chat.status = { kind: st === "tempo_esgotado" ? "warn" : "err", icon: st === "tempo_esgotado" ? "◷" : "✕", text, retry: st !== "cancelada" && human ? human.text : null };
+      chat.status = { kind: st === "tempo_esgotado" ? "warn" : "err", icon: st === "tempo_esgotado" ? "◷" : "✕", text, retry: st !== "cancelada" && human ? human.text : null, retryAtt: human?.attachments || [] };
     }
     if (st === "cancelada") announce(text); else announceErr(text);
   }
@@ -3592,7 +3990,12 @@ function chatMsgEl(m, isLastOrq) {
   const body = mk("div", orq ? "c-body bub" : "c-body c-bubble bub");
   li.append(meta, body);
   if (live) { li.id = "chat-live"; li.setAttribute("aria-busy", "true"); return li; }   // corpo e fase: chatRenderLive()
-  if (!orq) { body.textContent = m.text || ""; return li; }
+  if (!orq) {
+    const atts = Array.isArray(m.attachments) ? m.attachments.filter(a => a && AID_RE.test(a.id || "")) : [];
+    if (atts.length) meta.after(chatImgsEl(m, atts));   // D21 §8.3: miniaturas acima do texto; balão só se houver texto
+    if (m.text || !atts.length) body.textContent = m.text || ""; else body.remove();
+    return li;
+  }
   const txt = stripProposal(m.text);
   if (txt) body.append(mdRender(txt));
   if (!txt || (m.status && m.status !== "ok")) {
@@ -3697,7 +4100,7 @@ function chatRenderStatus() {
   let html = "", cls = "";
   if (s) {
     cls = s.kind === "err" ? "err" : s.kind === "warn" ? "warn" : "";
-    html = `<span class="ic" aria-hidden="true">${esc(s.icon || "▲")}</span><span class="txt">${esc(s.text)}${s.cmds ? s.cmds.map((c, i) => `${i ? " e " : ""}<code>${esc(c)}</code>`).join("") + "." : ""}${s.link ? ` <a href="${esc(s.link.href)}">${esc(s.link.text)}</a>` : ""}</span>${s.retry ? `<button class="btn" type="button" data-chat-retry-text="1">Tentar de novo</button>` : ""}`;
+    html = `<span class="ic" aria-hidden="true">${esc(s.icon || "▲")}</span><span class="txt">${esc(s.text)}${s.cmds ? s.cmds.map((c, i) => `${i ? " e " : ""}<code>${esc(c)}</code>`).join("") + "." : ""}${s.link ? ` <a href="${esc(s.link.href)}">${esc(s.link.text)}</a>` : ""}</span>${s.retry != null ? `<button class="btn" type="button" data-chat-retry-text="1">Tentar de novo</button>` : ""}`;
   }
   const key = cls + html;
   if (el.dataset.k !== key) { const had = el.contains(document.activeElement); el.className = `c-status ${cls}`; el.innerHTML = html; el.dataset.k = key; if (had) C("chat-text").focus({ preventScroll: true }); }
@@ -3708,10 +4111,11 @@ const CHAT_HINT = "<kbd>Enter</kbd> envia · <kbd>Shift+Enter</kbd> nova linha �
 function chatRenderComposer() {
   const busy = !!chat.active || chat.sending, ta = C("chat-text"), send = C("chat-send"), stop = C("chat-stop"), hint = C("chat-hint");
   ta.readOnly = false; ta.removeAttribute("aria-disabled");
-  send.hidden = !!chat.active; send.disabled = busy;
+  const up = attBusy(), bad = attHasErr();   // D21 §8.2: sem envio com imagem subindo ou com erro
+  send.hidden = !!chat.active; send.disabled = busy || up || bad;
   stop.hidden = !chat.active; stop.disabled = !chat.active || chat.active.turn == null || !!chat.active.cancelling;
   const st = chat.active?.cancelling ? "Parando…" : "Parar"; if (stop.textContent !== st) stop.textContent = st;
-  const h = busy ? "Aguarde a resposta ou pare. Você já pode escrever a próxima pergunta." : CHAT_HINT;
+  const h = busy ? "Aguarde a resposta ou pare. Você já pode escrever a próxima pergunta." : up ? "Aguarde o envio das imagens." : bad ? "Remova ou reenvie as imagens com erro." : CHAT_HINT;
   if (hint.dataset.k !== h) { hint.innerHTML = h; hint.dataset.k = h; }
 }
 function chatAutoSize() {
@@ -3729,7 +4133,7 @@ function chatCount() {
 function chatTitle() {
   const it = (chat.info?.items || []).find(x => x.id === chat.id);
   const first = chat.msgs.find(m => m.role === "humano");
-  const t = it?.title || chat.conv?.title || (first ? String(first.text).slice(0, 80) : "");
+  const t = it?.title || chat.conv?.title || (first ? String(first.text || (first.attachments?.length ? "Imagem enviada" : "")).slice(0, 80) : "");
   return chat.id ? `${t || "Conversa sem mensagens"}${chat.conv?.createdAt ? ` · desde ${fmtWhen(chat.conv.createdAt)}` : ""}` : "Nova conversa";
 }
 function chatRenderHead() {
@@ -3784,7 +4188,7 @@ C("chat-form").addEventListener("submit", ev => { ev.preventDefault(); chatSend(
 C("chat-text").addEventListener("keydown", ev => {
   if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing && !ev.altKey && !ev.ctrlKey && !ev.metaKey) { ev.preventDefault(); if (!chat.active && !chat.sending) chatSend(C("chat-text").value); }
 });
-C("chat-text").addEventListener("input", () => { chatCount(); if (chat.status && chat.status.kind === "err" && !chat.status.retry) { chat.status = null; chatRenderStatus(); } });
+C("chat-text").addEventListener("input", () => { chatCount(); if (chat.status && chat.status.kind === "err" && chat.status.retry == null) { chat.status = null; chatRenderStatus(); } });
 C("chat-stop").addEventListener("click", () => chatCancel());
 C("chat-msgs").addEventListener("scroll", () => chatRenderBottom(), { passive: true });
 C("chat-bottom").addEventListener("click", () => {
@@ -3798,8 +4202,9 @@ C("chat").addEventListener("click", ev => {
   const sg = ev.target.closest("[data-chat-sug]");
   if (sg) { C("chat-text").value = sg.dataset.chatSug; chatCount(); C("chat-text").focus(); return; }
   const rt = ev.target.closest("[data-chat-retry]");
-  if (rt) { const human = [...chat.msgs].reverse().find(x => x.role === "humano" && String(x.turn) === rt.dataset.chatRetry); if (human) chatSend(human.text); C("chat-text").focus(); return; }
-  if (ev.target.closest("[data-chat-retry-text]")) { const t = chat.status?.retry; chat.status = null; if (t) { if (C("chat-text").value.trim() === t) C("chat-text").value = ""; chatSend(t); } C("chat-text").focus(); return; }
+  if (rt) { const human = [...chat.msgs].reverse().find(x => x.role === "humano" && String(x.turn) === rt.dataset.chatRetry); if (human) chatSend(human.text, human.attachments || []); C("chat-text").focus(); return; }
+  if (ev.target.closest("[data-chat-retry-text]")) { const t = chat.status?.retry, ra = chat.status?.retryAtt; chat.status = null; if (t != null) { if (t && C("chat-text").value.trim() === t) C("chat-text").value = ""; chatSend(t, ra); } C("chat-text").focus(); return; }
+  const im = ev.target.closest("[data-chat-img]"); if (im) { viewerOpen(im); return; }
   const cf = ev.target.closest("[data-chat-confirm]"); if (cf) { chatDecide(cf.dataset.chatConfirm, "confirmar", cf); return; }
   const ds = ev.target.closest("[data-chat-discard]"); if (ds) { chatDecide(ds.dataset.chatDiscard, "descartar", ds); return; }
 });
