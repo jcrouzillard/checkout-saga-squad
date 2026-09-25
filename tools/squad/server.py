@@ -501,6 +501,7 @@ def collect_external_runs(now: float | None = None) -> list[dict]:
         out.append({"id": meta["id"], "agent": meta.get("agent", "outro"), "description": meta.get("description", ""),
                     **model_fields(models, hint, runner), "modelRequested": meta.get("modelRequested"),
                     "sessionId": meta.get("sessionId"), "demand": meta.get("demand"),
+                    "delegation": meta.get("delegation"),   # D19: run iniciada por delegação (run_agent --delegation)
                     "runner": runner, "status": status,
                     "started": meta.get("started"),
                     "updated": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
@@ -695,14 +696,19 @@ def compute(full: bool) -> dict:
         rules = rules_cached()
         rows = read_log()
         test_env = test_env_view()
-        gate_alerts = list(rules.open.values()) + al.env_alerts(rows, test_env, rules.codes)
+        gate_alerts = (list(rules.open.values()) + al.env_alerts(rows, test_env, rules.codes)
+                       + al.handoff_alerts(rows, rules, runs, now))          # D19: A6 (relógio, como o A2)
         agents, stalled = al.build_agents(runs, rules, rows, gate_alerts, now, orchestrator_view(runs, rules, now))
         alerts = al.with_age(al.sort_alerts(gate_alerts + stalled), now)
+        delegations = annotate_delegations(alerts, rows, rules, now)
         out = {"now": datetime.fromtimestamp(now, timezone.utc).isoformat(timespec="seconds"),
                "version": data_version(), "thresholds": al.thresholds(),
                "summary": al.summary(alerts, agents), "alerts": alerts,
                "testEnv": test_env if full else te.live_summary(test_env)}
         if full:
+            # D19: delegação ativa por demanda (badge). Só no /api/state: o /api/live mantém o conjunto de chaves
+            # (test_alertas_d14); toda mudança de delegação muda o log → `version` → o cliente recarrega o /api/state.
+            out["delegations"] = delegations
             out["agents"] = agents
             out["alertsHistory"] = sorted(rules.history, key=lambda a: a.get("closedAt") or "", reverse=True)
             out["_runs"] = [public_run(r) for r in runs]
@@ -711,6 +717,34 @@ def compute(full: bool) -> dict:
             out["agents"] = [al.compact_agent(a) for a in agents]
     out["serverMs"] = round((time.perf_counter() - t0) * 1000)
     return out
+
+
+def annotate_delegations(alerts: list[dict], rows: list[dict], rules, now: float) -> dict:
+    """D19 (contrato §5, §7, §11): alertas B6/A6/A7/A2/A4/A5 ganham `delegable`, `delegateReason`, `attempt`/`maxAttempts`
+    e `delegation` (a ativa para o mesmo alvo → "Delegado — em execução"). Devolve {demanda: delegação ativa resumida}."""
+    active = {}
+    for x in al.delegations_of(rows):
+        if x["result"] is None and x.get("demand"):
+            active[x["demand"]] = x
+    state = {"rows": rows, "rules": rules, "alerts": alerts, "now": al.iso(now)}
+    for a in alerts:
+        if a.get("kind") not in cv.DELEGABLE_KINDS:
+            continue
+        cur = active.get(a.get("demand"))
+        hit = cur if cur and (cur.get("target") in (a["id"], (a.get("source") or {}).get("event"))
+                              or (cur.get("run") and cur.get("run") == a.get("runId"))) else None
+        if isinstance(a.get("delegation"), str):   # A2: a run parada foi iniciada por delegação (CA-10d) — preserva
+            a["runDelegation"] = a["delegation"]
+        a["delegation"] = {"id": hit["id"], "state": hit["state"]} if hit else None
+        try:
+            info = cv.alert_delegation(state, a)
+        except Exception:
+            info = {"delegable": False, "reason": "erro", "attempt": None, "maxAttempts": None}
+        a["delegable"] = bool(info["delegable"]) and not hit
+        a["delegateReason"] = None if a["delegable"] else ("delegacao_ativa" if hit else info.get("reason"))
+        a["attempt"], a["maxAttempts"] = info.get("attempt"), info.get("maxAttempts")
+    return {d: {"id": x["id"], "category": x["category"], "state": x["state"], "owner": x["owner"],
+                "risk": x["risk"], "ts": x["ts"], "title": x["title"]} for d, x in active.items()}
 
 
 def live_payload() -> tuple[bytes, str]:
@@ -1066,6 +1100,69 @@ def chat_state() -> dict:
             "testEnv": live["testEnv"], "now": live["now"]}
 
 
+def record_delegation(v: dict, task: str, proposal_id: str) -> dict:
+    """D19 (contrato §3.1): ÚNICO gravador do evento `delegation` (log.py recusa o tipo). Chamado só na confirmação do
+    humano, já revalidado e sob LOG_WRITE_LOCK."""
+    return append_log({"agent": "humano", "type": "delegation", "to": "orquestrador", "demand": v["demand"],
+                       "category": v["category"], "target": v.get("target"), "owner": v.get("owner"),
+                       "risk": v.get("risk"), "attempt": v.get("attempt"), "attemptKey": v.get("attemptKey"),
+                       "pr": v.get("pr"), "branch": v.get("branch"), "run": v.get("run"),
+                       "title": v.get("title"), "detail": task, "via": "conversa", "proposal": proposal_id})
+
+
+def conversation_confirmed(event_id: str) -> bool:
+    """§8.2.1: há registro `confirmada` com `event` = id em `.squad/conversas/*.jsonl`?"""
+    d = DATA_ROOT / ".squad/conversas"
+    for f in (d.glob("c-*.jsonl") if d.is_dir() else []):
+        try:
+            for line in f.read_text(encoding="utf-8").splitlines():
+                if f'"{event_id}"' in line:
+                    r = json.loads(line)
+                    if r.get("t") == "proposal" and r.get("decision") == "confirmada" and r.get("event") == event_id:
+                        return True
+        except (OSError, json.JSONDecodeError):
+            continue
+    return False
+
+
+def delegation_items(demand: str) -> list[dict]:
+    rows = read_log()
+    codes = al.demand_codes(rows)
+    out = []
+    for x in reversed(al.delegations_of(rows, demand)):
+        item = {k: x[k] for k in ("id", "ts", "demand", "category", "target", "owner", "risk", "attempt", "title",
+                                  "task", "state", "startedAt", "endedAt", "result", "events", "pr", "branch",
+                                  "attemptKey", "run")}
+        item["code"] = codes.get(x["demand"])
+        out.append(item)
+    return out
+
+
+def delegation_check(event_id: str) -> tuple[int, dict]:
+    """Checagem do plantão antes de começar (§8.2): autenticidade + revalidação da pré-condição no estado atual.
+    Código 0 = pode começar; 3 = recusada (sem confirmação do humano); 4 = obsoleta; 5 = já iniciada/encerrada."""
+    rows = read_log()
+    ev = next((e for e in rows if e.get("id") == event_id and e.get("type") == "delegation"), None)
+    if ev is None:
+        return 5, {"id": event_id, "error": "delegação não encontrada"}
+    item = next(x for x in al.delegations_of(rows) if x["id"] == event_id)
+    out = {"id": event_id, "demand": ev.get("demand"), "category": ev.get("category"), "state": item["state"]}
+    if item["state"] != "pedida":
+        return 5, {**out, "reason": "já iniciada ou encerrada"}
+    if ev.get("agent") != "humano" or ev.get("via") != "conversa" or not conversation_confirmed(event_id):
+        return 3, {**out, "confirmed": False, "reason": "evento sem confirmação do humano"}
+    out["confirmed"] = True
+    # revalida como se fosse a 1ª proposta: sem contar a própria delegação (ativa e tentativa)
+    rows_wo = [e for e in rows if e.get("id") != event_id]
+    live = compute(full=False)
+    rules = al.Rules(rows_wo, gates_cached())
+    state = {"rows": rows_wo, "rules": rules, "alerts": live["alerts"], "now": live["now"]}
+    v = cv.validate_delegation({"demanda": ev.get("demand"), "tipo": ev.get("category"), "alvo": ev.get("target"),
+                                "tarefa": ev.get("detail") or "-"}, state)
+    out.update(valid=v["valid"], reason=v.get("reason"), owner=v.get("owner"), branch=v.get("branch"))
+    return (0 if v["valid"] else 4), out
+
+
 def chat() -> "cv.Engine":
     global _CHAT
     with _CHAT_LOCK:
@@ -1126,6 +1223,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not self._local_ok():
             return self._forbidden()
         parts = self._chat_parts(self.path)
+        if parts == ["pedido"]:
+            return self._chat_pedido()
         eng = chat()
         try:
             if not parts:
@@ -1147,6 +1246,36 @@ class Handler(SimpleHTTPRequestHandler):
         except cv.ChatError as e:
             return self._chat_err(e)
         return self._json({"error": "rota não encontrada", "code": "nao_encontrado"}, 404)
+
+    def _chat_pedido(self):
+        """D19 §7: GET /api/conversas/pedido?ref=<alertId> — texto pré-preenchido; nada é gravado."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        ref = (q.get("ref") or [""])[0]
+        if not cv.PEDIDO_RE.match(ref):
+            return self._json({"error": "alerta não encontrado", "code": "alerta_nao_encontrado"}, 404)
+        live = compute(full=False)
+        a = next((x for x in live["alerts"] if x.get("id") == ref), None)
+        if a is None:
+            return self._json({"error": "alerta não encontrado", "code": "alerta_nao_encontrado"}, 404)
+        rows = read_log()
+        state = {"rows": rows, "rules": rules_cached(), "alerts": live["alerts"], "now": live["now"]}
+        info = cv.alert_delegation(state, a)
+        if not info["delegable"]:
+            return self._json({"error": "alerta não delegável agora: " + cv.REASON_TEXT.get(info.get("reason"), "—"),
+                               "code": "nao_delegavel", "reason": info.get("reason")}, 409)
+        return self._json({"text": cv.pedido_text(a, info), "demand": info["validation"].get("code"),
+                           "tipo": info["tipo"], "alvo": info["validation"].get("target")})
+
+    def _delegations_get(self):
+        """D19 §7: GET /api/delegacoes?demand=<id|Dn> — delegações da demanda, mais recente primeiro."""
+        if not self._local_ok():
+            return self._forbidden()
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        ref = (q.get("demand") or [""])[0]
+        d = cv._resolve_demand(ref, al.demand_codes(read_log()))
+        if d is None:
+            return self._json({"error": "demanda não encontrada", "code": "demanda_nao_encontrada"}, 404)
+        return self._json({"items": delegation_items(d)})
 
     def _chat_stream(self, eng: "cv.Engine", cid: str, n: int):
         """SSE (§7.1): fase/texto/fim/erro; `: ping` a cada 15 s; reconexão reenvia o texto acumulado num `texto`."""
@@ -1235,7 +1364,8 @@ class Handler(SimpleHTTPRequestHandler):
             if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "cancelar" and parts[2].isdigit():
                 return self._json(eng.cancel(cid, int(parts[2])), 202)
             if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "confirmar":
-                return self._json(eng.confirm(cid, parts[2], data, record_human_decision, record_control), 201)
+                return self._json(eng.confirm(cid, parts[2], data, record_human_decision, record_control,
+                                              record_delegation), 201)
             if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "descartar":
                 return self._json(eng.discard(cid, parts[2]), 200)
         except cv.ChatError as e:
@@ -1390,6 +1520,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._chat_get()
         if self.path.startswith("/api/bug/"):
             return self._bug_get(urllib.parse.urlsplit(self.path).path)
+        if self.path == "/api/delegacoes" or self.path.startswith(("/api/delegacoes?", "/api/delegacoes/")):
+            return self._delegations_get()
         if self.path.startswith("/api/live"):
             # D14 (ADR-017, contrato §9.1): canal leve consultado a cada 1,5 s — sem enrich_log nem handoffs.
             body, version = live_payload()
@@ -1423,6 +1555,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "alerts": extra["alerts"], "alertsHistory": extra["alertsHistory"], "agents": extra["agents"],
                 "serverMs": extra["serverMs"],
                 "testEnv": extra["testEnv"],   # D15 — acréscimo (formato de GET /api/test-env)
+                "delegations": extra["delegations"],   # D19 — acréscimo: delegação ativa por demanda
             })
         if self.path.startswith("/api/test-env"):
             return self._json(test_env_view())
@@ -1666,7 +1799,14 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=int(os.environ.get("SQUAD_PORT") or 7070))
-    port = ap.parse_args().port
+    ap.add_argument("--delegation-check", metavar="ID",
+                    help="D19: checa autenticidade e pré-condição de uma delegação (JSON; código 0 = pode começar)")
+    args = ap.parse_args()
+    if args.delegation_check:
+        code, out = delegation_check(args.delegation_check)
+        print(json.dumps(out, ensure_ascii=False))
+        sys.exit(code)
+    port = args.port
     print(f"Squad Control em http://localhost:{port}  (transcrições: {transcripts_root()})")
     # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
     threading.Thread(target=lambda: compute(full=False), daemon=True).start()

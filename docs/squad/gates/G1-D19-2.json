@@ -1,0 +1,42 @@
+{
+  "gate": "G1",
+  "demand": "402e76f187f9",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 2,
+  "previous": "docs/squad/gates/G1-D19.json",
+  "handoff": "710df73a4dc0",
+  "diff": "git diff fa26ab8 c102235 -- docs/adr docs/contracts",
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Respostas do humano refletidas (caso c)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Contrato §2 'Tentativas' e tabela: pendencia-agente-parado com no máximo 1 delegation por chave estável (demanda, agente do run, passo), em que passo = id do último handoff com to = agente antes do run (ou 'inicio'), independente do runId. A run original é a tentativa 1 e a delegação é a única nova tentativa. Se falhar → delegation-result falhou e volta ao humano. A2 de uma run com --delegation fica fora de delegaveis. conflito-develop tem chave (demanda, tipo, PR): um pr-conflict novo não zera o contador. attemptKey/attempt ficam gravados no evento (§3.1). ADR-022 §4 está coerente. CA-10 (a-d) e CA-22 foram reescritos. UI §11 mostra 1/1 e 'Nova tentativa já usada — decisão sua'. As respostas q1, q2, q3a e q3b continuam como no ciclo 1."},
+    {"name": "Premissas técnicas batem com o código", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Confirmadas de novo: gitflow.py:58 STATE; log.py/gitflow.py resolvem a raiz pelo caminho do script (registrado como fato no ADR-022); run_agent.py gera um runId por execução (alerts.py:418 agent-stalled:<runId>). run_agent.py ainda não tem --delegation. Isso é implementação nova prevista no §8.2 (ver ressalva)."},
+    {"name": "Segurança", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Mantida em relação ao ciclo 1. §10 ganhou: log único, cópia principal intocada, review-update recusa push que toque docs/squad/memory/**."},
+    {"name": "Viabilidade da execução no worktree e memória", "status": "pass", "weight": 2, "blocking": true,
+     "source": "Contrato §8.3: log.py/gitflow.py sempre pelo caminho absoluto da cópia principal (ou SQUAD_LOG), com os caminhos prontos no delegacao.md e no plantao.md §D. O worktree não commita STATE. §9: os comandos novos usam cwd = worktree (--worktree) e nunca fazem switch/merge/commit na cópia principal. §9.4: review-update faz fetch + diff origin/develop...HEAD -- docs/squad/memory/; se o diff não for vazio → código 4, sem push, e a delegação termina falhou. A alternativa J do ADR justifica verificar em vez de realinhar. §9.2: merge --abort antes de falhou/cancelada. CA-29 (a-d) cobre o log da cópia principal, a cópia principal intacta, a recusa por STATE e o abort."},
+    {"name": "Coerência com ADR-011/017/018/020", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Nada regrediu: merge só humano, sem rebase/--force, mesmo PR, cópia principal em develop (ADR-018) reforçada no §9."},
+    {"name": "Critérios de aceite verificáveis", "status": "pass", "weight": 2, "blocking": false,
+     "source": "30 CAs. CA-1 exige ≥ 2 consultas do mergeable; CA-10/22 cobrem a chave estável; CA-29 usa repositório temporário com cópia principal + worktree; CA-30 cobre --refs no caso (a)."},
+    {"name": "Donos por arquivo (single-writer)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "docs/squad/gates.md entrou no §0 com o critério de G3. Falta tools/squad/run_agent.py no §0 (flag --delegation e o campo delegation no evento da run, que o alerts.py usa para excluir o A2). O dono é o mesmo (Orquestrador), então não há conflito de escrita."}
+  ],
+  "open_risks": [
+    "Incluir tools/squad/run_agent.py no §0: aceitar --delegation <id> e gravá-lo nos eventos da run (início/fim), para que alerts.py/conversa.py distingam a run delegada no A2. Sem isso o CA-10(d) não é implementável. Pode ser ajustado na implementação, sem novo ciclo de G1.",
+    "O STATE do gitflow.py:58 inclui docs/squad/inbox/, produto/bugs/ e operacao/bugs/, mas o review-update (§9.4) só verifica docs/squad/memory/. Recomendo verificar a tupla STATE inteira (é a mesma regra do align_memory). O CA-29(c) deve incluir um caso com docs/squad/inbox/.",
+    "O 'passo' do agente parado depende do handoff anterior ao início do run. Um run sem demand ou sem handoff cai em 'inicio', e duas runs de passos diferentes sem handoff intermediário compartilham a chave. É aceitável (é mais restritivo), mas o teste do CA-22 deve fixar esse caso.",
+    "As decisões provisórias do §17 (ajuste-pontual, latência ≈3 min, A6 de 30 min, chat pré-preenchido) seguem para o humano no PR. Nenhuma bloqueia."
+  ],
+  "resolved_from_cycle_1": [
+    "Bloqueante 1 (limite do caso c, chave estável, conflito por PR, run delegada não delegável, CA-10/CA-22): resolvido.",
+    "Bloqueante 2 (log/gitflow da cópia principal, cwd no worktree, sem switch na cópia principal, STATE fora do PR, review-update recusa, CA-29): resolvido. Ressalva: a verificação cobre só docs/squad/memory/, e não a tupla STATE inteira.",
+    "Ressalvas do ciclo 1: A2 some após STALLED_MAX_S (ADR Consequências + §2), --refs no caso (a) (CA-30), gates.md no §0, merge --abort, CA-1 com ≥ 2 consultas, padrões às perguntas (§17/ADR §7). Todas atendidas."
+  ],
+  "human_required": false,
+  "rationale": "Os dois bloqueantes do ciclo 1 foram corrigidos de forma verificável. O caso (c) agora realiza exatamente 'uma nova tentativa e depois volta ao humano', com chave independente do runId, e a run delegada não reabre o laço. O conflito é contado por PR. A delegação grava no log único da cópia principal, o git roda só no worktree e o review-update recusa o push que leve a memória ao PR, com o CA-29 para provar. Ficam ressalvas de implementação que não mudam o contrato: incluir run_agent.py no §0 e verificar a tupla STATE inteira. Confiança = (3+3+3+2+2+2+0.5)/16 ≈ 0,97, com desconto por dependerem de implementação ainda inexistente (run_agent --delegation, verificação de STATE parcial) → 0,88. Risco moderado: ferramental da squad com push em branch de PR. O produto não muda."
+}
