@@ -18,6 +18,8 @@ LOW_CONFIDENCE = 0.70      # abaixo: intervenção humana obrigatória (AGENTS.m
 MAX_AUTO_CYCLES = 2        # 3º RETURN escala para o humano
 DONE_RECENT_S = 15 * 60    # "Concluiu" por até 15 min
 INTERRUPTED_WINDOW_S = 3600
+# D19 (ADR-022 §7-iii): A6 — handoff sem continuidade há >= 30 min (ajustável)
+HANDOFF_STALLED_S = int(os.environ.get("SQUAD_HANDOFF_STALLED_S") or 1800)
 LIVE_TEXT = 160            # truncagem dos textos no /api/live
 
 ROLES = ["orquestrador", "arquiteto", "devops", "observabilidade", "backend", "frontend", "qa", "auditor"]
@@ -28,15 +30,19 @@ SEV_RANK = {"bloqueio": 0, "aviso": 1}
 KIND_RULE = {"cycle-limit": "B3", "human-required": "B2", "gate-return": "B1", "triage-open": "B4",
              "low-confidence": "A1", "agent-stalled": "A2", "pr-waiting": "A3",
              # D15 (ADR-018, contrato ambiente-de-teste §6)
-             "prod-update-failed": "B5", "test-env-failed": "A4", "test-env-divergent": "A5"}
+             "prod-update-failed": "B5", "test-env-failed": "A4", "test-env-divergent": "A5",
+             # D19 (ADR-022, contrato delegacao-pela-conversa §5)
+             "pr-conflict": "B6", "handoff-stalled": "A6", "change-request-open": "A7"}
 KIND_SEV = {"cycle-limit": "bloqueio", "human-required": "bloqueio", "gate-return": "bloqueio",
             "triage-open": "bloqueio", "low-confidence": "aviso", "agent-stalled": "aviso", "pr-waiting": "aviso",
-            "prod-update-failed": "bloqueio", "test-env-failed": "aviso", "test-env-divergent": "aviso"}
+            "prod-update-failed": "bloqueio", "test-env-failed": "aviso", "test-env-divergent": "aviso",
+            "pr-conflict": "bloqueio", "handoff-stalled": "aviso", "change-request-open": "aviso"}
 GATE_KIND_ORDER = ["cycle-limit", "human-required", "gate-return", "low-confidence"]
 
 
 def thresholds() -> dict:
     return {"stalledSeconds": STALLED_S, "stalledMaxSeconds": STALLED_MAX_S, "longToolSeconds": LONG_TOOL_S,
+            "handoffStalledSeconds": HANDOFF_STALLED_S,
             "waitWarnSeconds": WAIT_WARN_S,
             "lowConfidence": LOW_CONFIDENCE, "maxAutoCycles": MAX_AUTO_CYCLES}
 
@@ -129,6 +135,10 @@ class Rules:
         self.reviews: dict = {}          # demand -> [(idx, review)]
         self.pr_closed: set = set()      # (demand, pr)
         self.handoffs: list[tuple[int, dict]] = []
+        # D19: último pr-conflict/pr-conflict-cleared por (demanda, PR); change-requests e seus fechamentos
+        self.pr_conflict: dict[tuple, dict] = {}
+        self.change_requests: dict[str, dict] = {}
+        self.cr_closed: dict[str, dict] = {}
         self.open: dict[str, dict] = {}
         self.history: list[dict] = []
         self.gate_meta: dict[str, dict] = {}   # id do evento gate -> {cycle, returns}
@@ -272,6 +282,38 @@ class Rules:
                 "owner": "humano", "agent": "orquestrador",
                 "action": {"label": f"Revisar PR #{pr}", "href": href, "external": rv.get("url")},
                 "source": {"event": rv["id"], "file": None}}
+            # D19 — B6: último `pr-conflict` deste PR sem `pr-conflict-cleared` posterior (PR ainda em revisão)
+            c = self.pr_conflict.get((d, rv.get("pr")))
+            if c is not None and c.get("type") == "pr-conflict":
+                aid = f"pr-conflict:{c['id']}"
+                out[aid] = {
+                    "id": aid, "severity": "bloqueio", "kind": "pr-conflict", "kinds": ["pr-conflict"],
+                    "demand": d, "code": code, "gate": None, "pr": rv.get("pr"), "branch": rv.get("branch"),
+                    "rule": "B6 — `pr-conflict` do PR em revisão sem `pr-conflict-cleared` posterior (ADR-022)",
+                    "title": f"PR #{pr} em conflito com a develop", "detail": trunc(c.get("detail") or c.get("title"), 300),
+                    "owner": "humano", "agent": "orquestrador",
+                    "action": {"label": "Delegar correção", "href": delegate_href(href, aid), "external": None,
+                               "pedido": aid},
+                    "source": {"event": c["id"], "file": None}}
+        if d is not None and not hard_closed and not closed:
+            # D19 — A7: change-request com demanda aberta e `to` definido, sem `decision` com changeRequest = id
+            for crid, cr in self.change_requests.items():
+                if (cr.get("demand") or None) != d or crid in self.cr_closed:
+                    continue
+                to = _agent_of(cr.get("to"))
+                if not to:
+                    continue
+                code, href = self._where(d, None)
+                aid = f"change-request-open:{crid}"
+                out[aid] = {
+                    "id": aid, "severity": "aviso", "kind": "change-request-open", "kinds": ["change-request-open"],
+                    "demand": d, "code": code, "gate": None, "owner": "orquestrador", "agent": to,
+                    "rule": "A7 — change-request aberto em demanda ativa, sem `decision` com `changeRequest` (ADR-022)",
+                    "title": f"Change-request para {LABEL.get(to, to)} em aberto",
+                    "detail": trunc(cr.get("title"), 300),
+                    "action": {"label": "Delegar ao dono", "href": delegate_href(href, aid), "external": None,
+                               "pedido": aid},
+                    "source": {"event": crid, "file": None}}
         return out
 
     # ---------------- reprodução
@@ -299,6 +341,12 @@ class Rules:
                 self.delivered.add(d)
         elif t == "handoff":
             self.handoffs.append((i, e))
+        elif t in ("pr-conflict", "pr-conflict-cleared") and d:
+            self.pr_conflict[(d, e.get("pr"))] = e
+        elif t == "change-request" and e.get("id"):
+            self.change_requests[e["id"]] = e
+        elif t == "decision" and e.get("changeRequest"):
+            self.cr_closed.setdefault(e["changeRequest"], e)
 
     def _run(self):
         for i, e in enumerate(self.rows):
@@ -306,9 +354,12 @@ class Rules:
                 continue
             self._apply(i, e)
             if e.get("type") not in ("gate", "human", "validation", "clarification", "start", "control", "review",
-                                      "delivered", "review-rejected"):
+                                      "delivered", "review-rejected", "pr-conflict", "pr-conflict-cleared",
+                                      "change-request") and not (e.get("type") == "decision" and e.get("changeRequest")):
                 continue
             d = e.get("demand") or None
+            if e.get("type") == "decision" and e.get("changeRequest") in self.change_requests:
+                d = self.change_requests[e["changeRequest"]].get("demand") or None   # fecha o A7 da demanda do CR
             desired = self._eval_demand(d)
             for aid in [aid for aid, a in self.open.items() if a["demand"] == d and aid not in desired]:
                 a = self.open.pop(aid)
@@ -416,6 +467,8 @@ def stalled_alert(run, now, codes) -> dict | None:
     d = run.get("demand")
     base = {"id": f"agent-stalled:{run['id']}", "severity": "aviso", "kind": "agent-stalled", "kinds": ["agent-stalled"],
             "demand": d, "code": codes.get(d) if d else None, "gate": None, "agent": role, "runId": run["id"],
+            # D19: início e delegação da run (chave estável do agente parado; run delegada não é delegável)
+            "runStartedAt": run.get("started"), "delegation": run.get("delegation"),
             "action": {"label": "Ver integrante", "href": f"#/squad?agente={role}", "external": None},
             "source": {"event": None, "run": run["id"], "file": None}}
     if run.get("status") == "interrompido" and age < INTERRUPTED_WINDOW_S:
@@ -671,3 +724,113 @@ def env_alerts(rows: list[dict], test_env: dict | None, codes: dict | None = Non
                     "action": {"label": "Republicar", "href": href, "external": None},
                     "openedAt": te.get("publishedAt"), "source": {"event": None, "file": None}})
     return out
+
+
+# =============================================================== D19: A6, delegações (ADR-022, contrato §3.4, §5)
+def delegate_href(href: str, aid: str) -> str:
+    """Ação dos alertas delegáveis: abre a conversa nova com o pedido pré-preenchido (sem enviar)."""
+    return f"{href}?conversa=nova&pedido={aid}"
+
+
+def paused_demands(rows: list[dict]) -> set:
+    last = {}
+    for e in rows:
+        if e.get("type") == "control" and e.get("demand") and e.get("action") in ("pause", "resume"):
+            last[e["demand"]] = e["action"]
+    return {d for d, a in last.items() if a == "pause"}
+
+
+def handoff_alerts(rows: list[dict], rules: Rules, runs: list[dict], now: float) -> list[dict]:
+    """A6: último `handoff` (com `to` e `demand`) de cada (demanda, to) sem evento do `to` na demanda depois dele,
+    há >= HANDOFF_STALLED_S, sem run aberta do `to` na demanda, demanda aberta e não pausada. Reavaliado com o relógio
+    (como o A2), só a partir do log e das runs."""
+    paused = paused_demands(rows)
+    last: dict[tuple, tuple[int, dict]] = {}
+    for i, e in enumerate(rows):
+        if not isinstance(e, dict) or e.get("type") != "handoff" or not e.get("demand"):
+            continue
+        to = _agent_of(e.get("to"))
+        if to and to != e.get("agent"):
+            last[(e["demand"], to)] = (i, e)
+    out = []
+    for (d, to), (i, h) in last.items():
+        if rules._closed(d) or d in paused or d not in rules.codes:
+            continue
+        if any(x.get("agent") == to and (x.get("demand") or None) == d for x in rows[i + 1:] if isinstance(x, dict)):
+            continue
+        t = ts_epoch(h.get("ts"))
+        if t is None or now - t < HANDOFF_STALLED_S:
+            continue
+        if any(r.get("agent") == to and r.get("demand") == d and r.get("_open")
+               and (_run_age(r, now) or 0) < STALLED_MAX_S for r in runs):
+            continue
+        code, href = rules._where(d, None)
+        aid = f"handoff-stalled:{h['id']}"
+        mins = int((now - t) // 60)
+        out.append({"id": aid, "severity": "aviso", "kind": "handoff-stalled", "kinds": ["handoff-stalled"],
+                    "demand": d, "code": code, "gate": None, "owner": "orquestrador", "agent": to,
+                    "to": to, "from": h.get("agent"),
+                    "rule": f"A6 — handoff para {LABEL.get(to, to)} sem continuidade há {mins} min "
+                            f"(limite {HANDOFF_STALLED_S // 60} min, SQUAD_HANDOFF_STALLED_S)",
+                    "title": f"Handoff para {LABEL.get(to, to)} sem continuidade há {mins} min",
+                    "detail": trunc(h.get("title"), 300),
+                    "action": {"label": "Delegar continuidade", "href": delegate_href(href, aid), "external": None,
+                               "pedido": aid},
+                    "openedAt": iso(t + HANDOFF_STALLED_S), "source": {"event": h["id"], "file": None}})
+    return out
+
+
+DELEGATION_DONE = {"ok": "concluida", "falhou": "falhou", "obsoleta": "obsoleta", "recusada": "recusada",
+                   "cancelada": "cancelada"}
+
+
+def delegations_of(rows: list[dict], demand: str | None = None) -> list[dict]:
+    """Estado derivado de cada `delegation` (§3.4): pedida → em-execucao → aguardando-gate → concluida/falhou/…
+    Mais antiga primeiro; `events` = eventos com `delegation` = id."""
+    out, by_id = [], {}
+    for e in rows:
+        if not isinstance(e, dict):
+            continue
+        if e.get("type") == "delegation" and e.get("id") and (demand is None or e.get("demand") == demand):
+            item = {"id": e["id"], "ts": e.get("ts"), "demand": e.get("demand"), "category": e.get("category"),
+                    "target": e.get("target"), "owner": e.get("owner"), "risk": e.get("risk"),
+                    "attempt": e.get("attempt"), "attemptKey": e.get("attemptKey"), "title": e.get("title"),
+                    "task": e.get("detail"), "pr": e.get("pr"), "branch": e.get("branch"), "run": e.get("run"),
+                    "via": e.get("via"), "proposal": e.get("proposal"), "state": "pedida", "startedAt": None,
+                    "endedAt": None, "result": None, "events": [], "_pendingGate": False}
+            by_id[e["id"]] = item
+            out.append(item)
+            continue
+        item = by_id.get(e.get("delegation"))
+        if item is None:
+            continue
+        item["events"].append({"id": e.get("id"), "ts": e.get("ts"), "agent": e.get("agent"), "type": e.get("type"),
+                               "title": trunc(e.get("title"))})
+        t = e.get("type")
+        if item["result"] is not None:
+            continue
+        if t == "delegation-start":
+            item["startedAt"] = item["startedAt"] or e.get("ts")
+            item["state"] = "em-execucao"
+        elif t == "delegation-result":
+            item["endedAt"] = e.get("ts")
+            item["result"] = {"status": e.get("status"), "detail": e.get("detail"), "pr": e.get("pr"),
+                              "sha": e.get("sha")}
+            item["state"] = DELEGATION_DONE.get(e.get("status"), "falhou")
+        elif t == "handoff" and e.get("to") == "auditor":
+            item["_pendingGate"] = True
+            if item["state"] in ("em-execucao", "pedida"):
+                item["state"] = "aguardando-gate"
+        elif t == "gate":
+            item["_pendingGate"] = False
+            if item["state"] == "aguardando-gate":
+                item["state"] = "em-execucao"
+    for item in out:
+        item.pop("_pendingGate", None)
+    return out
+
+
+def active_delegation(rows: list[dict], demand: str) -> dict | None:
+    """Delegação ativa da demanda (sem `delegation-result`): no máximo uma (§2)."""
+    act = [x for x in delegations_of(rows, demand) if x["result"] is None]
+    return act[-1] if act else None

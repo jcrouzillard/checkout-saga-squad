@@ -1,0 +1,86 @@
+{
+  "gate": "G3",
+  "demand": "402e76f187f9",
+  "from": "qa",
+  "to": "orquestrador",
+  "cycle": 1,
+  "handoff": ["f937ee4c3ab4"],
+  "defects": ["3ec99c932151"],
+  "diff": "93e652c..034ef84 (a3be501 correção da ressalva 1 do G2; 034ef84 testes do QA)",
+  "recommendation": "APPROVE",
+  "confidence": 0.86,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "tests/squad/test_delegacao_d19.py — 27/27, checagem real do log (6 arquivos, 67 ids de teste ausentes)",
+      "status": "pass",
+      "source": "SQUAD_CHAT_RUNNER=fake python3 tests/squad/test_delegacao_d19.py (rodado pelo Auditor), rc=0"
+    },
+    {
+      "name": "tests/squad/e2e_delegacao_d19.py — CA-1 simulado 22/22 [ok], 0 falhas: UNKNOWN→CONFLICTING, B6, pedido, cartão, delegation, --delegation-check 0, demand-worktree, feature-sync, G3 --delegation, review-update no mesmo PR, delegation-result ok, B6 fecha, 1 PR e nenhum 'gh pr merge'/'pr create'",
+      "status": "pass",
+      "source": "SQUAD_CHAT_RUNNER=fake python3 tests/squad/e2e_delegacao_d19.py (rodado pelo Auditor), rc=0"
+    },
+    {
+      "name": "Não regressão, uma a uma: alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 38, conversa_d17 44, e2e_compose_seguro_d15 11, entrega_por_pr (todas as verificações), governanca_d14_qa 19",
+      "status": "pass",
+      "source": "scratchpad g3-d19/*.log; todas rc=0"
+    },
+    {
+      "name": "Ressalva 1 do G2 corrigida (a3be501): merge sem MERGE_HEAD só é 'nada a integrar' se origin/develop for ancestral de HEAD; senão sai ≠ 0 com o stderr do git",
+      "status": "pass",
+      "source": "git show a3be501; H_Gitflow.test_ressalva1_* FALHA em a3be501^ (worktree temporário destacado, 'AssertionError: 0 == 0 ... nada a integrar') e PASSA no head; test_nada_a_integrar_continua_zero passa nos dois"
+    },
+    {
+      "name": "Ressalvas do G2 para o QA cobertas: CA-10(d)/CA-22 pela via HTTP (test_ca10d_ca22), asserção real do log (sem 'or True'), A6 entre G3 e PR fixado como desvio aceito (test_a6_entre_g3_approve_e_pr_desvio_aceito)",
+      "status": "pass",
+      "source": "tests/squad/test_delegacao_d19.py:171, 663, 763, 880"
+    },
+    {
+      "name": "UI D19 no navegador — 39/39 checks ok, 0 erros; capturas 1440/390 claro/escuro",
+      "status": "pass",
+      "source": "tests/ui/d19-delegacao-result.json, tests/ui/d19-*.png (artefato do QA; não re-executado pelo Auditor para não subir servidor)"
+    },
+    {
+      "name": "Log real e cópia principal intocados pelas execuções do Auditor (570→572 linhas: os 2 eventos novos são handoffs da D20 de outros agentes; cópia principal em develop)",
+      "status": "pass",
+      "source": "wc/tail do decisions.jsonl da cópia principal; git rev-parse --abbrev-ref HEAD"
+    },
+    {
+      "name": "Memória fora do PR: branch traz docs/squad/memory/handoffs/10-orquestrador-d19-servidor-para-auditor.md (só na branch; align_memory não remove arquivos exclusivos da branch)",
+      "status": "validate",
+      "source": "git diff --name-only origin/develop...HEAD -- docs/squad/memory/ ..."
+    },
+    {
+      "name": "CA-1 com PR real no GitHub",
+      "status": "validate",
+      "source": "checklist-delegacao-d19.md linha 30 — fica com o humano"
+    },
+    {
+      "name": "CA-19/CA-20 executados pelo plantão real",
+      "status": "validate",
+      "source": "checklist-delegacao-d19.md linhas 48-49 — só verificados nos prompts e no e2e"
+    }
+  ],
+  "defect_assessment": "3ec99c932151 (baixo): A6 não abre para handoff parado entre o G3 APPROVE e a abertura do PR. É o desvio 3 aceito com ressalva no G2, reproduzido e fixado em teste; a janela é curta e coberta pelo plantão (que abre o PR logo após o G3). Não bloqueia → backlog do Orquestrador (alerts.py: usar 'task sem cancel e sem delivered' do contrato §1/§5 para A6/A7, filtrando demandas antigas por outro critério).",
+  "open_risks": [
+    "Handoff 10-orquestrador-d19-servidor-para-auditor.md vai entrar no PR: antes do feature-finish, o Orquestrador deve levá-lo para a develop (cópia principal) e retirá-lo da branch, ou o humano aceita o arquivo no PR. Pré-existente ao D19 (align_memory só faz checkout da develop, não apaga arquivos só da branch) → backlog.",
+    "CA-1 com PR real e CA-19/CA-20 com plantão real não executados (limite do ambiente: sem push/PR/claude reais).",
+    "Autenticidade do `delegation` segue por convenção (contrato §14); custo do validador por alerta a cada /api/live com log grande.",
+    "Decisões provisórias do §17 do contrato e o change-request do /api/live (delegations só no /api/state) seguem para o humano no PR."
+  ],
+  "backlog": [
+    "Defeito 3ec99c932151 — A6/A7 pelo critério de demanda aberta do contrato (dono: orquestrador).",
+    "align_memory/feature-finish: remover da branch arquivos de STATE que só existem nela (ou importá-los para a develop), para o PR nunca levar memória.",
+    "Teste automatizado com plantão real (CA-19/CA-20) quando houver runner de teste para o `claude`."
+  ],
+  "human_must_check_in_pr": [
+    "CA-1 real: provocar conflito num PR de teste, delegar pela conversa, confirmar o cartão e ver o mesmo PR atualizado por merge (sem --force, sem PR novo), B6 fechar e nenhum merge feito pela squad.",
+    "CA-19/CA-20 no plantão real: delegação que muda código passa pelo QA antes do G3; delegação 'ambiente-teste' não grava test-env-* e prod-fingerprint fica igual.",
+    "Arquivo de memória no diff do PR (handoff 10) — aceitar ou pedir a remoção.",
+    "Decisões provisórias do §17 do contrato e o desvio do /api/live.",
+    "Capturas tests/ui/d19-*.png (cartão, seção Delegações, 390/1440, claro/escuro)."
+  ],
+  "human_required": false,
+  "rationale": "Todas as suítes de tests/squad/ e o e2e do CA-1 simulado passam quando rodados pelo Auditor com SQUAD_CHAT_RUNNER=fake, sem tocar o log real. A correção a3be501 está correta e mínima (merge-base --is-ancestor antes de declarar 'nada a integrar') e o teste do QA prova que ela é necessária: falha no commit anterior e passa no head. As ressalvas do G2 destinadas ao QA foram cobertas. O defeito baixo é um desvio já aceito e fixado em teste; vira backlog. Os itens 'validar' (PR real, plantão real, handoff no diff do PR) dependem de ambiente real ou de decisão do humano no PR, não de correção de código. Confiança = suíte D19 (B,3) + e2e CA-1 simulado (B,3) + não regressão (2) + ressalva 1 provada (2) + UI (2) + log intacto (1) + memória fora do PR (1, validar 0,5) + CA-1 real (1, validar 0,5) + CA-19/20 (1, validar 0,5) = 14,5/16 ≈ 0,91, descontada para 0,86 porque a UI não foi re-executada pelo Auditor e três itens ficam para o humano. Risco moderado: ferramental da squad que faz push em branch de PR; produto inalterado."
+}

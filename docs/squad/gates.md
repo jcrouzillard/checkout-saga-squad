@@ -33,5 +33,17 @@ Peso entre parênteses. **B** = bloqueante (falhou → `RETURN`).
   commit do teste antes do commit de correção; o teste **falha** no commit dele (rodado num `git worktree`
   temporário, sem trocar a branch) e **passa** no *head*. Sem isso → `RETURN`. Não se aplica a demandas comuns.
 
+## G3 · Delegação pela conversa (D19, ADR-022)
+Vale para o gate do estágio avaliado durante uma delegação (G3 quando a demanda já tem PR em revisão).
+- (B, 3) Parecer gravado com `--delegation <id>` (é o que libera o `gitflow.py review-update`); o diff avaliado é o da
+  branch da demanda contra a `origin/develop` desde o `delegation-start`.
+- (B, 3) Escopo: a mudança atende **só** a tarefa confirmada pelo humano, dentro da demanda. Em `ajuste-pontual`, o
+  que for escopo novo → `RETURN` (a delegação termina `recusada`: "vira demanda nova, decisão do humano").
+- (B, 2) QA obrigatório (`handoff` do QA com `--delegation`) se algum arquivo fora de `docs/**` mudou.
+- (B, 2) Memória fora do PR: `git diff --name-only origin/develop...HEAD -- docs/squad/memory/ docs/squad/inbox/
+  docs/squad/produto/bugs/ docs/squad/operacao/bugs/` vazio.
+- (B, 2) Conflito com a develop resolvido por **merge** (histórico anterior do PR preservado; sem rebase nem `--force`),
+  preservando as duas intenções; nenhum merge de PR, `test-env-*` ou `control` feito pela squad.
+
 ## Cálculo de confiança
 `confiança = Σ pesos cumpridos com evidência / Σ pesos`. Critérios "validar" (evidência parcial) contam 50%.
