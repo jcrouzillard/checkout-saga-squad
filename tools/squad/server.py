@@ -9,7 +9,8 @@
                       o Orquestrador lê esse evento antes de avançar o gate.
 
 Uso: python3 tools/squad/server.py [--port 7070]   (ou $SQUAD_PORT)
-Transcrições: $SQUAD_TRANSCRIPTS ou ~/.claude/projects/<repo-slug>/*/subagents/*.jsonl
+Transcrições: $SQUAD_TRANSCRIPTS (exclusivo) ou ~/.claude/projects/<slug>/ da raiz de dados, da cópia principal e de cada
+worktree (D23, F2a §6: product.transcript_dirs, cache 30 s); runs novas trazem o caminho exato em `transcript`.
 Dados (log, gates, handoffs, .squad/runs): $SQUAD_ROOT_DATA (padrão: raiz deste repositório); log: $SQUAD_LOG.
 Modelo por agente (D9, ADR-012): runs[] e log[] trazem model/modelProvider (e modelSource nos eventos).
 """
@@ -37,15 +38,18 @@ import evidence_rules as er  # noqa: E402  (D16: regras únicas de evidência, m
 import instance as inst  # noqa: E402  (D18, ADR-021: ambiente e versão do próprio Squad Control)
 import conversa as cv  # noqa: E402  (D17, ADR-020: conversa direta com o Orquestrador)
 import publication as pub  # noqa: E402  (D24, ADR-025: publicação do Squad Control pelo supervisor)
+import product  # noqa: E402  (D23, F2a: resolvedor de produto, códigos congelados, transcrições)
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+# D23 (F2a §2): caminhos pelo resolvedor; os nomes do módulo continuam como apelidos do resolvido.
 # Dados podem vir de outra cópia do repositório (ex.: validar um worktree com o log/runs da cópia principal).
-DATA_ROOT = pathlib.Path(os.environ.get("SQUAD_ROOT_DATA") or ROOT).resolve()
-LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or DATA_ROOT / "docs/squad/memory/decisions.jsonl")
-GATES_DIR = DATA_ROOT / "docs/squad/gates"
-HANDOFFS_DIR = DATA_ROOT / "docs/squad/memory/handoffs"
-RUNS_DIR = DATA_ROOT / ".squad/runs"
+PRODUCT = product.resolve()
+ROOT = PRODUCT.platform_root
+DATA_ROOT = PRODUCT.data_root
+LOG = PRODUCT.log
+GATES_DIR = PRODUCT.gates_dir
+HANDOFFS_DIR = PRODUCT.handoffs_dir
+RUNS_DIR = PRODUCT.runs_dir
 UI_DIR = ROOT / "squad-control"
 INSTANCE = None   # D18: inst.Instance criada em main() (ou na 1ª consulta, com a porta do servidor)
 
@@ -64,11 +68,13 @@ LOCK = threading.RLock()   # o estado incremental das transcrições é comparti
 
 
 def transcripts_root() -> pathlib.Path:
-    env = os.environ.get("SQUAD_TRANSCRIPTS")
-    if env:
-        return pathlib.Path(env)
-    slug = re.sub(r"[^A-Za-z0-9]", "-", str(DATA_ROOT))
-    return pathlib.Path.home() / ".claude/projects" / slug
+    """Pasta de transcrições do DATA_ROOT (compatibilidade; a varredura usa transcript_dirs())."""
+    return product.transcript_dir_for(DATA_ROOT)
+
+
+def transcript_dirs() -> list[pathlib.Path]:
+    """D23 (F2a §6): $SQUAD_TRANSCRIPTS (exclusivo) ou as pastas do DATA_ROOT, da cópia principal e dos worktrees."""
+    return product.transcript_dirs(PRODUCT)
 
 
 # ---------- Modelo por agente (D9, ADR-012, docs/contracts/ui-modelo-por-agente.md) ----------
@@ -388,11 +394,11 @@ def run_from_state(st, agent: str | None = None, orchestrator=False, completed: 
 
 
 def collect_runs(now: float | None = None) -> list[dict]:
-    base = transcripts_root()
+    bases = transcript_dirs()
     runs = []
     with LOCK:
-        mains = sorted(base.glob("*.jsonl"))
-        subs = sorted(base.glob("*/subagents/agent-*.jsonl"))
+        mains = [p for base in bases for p in sorted(base.glob("*.jsonl"))]
+        subs = [p for base in bases for p in sorted(base.glob("*/subagents/agent-*.jsonl"))]
         store().prune({str(p) for p in mains + subs})
         completed, notified = set(), {}
         for m in mains:
@@ -405,7 +411,7 @@ def collect_runs(now: float | None = None) -> list[dict]:
         runs.extend(collect_external_runs(now))
         # Sessão principal = Orquestrador (todas as ferramentas; só sessões que delegaram)
         for path in mains:
-            if (base / path.stem / "subagents").exists():
+            if (path.parent / path.stem / "subagents").exists():
                 st = store().get(path)
                 if st.agent_tool_count:
                     run = run_from_state(st, agent="orquestrador", orchestrator=True, now=now)
@@ -485,12 +491,14 @@ def collect_external_runs(now: float | None = None) -> list[dict]:
                 hint = head.get("provider") or hint
         elif runner == "claude":
             tpath = None
-            if meta.get("sessionId"):
-                tpath = transcripts_root() / f"{meta['sessionId']}.jsonl"
-            else:
+            if meta.get("transcript"):      # D23 (F2a §6): caminho exato gravado pelo run_agent
+                tpath = pathlib.Path(meta["transcript"])
+            if (tpath is None or not tpath.exists()) and meta.get("sessionId"):
+                tpath = product.find_transcript(meta["sessionId"], PRODUCT)
+            elif tpath is None:
                 if top_level is None:
                     top_level = {}
-                    for t in transcripts_root().glob("*.jsonl"):
+                    for t in [f for base in transcript_dirs() for f in base.glob("*.jsonl")]:
                         m = re.search(r"--run (\S+?-[0-9a-f]{6})\b", scan_transcript(t)["first_prompt"])
                         if m:
                             top_level[m.group(1)] = t
@@ -779,8 +787,7 @@ def enrich_log(rows: list[dict], runs: list[dict]) -> list[dict]:
     Ordem: gravado no evento > run do evento > chamada a log.py numa transcrição (agente + título, ±120 s) > none."""
     by_run = {r["id"]: r for r in runs if r.get("model")}
     calls: dict[tuple[str, str], list[tuple[float, str]]] = {}
-    base = transcripts_root()
-    for path in list(base.glob("*.jsonl")) + list(base.glob("*/subagents/agent-*.jsonl")):
+    for path in [p for base in transcript_dirs() for p in [*base.glob("*.jsonl"), *base.glob("*/subagents/agent-*.jsonl")]]:
         for c in scan_transcript(path)["calls"]:
             t = _ts(c["ts"])
             if t is not None:
@@ -847,7 +854,7 @@ def collect_gates() -> list[dict]:
 
 def github_issues() -> dict:
     """id do evento -> {number, url} das issues criadas pelo github_sync (para links no painel)."""
-    st = DATA_ROOT / "docs/squad/memory/github-sync.json"
+    st = LOG.parent / "github-sync.json"   # D23 (F2a §5.2): companheiro do log (= memory_dir)
     try:
         data = json.loads(st.read_text(encoding="utf-8"))
         return {k: {"number": v["number"], "url": v["url"], "closed": v.get("closed", False)}
@@ -1059,6 +1066,11 @@ def _write_log_line(entry: dict):
 def append_log(entry: dict) -> dict:
     entry = {"id": uuid.uuid4().hex[:12], "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **entry}
     entry = {k: v for k, v in entry.items() if v not in (None, "")}
+    if entry.get("type") == "task" and entry.get("agent") == "humano":
+        # D23 (F2a §4.2): única gravação de `task` do humano — código sob trava entre processos (product.LockTimeout
+        # → 503 nas rotas); LOG_WRITE_LOCK segue valendo entre as threads.
+        with LOG_WRITE_LOCK:
+            return product.append_task(entry, PRODUCT.with_log(LOG))
     _write_log_line(entry)
     return entry
 
@@ -1533,16 +1545,23 @@ class Handler(SimpleHTTPRequestHandler):
                        "source": meta.get("source"), "dir": f"docs/squad/{kind}/bugs/{demand}",
                        "evidences": meta["evidences"], "consent": consent,
                        "extracted": meta.get("extracted"), "warnings": meta.get("warnings") or []}
+                mark = store.mark(kind)
                 store.put_bug(kind, demand, doc, blobs)
-                entry = self._append_log({"id": demand, "agent": "humano", "type": "task", "to": "orquestrador",
-                                          "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
-                                          "priority": data.get("priority", "normal"), "kind": kind,
-                                          "backlog": True if when == "backlog" else None,
-                                          "nature": "bug", "bug": self._bug_task_meta(doc)})
+                try:
+                    entry = self._append_log({"id": demand, "agent": "humano", "type": "task", "to": "orquestrador",
+                                              "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
+                                              "priority": data.get("priority", "normal"), "kind": kind,
+                                              "backlog": True if when == "backlog" else None,
+                                              "nature": "bug", "bug": self._bug_task_meta(doc)})
+                except BaseException:   # QA-D23-2: task não gravado → nada fica gravado (pasta e índice revertidos)
+                    store.discard_bug(kind, demand, mark)
+                    raise
                 import shutil
                 shutil.rmtree(d, ignore_errors=True)
         except er.EvidenceError as e:
             return self._bug_err(e)
+        except product.LockTimeout as e:   # D23 (F2a §4.2): task não gravado; o rascunho continua na prévia
+            return self._json({"error": str(e), "code": "trava_de_codigos"}, 503)
         return self._json(entry, 201)
 
     def _bug_evidence(self, data: dict):
@@ -1640,10 +1659,13 @@ class Handler(SimpleHTTPRequestHandler):
             extra = compute(full=True)
             runs, rules = extra.pop("_runs"), extra.pop("_rules")
             log = enrich_log(read_log(), runs)
+            codes = al.demand_codes(read_log())   # D23 (F2a §4.6): código resolvido de cada demanda
             for e in log:   # só na resposta: ciclo e devoluções por gate (o log segue append-only)
                 if e.get("type") == "gate" and e.get("id") in rules.gate_meta:
                     for k, v in rules.gate_meta[e["id"]].items():
                         e.setdefault(k, v)
+                elif e.get("type") == "task" and e.get("agent") == "humano" and e.get("id") in codes:
+                    e["code"] = codes[e["id"]]
             return self._json({
                 "now": extra["now"],
                 "log": log,
@@ -1659,6 +1681,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "testEnv": extra["testEnv"],   # D15 — acréscimo (formato de GET /api/test-env)
                 "instance": self._instance(),  # D18 — acréscimo (formato de GET /api/instance)
                 "delegations": extra["delegations"],   # D19 — acréscimo: delegação ativa por demanda
+                "codes": codes,   # D23 — acréscimo: id → código (congelado > gravado > posicional)
             })
         if self.path.startswith("/api/instance"):
             return self._json(self._instance())
@@ -1897,10 +1920,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"error": "objeto bug exige nature: bug", "code": "bug_sem_natureza"}, 400)
             if nature == "bug":
                 return self._create_bug(data, title, when)
-            entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
-                                      "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
-                                      "priority": data.get("priority", "normal"), "kind": data.get("kind"),
-                                      "backlog": True if when == "backlog" else None})
+            try:
+                entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
+                                          "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
+                                          "priority": data.get("priority", "normal"), "kind": data.get("kind"),
+                                          "backlog": True if when == "backlog" else None})
+            except product.LockTimeout as e:   # D23 (F2a §4.2): nada gravado
+                return self._json({"error": str(e), "code": "trava_de_codigos"}, 503)
             return self._json(entry, 201)
         if not self.path.startswith("/api/human"):
             return self._json({"error": "not found"}, 404)

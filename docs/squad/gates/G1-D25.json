@@ -1,0 +1,123 @@
+{
+  "gate": "G1",
+  "cycle": 1,
+  "demand": "233278d0cfa9",
+  "code": "D25",
+  "phase": "revisão do ADR-024 (ADR-026, antes da F3)",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "handoff": "46d0e2ec4ba3",
+  "commit": "82a7212",
+  "recommendation": "APPROVE",
+  "confidence": 0.85,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) Os 3 pontos com decisão, alternativas e impacto em F3–F5",
+      "status": "pass",
+      "source": "ADR-026 §3.1 (13 critérios A×B, com esforço F3/F4/F5), §3.2 e §3.3 (alternativas: A, B sem renomear, B reutilizando o nome proibido, monorepo); §4 decisão + §4.7 (driver) e §4.11 (backend) + §6 F3a/F3b; §5.1, §5.3 (4 alternativas) + §6 F3c e a tag antes da F4. O impacto em F5 dos pontos 2 e 3 é implícito (um esquema, um papel e uma variável por produto: H4, H7 e o risco 'leitura por outro produto')"
+    },
+    {
+      "name": "(B,3) Critérios verificáveis da sincronização: offline, sem duplicar, conflito, integridade, máquina nova",
+      "status": "pass",
+      "source": "ADR-026 §4.12 S1–S9, cada um com o jeito de verificar: S1 offline (host inalcançável, 50 eventos, p95 ≤ 300 ms), S2 sem duplicar (3 pushes + SIGKILL entre COMMIT e acked), S3 duas máquinas, S4 conflito (G2 aprovado × devolvido, feature-finish recusa, nenhuma resolução automática), S5 integridade (UPDATE/DELETE/TRUNCATE negados, verify aponta o id, colisão recusada), S6 máquina nova (init + push --all), S7 segredo, S8 máscara, S9 legado. S1–S8 entram no aceite da F3b"
+    },
+    {
+      "name": "(B,2) Itens do desafio §14 com onde cada um fica depois da separação",
+      "status": "pass",
+      "source": "docs/desafio.md:208 lista 6 categorias (código-fonte, infraestrutura, arquitetura, agentes de IA, evidências, documento técnico); ADR-026 §5.2 cobre as 6 (evidências em 3 linhas) + histórico git, PRs, issues e Project, nas colunas checkout-saga / squad-platform / Neon-local"
+    },
+    {
+      "name": "(B,2) Conflitos de sentido nunca resolvidos pela sincronização",
+      "status": "pass",
+      "source": "ADR-026 §4.3: tabela de sentido (gate, estado da demanda, handoff, pedidos de ambiente, código), os dois eventos guardados, alerta sync-conflict, demanda bloqueada no gitflow e no plantão até o conflict-resolved do humano; divergências mecânicas (github-sync.json derivado, união de campos no inbox, campo diferente vira conflito) declaradas; S4 exige 'não existe evento de resolução automática'"
+    },
+    {
+      "name": "(B,2) Segredo só no servidor e no gravador; limite com agentes que têm Bash (Q-B4)",
+      "status": "validate",
+      "source": "ADR-026 §4.1/§4.6: gravadores dos agentes só escrevem no cache (sem rede e sem segredo), só o sincronizador do server.py fala com o Neon, leitor próprio do .env sem os.environ, lista de permissão no ambiente dos filhos, filtro de mensagens, papel só SELECT/INSERT, limite declarado (Q-B4). Nenhuma string de conexão no commit (grep postgres://, neon.tech, npg_ = vazio). LACUNAS: (1) server.py:1660-1670 (/api/project) já lê o .env da raiz e substitui QUALQUER {{VAR}} de project.json na resposta: um {{SQUAD_MEMORY_URL_CHECKOUT_SAGA}} num project.json (arquivo editável por agentes) devolveria o segredo pela API; (2) run_agent.py:150/227 repassa os.environ inteiro aos filhos hoje (a lista de permissão do §4.6 é mudança, precisa estar no contrato F3b); (3) o CLI 'squad memory sync' lê o .env e um agente com Bash pode executá-lo; (4) até a F4 o .env da cópia principal é o mesmo que o docker compose do produtivo lê para interpolação"
+    },
+    {
+      "name": "(2) Integridade: log só de inclusão com trava, hash encadeado, verificação",
+      "status": "pass",
+      "source": "ADR-026 §4.2.2 (machine, mseq, prev, hash sobre JSON canônico), §4.4 (GRANT só SELECT/INSERT/USAGE, papel não dono, gatilho BEFORE UPDATE OR DELETE, sync_runs só inclusão, setup pelo humano com getpass), verify (a)–(e) em cada pull e a cada 24 h, legado verificado pelo sha256 do evento migration; gravação local com flock (§4.1). Observação: o resumo global 'na ordem de chegada' exige que o cache guarde o arrival_seq de cada id (inclusive os próprios, que voltam pelo pull); o ADR só cita cursor e acked"
+    },
+    {
+      "name": "(2) Coerência com a D23 (codes.json congelado, product.append_task sob flock)",
+      "status": "validate",
+      "source": "D23 (feature/D23-f2a-resolvedor-de-produto): product.py:320-345 grava o code = max+1 dentro do próprio evento task, sob fcntl.flock(codes.lock), e recusa entry que já traz code; chamado por server.py:1071 e por log.py:168. O ADR-026 §4.2.9 (reserva no Neon com UNIQUE, código provisório 'D?' offline, feature-start exige confirmado) não diz: (a) como a reserva de rede convive com a trava local e o LOCK_TIMEOUT_S de 5 s (connect_timeout 10 s); (b) como o código confirmado é registrado se o task é só de inclusão (evento novo code-assigned?); (c) que o log.py:168 (caminho dos agentes, sem rede pelo §4.1) sempre gera provisório; (d) que a reserva na requisição do servidor contraria 'só o sincronizador fala com o Neon'. codes.json D1–D24 congelado citado corretamente (§1)"
+    },
+    {
+      "name": "(2) Coerência com ADR-011/017/018/019/020/023/024/025",
+      "status": "pass",
+      "source": "011: F4 é demanda com PR e merge humano; renomear e criar repositório ficam para o humano (Q-A1/Q-A2). 017: memory ≤ 200 B no /api/live, lido de status.json sem rede; sync-conflict como tipo de alerta. 018: mudança do Compose com o mesmo nome de projeto, sem down/-v, janela do humano, prod-fingerprint antes/depois; teste de integração com -p squad-memtest. 019: máscara reaplicada e recusa no envio (S8). 020/023: conversas, anexos e runs nunca vão ao Neon (§4.9). 024: só avisos de substituição no cabeçalho e nos títulos §4.1, §4.3, §6 e §7, texto aprovado no G1-D22 preservado. 025: publicador, 7070 e plankton-squad-prev ficam onde estão no sentido B (conferido em docs/adr/025-publicacao-do-squad-control.md da D24: ls-remote origin, cópia principal, flock)"
+    },
+    {
+      "name": "(2) Fatos citados",
+      "status": "validate",
+      "source": "gh (só leitura) em 2026-09-25: repositório jcrouzillard/checkout-saga-squad, público, padrão develop; 24 PRs integrados na develop = exatamente a lista do §1 (#30…#203, com #85 e #95); Project nº 1 é do usuário (owner type=User, 'Checkout Saga · Squad Agêntica'; github_sync.py:63-105 usa --owner); log.py:116 uuid4().hex[:12] confirmado. DIVERGE: o ADR diz '173 issues' (§3.1, §5.2) e hoje há 189 issues (gh issue list --state all) e 189 itens no Project; o pedido do humano falava em '14 PRs' e o ADR usa 24 (correto) sem registrar a correção. Redirecionamento após renomear e a regra de não reutilizar o nome estão certos e marcados 'a confirmar' (a doc do GitHub diz que criar um repositório com o nome antigo quebra os redirecionamentos; referências em GitHub Actions 'uses:' não são redirecionadas)"
+    },
+    {
+      "name": "(1) Exceção à stdlib restrita a um módulo",
+      "status": "pass",
+      "source": "ADR-026 §4.7: psycopg[binary] 3 com versão fixa num venv, importado só por memory_neon.py e só com backend neon; sem driver o status mostra 'driver ausente' e o cache segue; tests/squad roda sem o driver com backend falso; alternativas HTTP/Data API/protocolo próprio rejeitadas com motivo; H3 no mapa"
+    },
+    {
+      "name": "(1) Limites do Neon marcados 'a confirmar' com a forma de confirmar",
+      "status": "pass",
+      "source": "ADR-026 §4.8: 4 limites (armazenamento, CU-h, hibernação, janela de restauração) com 'como confirmar' (console Usage/Billing, pg_database_size em sync_runs, latência no sync.log, History retention); conduta no limite (alertas 70/90%, nada se perde, época nova com epoch-sealed, nunca apagar)"
+    },
+    {
+      "name": "(1) Plano F3a/F3b/F3c/F4 com critérios e dependências",
+      "status": "validate",
+      "source": "ADR-026 §6: 4 fases com entrega, critério verificável e rollback; dependências (F3a←F2a; F3b←F3a+Q-B1+URL; F3c←F3a; F4←F2b+F3a+F3c, não depende de F3b). INCOERÊNCIA: a F3c pode vir antes da F4, mas antes da F4 o único repositório é o atual (a futura plataforma), e o §5.3 rejeita 'exportação no repositório da plataforma'. Falta dizer onde fica a exportação gerada antes da F4 (ex.: gerada em docs/evidencias/ e levada ao checkout-saga pelo filter-repo da F4, ou integração no release-start só depois da F4)"
+    },
+    {
+      "name": "(1) Mapa: seção H e contagem de 84 pontos",
+      "status": "validate",
+      "source": "74 + H1–H10 = 84, classes (PLAT 6, CFG 1, MEM 1, PROD 2) e fases (F3a 1, F3b 7, F3c 1, F4 1) conferidas; nota de leitura das seções A–G no topo. Inconsistência: a linha H0 'B1–B6, B14, B16 → mem: cache local' põe o B16 (anexos) no cache e, na mesma linha, diz que o B16 fica em run: e nunca vai ao Neon"
+    },
+    {
+      "name": "(1) Riscos novos (rede, Neon, segredo, sincronização, sentido B)",
+      "status": "pass",
+      "source": "ADR-026 §7: 12 riscos com probabilidade, impacto e mitigação, incluindo vazamento da string (impacto alto), duplicar/perder, conflito não detectado, colisão de id, código duplicado offline, psycopg, mudança do Compose e reutilização do nome; ADR-024 §7 aponta para eles"
+    },
+    {
+      "name": "(1) Sem conflito com as branches em voo D23 e D24",
+      "status": "pass",
+      "source": "git merge-tree --write-tree: D25×D23 sem conflito, D25×D24 sem conflito (e D23×D24 também sem conflito); números de ADR sem colisão (025 na D24, 026 aqui)"
+    },
+    {
+      "name": "(1) Brief e handoff",
+      "status": "pass",
+      "source": "handoffs/17-arquiteto-d25-revisao-adr024-para-auditor.md (37 linhas) + evento 46d0e2ec4ba3 (handoff → auditor, demand 233278d0cfa9). Brief e evento dizem 'sem commit', mas o trabalho já está no commit 82a7212 da branch"
+    }
+  ],
+  "questions_blocking": {
+    "Q-A1": "bloqueia a F4 inteira (sentido B). Na F3c, só o destino da exportação; o mecanismo não depende",
+    "Q-A2": "bloqueia só o último passo da F4 (renomear para squad-platform); não afeta F3a, F3b nem F3c",
+    "Q-A3": "precisa de resposta antes do corte da F4 (aviso no README); não bloqueia F3",
+    "Q-B1": "bloqueia a F3b (DDL do setup: esquema ou banco por produto, e quem roda o setup)",
+    "Q-B2": "bloqueia o G1 da F3a (escopo: backend git implementado já ou só sob demanda); a recomendação 'sob demanda' vale como padrão se o humano não objetar",
+    "Q-B3": "não bloqueia: o padrão do ADR (reserva e S3/S4 implementados, prova com dois SQUAD_HOME no mesmo host) é suficiente",
+    "Q-B4": "bloqueia a F3b ser ligada (antes de a URL entrar no .env e o backend virar neon): é aceitação de risco do humano, porque o pedido dizia 'nunca repassada aos agentes'",
+    "Q-C1": "bloqueia a F3c (onde a exportação é gerada e revisada)",
+    "Q-C2": "bloqueia o aceite da F3c (a tag faz parte do critério) e é pré-requisito da F4; não bloqueia F3a nem F3b",
+    "sem_bloqueio": "a F3a pode começar depois do merge da D23 (F2a), dependendo só da Q-B2 para o escopo"
+  },
+  "open_risks": [
+    "Segredo: /api/project (server.py:1660-1670) substitui qualquer {{VAR}} a partir do .env; o contrato da F3b tem de restringir a substituição a uma lista (GRAFANA_PORT, CONSOLE_PORT…) e o S7 tem de testar {{SQUAD_MEMORY_URL_*}} em project.json e no cadastro",
+    "Segredo: run_agent.py e conversa.py repassam os.environ inteiro aos filhos hoje; a lista de permissão do §4.6 precisa de critério próprio (S7 já cobre o runner falso) e de cobrir também o testenv e o publicador",
+    "Segredo: 'squad memory sync' (CLI) lê o .env e um agente com Bash pode rodá-lo; incluir no limite declarado da Q-B4 ou exigir confirmação interativa (tty)",
+    "Segredo: até a F4, o .env da cópia principal é o mesmo que o Compose do produtivo lê; considerar um arquivo próprio (ex.: .env.squad, modo 600), se o humano aceitar sair do '.env'",
+    "Códigos: conciliar o §4.2.9 com o product.append_task da D23 (trava local × reserva remota, registro do código confirmado num log só de inclusão, caminho do log.py sem rede)",
+    "F3c antes da F4: definir onde a exportação fica enquanto o checkout-saga não existe, sem contrariar o §5.3",
+    "Resumo global na ordem de chegada: o cache precisa guardar o arrival_seq por id; especificar no contrato da F3b",
+    "S9 e §4.2.8 citam 'D1–D24' como legado, mas a migração da F3a importa o log inteiro existente na hora (D25 em diante incluídos)",
+    "Números desatualizados: 173 issues (hoje 189); o '14 PRs' do pedido vs. 24 verificados deveria ficar registrado como correção",
+    "Limites do plano gratuito do Neon e a estabilidade das APIs HTTP/Data API continuam 'a confirmar' (sem acesso à web na revisão)",
+    "A arquitetura da squad (§14 'diagramas da squad agêntica') só 'aponta para a plataforma' no checkout-saga: a exportação deve levar o diagrama da squad junto"
+  ],
+  "human_required": false,
+  "rationale": "Documento de revisão sem código, verificado no repositório, no GitHub (só leitura) e nas branches D23/D24. Os 3 pontos têm decisão, alternativas e impacto nas fases; S1–S9 tornam verificáveis offline, sem duplicar, conflito, integridade e máquina nova; o §14 está mapeado inteiro; conflitos de sentido nunca são resolvidos pela sincronização; integridade com papel só de inclusão, gatilho, hash encadeado e verify. Nenhum bloqueante falhou. O critério do segredo fica em 'validar' porque o desenho está correto mas omite caminhos de vazamento que já existem no código (/api/project com {{VAR}} e ambiente herdado pelos filhos); isso, a conciliação com o append_task da D23 e o destino da F3c antes da F4 são ressalvas obrigatórias para o contrato/G1 da F3a–F3c, não motivo de devolução deste ADR. A decisão final dos três pontos continua sendo do humano (Q-A1…Q-C2)."
+}

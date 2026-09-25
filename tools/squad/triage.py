@@ -14,7 +14,14 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-LOG = ROOT / "docs/squad/memory/decisions.jsonl"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import product  # noqa: E402  (D23, F2a §5.3: log pelo resolvedor)
+
+try:
+    LOG = product.resolve().log                     # $SQUAD_LOG > $SQUAD_ROOT_DATA > repositório
+except product.ProductError as _e:
+    sys.exit(f"triage.py: {_e}")
+CHILD_ENV = {**os.environ, "SQUAD_LOG": str(LOG)}   # log.py e run_agent.py filhos gravam no MESMO log
 DIMS = {"objetivo", "aceite", "escopo", "restricoes", "tipo"}
 
 
@@ -50,14 +57,14 @@ def main():
         return
     subprocess.run([sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", "arquiteto", "--type", "progress",
                     "--demand", a.demand, "--runner", a.runner, "--title", "Triagem: validando a clareza da demanda"],
-                   cwd=ROOT, capture_output=True)
+                   cwd=ROOT, capture_output=True, env=CHILD_ENV)
     task = build_task(d)
     tmp = ROOT / ".squad" / f"triagem-{a.demand}.md"
     tmp.parent.mkdir(exist_ok=True)
     tmp.write_text(task, encoding="utf-8")
     out = subprocess.run([sys.executable, str(ROOT / "tools/squad/run_agent.py"), "arquiteto", f"@{tmp.relative_to(ROOT)}",
                           "--runner", a.runner, "--demand", a.demand, "--read-only"],
-                         cwd=ROOT, capture_output=True, text=True).stdout
+                         cwd=ROOT, capture_output=True, text=True, env=CHILD_ENV).stdout
     result, dec = None, json.JSONDecoder()
     for i, ch in enumerate(out):
         if ch == "{":
@@ -88,7 +95,7 @@ def main():
         args += ["--question", f"{dim}::{q['text'].strip()}"]
     if result.get("suggestedKind") in ("produto", "operacao") and result["suggestedKind"] != d.get("kind"):
         args += ["--suggested-kind", result["suggestedKind"]]
-    print(subprocess.run(args, cwd=ROOT, capture_output=True, text=True).stdout.strip())
+    print(subprocess.run(args, cwd=ROOT, capture_output=True, text=True, env=CHILD_ENV).stdout.strip())
 
 
 if __name__ == "__main__":
