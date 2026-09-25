@@ -1,0 +1,30 @@
+{
+  "demand": "b72a6bd8caf3",
+  "title": "Mostrar ambiente e versao",
+  "detail": "Precisamos ter o ambioente e versão sendo mostrado em algum lugar aqui do squad control",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T00:16:44+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Que ambiente deve aparecer? (a) o ambiente em que o próprio Squad Control está rodando; (b) os ambientes do checkout, ou seja, o produtivo `checkout-saga` e o de teste `checkout-teste` (ADR-018), que já têm um cartão \"Ambientes\" no Painel; ou (c) os dois?",
+      "dimension": "objetivo",
+      "answer": "somente a Opcão A. Lembrtando que o Squad control tambem tem seu abiemte de teste apartado apra ele"
+    },
+    {
+      "question": "Qual versão deve aparecer? Opções: a última tag de release (hoje `v1.0.0`), a versão do `pom.xml` (hoje `1.1.0-SNAPSHOT`), o commit (SHA curto) que está no ar em cada ambiente, ou uma combinação delas.",
+      "dimension": "aceite",
+      "answer": "Uma combinaçao delas"
+    },
+    {
+      "question": "Onde deve aparecer? Opções: no cabeçalho, visível em todas as telas do Squad Control, ou só no Painel, dentro do cartão \"Ambientes\"? Também serve responder \"a critério do Frontend\".",
+      "dimension": "escopo",
+      "answer": "Em um lugar que fique sempre visivel no Squad Control. Sugestão no rodape no menu a esquerda"
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
