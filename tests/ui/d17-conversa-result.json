@@ -88,14 +88,14 @@
         "aviso": "Nova conversa"
       },
       "humanNow": true,
-      "pensandoMs": 62,
+      "pensandoMs": 12,
       "lendo": true,
-      "lendoTxt": "⌕Lendo docs/squad/gates/G1-D17.json0 s Orquestradorrunner fake· Lendo docs/squad/gates/G1-D17.jsonLendo docs/squad/gates/G1-D17.json",
+      "lendoTxt": "OOrquestrador09:53⌕Lendo docs/squad/gates/G1-D17.json 0 s",
       "durante": {
-        "hash": "#/painel?conversa=c-a7be5ac81839",
+        "hash": "#/painel?conversa=c-166de97ccfdc",
         "open": true,
         "focus": "chat-text",
-        "status": "✎Respondendo…0 s",
+        "status": "",
         "msgs": 2,
         "hscroll": false,
         "textDisabled": false,
@@ -103,17 +103,17 @@
         "stopVisible": true
       },
       "fim": {
-        "hash": "#/painel?conversa=c-a7be5ac81839",
+        "hash": "#/painel?conversa=c-166de97ccfdc",
         "open": true,
         "focus": "chat-text",
-        "status": "✓Resposta concluída em 0,4 s.",
+        "status": "",
         "msgs": 2,
         "hscroll": false,
         "textDisabled": false,
         "sendDisabled": false,
         "stopVisible": false
       },
-      "bubble": "Orquestradorrunner fakeclaude-fake-1-20260901 · Anthropic01:25:05Resposta simulada da D17.1º trecho em 0,3 s · total 0,4 s",
+      "bubble": "OOrquestradorclaude-fake-1-20260901 · Anthropic09:53Resposta simulada da D17.1º trecho 0,4 s · total 0,5 s",
       "model": true
     },
     "CA23-aria-live": {
@@ -145,7 +145,7 @@
     "CA21-balao": {
       "ok": true,
       "linkDemanda": [
-        "#/demandas/D17?conversa=c-a7be5ac81839"
+        "#/demandas/D17?conversa=c-166de97ccfdc"
       ]
     },
     "CA3-historico": {
@@ -155,7 +155,7 @@
       "reaberto": 6,
       "ord1": "HOHOHO",
       "ord2": "HOHOHO",
-      "cid": "c-a7be5ac81839"
+      "cid": "c-166de97ccfdc"
     },
     "reconexao-sse-caiu": {
       "ok": true,
@@ -170,37 +170,53 @@
     },
     "estado-erro": {
       "ok": true,
-      "status": "✕Erro na resposta: Invalid API key · Please run /loginTentar de novo",
-      "retry": true,
-      "alert": []
+      "flag": "✕Erro",
+      "retryNoRodape": true,
+      "retryNaBarra": false,
+      "statusHidden": true,
+      "ocorrencias": 1,
+      "msgs": 12,
+      "status": "",
+      "alert": [
+        "Erro na resposta: Invalid API key · Please run /login"
+      ]
     },
     "tentar-de-novo": {
-      "status": "✕Erro na resposta: Invalid API key · Please run /loginTentar de novo",
-      "msgs": 14
+      "ok": true,
+      "antes": 12,
+      "depois": 14,
+      "turns": [
+        "FALHAR agora",
+        "FALHAR agora"
+      ],
+      "flag": "✕Erro",
+      "ocorrencias": 1,
+      "status": "",
+      "focus": "chat-text"
     },
     "estado-cancelada": {
       "ok": true,
-      "status": "■Resposta cancelada: cancelada pelo humano O texto parcial ficou marcado.",
+      "status": "",
       "flag": "■Cancelada · texto parcial",
       "textDisabledDuring": false,
       "sendDisabledDuring": true
     },
     "estado-tempo-esgotado": {
       "ok": true,
-      "status": "◷Tempo esgotado: tempo esgotado (6 s) O texto parcial ficou marcado.Tentar de novo",
+      "status": "",
       "flag": "◷Tempo esgotado · texto parcial"
     },
     "estado-ocupado": {
       "ok": true,
       "status": "◷Ocupado: outra conversa está respondendo agora. Só uma resposta por vez no servidor. Abrir a conversa que está respondendo",
-      "link": "#/painel?conversa=c-a7be5ac81839",
+      "link": "#/painel?conversa=c-166de97ccfdc",
       "rascunho": "teste ocupado"
     },
     "lista-conversas": {
       "ok": true,
       "lista": [
-        "Qual o estado da D16? LER25/09, 01:25 20 mensagens · cancelada",
-        "Conversa sem mensagens25/09, 01:25 0 mensagens"
+        "Qual o estado da D16? LER09:53 20 mensagens · cancelada",
+        "Conversa sem mensagens09:53 0 mensagens"
       ]
     },
     "estado-indisponivel": {
@@ -214,12 +230,12 @@
       "confirmar": {
         "ok": true,
         "card": {
-          "text": "Proposta de destravar · precisa da sua confirmaçãoDemandaD18 · B1 puro (confirmar pelo chat)GateG2Parecer atual do AuditorDevolveu · 85% de confiança · risco moderadoAçãoSeguir mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Nota para o registro (editável, até 2 000 caracteres)Seguir mesmo assim (assumo o risco)Descartar",
+          "text": "Proposta de destravar · precisa da sua confirmaçãoDemandaD21 · B1 puro (confirmar pelo chat)GateG2Parecer atual do AuditorDevolveu · 85% de confiança · risco moderadoAçãoSeguir mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Nota para o registro (editável, até 2 000 caracteres)Seguir mesmo assim (assumo o risco)Descartar",
           "danger": true,
           "role": "group"
         },
         "bloco": false,
-        "done": " mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Confirmada às 01:25:40: o servidor registrou a decisão (evento 858d1cefbd87).Ver G2 da D18",
+        "done": " mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Confirmada às 09:53:34: o servidor registrou a decisão (evento d5d878a29c41).Ver G2 da D21",
         "ev": {
           "detail": "nota editada no painel",
           "rec": "OVERRIDE",
@@ -229,15 +245,15 @@
       },
       "descartar": {
         "ok": true,
-        "disc": "· corrigir e reauditarEfeitoO Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.Descartada às 01:25:42: nada foi registrado.Ver G2 da D21"
+        "disc": "· corrigir e reauditarEfeitoO Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.Descartada às 09:53:37: nada foi registrado.Ver G2 da D24"
       },
       "obsoleta": {
         "ok": true,
-        "obs": "moderadoAçãoSeguir mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Obsoleta às 01:25:44: o estado mudou antes da confirmação; nada foi registrado.Ver G2 da D24"
+        "obs": "moderadoAçãoSeguir mesmo assim (assumo o risco)EfeitoVocê assumiu o risco; o Orquestrador libera a demanda e registra a decisão.Obsoleta às 09:53:38: o estado mudou antes da confirmação; nada foi registrado.Ver G2 da D27"
       },
       "invalida": {
         "ok": true,
-        "inval": "Sugestão não acionávelO Orquestrador sugeriu algo que não pode ser feito por aqui: essa ação não é permitida para esse estado.Ver G2 da D23"
+        "inval": "Sugestão não acionávelO Orquestrador sugeriu algo que não pode ser feito por aqui: essa ação não é permitida para esse estado.Ver G2 da D26"
       },
       "axe": {
         "ok": true,
@@ -248,7 +264,7 @@
       "ok": true,
       "descartar": {
         "ok": true,
-        "disc": "· corrigir e reauditarEfeitoO Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.Descartada às 01:25:50: nada foi registrado.Ver G2 da D21"
+        "disc": "· corrigir e reauditarEfeitoO Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria.Descartada às 09:53:43: nada foi registrado.Ver G2 da D24"
       },
       "alvos390": {
         "ok": true,

@@ -1,0 +1,25 @@
+{
+  "ca": "CA-V5 (runner real)",
+  "perguntas_reais": 1,
+  "runner": "claude",
+  "tzEnviado": "America/Sao_Paulo",
+  "pergunta": "a que horas registrei as respostas da D19?",
+  "eventoNoLog": {
+    "title": "Respostas à validação",
+    "demand": "402e76f187f9 (D19)",
+    "ts": "2026-09-25T11:47:11+00:00"
+  },
+  "esperado_no_fuso_local": "08:47",
+  "resposta": {
+    "status": "ok",
+    "model": "claude-opus-5-5",
+    "totalMs": 4384,
+    "ts": "2026-09-25T12:58:58Z",
+    "text": "Você registrou as respostas à validação da **D19** hoje às **08:47** (horário de Brasília). Foi o evento \"Respostas à validação\".\n\n- As 3 perguntas do Arquiteto tinham chegado às 08:43.\n- Você iniciou a demanda logo depois, às 08:47 também."
+  },
+  "registroEmUTC": {
+    "humano.ts": "2026-09-25T12:58:53Z",
+    "orquestrador.ts": "2026-09-25T12:58:58Z"
+  },
+  "ok": true
+}

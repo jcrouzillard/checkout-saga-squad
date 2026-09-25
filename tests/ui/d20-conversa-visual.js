@@ -15,6 +15,8 @@
 //   docker run --rm --add-host=host.docker.internal:host-gateway -e TZ=America/Sao_Paulo -e PORT=<livre> \
 //     -v "$PWD/tests/ui:/shots" -v "$S/ui-data/.squad/conversas:/conv" zenika/alpine-chrome:with-puppeteer \
 //     node /shots/d20-conversa-visual.js > $S/d20-ui.json
+//   (G3/QA: imagem zenika com NODE_PATH=/usr/src/app/node_modules e --entrypoint node; axe opcional em
+//    -v "$S/axe.min.js:/work/axe.min.js:ro" — sem ele o CA-V10 falha por falta da medida de contraste.)
 // As rotas /api/conversas* exigem Host local (anti-DNS-rebinding): repasse TCP dentro do container
 // (127.0.0.1:PORT → host.docker.internal:PORT). Saída: JSON {results:{CA-Vn:{ok,...}}, errors}; código 1 se algum falhar.
 const puppeteer = require('puppeteer');
@@ -222,9 +224,178 @@ function measure() {
     const cs = getComputedStyle(h); return { existe: true, display: cs.display, color: cs.color, okOrState: [probe('var(--ok)'), probe('var(--warn)'), probe('var(--danger)')].includes(cs.color) }; });
   R('CA-V12-indicador-live', { ok: v12.existe ? /flex/.test(v12.display) && v12.okOrState : true, ...v12 });
   await q.close();
+
+  // ======================= G3 (QA): CA-V6, V7, V8, V9, V10 e V11 completos (ressalvas do G2-D20)
+  const axe = fs.existsSync('/work/axe.min.js') ? fs.readFileSync('/work/axe.min.js', 'utf8') : null;
+  const runAxe = async pg => { if (!axe) return null; if (!(await pg.evaluate(() => !!window.axe))) await pg.addScriptTag({ content: axe });
+    return pg.evaluate(async () => (await axe.run('#chat', { runOnly: ['wcag2aa'] })).violations.map(v => ({ id: v.id, n: v.nodes.length, ex: v.nodes.slice(0, 3).map(n => n.target.join(' ')) }))); };
+  const greenText = pg => pg.evaluate(() => {
+    const probe = c => { const d = document.createElement('span'); d.style.color = c; document.body.append(d); const v = getComputedStyle(d).color; d.remove(); return v; };
+    const ok = probe(getComputedStyle(document.documentElement).getPropertyValue('--ok').trim());
+    return [...document.querySelectorAll('#chat-msgs li.c-msg *')].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && getComputedStyle(e).color === ok).map(e => e.tagName + '.' + e.className).slice(0, 10);
+  });
+
+  // ---- CA-V10: 8 capturas d20-{1440,390}-{claro,escuro}-{streaming,final}.png + contraste (axe wcag2aa) + nenhum texto verde
+  const v10f = {};
+  for (const [w, theme, nome] of [[1440, 'light', 'claro'], [1440, 'dark', 'escuro'], [390, 'light', 'claro'], [390, 'dark', 'escuro']]) {
+    const pg = await page(w, { theme, hash: '#/painel?conversa=nova' }); await sleep(800);
+    await typeSend(pg, 'Primeira FXD20'); await waitIdle(pg);
+    await typeSend(pg, 'Mandei la FXD20');
+    await pg.waitForFunction(s => { const li = document.querySelector(s); return li && /você iniciou/.test(li.textContent); }, { timeout: 15000 }, SEL.live);
+    const k = `${w}-${nome}`;
+    v10f[k] = { durante: { axe: await runAxe(pg), verde: await greenText(pg) } };
+    await shot(pg, `${w}-${nome}-streaming`);
+    await waitIdle(pg); await sleep(500);
+    v10f[k].final = { axe: await runAxe(pg), verde: await greenText(pg), hscroll: await pg.evaluate(() => document.documentElement.scrollWidth > innerWidth) };
+    await shot(pg, `${w}-${nome}-final`);
+    await pg.close();
+  }
+  R('CA-V10', { ok: Object.values(v10f).every(x => ['durante', 'final'].every(f => (x[f].axe === null || x[f].axe.length === 0) && x[f].verde.length === 0)) && !!axe, axeDisponivel: !!axe, ...v10f });
+
+  // ---- CA-V6: Markdown completo e seguro (390, escuro)
+  {
+    const pg = await page(390, { theme: 'dark', hash: '#/painel?conversa=nova' }); await sleep(800);
+    await typeSend(pg, 'MDV6 markdown'); await waitIdle(pg); await sleep(400);
+    const r = await pg.evaluate(() => {
+      const li = [...document.querySelectorAll('#chat-msgs > li.c-msg')].at(-1), bd = li.querySelector(':scope > .c-body');
+      const pre = bd.querySelector('pre'), tbl = bd.querySelector('table'), tw = tbl && tbl.parentElement;
+      const ext = [...bd.querySelectorAll('a')].find(a => /^https?:/.test(a.getAttribute('href') || ''));
+      const ol = bd.querySelector('ol');
+      return {
+        p: !!bd.querySelector('p'), ol: !!ol && getComputedStyle(ol).listStyleType, aninhada: !!bd.querySelector('li > ul, li > ol'),
+        ulTopo: bd.querySelector(':scope ul') && getComputedStyle(bd.querySelector('ul')).listStyleType,
+        ulAninhada: bd.querySelector('li > ul') && getComputedStyle(bd.querySelector('li > ul')).listStyleType,
+        code: !!bd.querySelector(':not(pre) > code'), pre: pre && { ox: getComputedStyle(pre).overflowX, rola: pre.scrollWidth > pre.clientWidth, ws: getComputedStyle(pre).whiteSpace },
+        quote: !!bd.querySelector('blockquote'), tabela: tbl && { linhas: tbl.querySelectorAll('tr').length, cols: tbl.querySelector('tr').children.length, contOx: getComputedStyle(tw).overflowX },
+        interno: [...bd.querySelectorAll('a')].map(a => a.getAttribute('href')).filter(h => h && h.startsWith('#/')),
+        externo: ext && { rel: ext.getAttribute('rel'), target: ext.getAttribute('target') },
+        negritoLiteral: bd.textContent.includes('**negrito sem fechar'), img: bd.querySelectorAll('img').length, imgLiteral: bd.textContent.includes('<img src=x onerror=alert(1)>'),
+        hscroll: document.documentElement.scrollWidth > innerWidth || document.body.scrollWidth > innerWidth,
+      };
+    });
+    await shot(pg, '390-escuro-markdown');
+    R('CA-V6', { ok: r.p && r.ol === 'decimal' && r.aninhada && r.ulTopo === 'disc' && r.code && r.pre && /auto|scroll/.test(r.pre.ox) && r.pre.rola && r.quote && r.tabela && r.tabela.linhas === 4 && r.tabela.cols === 3
+      && /auto|scroll/.test(r.tabela.contOx) && r.interno.some(h => /^#\/painel(\?|$)/.test(h)) && r.externo && /noopener/.test(r.externo.rel) && /noreferrer/.test(r.externo.rel) && r.negritoLiteral && r.img === 0 && r.imgLiteral && !r.hscroll, ...r });
+    await pg.close();
+  }
+
+  // ---- CA-V7 (rolagem) + CA-V11 (teclado em "Ir para o fim"): histórico longo semeado + resposta LONGO (~10 s)
+  const CID7 = 'c-d20d20d20d21';
+  if (fs.existsSync('/conv')) {
+    const hist = [{ t: 'meta', id: CID7, createdAt: `${today}T10:00:00Z`, runner: 'fake', modelRequested: null, sessionId: '00000000-0000-4000-8000-00000000d021', v: 1 }];
+    for (let i = 1; i <= 15; i++) {
+      hist.push({ t: 'msg', seq: 2 * i - 1, turn: i, role: 'humano', ts: `${today}T10:${String(i).padStart(2, '0')}:00Z`, text: `pergunta ${i}` });
+      hist.push({ t: 'msg', seq: 2 * i, turn: i, role: 'orquestrador', ts: `${today}T10:${String(i).padStart(2, '0')}:30Z`, text: `Resposta ${i}.\n\n- item a\n- item b\n- item c`, status: 'ok', runner: 'fake', model: 'claude-fake-1-20260901', firstTextMs: 500, totalMs: 1500 });
+    }
+    fs.writeFileSync(`/conv/${CID7}.jsonl`, hist.map(r => JSON.stringify(r)).join('\n') + '\n');
+  }
+  {
+    const pg = await page(1440, { hash: `#/painel?conversa=${CID7}` }); await sleep(1500);
+    const dist = () => pg.evaluate(() => { const l = document.getElementById('chat-msgs'); return Math.round(l.scrollHeight - l.scrollTop - l.clientHeight); });
+    const btn = () => pg.evaluate(() => { const b = document.getElementById('chat-bottom'), r = b.getBoundingClientRect(); return { visivel: !b.hidden && r.height > 0, texto: b.textContent.trim(), ctrl: b.getAttribute('aria-controls') }; });
+    const r = { historicoRola: await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); return l.scrollHeight > l.clientHeight + 400; }) };
+    await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = 0; });   // rolado para cima antes de enviar
+    await typeSend(pg, 'LONGO rolagem');
+    await pg.waitForFunction(s => { const li = document.querySelector(s); return li && /Parágrafo 03/.test(li.textContent); }, { timeout: 15000 }, SEL.live);
+    r.aoEnviarVaiAoFim = await dist();
+    // parado no fim: acompanha cada trecho
+    const seg = []; for (let i = 0; i < 8; i++) { await sleep(250); seg.push(await dist()); }
+    r.acompanha = seg;
+    // rola 400 px para cima: posição fixa por 3 s de trechos e aparece o botão
+    await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = l.scrollTop - 400; l.dispatchEvent(new Event('scroll')); });
+    await sleep(100);
+    const top0 = await pg.evaluate(() => document.getElementById('chat-msgs').scrollTop), len0 = (await liveBodyText(pg)).length;
+    const tops = []; for (let i = 0; i < 6; i++) { await sleep(500); tops.push(await pg.evaluate(() => document.getElementById('chat-msgs').scrollTop)); }
+    r.rolado = { top0, tops, cresceu: (await liveBodyText(pg)).length > len0, botao: await btn() };
+    // CA-V11: só teclado — Shift+Tab a partir do campo chega em "Ir para o fim"; Enter rola ao fim e o foco volta ao campo
+    await pg.focus('#chat-text'); await pg.keyboard.down('Shift'); await pg.keyboard.press('Tab'); await pg.keyboard.up('Shift');
+    r.focoNoBotao = await pg.evaluate(() => document.activeElement?.id);
+    const focVis = await pg.evaluate(() => { const b = document.getElementById('chat-bottom'), cs = getComputedStyle(b); return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2; });
+    await pg.keyboard.press('Enter'); await sleep(1200);
+    r.aposClique = { dist: await dist(), botao: await btn(), foco: await pg.evaluate(() => document.activeElement?.id), focoVisivel: focVis };
+    // rolar manualmente até o fim também esconde o botão
+    await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = l.scrollTop - 400; l.dispatchEvent(new Event('scroll')); }); await sleep(300);
+    const antesManual = (await btn()).visivel;
+    await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = l.scrollHeight; l.dispatchEvent(new Event('scroll')); }); await sleep(300);
+    r.manual = { antes: antesManual, depois: (await btn()).visivel };
+    await shot(pg, '1440-claro-rolagem');
+    await waitIdle(pg, 30000); await sleep(400);
+    // parado no meio do histórico, recarregar a lista (fim do turno → chatRender) preserva a posição
+    await pg.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = 200; l.dispatchEvent(new Event('scroll')); }); await sleep(300);
+    await typeSend(pg, 'pergunta curta depois de rolar');
+    await sleep(300); r.enviarDeNovo = await dist();
+    await waitIdle(pg); await sleep(300); r.aposFim = await dist();
+    R('CA-V7', { ok: r.historicoRola && r.aoEnviarVaiAoFim <= 80 && r.acompanha.every(d => d <= 80) && r.rolado.tops.every(t => Math.abs(t - r.rolado.top0) <= 1) && r.rolado.cresceu
+      && r.rolado.botao.visivel && /Nova resposta|Ir para o fim/.test(r.rolado.botao.texto) && r.rolado.botao.ctrl === 'chat-msgs'
+      && r.aposClique.dist <= 80 && !r.aposClique.botao.visivel && r.aposClique.foco === 'chat-text' && r.manual.antes && !r.manual.depois && r.enviarDeNovo <= 80, ...r });
+    R('CA-V11-ir-para-o-fim-teclado', { ok: r.focoNoBotao === 'chat-bottom' && r.aposClique.foco === 'chat-text' && r.aposClique.focoVisivel, foco: r.focoNoBotao, focoVisivel: r.aposClique.focoVisivel });
+    await pg.close();
+  }
+
+  // ---- CA-V8: composição (altura automática, contador, Enter durante o turno, dica de atalhos)
+  {
+    const pg = await page(1440, { hash: '#/painel?conversa=nova' }); await sleep(800);
+    const set = v => pg.evaluate(v => { const t = document.getElementById('chat-text'); t.value = v; t.dispatchEvent(new Event('input', { bubbles: true })); const r = t.getBoundingClientRect();
+      return { h: Math.round(r.height), oy: getComputedStyle(t).overflowY, vh40: Math.round(innerHeight * 0.4), cont: !document.getElementById('chat-count').hidden }; }, v);
+    const h1 = await set(''), h12 = await set(Array.from({ length: 12 }, (_, i) => `linha ${i}`).join('\n')), h60 = await set(Array.from({ length: 60 }, (_, i) => `linha ${i}`).join('\n'));
+    const c100 = await set('a'.repeat(100)), c7000 = await set('a'.repeat(7000)), c8001 = await set('a'.repeat(8001));
+    const over = await pg.evaluate(() => document.getElementById('chat-count').classList.contains('over'));
+    await set(''); await typeSend(pg, 'Mandei la FXD20');
+    await pg.waitForFunction(s => !!document.querySelector(s), { timeout: 10000 }, SEL.live);
+    const nMsgs = await pg.evaluate(() => document.querySelectorAll('#chat-msgs > li.c-msg').length);
+    await pg.type('#chat-text', 'rascunho'); await pg.keyboard.press('Enter'); await sleep(400);
+    const dur = await pg.evaluate(() => ({ msgs: document.querySelectorAll('#chat-msgs > li.c-msg').length, val: document.getElementById('chat-text').value, hint: document.getElementById('chat-hint').textContent.trim() }));
+    await waitIdle(pg); await set(''); const hApos = await set('');
+    const hint1440 = await pg.evaluate(() => { const r = document.getElementById('chat-hint').getBoundingClientRect(); return r.width > 50 && r.height > 5; });
+    await pg.close();
+    const pq = await page(390, { hash: '#/painel?conversa=nova' }); await sleep(800);
+    const hint390 = await pq.evaluate(() => { const h = document.getElementById('chat-hint'), r = h.getBoundingClientRect(); return { visivel: r.width > 2 && r.height > 2, describedby: document.getElementById('chat-text').getAttribute('aria-describedby') }; });
+    await pq.close();
+    const r = { h1, h12, h60, c100: c100.cont, c7000: c7000.cont, c8001: c8001.cont, over, nMsgs, dur, hApos, hint1440, hint390 };
+    R('CA-V8', { ok: h1.h >= 44 && h12.h > h1.h && Math.abs(h60.h - h60.vh40) <= 2 && h60.oy === 'auto' && hApos.h === h1.h && !r.c100 && r.c7000 && r.c8001 && over
+      && dur.msgs === nMsgs && dur.val.includes('rascunho') && /Aguarde/.test(dur.hint) && hint1440 && !hint390.visivel && /chat-hint/.test(hint390.describedby || ''), ...r });
+  }
+
+  // ---- CA-V9 completo: largura de leitura em 1440 e alvos em 390; CA-V11 reduced-motion
+  {
+    const pg = await page(1440, { hash: `#/painel?conversa=${CID}` }); await sleep(1500);
+    const r1440 = await pg.evaluate(() => {
+      const li = [...document.querySelectorAll('#chat-msgs > li.c-msg--orq')].at(-1), bd = li.querySelector(':scope > .c-body');
+      const s = document.createElement('span'); s.textContent = '0'.repeat(68); s.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap'; bd.append(s); const ch68 = s.getBoundingClientRect().width; s.remove();
+      const col = document.getElementById('chat-msgs'), cw = col.clientWidth;
+      const hum = [...document.querySelectorAll('#chat-msgs > li.c-msg--hum > .c-body')].map(b => b.getBoundingClientRect().width / cw);
+      return { corpo: Math.round(bd.getBoundingClientRect().width), ch68: Math.round(ch68), balaoMax: Math.round(Math.max(...hum) * 1000) / 1000 };
+    });
+    await pg.close();
+    const pq = await page(390, { hash: `#/painel?conversa=${CID7}` }); await sleep(1500);
+    await pq.evaluate(() => { const l = document.getElementById('chat-msgs'); l.scrollTop = 0; l.dispatchEvent(new Event('scroll')); }); await sleep(300);
+    const r390 = await pq.evaluate(() => {
+      const sz = e => { const r = e.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width) }; };
+      return { irParaOFim: sz(document.getElementById('chat-bottom')), enviar: sz(document.getElementById('chat-send')), hscroll: document.documentElement.scrollWidth > innerWidth,
+        links: [...document.querySelectorAll('#chat-msgs .c-foot .linkbtn, #chat-msgs .c-foot a')].filter(e => e.offsetParent).map(sz) };
+    });
+    await typeSend(pq, 'DORMIR parar'); await pq.waitForFunction(() => !document.getElementById('chat-stop').hidden, { timeout: 8000 });
+    r390.parar = await pq.evaluate(() => Math.round(document.getElementById('chat-stop').getBoundingClientRect().height));
+    await pq.click('#chat-stop'); await waitIdle(pq); await sleep(300);
+    r390.linksRodape = await pq.evaluate(() => [...document.querySelectorAll('#chat-msgs .c-foot .linkbtn')].map(e => Math.round(e.getBoundingClientRect().height)));
+    await pq.close();
+    R('CA-V9', { ok: r1440.corpo <= r1440.ch68 + 1 && r1440.balaoMax <= 0.85 + 0.005 && r390.irParaOFim.h >= 44 && r390.enviar.h >= 44 && r390.parar >= 44 && !r390.hscroll && r390.linksRodape.every(h => h >= 44), r1440, r390 });
+    // reduced motion: cursor e ícone de fase sem animação
+    const pm = await page(1440, { hash: '#/painel?conversa=nova' }); await pm.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]); await sleep(500);
+    await typeSend(pm, 'Mandei la FXD20');
+    await pm.waitForFunction(s => { const li = document.querySelector(s); return li && li.querySelector('.c-caret') && li.querySelector('.c-phase-ic'); }, { timeout: 15000 }, SEL.live);
+    const rm = await pm.evaluate(() => ({ caret: getComputedStyle(document.querySelector('#chat-live .c-caret')).animationName, fase: getComputedStyle(document.querySelector('#chat-live .c-phase-ic')).animationName }));
+    await pm.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]); await sleep(200);
+    const semRm = await pm.evaluate(() => { const c = document.querySelector('#chat-live .c-caret'); return c ? getComputedStyle(c).animationName : null; });
+    // Esc fecha e o foco volta ao botão do cabeçalho
+    await waitIdle(pm); await pm.focus('#chat-text'); await pm.keyboard.press('Escape'); await sleep(500);
+    const esc = await pm.evaluate(() => ({ fechado: document.getElementById('chat').hidden, foco: document.activeElement?.id }));
+    await pm.close();
+    R('CA-V11-reduced-motion-esc', { ok: rm.caret === 'none' && rm.fase === 'none' && esc.fechado && esc.foco === 'chat-btn', reduce: rm, semReduce: semRm, esc });
+  }
   await b.close();
-  // CA-V5 (servidor): tests/squad/test_conversa_tz_d20.py. CA-V7 (rolagem) e CA-V11 (teclado/reduced-motion) completos e
-  // CA-V12 (D17 CA-1,2,3,10,18,19,21,23): tests/ui/d17-conversa.js + checklist, rodados no G3.
+  // CA-V5 (servidor): tests/squad/test_conversa_tz_d20.py (+ pergunta real no checklist). CA-V12 (D17 CA-1,2,3,10,18,19,21,23):
+  // tests/ui/d17-conversa.js. Resultado desta execução: tests/ui/d20-conversa-visual-result.json.
   out.ok = Object.values(out.results).every(r => r.ok);
   console.log(JSON.stringify(out, null, 2));
   process.exit(out.ok ? 0 : 1);

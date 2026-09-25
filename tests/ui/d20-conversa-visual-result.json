@@ -1,0 +1,417 @@
+{
+  "results": {
+    "CA-V1": {
+      "ok": true,
+      "durante": [
+        {
+          "orq": false,
+          "streaming": false,
+          "cls": "c-msg c-msg--hum humano",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": true,
+          "streaming": false,
+          "cls": "c-msg c-msg--orq orquestrador",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": false,
+          "streaming": false,
+          "cls": "c-msg c-msg--hum humano",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": true,
+          "streaming": true,
+          "cls": "c-msg c-msg--orq orquestrador c-msg--streaming",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        }
+      ],
+      "final": [
+        {
+          "orq": false,
+          "streaming": false,
+          "cls": "c-msg c-msg--hum humano",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": true,
+          "streaming": false,
+          "cls": "c-msg c-msg--orq orquestrador",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": false,
+          "streaming": false,
+          "cls": "c-msg c-msg--hum humano",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        },
+        {
+          "orq": true,
+          "streaming": false,
+          "cls": "c-msg c-msg--orq orquestrador",
+          "display": "flex",
+          "flexDirection": "column",
+          "metaAbove": true,
+          "sideDelta": 0
+        }
+      ],
+      "classeLive": 0
+    },
+    "CA-V2": {
+      "ok": true,
+      "liveColor": "rgb(27, 29, 33)",
+      "liveWeight": "400",
+      "liveBodyColor": "rgb(27, 29, 33)",
+      "doneColor": "rgb(27, 29, 33)",
+      "textColor": "rgb(27, 29, 33)",
+      "okColor": "rgb(46, 107, 63)",
+      "strong": [
+        "08:47"
+      ],
+      "ulStyle": "disc",
+      "caretParent": "LI",
+      "iguaisLiveFinal": true
+    },
+    "CA-V3": {
+      "ok": true,
+      "durante": {
+        "phases": [
+          {
+            "where": "streaming",
+            "t": "Respondendo… 2 s"
+          }
+        ],
+        "statusVisible": false
+      },
+      "final": {
+        "statusText": "",
+        "total": 1
+      },
+      "erro": {
+        "statusVisible": false,
+        "statusText": "",
+        "invalidKey": 1
+      }
+    },
+    "CA-V8-parcial": {
+      "ok": true,
+      "durante": {
+        "editable": true,
+        "stop": {
+          "x": 1324,
+          "y": 846
+        }
+      },
+      "enviar": {
+        "x": 1324,
+        "y": 846
+      }
+    },
+    "CA-V11-aria-live": {
+      "ok": true,
+      "liveAnnounce": [
+        "Resposta do Orquestrador recebida",
+        "Resposta do Orquestrador recebida"
+      ]
+    },
+    "CA-V4": {
+      "ok": true,
+      "saoPaulo": [
+        {
+          "meta": "Vocêontem 08:47",
+          "time": "ontem 08:47",
+          "title": "24/09/2026 08:47:59 (America/Sao_Paulo)",
+          "dt": "2026-09-24T11:47:59.000Z"
+        },
+        {
+          "meta": "OOrquestradorclaude-fake-1-20260901 · Anthropicontem 08:48",
+          "time": "ontem 08:48",
+          "title": "24/09/2026 08:48:10 (America/Sao_Paulo) · 1º trecho 0,9 s · total 2,1 s",
+          "dt": "2026-09-24T11:48:10.000Z"
+        },
+        {
+          "meta": "Você08:47",
+          "time": "08:47",
+          "title": "25/09/2026 08:47:59 (America/Sao_Paulo)",
+          "dt": "2026-09-25T11:47:59.000Z"
+        },
+        {
+          "meta": "OOrquestradorclaude-fake-1-20260901 · Anthropic08:48",
+          "time": "08:48",
+          "title": "25/09/2026 08:48:30 (America/Sao_Paulo)",
+          "dt": "2026-09-25T11:48:30.000Z"
+        }
+      ],
+      "toquio": [
+        "ontem 20:47",
+        "ontem 20:48",
+        "20:47",
+        "20:48"
+      ],
+      "comSegundos": [],
+      "tzEnviadoNoPost": [
+        "America/Sao_Paulo",
+        "America/Sao_Paulo"
+      ]
+    },
+    "CA-V9-parcial": {
+      "ok": true,
+      "hscroll": false,
+      "maxBubble": 0.38363592544987146,
+      "separadorDeDia": 1
+    },
+    "CA-V10-parcial": {
+      "ok": true,
+      "okColor": "rgb(111, 207, 142)",
+      "textoVerde": []
+    },
+    "CA-V6-parcial": {
+      "ok": true,
+      "ulStyle": "disc",
+      "strong": [
+        "08:47"
+      ]
+    },
+    "CA-V12-indicador-live": {
+      "ok": true,
+      "existe": true,
+      "display": "flex",
+      "color": "rgb(111, 207, 142)",
+      "okOrState": true
+    },
+    "CA-V10": {
+      "ok": true,
+      "axeDisponivel": true,
+      "1440-claro": {
+        "durante": {
+          "axe": [],
+          "verde": []
+        },
+        "final": {
+          "axe": [],
+          "verde": [],
+          "hscroll": false
+        }
+      },
+      "1440-escuro": {
+        "durante": {
+          "axe": [],
+          "verde": []
+        },
+        "final": {
+          "axe": [],
+          "verde": [],
+          "hscroll": false
+        }
+      },
+      "390-claro": {
+        "durante": {
+          "axe": [],
+          "verde": []
+        },
+        "final": {
+          "axe": [],
+          "verde": [],
+          "hscroll": false
+        }
+      },
+      "390-escuro": {
+        "durante": {
+          "axe": [],
+          "verde": []
+        },
+        "final": {
+          "axe": [],
+          "verde": [],
+          "hscroll": false
+        }
+      }
+    },
+    "CA-V6": {
+      "ok": true,
+      "p": true,
+      "ol": "decimal",
+      "aninhada": true,
+      "ulTopo": "disc",
+      "ulAninhada": "circle",
+      "code": true,
+      "pre": {
+        "ox": "auto",
+        "rola": true,
+        "ws": "pre"
+      },
+      "quote": true,
+      "tabela": {
+        "linhas": 4,
+        "cols": 3,
+        "contOx": "auto"
+      },
+      "interno": [
+        "#/painel?conversa=c-4ab5057ab144"
+      ],
+      "externo": {
+        "rel": "noopener noreferrer",
+        "target": "_blank"
+      },
+      "negritoLiteral": true,
+      "img": 0,
+      "imgLiteral": true,
+      "hscroll": false
+    },
+    "CA-V7": {
+      "ok": true,
+      "historicoRola": true,
+      "aoEnviarVaiAoFim": 0,
+      "acompanha": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rolado": {
+        "top0": 3049,
+        "tops": [
+          3049,
+          3049,
+          3049,
+          3049,
+          3049,
+          3049
+        ],
+        "cresceu": true,
+        "botao": {
+          "visivel": true,
+          "texto": "↓Nova resposta",
+          "ctrl": "chat-msgs"
+        }
+      },
+      "focoNoBotao": "chat-bottom",
+      "aposClique": {
+        "dist": 0,
+        "botao": {
+          "visivel": false,
+          "texto": "↓Ir para o fim",
+          "ctrl": "chat-msgs"
+        },
+        "foco": "chat-text",
+        "focoVisivel": true
+      },
+      "manual": {
+        "antes": true,
+        "depois": false
+      },
+      "enviarDeNovo": 0,
+      "aposFim": 0
+    },
+    "CA-V11-ir-para-o-fim-teclado": {
+      "ok": true,
+      "foco": "chat-bottom",
+      "focoVisivel": true
+    },
+    "CA-V8": {
+      "ok": true,
+      "h1": {
+        "h": 44,
+        "oy": "hidden",
+        "vh40": 360,
+        "cont": false
+      },
+      "h12": {
+        "h": 270,
+        "oy": "hidden",
+        "vh40": 360,
+        "cont": false
+      },
+      "h60": {
+        "h": 360,
+        "oy": "auto",
+        "vh40": 360,
+        "cont": false
+      },
+      "c100": false,
+      "c7000": true,
+      "c8001": true,
+      "over": true,
+      "nMsgs": 2,
+      "dur": {
+        "msgs": 2,
+        "val": "rascunho",
+        "hint": "Aguarde a resposta ou pare. Você já pode escrever a próxima pergunta."
+      },
+      "hApos": {
+        "h": 44,
+        "oy": "hidden",
+        "vh40": 360,
+        "cont": false
+      },
+      "hint1440": true,
+      "hint390": {
+        "visivel": false,
+        "describedby": "chat-hint"
+      }
+    },
+    "CA-V9": {
+      "ok": true,
+      "r1440": {
+        "corpo": 571,
+        "ch68": 571,
+        "balaoMax": 0.234
+      },
+      "r390": {
+        "irParaOFim": {
+          "h": 44,
+          "w": 120
+        },
+        "enviar": {
+          "h": 44,
+          "w": 96
+        },
+        "hscroll": false,
+        "links": [],
+        "parar": 44,
+        "linksRodape": []
+      }
+    },
+    "CA-V11-reduced-motion-esc": {
+      "ok": true,
+      "reduce": {
+        "caret": "none",
+        "fase": "none"
+      },
+      "semReduce": "c-blink",
+      "esc": {
+        "fechado": true,
+        "foco": "chat-btn"
+      }
+    }
+  },
+  "errors": [],
+  "ok": true
+}
