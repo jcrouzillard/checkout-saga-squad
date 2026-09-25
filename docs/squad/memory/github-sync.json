@@ -495,7 +495,29 @@
   "d68d4cb0b1c3",
   "a2c676859a1e",
   "a52441a9248e",
-  "e7df6310d4b6"
+  "e7df6310d4b6",
+  "e517361e9222",
+  "22fcd35e1bab",
+  "3b676b705243",
+  "763a1b8d706f",
+  "72b09e5fab16",
+  "687a54f19756",
+  "fe8c677dfe74",
+  "20c23a554275",
+  "a2e138988394",
+  "a3e43d2e9195",
+  "848505fd5d0e",
+  "f61cd842c1ff",
+  "d3c086349f90",
+  "896e474bd330",
+  "25425042af36",
+  "4ea192921db4",
+  "188ee7c0188f",
+  "f558e6585895",
+  "f33f1b3d52e3",
+  "e029eb6233cc",
+  "e5907a461fc7",
+  "e38ccfeeae95"
  ],
  "issues": {
   "_diario": {
@@ -1911,10 +1933,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/147",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8o0-k",
    "agent": "frontend",
-   "status": "Gate (Auditor)",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "528eecec9dec": {
@@ -2065,9 +2087,9 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/162",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8qEYI",
    "agent": "orquestrador",
-   "status": "Em andamento",
+   "status": "Gate (Auditor)",
    "phase": null,
-   "handed": false,
+   "handed": true,
    "closed": false,
    "kind": "task"
   },
@@ -2076,10 +2098,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/163",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8qG-Q",
    "agent": "arquiteto",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
-   "handed": false,
-   "closed": false,
+   "handed": true,
+   "closed": true,
    "kind": "task"
   },
   "b72a6bd8caf3": {
@@ -2089,7 +2111,73 @@
    "agent": "orquestrador",
    "status": "Em andamento",
    "phase": null,
+   "handed": true,
+   "closed": false,
+   "kind": "task"
+  },
+  "3b676b705243": {
+   "number": 165,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/165",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qI5Q",
+   "agent": "arquiteto",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "25425042af36": {
+   "number": 166,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/166",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qQqs",
+   "agent": "frontend",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "188ee7c0188f": {
+   "number": 167,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/167",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qU7A",
+   "agent": "frontend",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "f33f1b3d52e3": {
+   "number": 168,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/168",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qcLg",
+   "agent": "frontend",
+   "status": "Backlog",
+   "phase": null,
    "handed": false,
+   "closed": false,
+   "kind": "ticket"
+  },
+  "e029eb6233cc": {
+   "number": 169,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/169",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qcOc",
+   "agent": "qa",
+   "status": "Concluído",
+   "phase": "F3",
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "e5907a461fc7": {
+   "number": 170,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/170",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8qdQk",
+   "agent": "frontend",
+   "status": "Gate (Auditor)",
+   "phase": null,
+   "handed": true,
    "closed": false,
    "kind": "task"
   }
@@ -2136,8 +2224,9 @@
   }
  },
  "gates": {
-  "G1": "a1e0cfcbd153",
-  "G2": "40975a94eb23",
-  "G3": "0c6620a51ff1"
+  "G1": "a2e138988394",
+  "G2": "f558e6585895",
+  "G3": "e38ccfeeae95",
+  "null": "4ea192921db4"
  }
 }
