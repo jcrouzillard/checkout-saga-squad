@@ -2,6 +2,7 @@
 
 **Status**: Proposto (2026-09-25, Arquiteto — D22 `b26da7851764`, fase 1). G1 ciclo 1: APPROVE com ressalvas
 (`docs/squad/gates/G1-D22.json`, 0,75); ressalvas aplicadas nesta revisão, sem novo ciclo (§10). Aguarda decisão humana (§9).
+**Q2 e Q3 respondidas** pelo humano na D23 (`6450aecde7f9`, F2a) — ver §11; errata da F2a no §11.
 **Numeração**: 023 está com a D21 (`feature/D21-imagem-no-chat`, "imagens na conversa"); este é o próximo livre.
 **Anexo (mapa completo, 74 pontos)**: [`docs/contracts/plataforma-multiproduto-mapa.md`](../contracts/plataforma-multiproduto-mapa.md).
 **Afeta**: ADR-011 (sem mudança de regra), ADR-015, ADR-017, ADR-018, ADR-019, ADR-020 e ADR-023 (sem mudança de
@@ -453,3 +454,29 @@ Recomendado responder a Q3 junto com a Q2. As demais não bloqueiam (Q1: F4; Q5:
 | 8 | Valores menores | mapa A10, C16, C17, C18, G7 |
 | 9 | F2 grande | §6: F2a e F2b; mapa com fase F2a/F2b |
 | 10 | Brief de handoff | `docs/squad/memory/handoffs/12-arquiteto-d22-adr024-para-auditor.md` |
+
+## 11. Respostas do humano e errata da F2a (D23, `6450aecde7f9`, Arquiteto, 2026-09-25)
+Contrato da fase: [`docs/contracts/f2a-resolvedor-de-produto.md`](../contracts/f2a-resolvedor-de-produto.md).
+
+**Respostas (cartão da D23)**: **Q2** — numeração `D` global (D23, D24…) até a F5; a partir da F5 o produto
+`squad-platform` usa `P` (P1, P2…); o checkout continua em `D`; D1–D23 congeladas como aparecem hoje no painel (a D22
+continua D22; a F2a é a D23). **Q3** — aceito: D1–D21 inteiras na memória do checkout, sem dividir por tipo, visíveis
+como somente leitura na plataforma (§4.4.6 confirmado).
+
+**Errata** (nenhuma muda uma decisão do §2; todas precisam o que a F2a entrega):
+- **E1 — caminho do módulo.** Onde o §6 diz `squad/product.py`, na F2a lê-se `tools/squad/product.py` (a pasta
+  `squad/` só existe na plataforma, F4). O cadastro fica em `docs/squad/products/checkout-saga/product.toml`.
+- **E2 — local da tabela congelada.** Na F2a, `codes.json` **não** fica em `docs/squad/memory/` (memória viva, `STATE`
+  do `gitflow.py`: descartada do worktree e proibida no PR pelo G3). Fica em
+  `docs/squad/products/checkout-saga/codes.json`, como configuração imutável revisada no PR; na F3 vai para
+  `mem:codes.json` sem mudar de formato. (Afeta §3, §4.4.1 e mapa B14.)
+- **E3 — alcance do congelamento.** Pela resposta à Q2, o congelamento cobre **D1–D23** (o §6, F2a (a), dizia D1–D22).
+- **E4 — semântica dos apelidos.** O apelido `D7` (citado para `e31bdfb73679`) colide com o código congelado `D7`
+  (`349e5b1bf818`). "Continuar resolvendo" (§4.4.1) passa a significar: **no contexto do documento/branch/parecer que o
+  cita**; um código sem contexto resolve sempre para o congelado.
+- **E5 — divergências não estão só nos contratos.** As mesmas 4 demandas (`e31bdfb73679`, `349e5b1bf818`,
+  `174084ec85d0`, `f2324e0f25de`) têm o código "antigo" também nos nomes das branches e dos pareceres
+  (`G*-D7…D10.json`); a lista exata está no contrato §4.3. Nada é renomeado.
+- **E6 — B13 inclui as runs.** Além do slug, `run_agent.py` grava `.squad/runs` no `ROOT` do script e não no
+  `DATA_ROOT` do servidor; a F2a passa as runs para o `data_root` resolvido e grava o caminho exato da transcrição no
+  metadado da run (contrato §6).
