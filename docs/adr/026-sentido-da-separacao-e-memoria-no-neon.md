@@ -6,6 +6,8 @@
 Também retira "banco de dados para a memória" do §8 do ADR-024. O resto do ADR-024 continua valendo, junto com a
 errata do §11 que a D23 aplicou: cadastro TOML (§4.2), histórico legado inteiro (§4.4, Q3), camadas de regras (§4.5),
 ambientes (§4.7), painel (§4.8), isolamento (§4.9), transição sem parar (§4.10) e demandas em voo (§4.11).
+**Ajuste pós-G1** (G1-D25, ciclo 1, APPROVE com ressalvas): §9 fixa as restrições obrigatórias para os contratos
+F3a–F3c; números corrigidos no §1, §3.1 e §5.2; legado = log inteiro na migração (§4.2.8, S9, §5.1).
 **Anexo**: mapa [`docs/contracts/plataforma-multiproduto-mapa.md`](../contracts/plataforma-multiproduto-mapa.md), seção H.
 **Relaciona-se com**: ADR-017 (300 ms e 64 KB no `/api/live`), ADR-018 (produtivo inquebrável), ADR-019 (evidências
 mascaradas), ADR-020 e ADR-023 (conversas e anexos fora do git), ADR-021 (versão e ambiente), ADR-025 (publicador da
@@ -27,6 +29,10 @@ Fatos verificados em 2026-09-25 (cópia principal em `develop`, `eef4dd9`):
   #56, #67, #74, #84, #90, #104, #106, #118, #136, #143, #161, #171, #179, #189, #191, #197, #203) mudaram
   `tools/squad`, `squad-control`, `docs/squad` ou o protocolo. As branches em voo (D23, D24, D25) também são da
   plataforma.
+  **Correção de número**: o pedido do humano falava em "14 PRs"; o `gh` (só leitura, 2026-09-25) mostra **24 PRs
+  integrados** na `develop`, que são exatamente os listados acima (#85 e #95 incluídos). Este ADR usa 24.
+- **Issues**: 189 no repositório (`gh issue list --state all`) e 189 itens no Project nº 1 em 2026-09-25 (a primeira
+  versão deste ADR dizia 173).
 - **O Project nº 1 é do usuário, não do repositório.** `github_sync.py` usa `gh project … --owner` e não amarra o
   Project a um repositório. Ele pode ter itens de mais de um repositório.
 - **O publicador (ADR-025, D24) está preso à cópia principal deste repositório**: `plankton/` em `develop`, com
@@ -65,7 +71,7 @@ Fatos verificados em 2026-09-25 (cópia principal em `develop`, `eef4dd9`):
 |---|---|---|
 | Histórico git | a plataforma nasce de `filter-repo` com SHAs novos (tabela `MIGRATION-SHAS.md`). Ela é o lado com mais commits e é o que continua mudando | a plataforma **mantém os SHAs**. O produto, pequeno e estável, nasce de `filter-repo` com a tabela de SHAs |
 | PRs (#30…#203) | 22 dos 24 PRs integrados ficam no repositório do produto, longe do código que mudaram | os PRs ficam junto do código que mudaram. Os do produto (#85, #95) continuam válidos no repositório antigo |
-| Issues (173) | espelham sobretudo demandas da fábrica e ficam no repositório do produto. As `operacao` novas vão para outro repositório | continuam no repositório da plataforma, que é onde está a maioria. A partir da F4 as issues do checkout vão para `checkout-saga` |
+| Issues (189) | espelham sobretudo demandas da fábrica e ficam no repositório do produto. As `operacao` novas vão para outro repositório | continuam no repositório da plataforma, que é onde está a maioria. A partir da F4 as issues do checkout vão para `checkout-saga` |
 | Project nº 1 | é do usuário, então nada muda | é do usuário, então nada muda. Recebe itens dos dois repositórios, filtráveis pelo campo "Repositório" |
 | Nome | `checkout-saga-squad` continua nomeando o produto; nada a renomear | renomear para `squad-platform`. O GitHub redireciona web, API e `git` do nome antigo **enquanto ninguém criar outro repositório com esse nome** (a confirmar na doc de renomeação do GitHub; a regra de nunca reutilizar o nome vai para o cadastro e para o `squad doctor`) |
 | Links existentes (`blob/develop/docs/squad/…` nas issues, handoffs e ADRs da fábrica) | continuam válidos só enquanto o produto mantiver os arquivos (Q7) | continuam válidos pelo redirecionamento. Os arquivos da memória legada ficam congelados neste repositório (§4.2.8) e o ADR-024 §4.12 fica mais simples |
@@ -144,18 +150,21 @@ de produto na plataforma.
    Uma lacuna de `mseq` (eventos que ainda estão para chegar) não é erro: a sincronização fica pendente e o painel
    mostra quantos eventos faltam.
 6. **Ordem**: a ordem canônica é a de chegada no Neon (`arrival_seq`). No cache local, os eventos que ainda não
-   subiram vêm depois dos sincronizados. Nada no painel depende da posição física da linha: os códigos saem de
+   subiram vêm depois dos sincronizados. Para isso o cache guarda o `arrival_seq` **de cada id** (`arrival.json` ou
+   coluna no índice local), inclusive dos próprios eventos, que voltam com o número no `RETURNING` do push ou no pull;
+   o resumo global da exportação (§5.1) é calculado nessa ordem. Nada no painel depende da posição física da linha: os códigos saem de
    `code`/`codes.json` (F2a).
 7. **Documentos** (gates, handoffs, inbox, bugs, `github-sync.json`, `codes.json`): cada gravação vira uma **versão
    nova** com `(path, version_id, parent_version_id, sha256, machine)` e só por inclusão. A versão mais recente de um
    caminho é a folha única da árvore. Duas folhas para o mesmo caminho formam uma divergência: se o caminho estiver na
    tabela de sentido (§4.3), o caso vira conflito de sentido; senão vale a regra por tipo (§4.3). O parecer do Auditor
    já é imutável por ciclo (`G2-D30.json`, ciclo n), e a regra só formaliza isso.
-8. **Legado (D1–D24)**: na carga da F3 (`squad memory migrate`), o `decisions.jsonl` atual é importado na ordem do
-   arquivo como máquina `legado`. O encadeamento é calculado na importação, e um evento `migration` guarda contagem,
+8. **Legado (o log inteiro na hora da migração)**: na carga da F3a (`squad memory migrate`), o `decisions.jsonl` atual
+   é importado **inteiro** (D1–D24 congeladas no `codes.json` e também tudo o que vier depois, D25 em diante, até o
+   momento da migração), na ordem do arquivo como máquina `legado`. O encadeamento é calculado na importação, e um evento `migration` guarda contagem,
    sha256 do arquivo e o SHA git de origem. Os arquivos continuam **congelados no histórico git** deste repositório. É
    isso que dispensa o `git filter-repo` da F3 (ADR-024 §4.4.2 e §4.13 deixam de valer para a memória).
-9. **Códigos de demanda com várias máquinas**: com a máquina online, o código novo é reservado no Neon (tabela
+9. **Códigos de demanda com várias máquinas**: (detalhado e corrigido no §9.2: reserva só pelo sincronizador, fora da trava, confirmada pelo evento `code-confirmed`) com a máquina online, o código novo é reservado no Neon (tabela
    `codes`, com `UNIQUE (code)`). Se a reserva falhar, a máquina tenta o seguinte. Offline, a demanda nasce com
    **código provisório** (`D?`), que aparece no painel como "provisório". O `feature-start` exige código confirmado,
    porque o nome da branch não pode mudar depois. Uma demanda criada offline pode ser triada e discutida, mas só abre
@@ -280,7 +289,7 @@ como no ADR-025). O modo `local` mostra "Só local", e o modo `git` mostra o est
 | S6 máquina nova | um `SQUAD_HOME` vazio + `init` produz um cache com resumo global igual ao de A e um `/api/state` normalizado igual. Neon recriado vazio + `push --all` de A dá `verify` verde | teste + cópia normalizada |
 | S7 segredo | a URL, o host e a senha de teste não aparecem em log, runs, transcrições, `sync.log`, `server.log`, respostas `/api/*` nem no ambiente de um runner falso que imprime o próprio ambiente | `grep` com o valor sentinela |
 | S8 máscara | evidência com dados pessoais sem máscara é recusada no envio, com alerta | teste com o corpus da D16 |
-| S9 legado | `migrate` importa D1–D24 com contagem e sha256 iguais aos do arquivo congelado; o `migration` fica gravado no Neon e no git | `migrate --verify` |
+| S9 legado | `migrate` importa o log inteiro existente na hora (D1–D24 e os posteriores) com contagem e sha256 iguais aos do arquivo congelado; o `migration` fica gravado no Neon e no git | `migrate --verify` |
 
 ## 5. Ponto 3: evidências do desafio (§14)
 
@@ -289,12 +298,14 @@ como no ADR-025). O modo `local` mostra "Só local", e o modo `git` mostra o est
 `docs/evidencias/squad/<versão>/`, gerada por `squad memory export --product checkout-saga` no `release-start` e revisada
 no PR de release (é o único momento em que memória entra num repositório de produto: um retrato fixo, não um estado
 vivo). Conteúdo:
-- `log.jsonl`: todos os eventos do produto (legado D1–D24 + os posteriores) em ordem de chegada, com `hash`/`prev`;
+- `log.jsonl`: todos os eventos do produto (legado importado na migração + os posteriores) em ordem de chegada, com `hash`/`prev`;
 - `gates/`, `handoffs/`, `inbox/` (demandas encerradas) e `bugs/` (já mascarados, ADR-019);
 - `prompts/`: o prompt **composto** de cada papel (base da plataforma + especialização do produto), a constituição,
   os gates-base, os prompts de plantão, delegação, conversa e triagem, e o README "como a squad opera", tudo na versão
   da plataforma em uso;
 - `decisoes/`: cópia dos ADRs e contratos da fábrica que o produto usou;
+- `arquitetura/`: o diagrama e a visão da squad agêntica (§14 pede "diagramas da squad" no material entregue; o
+  `docs/architecture` do produto não basta apontar para a plataforma);
 - `MANIFEST.json`: versão e SHA da plataforma e do produto, contagens, sha256 de cada arquivo, cabeças do encadeamento
   por máquina, resumo global e o `arrival_seq` máximo no Neon na hora da exportação;
 - `verificar.py`, só stdlib, que recalcula hashes, encadeamento e resumo **sem rede** e sem o Neon.
@@ -314,7 +325,7 @@ mais simples possível e não depende de nada que esta revisão muda.
 | Evidências: decisões arquiteturais | `docs/adr/` do produto + `evidencias/squad/<v>/decisoes/` | ADRs da fábrica (fonte) | eventos `decision` |
 | Evidências: resultados por agente | `evidencias/squad/<v>/{gates,handoffs}/` | — | fonte viva |
 | Documento técnico (README, execução, testes, falhas, **como a squad opera**) | `README.md` + `evidencias/squad/<v>/prompts/README-squad.md` | `README.md` da plataforma (fonte) | — |
-| Histórico git, PRs, issues e Project | tag `entrega-desafio-<data>` (antes da F4) + PRs do produto | PRs #30…#203, 173 issues (via redirecionamento) | Project nº 1 (do usuário) |
+| Histórico git, PRs, issues e Project | tag `entrega-desafio-<data>` (antes da F4) + PRs do produto | PRs #30…#203, 189 issues (via redirecionamento) | Project nº 1 (do usuário) |
 
 ### 5.3 Alternativas
 | Alternativa | Situação |
@@ -330,11 +341,11 @@ mais simples possível e não depende de nada que esta revisão muda.
 |---|---|---|---|
 | **F3a — memória fora do repositório (backend `local`)** | `MemoryStore` + cache em `$SQUAD_HOME/products/<id>/memory` + `run:`; `migrate` com máquina `legado`, encadeamento e evento `migration`; `gitflow` sem `STATE` no modo externo; campos `machine/mseq/prev/hash` no `log.py`; `README` "movido para" em `docs/squad/memory` | ADR-024 F3 (a), (c), (d), (e) + S9; **sem** `git filter-repo` | `SQUAD_MEMORY_MODE=repo` + reimportação por id (ADR-024 §4.10) |
 | **F3b — backend Neon e sincronização** | `memory_neon.py` (psycopg), `setup`/`init`/`sync`/`verify`/`push --all`, sincronizador no `server.py`, tabela de sentido, alertas `sync-conflict`/integridade, `memory` no `/api/live`, botão, reserva de código, filtro de segredo, lista de permissão do ambiente | S1–S8; `tests/squad` verde **sem** driver instalado | `backend = "local"` no cadastro: o cache continua íntegro e o Neon só deixa de receber |
-| **F3c — exportação de evidências** | `squad memory export` + `verificar.py` + integração no `release-start`; tag `entrega-desafio-<data>` | a exportação de um release verifica offline; mudar 1 byte faz o `verificar.py` falhar; os itens do §5.2 presentes | apagar a pasta da exportação no PR |
-| **F4 — extração do produto (sentido B)** | `checkout-saga` extraído com `filter-repo` (serviços, infra, console, `docs/architecture`, ADRs/contratos do produto, `tests/e2e`, CI Maven) + `MIGRATION-SHAS.md`; produto removido da plataforma; `AGENTS.md` dividido (constituição na plataforma, bloco gerado no produto); cadastro `checkout-saga` apontando para o clone novo; mudança do Compose `checkout-saga` com janela; `plankton-teste` recriado; renomeação para `squad-platform` | (a) nenhum arquivo de produto na plataforma (`grep`/lista); (b) `git log --follow` do `server.py` inalterado (mesmos SHAs); (c) produtivo do checkout com volumes preservados (`prod-fingerprint` de dados antes/depois igual) e smoke verde; (d) CI verde nos dois repositórios; (e) um link antigo `blob/develop/docs/squad/…` de issue abre pelo redirecionamento; (f) uma demanda `produto` e uma `operacao` entregues depois do corte | o produto continua no histórico da plataforma: reverter o PR de remoção e voltar o Compose ao diretório antigo (mesmo projeto, mesmos volumes) |
+| **F3c — exportação de evidências** | `squad memory export` + `verificar.py` + integração no `release-start` (só depois da F4, §9.3); tag `entrega-desafio-<data>` | a exportação de um release verifica offline; mudar 1 byte faz o `verificar.py` falhar; os itens do §5.2 presentes, com o diagrama da squad | apagar a pasta da exportação no PR |
+| **F4 — extração do produto (sentido B)** | `checkout-saga` extraído com `filter-repo` (serviços, infra, console, `docs/architecture`, ADRs/contratos do produto, `tests/e2e`, CI Maven) + `MIGRATION-SHAS.md`; produto removido da plataforma; `AGENTS.md` dividido (constituição na plataforma, bloco gerado no produto); cadastro `checkout-saga` apontando para o clone novo; mudança do Compose `checkout-saga` com janela; `plankton-teste` recriado; renomeação para `squad-platform` | (a) nenhum arquivo de produto na plataforma (`grep`/lista); (b) `git log --follow` do `server.py` inalterado (mesmos SHAs); (c) produtivo do checkout com volumes preservados (`prod-fingerprint` de dados antes/depois igual) e smoke verde; (d) CI verde nos dois repositórios; (e) um link antigo `blob/develop/docs/squad/…` de issue abre pelo redirecionamento; (f) uma demanda `produto` e uma `operacao` entregues depois do corte; (g) primeiro release do `checkout-saga` com a exportação commitada e verificada offline (§9.3) | o produto continua no histórico da plataforma: reverter o PR de remoção e voltar o Compose ao diretório antigo (mesmo projeto, mesmos volumes) |
 
 Dependências novas: a F3a exige a F2a. A F3b exige a F3a, a conta Neon com `setup` feito pelo humano (Q-B1) e a URL no
-`.env`. A F3c exige a F3a (pode vir antes da F3b; nesse caso exporta do cache). A F4 exige F2b + F3a + F3c. A F4 não
+`.env`. A F3c exige a F3a (pode vir antes da F3b; nesse caso exporta do cache; onde a exportação fica antes da F4: §9.3). A F4 exige F2b + F3a + F3c. A F4 não
 depende da F3b: o backend pode continuar `local` durante a extração. A Q4 do ADR-024 deixa de bloquear a F3: com o
 Neon, os links de parecer em PRs e issues passam a citar o id do evento e trazem o resumo no corpo (ADR-024 §4.12, caso
 "só local"), e os links antigos continuam válidos pelo §3.
@@ -373,3 +384,69 @@ Neon, os links de parecer em PRs e issues passam a citar o id do evento e trazem
 - **Q-C1**: a entrega é o repositório `checkout-saga` com a exportação (recomendado), ou prefere entregar os dois
   repositórios com a exportação num deles?
 - **Q-C2**: autoriza criar agora a tag `entrega-desafio-<data>` no estado atual (antes da F3)?
+
+## 9. Restrições obrigatórias para os contratos da F3a–F3c (ressalvas do G1-D25)
+
+O G1-D25 aprovou este ADR com ressalvas. Cada item abaixo é **obrigatório** no contrato da fase indicada e vira
+critério do G1 dessa fase: o contrato que não o cobrir volta ao Arquiteto.
+
+### 9.1 Segredo (`SQUAD_MEMORY_URL_*`): caminhos que já existem no código (contrato F3b; S7 ampliado)
+| # | Caminho de vazamento | Restrição |
+|---|---|---|
+| R1 | `/api/project` (`server.py:1660-1670`) lê o `.env` da raiz e substitui **qualquer** `{{VAR}}` de `project.json` (arquivo editável por agentes) na resposta | a substituição passa a ser por **lista de permissão** de nomes (`GRAFANA_PORT`, `CONSOLE_PORT`, … declarados no contrato); nome fora da lista vira texto vazio e gera alerta; `SQUAD_MEMORY_URL_*` (e qualquer nome com `URL`, `TOKEN`, `KEY`, `SECRET`, `PASSWORD`) é recusado mesmo se alguém o incluir na lista. O mesmo vale para o cadastro TOML (F2a) e qualquer outro ponto que interpole `{{VAR}}` |
+| R2 | `run_agent.py:150` e `:227` repassam o `os.environ` inteiro aos filhos | lista de permissão igual à de `conversa.py` (`ENV_ALLOW`/`ENV_PREFIX`, `conversa.py:96-97` e `child_env`, `:222-225`, que já não repassa `SQUAD_*`); a regra cobre também `testenv.py`, o publicador (ADR-025), o plantão e o `github_sync`. Além disso o servidor lê o `.env` num dicionário próprio e **nunca** grava a URL em `os.environ`, para que nenhum filho do servidor a herde |
+| R3 | um agente com Bash pode rodar `squad memory sync` | o CLI **não** lê a URL: `sync`, `verify`, `push --all` e `init` pedem ao servidor (`POST /api/memory/sync`, só do humano, ADR-017) e não abrem conexão. Só `setup` fala com o Neon a partir do CLI, com a conexão do dono digitada via `getpass` em tty (sem tty, recusa). O que resta (um agente com Bash lendo o arquivo do segredo) é o limite declarado da Q-B4 |
+| R4 | até a F4 o `.env` da cópia principal é o mesmo que o Compose do produtivo interpola | a URL fica num **arquivo separado**, `$SQUAD_HOME/secrets/memory.env` (modo 600, fora de qualquer worktree e fora do alcance do `docker compose`), nunca no `.env` do repositório. O cadastro guarda só o nome da variável (`cad:memory.url_env`). Se o humano preferir o `.env` (pedido original), isso entra como aceitação explícita na Q-B4 |
+
+S7 passa a testar, além do runner falso: `{{SQUAD_MEMORY_URL_X}}` em `project.json` e no cadastro (resposta sem o
+valor), ambiente do filho de `run_agent.py`/`testenv.py`/publicador sem `SQUAD_MEMORY_*`, CLI sem tty recusando
+`setup`, e `sync` pelo CLI sem servidor falhando sem abrir conexão.
+
+### 9.2 Reserva de código no Neon × `product.append_task` da D23 (contratos F3a e F3b)
+A D23 grava `code = max+1` dentro do próprio evento `task`, sob `fcntl.flock(codes.lock)` com `LOCK_TIMEOUT_S = 5 s`
+(`product.py:320-345`), chamado por `server.py:1071` e por `log.py:168`. Regras:
+1. **Reserva fora da trava.** Rede nunca acontece com `codes.lock` segura (o `connect_timeout` de 10 s estouraria a
+   trava de 5 s e travaria os outros gravadores). O `task` é gravado sob a trava como hoje, com `code` **provisório**
+   (`D?<id>`) sempre que o backend for `neon`; o `max+1` local só vale no backend `local`/`git` (F3a sem mudança de
+   comportamento).
+2. **Quem reserva é só o sincronizador** (thread do servidor, §4.1), na rodada de push: `INSERT INTO codes … ON
+   CONFLICT DO NOTHING`, tentando o seguinte em caso de colisão. A requisição HTTP que cria a demanda não fala com o
+   Neon (corrige o §4.2.9, que dava a entender reserva na requisição).
+3. **Registro do código confirmado**: o `task` é imutável; a confirmação é um **evento novo `code-confirmed`**
+   `{task: <id do task>, code: "D31", reserved_at, machine}`, gravado no cache sob a trava e sincronizado como qualquer
+   evento. O leitor resolve o código da demanda como: `code-confirmed` mais recente para o id, senão o `code` do `task`.
+   `codes.json` passa a ser derivado desses eventos (é documento, §4.2.7). Dois `code-confirmed` com códigos diferentes
+   para o mesmo `task` é conflito de sentido (entra na tabela do §4.3).
+4. **`log.py` é offline** (caminho dos agentes, §4.1): sempre grava provisório no backend `neon`; o painel mostra
+   "provisório" até o `code-confirmed`, e o `feature-start` continua exigindo confirmado.
+5. Critério no G1 da F3b: duas máquinas (dois `SQUAD_HOME`) criam demanda offline, sincronizam e recebem códigos
+   distintos; `strace`/log do teste mostra zero conexões com `codes.lock` segura.
+
+### 9.3 F3c antes da F4: onde fica a exportação (contrato F3c)
+Enquanto `checkout-saga` não existe, o único repositório é o atual (a futura plataforma), e o §5.3 rejeita exportar
+para o repositório da plataforma. Portanto:
+- a F3c entrega **o mecanismo** (`squad memory export`, `verificar.py`, testes) e gera exportações só em diretório de
+  trabalho (`$SQUAD_HOME/products/checkout-saga/exports/<versão>/`), **sem commit**;
+- a integração no `release-start` fica **desligada** até a F4 (`export.enabled = false` no cadastro);
+- a evidência versionada antes da F4 é só a tag `entrega-desafio-<data>` (Q-C2);
+- a primeira exportação commitada em `docs/evidencias/squad/<versão>/` acontece no primeiro release de `checkout-saga`
+  depois da F4 (critério (g) da F4: esse release existe e o `verificar.py` passa offline).
+- Se a Q-C1 escolher "entregar os dois repositórios com a exportação num deles", este item é revisto por ADR.
+
+### 9.4 Correções de detalhe (contratos F3a/F3b)
+- `arrival_seq` por id no cache (§4.2.6); o contrato F3b define o arquivo e o critério (resumo global igual em duas
+  máquinas depois do pull).
+- Legado = o log inteiro na hora da migração (§4.2.8, S9), não "D1–D24".
+- Mapa H0: B16 (anexos) sai da linha do cache e fica só em `run:` (corrigido no anexo).
+- A exportação leva o diagrama da squad (§5.1 `arquitetura/`; mapa H9).
+
+### 9.5 Impacto em F5 dos pontos 2 e 3
+- **Ponto 2 (memória)**: cada produto novo da F5 ganha esquema `squad_<id>`, papel `squad_writer_<id>`, variável
+  `SQUAD_MEMORY_URL_<ID>` no arquivo de segredo (R4) e nome na lista de recusa do R1; a lista de permissão do R2 não muda
+  (é por prefixo recusado, não por produto). A reserva de código (§9.2) é por produto (tabela `codes` no esquema do
+  produto), então códigos `D…` repetem entre produtos e toda referência passa a ser `<produto>/<código>`; o evento
+  `code-confirmed` e a tabela de sentido valem sem mudança. A negação de leitura cruzada (ADR-024 §4.9) passa a cobrir
+  também o arquivo de segredo.
+- **Ponto 3 (evidências)**: `squad memory export --product <id>` já é por produto; cada produto da F5 liga
+  `export.enabled` só quando tiver repositório próprio (mesma regra do §9.3). O `MANIFEST.json` referencia o esquema do
+  produto e o `verificar.py` não muda. Produto sem entrega externa pode deixar a exportação desligada.

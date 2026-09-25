@@ -149,9 +149,10 @@ próprio), `run:` = `$SQUAD_HOME/products/<id>/runtime/` (fora do git; inclui `r
 | A4 | CLI `squad` + apelidos no Makefile do produto | Makefile da plataforma mantém os alvos da squad; os alvos do produto (`e2e`, Compose) vão para o Makefile de `checkout-saga` (F4) |
 | A8 | CI do produto intacta; CI nova na plataforma | `ci.yml` (Maven/e2e) **vai** para `checkout-saga`; a plataforma ganha CI de `tests/squad` (F4) |
 | A9, D2, D4, D7 | produto recebe constituição gerada | igual, no clone novo (F4) |
-| B1–B6, B14, B16 | `mem:` (repo git) na F3 | `mem:` cache local na F3a; envio ao Neon na F3b (B7, B8, B10, B11, B16 permanecem em `run:`, nunca no Neon) |
+| B1–B6, B14 | `mem:` (repo git) na F3 | `mem:` cache local na F3a; envio ao Neon na F3b |
+| B7, B8, B10, B11, B16 | `run:` | igual: permanecem em `run:`, nunca no cache sincronizado nem no Neon (B16 = anexos, ADR-023) |
 | B12 | no-op na F3, removido na F4 | igual; **sem** `git filter-repo` na F3 (legado importado como máquina `legado`, arquivos congelados no git) |
-| B14 | `codes.json` congelado (F2a) | + reserva de código no Neon (`UNIQUE`), código provisório offline, `feature-start` exige confirmado (F3b) |
+| B14 | `codes.json` congelado (F2a) | + reserva de código no Neon (`UNIQUE`) feita só pelo sincronizador e fora do `codes.lock`; confirmação pelo evento `code-confirmed`; `log.py` sempre provisório no backend `neon`; `feature-start` exige confirmado (F3b, ADR-026 §9.2) |
 | B15 | produto implícito pelo local do log | + `machine`, `mseq`, `prev`, `hash` em todo evento (F3a) |
 | D1, D3, D5, D6, D13, E2 | movem para `plat:` (F4) | **ficam**; só o texto de produto sai para `prod:` |
 | E1 | ficam no produto | **movem** para `checkout-saga` com os mesmos números (F4) |
@@ -165,12 +166,12 @@ próprio), `run:` = `$SQUAD_HOME/products/<id>/runtime/` (fora do git; inclui `r
 | H1 | `log.py` e demais gravadores (`gitflow`, `github_sync`, `triage`, `pending`, `server.py`) | gravam só no cache local com `flock`, sem rede e sem segredo; campos `machine/mseq/prev/hash` | PLAT | `MemoryStore` | F3a |
 | H2 | sincronizador (thread do `server.py`) + `squad memory {setup,init,sync,verify,push --all,migrate,export}` | push/pull idempotente por id, cursor e `acked` locais, conexão curta | PLAT | `plat:tools/squad/memory*.py` | F3b |
 | H3 | `memory_neon.py` + `$SQUAD_HOME/venv` com `psycopg[binary]` fixo | única exceção à regra "só stdlib"; `squad doctor` verifica | PLAT | `plat:` | F3b |
-| H4 | `.env` da cópia principal da plataforma: `SQUAD_MEMORY_URL_<ID>` | segredo lido só pelo servidor/CLI humano; lista de permissão do ambiente dos filhos; filtro de mensagens | CFG | `cad:memory.url_env` (nome, nunca valor) | F3b |
+| H4 | arquivo de segredo `$SQUAD_HOME/secrets/memory.env` (modo 600, fora do `.env` do Compose): `SQUAD_MEMORY_URL_<ID>` | segredo lido só pelo servidor (CLI só no `setup`, com tty); lista de permissão do ambiente em `run_agent.py`/`testenv.py`/publicador; `/api/project` com `{{VAR}}` só por lista (ADR-026 §9.1) | CFG | `cad:memory.url_env` (nome, nunca valor) | F3b |
 | H5 | `/api/live` (`memory` ≤ 200 B, sem rede), `POST /api/memory/sync`, selo no painel | status Sincronizado / Offline · N pendentes / Erro; botão só do humano | PLAT | `server.py`, `index.html` | F3b |
 | H6 | `alerts.py` | alertas `sync-conflict` (tabela de sentido) e de integridade; bloqueio da demanda no `gitflow` e no plantão até `conflict-resolved` | PLAT | `plat:` | F3b |
 | H7 | Neon: esquema `squad_<id>`, papel `squad_writer_<id>` só `SELECT, INSERT`; gatilho contra `UPDATE`/`DELETE`; tabelas `events`, `docs`, `codes`, `sync_runs` | log só de inclusão com ordem de chegada | MEM | Neon | F3b |
 | H8 | máscara ADR-019 reaplicada antes do envio; evidências > 1 MB só locais | nada sem máscara sai da máquina | PLAT | sincronizador | F3b |
-| H9 | `docs/evidencias/squad/<versão>/` + `verificar.py` + `release-start`; tag `entrega-desafio-<data>` | retrato congelado e verificável para o §14 do desafio | PROD (gerado) | `prod:` (`checkout-saga`) | F3c |
+| H9 | `docs/evidencias/squad/<versão>/` + `verificar.py` + `release-start`; tag `entrega-desafio-<data>` | retrato congelado e verificável para o §14 do desafio, com o diagrama da squad; antes da F4 só mecanismo e exportação fora do git (ADR-026 §9.3) | PROD (gerado) | `prod:` (`checkout-saga`) | F3c |
 | H10 | extração do produto: `services/`, `checkout-console/`, `infra/`, `Dockerfile`, `docker-compose.yml`, `pom.xml`, `tests/e2e`, `docs/architecture`, ADRs/contratos E1, `docs/desafio.md`, `README.md` do produto; mudança do Compose `checkout-saga` de diretório; renomeação do repo | sentido B | PROD | `prod:` novo `checkout-saga` | F4 |
 
 ## Contagem
