@@ -428,7 +428,6 @@ class T03Listagem(unittest.TestCase):
         self.assertIn(a, ids)
         self.assertIn(b, ids)
 
-    @unittest.expectedFailure   # defeito QA-D17-1 (menor, Orquestrador): updatedAt em segundos, empate cai na ordem do glob
     def test_mais_recente_primeiro_no_mesmo_segundo(self):
         """Contrato §7: itens 'mais recente primeiro'. Conversa A criada e respondida, B criada logo depois (mesmo
         segundo) → B é a mais recente e deve vir primeiro, em todas as repetições."""

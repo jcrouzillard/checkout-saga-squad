@@ -506,10 +506,13 @@ class Store:
             for p in self.dir.glob("c-*.jsonl"):
                 if ID_RE.match(p.stem):
                     try:
-                        out.append(self.summary(p.stem))
+                        out.append((self.summary(p.stem), p.stat().st_mtime_ns))
                     except (ChatError, OSError):
                         continue
-        return sorted(out, key=lambda s: s["updatedAt"] or "", reverse=True)
+        # QA-D17-1: `updatedAt` tem resolução de segundo (formato do contrato §5); no empate, desempata pela última
+        # escrita no arquivo (mtime em ns, cada append faz fsync) e depois pelo createdAt — nunca pela ordem do glob.
+        out.sort(key=lambda it: (it[0]["updatedAt"] or "", it[1], it[0]["createdAt"] or "", it[0]["id"]), reverse=True)
+        return [s for s, _ in out]
 
     def recover(self) -> int:
         """Na subida: turno com mensagem do humano sem resposta é fechado com `interrompida` (§3.2)."""
