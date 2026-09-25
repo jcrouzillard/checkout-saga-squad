@@ -6,7 +6,7 @@ Contrato: `docs/contracts/conversa-com-o-orquestrador.md` (CA-1..CA-23) · ressa
 ## Evidências
 | Arquivo | O que prova |
 |---|---|
-| `tests/squad/test_conversa_d17.py` + `tests/squad/conversa_fake_runner.py` | 44 testes com o runner simulado (43 OK + 1 falha esperada = QA-D17-1) |
+| `tests/squad/test_conversa_d17.py` + `tests/squad/conversa_fake_runner.py` | 44 testes com o runner simulado (44 OK após a correção de QA-D17-1) |
 | `tests/squad/latencia_conversa_d17.json` | CA-5: 14 perguntas reais, `firstTextMs` com e sem ferramenta |
 | `tests/ui/d17-ca7-real.json` | CA-7/CA-16 com o `claude` real (canários, respostas, negação por construção) |
 | `tests/ui/d17-conversa.js` → `tests/ui/d17-conversa-result.json`, `tests/ui/d17-*.png` | UI no navegador (puppeteer descartável), 1440/390, claro/escuro, axe |
@@ -53,6 +53,14 @@ turno ativo e o texto final também não duplica. Na API, `Last-Event-ID` reenvi
 | QA-D17-1 | menor | Orquestrador | `Store.list()` ordena por `updatedAt` com resolução de segundo. Com empate, a ordem cai na do glob. Conversa A respondida e B criada no mesmo segundo: B (a mais recente) fica fora do topo em 6/6 repetições. Correção: desempatar por `createdAt`/`seq`/mtime ou gravar ms. Teste: `T03Listagem.test_mais_recente_primeiro_no_mesmo_segundo` (`expectedFailure`, falha de propósito até a correção) |
 | QA-D17-2 | menor | Frontend | `<ol id="chat-msgs" role="log">`: o `role` tira a semântica de lista e os `<li class="c-msg">` ficam órfãos. O axe acusa `listitem` (WCAG 1.3.1, 2 a 8 nós). Correção: `role="log"` num contêiner em volta do `<ol>`, ou `div`/`article` no lugar de `li` |
 | QA-D17-3 | menor | Orquestrador (prompt) | Com o runner real, a pedidos de escrita ("crie x.txt, rode log.py, faça commit") o modelo recusa, mas indica **comandos de terminal**, inclusive `log.py --agent orquestrador`. O §4.2 manda explicar o caminho pelo Squad Control. Efeito provável do `CLAUDE.md`/`AGENTS.md` carregados como instrução. Nas outras 13 respostas não houve "ação de agente" |
+
+## Revalidação após correção (47976c9, f02726b)
+| Defeito | Resultado | Evidência |
+|---|---|---|
+| QA-D17-1 | **PASS** | `Store.list()` desempata por mtime em ns, depois `createdAt` e `id`. O `expectedFailure` saiu; `T03Listagem.test_mais_recente_primeiro_no_mesmo_segundo` passou na suíte e em mais 3 execuções isoladas (6/6 listagens com B no topo em cada uma) |
+| QA-D17-2 | **PASS** | `#chat-log` é `div role="log" aria-live="off"` e envolve `#chat-msgs`, que segue `ol` sem `role`; 0 `li` órfãos (`CA23-aria-live.roleLog` em `tests/ui/d17-conversa-result.json`). O axe (WCAG A/AA) dá 0 violações em 390 escuro e no contraste escuro; `listitem` não aparece mais. Roteiro inteiro verde (20/20 checagens, 0 erros de página); capturas refeitas |
+| QA-D17-3 | **PASS** | Runner real `claude` 2.1.280, em cópia com `CLAUDE.md`/`AGENTS.md`/`tools/squad`. Perguntas: "grave no log que aprovei o G2 da D16" e "faça commit desse arquivo". As duas respostas recusam e apontam o Squad Control (painel da demanda/alerta; Demandas → Nova demanda + PR). Nenhuma cita `log.py`, `git` ou `gitflow.py`. Sem ferramentas, sem proposta; log, gates e HEAD iguais; log real intocado. Detalhes em `revalidacao_QA-D17-3` de `tests/ui/d17-ca7-real.json` |
+| Suítes `tests/squad/` | **PASS** | Rodadas uma a uma: alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 38, conversa_d17 44, e2e_compose_seguro_d15 11, governanca_d14_qa 19 (todas OK), entrega_por_pr (todas as verificações passaram) |
 
 ## Observações (sem defeito)
 - §9 diz "caixa desabilitada durante o turno", mas também "foco permanece na caixa de texto". A UI desabilita **Enviar**

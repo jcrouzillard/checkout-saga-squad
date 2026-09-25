@@ -107,8 +107,13 @@ const dropAll = () => { for (const s of [...sockets]) s.destroy(); };
   const lives = await p.evaluate(() => ({ live: [...window.__live], alert: [...window.__alert] }));
   R('CA2-estados', { ok: humanNow && pensandoMs <= 300 && lendo && durante.textDisabled !== undefined && fim.msgs === 2 && /Resposta simulada/.test(bubble) && !/\*\*/.test(bubble),
     vazio, humanNow, pensandoMs, lendo, lendoTxt, durante, fim, bubble: bubble.slice(0, 200), model: /claude-fake-1-20260901/.test(bubble) });
-  R('CA23-aria-live', { ok: lives.live.filter(t => /Resposta simulada|Trecho/.test(t)).length === 0 && lives.live.some(t => /Resposta do Orquestrador recebida/.test(t)), ...lives,
-    roleLog: await p.$eval('#chat-msgs', e => e.getAttribute('role')), dialog: await p.$eval('#chat', e => [e.getAttribute('role'), e.getAttribute('aria-modal'), e.getAttribute('aria-labelledby')]) });
+  // QA-D17-2 (revalidação): role="log" no contêiner #chat-log; #chat-msgs continua <ol> SEM role (semântica de lista).
+  const roleLog = await p.evaluate(() => { const c = document.getElementById('chat-log'), l = document.getElementById('chat-msgs');
+    return { container: c && [c.tagName, c.getAttribute('role'), c.getAttribute('aria-live')], lista: l && [l.tagName, l.getAttribute('role')], dentro: !!(c && l && c.contains(l)),
+      liOrfaos: [...document.querySelectorAll('#chat-msgs > li')].filter(li => li.parentElement.tagName !== 'OL').length }; });
+  const roleLogOk = !!roleLog.container && roleLog.container[1] === 'log' && roleLog.lista && roleLog.lista[0] === 'OL' && roleLog.lista[1] === null && roleLog.dentro && roleLog.liOrfaos === 0;
+  R('CA23-aria-live', { ok: roleLogOk && lives.live.filter(t => /Resposta simulada|Trecho/.test(t)).length === 0 && lives.live.some(t => /Resposta do Orquestrador recebida/.test(t)), ...lives,
+    roleLog, roleLogOk, dialog: await p.$eval('#chat', e => [e.getAttribute('role'), e.getAttribute('aria-modal'), e.getAttribute('aria-labelledby')]) });
   const linkD = await p.evaluate(() => [...document.querySelectorAll('#chat-msgs a')].map(a => a.getAttribute('href')).filter(h => /D17/.test(h || '')));
   R('CA21-balao', { ok: /claude-fake-1-20260901/.test(bubble), linkDemanda: linkD });
 
