@@ -256,7 +256,8 @@ def build_cmd(runner: str, conversa: dict, turno: dict) -> list[str]:
         # variádico e engoliria o prompt. Sem imagem: comando do D17 inalterado.
         img = [f"--image={p}" for p in images] + (["--"] if images else [])
         if turno.get("resume") and conversa.get("sessionId"):
-            cmd = ["codex", "exec", "resume", conversa["sessionId"], "--json", "-c", 'sandbox_mode="read-only"']
+            cmd = ["codex", "exec", "resume", conversa["sessionId"], "--json", "-c", 'sandbox_mode="read-only"',
+                   "--skip-git-repo-check"]   # defeito c1b28e123d53: fora de repo git a sessão reiniciava sem aviso
             return cmd + (["-m", model] if model else []) + img + [prompt]
         cmd = ["codex", "exec", "--json", "-s", "read-only", "-C", data_root, "--skip-git-repo-check"]
         return cmd + (["-m", model] if model else []) + img + [f"{sp}\n\n{prompt}"]
