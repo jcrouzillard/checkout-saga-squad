@@ -38,6 +38,9 @@ BUILTIN = {DEFAULT_PRODUCT: {"name": "Checkout Saga", "code_prefix": "D"}}
 LOCK_TIMEOUT_S = 5.0
 TRANSCRIPT_DIRS_TTL_S = 30.0
 CANONICAL_LOG = "docs/squad/memory/decisions.jsonl"
+# D26 §3.1: `[executors]` ausente = os dois executores permitidos e semente `claude`
+EXECUTOR_NAMES = ("claude", "codex")
+DEFAULT_EXECUTORS = {"allowed": ["claude", "codex"], "seed": {"runner": "claude", "model": None}}
 
 # Divergências conhecidas (contrato §4.3): código citado em documentos/branches/pareceres ≠ código do painel.
 F2A_ALIASES = [
@@ -89,6 +92,9 @@ class Product:
     locks_dir: pathlib.Path
     config_dir: pathlib.Path
     explicit: bool
+    # D26 (ADR-027, contrato executor-e-modelo-por-agente §3.1): guarda/semente dos executores e runtime por máquina
+    executors: dict = dataclasses.field(default_factory=lambda: dict(DEFAULT_EXECUTORS))
+    runtime_dir: pathlib.Path | None = None
 
     def with_log(self, log) -> "Product":
         """Mesmo produto com outro log (ex.: `server.LOG` trocado em teste); memory_dir acompanha o log."""
@@ -144,7 +150,38 @@ def _parse_toml(path: pathlib.Path, pid: str) -> dict:
         raise ProductError(f"{path}: campo `product.id` ({prod['id']}) difere da pasta ({pid})")
     if not PREFIX_RE.match(prod["code_prefix"]):
         raise ProductError(f"{path}: campo `product.code_prefix` inválido ({prod['code_prefix']!r}; esperado ^[A-Z]$)")
+    _parse_executors(path, data.get("executors"))   # D26: [executors] inválido também é cadastro inválido
     return {"name": prod["name"], "code_prefix": prod["code_prefix"]}   # demais tabelas: aceitas e ignoradas (F2b)
+
+
+def load_executors(path: pathlib.Path) -> dict:
+    """D26 §3.1: `[executors]` do product.toml (ausente/arquivo ausente = DEFAULT_EXECUTORS)."""
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        return _parse_executors(path, None)
+    except tomllib.TOMLDecodeError as e:
+        raise ProductError(f"{path}: cadastro ilegível ({e})") from e
+    return _parse_executors(path, data.get("executors"))
+
+
+def _parse_executors(path: pathlib.Path, table) -> dict:
+    """D26 §3.1: `[executors] allowed = [...]`, `seed = {runner, model?}`; ausente = DEFAULT_EXECUTORS."""
+    if table is None:
+        return {"allowed": list(DEFAULT_EXECUTORS["allowed"]), "seed": dict(DEFAULT_EXECUTORS["seed"])}
+    if not isinstance(table, dict):
+        raise ProductError(f"{path}: [executors] deve ser uma tabela")
+    allowed = table.get("allowed", list(DEFAULT_EXECUTORS["allowed"]))
+    if (not isinstance(allowed, list) or not allowed
+            or any(not isinstance(x, str) or x not in EXECUTOR_NAMES for x in allowed)):
+        raise ProductError(f"{path}: executors.allowed inválido (esperado subconjunto não vazio de {list(EXECUTOR_NAMES)})")
+    seed = table.get("seed", {"runner": allowed[0]})
+    if not isinstance(seed, dict) or seed.get("runner") not in allowed:
+        raise ProductError(f"{path}: executors.seed.runner deve estar em executors.allowed")
+    model = seed.get("model")
+    if model is not None and not isinstance(model, str):
+        raise ProductError(f"{path}: executors.seed.model deve ser texto")
+    return {"allowed": sorted(set(allowed), key=allowed.index), "seed": {"runner": seed["runner"], "model": model or None}}
 
 
 def resolve(product: str | None = None) -> Product:
@@ -169,7 +206,9 @@ def resolve(product: str | None = None) -> Product:
                    repo_root=repo_root, data_root=data_root, log=log, memory_dir=log.parent,
                    gates_dir=data_root / "docs/squad/gates", handoffs_dir=data_root / "docs/squad/memory/handoffs",
                    inbox_dir=data_root / "docs/squad/inbox", runs_dir=data_root / ".squad/runs",
-                   locks_dir=data_root / ".squad/locks", config_dir=config_dir, explicit=explicit)
+                   locks_dir=data_root / ".squad/locks", config_dir=config_dir, explicit=explicit,
+                   executors=load_executors(toml),
+                   runtime_dir=data_root / ".squad")   # F3: $SQUAD_HOME/products/<id>/runtime (fora do escopo)
 
 
 # ============================================================== códigos

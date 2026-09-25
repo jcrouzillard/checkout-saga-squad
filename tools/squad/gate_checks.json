@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "_doc": "D26 (ADR-027 §2.8, contrato §7.4): ÚNICA fonte dos comandos que o chamador (gate.py verify) roda antes do Auditor. Mudança só com revisão do Arquiteto. Nada roda por shell.",
+  "checks": [
+    {"id": "g2-mvn-package", "gate": "G2", "when": "backend", "cwd": "worktree", "timeoutS": 900,
+     "cmd": ["mvn", "-q", "package", "-DskipTests"], "expect": "exit0", "criterion": "G2 (B,3) mvn package"},
+    {"id": "g2-saga-unit", "gate": "G2", "when": "backend", "cwd": "worktree", "timeoutS": 900,
+     "cmd": ["mvn", "-q", "-pl", "services/saga-orchestrator", "-am", "test"], "expect": "exit0",
+     "criterion": "G2 (B,3) testes unitários da Saga"},
+    {"id": "g2-compose-config", "gate": "G2", "when": "devops", "cwd": "worktree", "timeoutS": 60,
+     "cmd": ["docker", "compose", "-p", "checkout-verify-{demand}", "config", "-q"], "expect": "exit0",
+     "criterion": "G2 (B,2) docker compose config"},
+    {"id": "g2-compose-healthcheck", "gate": "G2", "when": "devops", "cwd": "worktree", "timeoutS": 60,
+     "cmd": ["docker", "compose", "-p", "checkout-verify-{demand}", "config", "--format", "json"],
+     "expect": "healthcheck-todos", "criterion": "G2 (B,2) todos os serviços com healthcheck"},
+    {"id": "bug-repro-falha", "gate": ["G1", "G3"], "when": "bug", "cwd": "tmp-worktree:{testCommit}", "timeoutS": 900,
+     "cmd": "{testCmd}", "expect": "fail", "criterion": "ADR-019 teste falha no commit do teste"},
+    {"id": "bug-repro-passa", "gate": "G3", "when": "bug", "cwd": "worktree", "timeoutS": 900,
+     "cmd": "{testCmd}", "expect": "exit0", "criterion": "ADR-019 teste passa no head"}
+  ]
+}

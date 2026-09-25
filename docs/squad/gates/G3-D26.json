@@ -1,0 +1,73 @@
+{
+  "gate": "G3",
+  "cycle": 1,
+  "demand": "50366913d891",
+  "code": "D26",
+  "from": "qa",
+  "to": "release (PR para develop, merge do humano)",
+  "commits": [
+    "3a271e2",
+    "0793fa5",
+    "8224764"
+  ],
+  "handoffs": [
+    "f79cb5453d26"
+  ],
+  "defects": [
+    "fa7ef3271a91"
+  ],
+  "recommendation": "APPROVE",
+  "confidence": 0.89,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) Suítes de tests/squad uma a uma (exceto publicador_d24)",
+      "status": "pass",
+      "source": "PATH com claude/codex falsos, CLAUDE_CONFIG_DIR/CODEX_HOME temporários: alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 38, conversa_anexos_d21 27, conversa_d17 44, conversa_tz_d20 7, delegacao_d19 27, e2e_compose_seguro_d15 11, entrega_por_pr (script) ok, executores_d26 41, governanca_d14_qa 19, instancia_d18 18, produto_f2a 27, e2e_delegacao_d19 ok — todas rc=0. Saídas: scratchpad g3-d26/summary.txt"
+    },
+    {
+      "name": "(B,3) Gancho guard-agent com a configuração padrão: 0 bloqueios",
+      "status": "pass",
+      "source": "scratchpad g3-d26/matrix.py com o comando literal de .claude/settings.json (matcher Agent|Task): 8 papéis × {sem, opus, sonnet, haiku, fable} × {sem demanda, com demanda} × {subagent_type, 'agente **Papel**' no prompt} = 160 chamadas, 0 negadas; 18 eventos (snapshot, config de migração, executor-dispatch agregado por papel×demanda — não 160)"
+    },
+    {
+      "name": "(B,2) Falha aberta do gancho",
+      "status": "pass",
+      "source": "log ilegível → 0 (UnicodeDecodeError, permitido); runtime sem permissão → 0; trava ocupada 5,1 s → 0 ('subagente permitido sem checar'); python3 3.9 (/usr/bin) no PATH → 0 com aviso; sem python3 → 0; só JSON de configuração inválido nega (2, 'configuração ilegível'), como o contrato pede"
+    },
+    {
+      "name": "(B,2) Diff 3a271e2 e 8224764 conferido",
+      "status": "pass",
+      "source": "alerts.py: exec_configured com since + exec_governs (B9/'Diferente' não retroativos) e fallback_runs restrito à run; run_agent: run_id antes do resolve; executores.py: append O_APPEND, trava → falha aberta, dispatch_changed, audit-bash (lista branca, falha fechada; testei --outp=, --no-index, -O, ../, ~, -c antes do subcomando, --textconv, --ext-diff: todos negados), auditoria no Codex com -c mcp_servers={}; gate.py incoherent (b) pega APPROVE com check fail/erro não reconhecido; triage.py registra o efetivo da run; settings.json: pré-checagem de versão do python3"
+    },
+    {
+      "name": "(B,2) Memória fora do PR e sincronia com a develop",
+      "status": "pass",
+      "source": "git diff --name-only origin/develop...HEAD -- docs/squad/memory/ inbox/ produto/bugs/ operacao/bugs/ vazio; origin/develop ancestral do HEAD; merge-tree limpo"
+    },
+    {
+      "name": "(B,2) Log real intocado",
+      "status": "pass",
+      "source": "wc -l dos dois decisions.jsonl igual antes/depois (723/734); 0 ids de teste d26a…/d26b…; e2e/delegacao confirmam 'log real intocado'"
+    },
+    {
+      "name": "(2) Interface: roteiros de navegador do QA",
+      "status": "validate",
+      "source": "tests/ui/d26-executores.js 39/39 + 22/22 e d19-delegacao.js 39/39 (resultados versionados); não reexecutados por mim contra servidor real (7070 proibida)"
+    },
+    {
+      "name": "(2) CA-11 e CA-H1..H3 (runs reais)",
+      "status": "validate",
+      "source": "tests/ui/checklist-executores-d26.md: pendentes com o humano; CA-H2 depende da Q2"
+    }
+  ],
+  "open_risks": [
+    "Codex resume da conversa (conversa.py build_cmd) não leva -c mcp_servers={}: o 1º turno roda sem MCP e os seguintes carregam os servidores do ~/.codex/config.toml. Decisão: ERRATA não bloqueante (contrato §7.1 só pede sandbox_mode no resume; não regride em relação à develop, que não tinha nenhum dos dois). Recomendo corrigir no próprio PR (uma linha + asserção no test_executores_d26) e o Arquiteto registrar a errata em §7.1.",
+    "Q2 e Q3 desligadas (DECISOES): Orquestrador fica em Claude Code; perfil auditoria no Claude segue com escrita até a Q3.",
+    "CA-11 e CA-H1..H3 são aceites humanos (roteiro no checklist).",
+    "Após o merge, o gancho PreToolUse(Agent|Task) passa a valer para a sessão do plantão; o primeiro Agent cria .squad/executores.json e grava a migração (executor-config) e a foto da demanda no log real. Com a configuração padrão não nega nada (160/160 permitidos).",
+    "audit-bash: 'git show <rev>:<caminho>' só lê objetos do repositório (aceitável); a validação é por lista branca e só vale no perfil auditoria."
+  ],
+  "human_required": false,
+  "rationale": "Todas as ressalvas do G2 (QA-1..QA-4, endurecimento da auditoria, mcp no Codex auditoria, gate.py record, triagem efetivo) estão no código e cobertas por teste; o defeito fa7ef3271a91 (python3 < 3.11) está corrigido e verificado. Suítes verdes uma a uma, matriz do gancho com 0 bloqueios e falha aberta em todos os modos de erro exceto configuração realmente ilegível. Confiança = (3+3+2+2+2+2+1+1)/(3+3+2+2+2+2+2+2)=16/18≈0,89. Risco moderado por mudar o comportamento da sessão do plantão após o merge; confiança ≥ 0,70 e risco não alto: intervenção humana opcional, além do merge e dos aceites CA-11/CA-H."
+}

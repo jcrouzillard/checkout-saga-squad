@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""`claude` FALSO (D26, QA) — custo zero. Nunca chama um modelo.
+- `--version` → versão; `auth status --json` → {"loggedIn": ...} conforme FAKE_CLAUDE_LOGIN (padrão 1).
+- `-p ...` → registra argv em $FAKE_CALLS (uma linha JSON por chamada) e, conforme FAKE_CLAUDE_MODE:
+  ok (padrão) = grava a transcrição em $SQUAD_TRANSCRIPTS/<session-id>.jsonl com message.model = $FAKE_CLAUDE_MODEL
+  e sai 0; authfail = imprime "Not logged in · Please run /login" e sai 1.
+"""
+import json, os, sys, time
+a = sys.argv[1:]
+if a[:1] == ["--version"]:
+    print("2.1.280 (Claude Code)"); sys.exit(0)
+if a[:2] == ["auth", "status"]:
+    ok = os.environ.get("FAKE_CLAUDE_LOGIN", "1") == "1"
+    print(json.dumps({"loggedIn": ok, "authMethod": "fake"})); sys.exit(0 if ok else 1)
+calls = os.environ.get("FAKE_CALLS")
+if calls:
+    with open(calls, "a") as f:
+        f.write(json.dumps({"bin": "claude", "argv": a, "cwd": os.getcwd(),
+                            "CLAUDE_CONFIG_DIR": os.environ.get("CLAUDE_CONFIG_DIR"),
+                            "SQUAD_MODEL": os.environ.get("SQUAD_MODEL"), "SQUAD_RUN": os.environ.get("SQUAD_RUN")}) + "\n")
+mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")
+if mode == "authfail":
+    print("Invalid API key · Not logged in · Please run /login"); sys.exit(1)
+model = os.environ.get("FAKE_CLAUDE_MODEL", "claude-sonnet-5-fake")
+sid = a[a.index("--session-id") + 1] if "--session-id" in a else None
+tr = os.environ.get("SQUAD_TRANSCRIPTS")
+if sid and tr:
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    with open(os.path.join(tr, f"{sid}.jsonl"), "a") as f:
+        f.write(json.dumps({"type": "user", "timestamp": ts, "message": {"role": "user", "content": "x"}}) + "\n")
+        f.write(json.dumps({"type": "assistant", "timestamp": ts, "message": {"model": model,
+                            "content": [{"type": "text", "text": "OK"}]}}) + "\n")
+print("OK (claude falso)")

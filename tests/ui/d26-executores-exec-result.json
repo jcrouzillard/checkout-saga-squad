@@ -1,0 +1,288 @@
+{
+  "phase": "exec",
+  "checks": [
+    {
+      "name": "link na tela da squad",
+      "ok": true
+    },
+    {
+      "name": "menu Squad ativo",
+      "ok": true
+    },
+    {
+      "name": "foco no h1",
+      "ok": true
+    },
+    {
+      "name": "9 linhas (padrão + 8)",
+      "ok": true,
+      "info": 9
+    },
+    {
+      "name": "Orquestrador: Codex desabilitado (Q2)",
+      "ok": true
+    },
+    {
+      "name": "motivo Q2 visível",
+      "ok": true
+    },
+    {
+      "name": "variável ignorada (SQUAD_RUNNER no ambiente do servidor)",
+      "ok": true
+    },
+    {
+      "name": "estado real: codex sem login (CODEX_HOME vazio)",
+      "ok": true
+    },
+    {
+      "name": "efetivo recente com chip do run real",
+      "ok": true,
+      "info": "Executor e modelo por agente; a primeira linha é o padrão da squad\nAGENTE\tEXECUTOR\tMODELO\tEFETIVO RECENTE\tESTADO\nPadrão da squad\nvale para quem “usa o padrão”\n\t\nClaude Code\nCodex\n\t\t—\tInstalado · Login ok · 2.1.280\n\n\n🎼\nOrquestrador\nagora: Claude Code · claude-opus-5-5 · configuração do agente · run_agent\n\t\nUsar o padrão\nClaude Code\nCodex (aguardando Q2)\n\t\tsem execução ainda\tInstalado · Login ok · "
+    },
+    {
+      "name": "histórico com antes → depois",
+      "ok": true,
+      "info": "QUANDO\tQUEM\tO QUÊ\tANTES → DEPOIS\n25/09/2026, 21:08:00\nhá 14 s\n\tHumano\njuliencrouzillard @ Mac-mini-de-Julien.local\nvia painel\n\tAgente · Arquiteto\tusar o padrão →\npara\n Claude Code · sonnet\n25/09/2026, 21:08:00\nhá 14 s\n\tHumano\njuliencrouzillard @ Mac-mini-de-Julien.local\nvia painel\n\tAgente · Orquestr"
+    },
+    {
+      "name": "Salvar desabilitado sem mudança",
+      "ok": true
+    },
+    {
+      "name": "teclado: select mudou e manteve o foco",
+      "ok": true,
+      "info": "codex"
+    },
+    {
+      "name": "aviso Codex (leitura não isolada)",
+      "ok": true
+    },
+    {
+      "name": "modelo incompatível bloqueia",
+      "ok": true
+    },
+    {
+      "name": "servidor real devolveu 409 (codex sem login)",
+      "ok": true,
+      "info": {
+        "path": "/api/executores",
+        "body": {
+          "baseVersion": 2,
+          "squad": {
+            "runner": "claude",
+            "model": null
+          },
+          "agents": {
+            "orquestrador": {
+              "runner": "claude",
+              "model": "claude-opus-5-5"
+            },
+            "arquiteto": {
+              "runner": "claude",
+              "model": "sonnet"
+            },
+            "devops": null,
+            "observabilidade": null,
+            "backend": null,
+            "frontend": null,
+            "qa": {
+              "runner": "codex",
+              "model": "gpt-5.6-sol"
+            },
+            "auditor": null
+          },
+          "policy": {
+            "onUnavailable": "padrao"
+          }
+        },
+        "status": 409
+      }
+    },
+    {
+      "name": "409 → Salvar mesmo assim",
+      "ok": true
+    },
+    {
+      "name": "409 marca a linha do QA",
+      "ok": true,
+      "info": "▲ Codex sem login nesta máquina"
+    },
+    {
+      "name": "reenvio com acknowledge → 200",
+      "ok": true,
+      "info": {
+        "path": "/api/executores",
+        "body": {
+          "baseVersion": 2,
+          "squad": {
+            "runner": "claude",
+            "model": null
+          },
+          "agents": {
+            "orquestrador": {
+              "runner": "claude",
+              "model": "claude-opus-5-5"
+            },
+            "arquiteto": {
+              "runner": "claude",
+              "model": "sonnet"
+            },
+            "devops": null,
+            "observabilidade": null,
+            "backend": null,
+            "frontend": null,
+            "qa": {
+              "runner": "codex",
+              "model": "gpt-5.6-sol"
+            },
+            "auditor": null
+          },
+          "policy": {
+            "onUnavailable": "padrao"
+          },
+          "acknowledge": true
+        },
+        "status": 200
+      }
+    },
+    {
+      "name": "mensagem salva (versão real)",
+      "ok": true,
+      "info": "Configuração salva (versão 3)."
+    },
+    {
+      "name": "histórico mostra \"salvo mesmo assim\"",
+      "ok": true
+    },
+    {
+      "name": "servidor gravou QA = codex · gpt-5.6-sol",
+      "ok": true,
+      "info": {
+        "runner": "codex",
+        "model": "gpt-5.6-sol"
+      }
+    },
+    {
+      "name": "padrão Codex + Orquestrador herdando = bloqueado",
+      "ok": true
+    },
+    {
+      "name": "outra aba salvou (200)",
+      "ok": true,
+      "info": {
+        "status": 200,
+        "json": {
+          "version": 4,
+          "warnings": [],
+          "events": [
+            "d5fbdca6de6b"
+          ]
+        }
+      }
+    },
+    {
+      "name": "409 versão desatualizada + recarregar",
+      "ok": true,
+      "info": "Não salvo: A configuração mudou em outro lugar (outra aba ou o CLI) depois que você abriu a tela. Recarregue para ver a versão atual e refaça a mudança.. Recarregar a configuração"
+    },
+    {
+      "name": "confirmação na tela (texto do contrato)",
+      "ok": true
+    },
+    {
+      "name": "confirmação diz que o Orquestrador fica no Claude",
+      "ok": true
+    },
+    {
+      "name": "aplicar: 409 real → Aplicar mesmo assim",
+      "ok": true
+    },
+    {
+      "name": "aplicar: POST runner codex + ack → 200",
+      "ok": true,
+      "info": {
+        "path": "/api/executores/aplicar-a-todos",
+        "body": {
+          "baseVersion": 4,
+          "runner": "codex",
+          "model": null,
+          "acknowledge": true
+        },
+        "status": 200
+      }
+    },
+    {
+      "name": "aplicar: mensagem Q2",
+      "ok": true,
+      "info": "Aplicado a todos: padrão Codex. O Orquestrador ficou em Claude Code: Orquestrador no Codex exige danger-full-access; aguardando decisão do humano (Q2)."
+    },
+    {
+      "name": "servidor: squad codex, 7 null, Orquestrador claude",
+      "ok": true,
+      "info": {
+        "schema": 1,
+        "version": 5,
+        "updatedAt": "2026-09-25T21:08:25Z",
+        "squad": {
+          "runner": "codex",
+          "model": null
+        },
+        "agents": {
+          "orquestrador": {
+            "runner": "claude",
+            "model": "claude-opus-5-5"
+          },
+          "arquiteto": null,
+          "backend": null,
+          "devops": null,
+          "observabilidade": null,
+          "frontend": null,
+          "qa": null,
+          "auditor": null
+        },
+        "policy": {
+          "onUnavailable": "parar"
+        },
+        "codexAck": null
+      }
+    },
+    {
+      "name": "política parar explica",
+      "ok": true
+    },
+    {
+      "name": "sem rolagem horizontal 1440",
+      "ok": true
+    },
+    {
+      "name": "390 dark: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "390 dark: tema",
+      "ok": true
+    },
+    {
+      "name": "1440 dark: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "1440 dark: tema",
+      "ok": true
+    },
+    {
+      "name": "390 light: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "390 light: tema",
+      "ok": true
+    },
+    {
+      "name": "sem erros de página",
+      "ok": true,
+      "info": []
+    }
+  ],
+  "errors": []
+}

@@ -1,7 +1,8 @@
 """Conversa direta com o Orquestrador (D17, ADR-020, docs/contracts/conversa-com-o-orquestrador.md).
 
 Sessão dedicada, somente leitura, fora do plantão e fora de `run_agent.py`:
-- cada pergunta dispara um processo do runner (`SQUAD_CHAT_RUNNER`, senão `SQUAD_RUNNER`, senão `claude`) que retoma
+- cada pergunta dispara um processo do executor do Orquestrador (D26: `executores.py resolve orquestrador --context
+  conversa`; `SQUAD_CHAT_RUNNER`/`SQUAD_RUNNER` não configuram mais, exceto `fake` nos testes) que retoma
   a sessão da conversa (`claude -p --resume <uuid>` / `codex exec resume <thread>`), com cwd dedicado
   `<DATA_ROOT>/.squad/conversas/.sessao/` e ambiente do filho por lista de permissão;
 - o histórico é gravado por nós em `<DATA_ROOT>/.squad/conversas/<id>.jsonl` (append-only, fora do git, sem demanda);
@@ -96,6 +97,7 @@ HOME_DENY_FILES = [".netrc", ".gitconfig", ".git-credentials", ".npmrc", ".pypir
 ENV_ALLOW = {"PATH", "HOME", "USER", "LANG", "TERM", "TMPDIR", "CODEX_HOME", "CLAUDE_CONFIG_DIR"}
 ENV_PREFIX = ("LC_", "ANTHROPIC_", "CLAUDE_CODE_", "OPENAI_")
 RUNNERS = ("claude", "codex", "fake")
+LEITURA_SETTINGS = pathlib.Path(__file__).resolve().parent / "perfis/leitura.json"   # D26 §7.1
 CODEX_WARNING = ("Com o runner codex o Orquestrador pode ler qualquer arquivo desta máquina (o sandbox read-only do "
                  "Codex não restringe leitura). Segredos são filtrados da resposta, mas prefira o runner claude.")
 MARK = "```destravar"
@@ -184,13 +186,38 @@ class ChatError(Exception):
 
 
 # ================================================================ runner e comando (§3.1)
+def _fake() -> bool:
+    """Runner simulado só nos testes: `SQUAD_CHAT_RUNNER=fake` + `SQUAD_CHAT_FAKE=<script>`."""
+    return (os.environ.get("SQUAD_CHAT_RUNNER") or "").strip().lower() == "fake" and bool(os.environ.get("SQUAD_CHAT_FAKE"))
+
+
+def resolve_chat(do_check: bool = False) -> dict:
+    """D26 (ADR-027 §4, contrato §8.3): executor/modelo ATUAIS do Orquestrador (contexto conversa, sem foto).
+    do_check=True aplica a política (padrao → roda no padrão com `fallback`; parar → ChatError 503)."""
+    if _fake():
+        return {"runner": "fake", "model": os.environ.get("SQUAD_CHAT_MODEL") or None, "fallback": None}
+    import executores as ex
+    try:
+        r = ex.resolve("orquestrador", None, "conversa", do_check=do_check)
+    except ex.ExecError as e:
+        if e.exit_code == ex.EXIT_STOP:
+            raise ChatError(503, "executor_indisponivel", f"Orquestrador indisponível: {e.message}")
+        raise ChatError(503 if e.exit_code == ex.EXIT_CONFIG else 400, e.code, e.message)
+    return {"runner": r["runner"], "model": r["model"], "fallback": r["fallback"]}
+
+
 def default_runner() -> str:
-    r = (os.environ.get("SQUAD_CHAT_RUNNER") or os.environ.get("SQUAD_RUNNER") or "claude").strip().lower()
-    return r if r in RUNNERS else "claude"
+    try:
+        return resolve_chat()["runner"]
+    except ChatError:
+        return "claude"
 
 
 def requested_model() -> str | None:
-    return os.environ.get("SQUAD_CHAT_MODEL") or None
+    try:
+        return resolve_chat()["model"]
+    except ChatError:
+        return None
 
 
 def timeout_s() -> float:
@@ -257,9 +284,10 @@ def build_cmd(runner: str, conversa: dict, turno: dict) -> list[str]:
         img = [f"--image={p}" for p in images] + (["--"] if images else [])
         if turno.get("resume") and conversa.get("sessionId"):
             cmd = ["codex", "exec", "resume", conversa["sessionId"], "--json", "-c", 'sandbox_mode="read-only"',
-                   "--skip-git-repo-check"]   # defeito c1b28e123d53: fora de repo git a sessão reiniciava sem aviso
+                   "--skip-git-repo-check", "-c", 'approval_policy="never"']   # defeito c1b28e123d53: fora de repo git a sessão reiniciava sem aviso
             return cmd + (["-m", model] if model else []) + img + [prompt]
-        cmd = ["codex", "exec", "--json", "-s", "read-only", "-C", data_root, "--skip-git-repo-check"]
+        cmd = ["codex", "exec", "--json", "-s", "read-only", "-C", data_root, "--skip-git-repo-check",
+               "-c", 'approval_policy="never"', "-c", "mcp_servers={}"]   # D26 §7.1 perfil `leitura`
         return cmd + (["-m", model] if model else []) + img + [f"{sp}\n\n{prompt}"]
     exe = ["claude"] if runner == "claude" else [sys.executable, binary("fake") or "fake-runner"]
     # D21 §5.1: turno com imagem troca só a entrada (uma linha stream-json no stdin, ver claude_stdin); demais flags iguais.
@@ -269,6 +297,8 @@ def build_cmd(runner: str, conversa: dict, turno: dict) -> list[str]:
                  "--disallowedTools", *DENY_TOOLS,
                  "--disallowedTools", *claude_deny_paths(pathlib.Path(data_root)),
                  "--add-dir", data_root, "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
+                 # D26 §7.1 perfil `leitura`: só a fonte `project` + settings dedicado (regras do usuário não ampliam)
+                 "--setting-sources", "project", "--settings", str(LEITURA_SETTINGS), "--permission-mode", "dontAsk",
                  "--append-system-prompt", sp]
     if model:
         cmd += ["--model", model]
@@ -1022,8 +1052,8 @@ class Store:
         """(sessão atual, já usada por algum processo) — usada → --resume."""
         sid = Store.meta(records).get("sessionId")
         for r in records:
-            if r.get("t") == "meta-update" and r.get("sessionId"):
-                sid = r["sessionId"]
+            if r.get("t") == "meta-update" and (r.get("sessionId") or r.get("reason") == "executorChanged"):
+                sid = r.get("sessionId")   # D26: troca de executor zera a sessão (codex: nova thread)
         used = any(r.get("t") == "msg" and r.get("role") == "orquestrador" and r.get("sessionId") == sid
                    for r in records) if sid else False
         return sid, used
@@ -1376,7 +1406,10 @@ class Engine:
             raise ChatError(413, "mensagem_grande", f"mensagem acima de {MAX_TEXT} caracteres")
         recs = self.store.records(cid)
         meta = self.store.meta(recs)
-        runner = meta.get("runner") or default_runner()
+        # D26 (contrato §4): o executor/modelo são os ATUAIS do Orquestrador; troca de executor vale a partir deste
+        # turno e abre sessão nova no novo executor (o histórico injetado continua).
+        chosen = resolve_chat(do_check=True)
+        runner, model = chosen["runner"], chosen["model"]
         with self.lock, self.store.lock:
             # D21: validação dos anexos + gravação da mensagem sob o Store.lock (a limpeza de pendentes não os apaga)
             infos = self.store.resolve_attachments(cid, attachments)
@@ -1398,7 +1431,16 @@ class Engine:
                 raise ChatError(503, "orquestrador_indisponivel",
                                 f"Orquestrador indisponível: runner {runner} ausente (verifique `{runner} --version`)",
                                 message=human)
+            cur_runner = meta.get("runner")
+            for r in recs:
+                if r.get("t") == "meta-update" and r.get("runner"):
+                    cur_runner = r["runner"]
+            if cur_runner and cur_runner != runner:
+                self.store.append(cid, {"t": "meta-update", "sessionId": str(uuid.uuid4()) if runner != "codex" else None,
+                                        "runner": runner, "reason": "executorChanged"})
             t = Turn(cid, n, t0)
+            t.model = model
+            t.fallback = chosen.get("fallback")
             t.attachments = infos
             t.tz = tz
             self.active = t
@@ -1406,7 +1448,10 @@ class Engine:
             for k in [k for k in self.turns if k != (cid, n)][:-20]:   # guarda só os últimos turnos em memória
                 self.turns.pop(k, None)
         threading.Thread(target=self._run, args=(t, runner, text), daemon=True).start()
-        return {"turn": n, "message": human, "stream": f"/api/conversas/{cid}/turnos/{n}/stream"}
+        out = {"turn": n, "message": human, "stream": f"/api/conversas/{cid}/turnos/{n}/stream"}
+        if t.fallback:
+            out["fallback"] = t.fallback
+        return out
 
     def cancel(self, cid: str, n: int) -> dict:
         t = self.turns.get((cid, n))
@@ -1473,7 +1518,7 @@ class Engine:
                 context = build_context(self.state_fn(), self.store.data_root, tz=t.tz)
             except Exception as e:   # sem estado da squad ainda assim responde (e diz que não sabe)
                 context = f"<dados_da_squad erro=\"{type(e).__name__}\">{{}}</dados_da_squad>"
-            model = meta.get("modelRequested")
+            model = getattr(t, "model", meta.get("modelRequested"))   # D26: modelo atual do Orquestrador
             deadline = t.t0 + timeout_s()
             history = ""
             if runner == "codex" and not sid:

@@ -1,6 +1,7 @@
 .PHONY: up down ps logs build test e2e restart-orchestrator kill-orchestrator squad \
 	squad-primeiro-plano squad-parar squad-status squad-logs squad-publicar \
-	teste-publicar teste-status teste-liberar teste-derrubar teste-apagar-dados teste-config e2e-teste prod-atualizar
+	teste-publicar teste-status teste-liberar teste-derrubar teste-apagar-dados teste-config e2e-teste prod-atualizar \
+	plantao run-agent executores executores-checar
 
 ## Sobe toda a stack (infra + observabilidade + serviços), (re)construindo as imagens.
 up:
@@ -71,11 +72,19 @@ feature-finish: ## make feature-finish DEMAND=<id>
 release: ## make release VERSION=1.1.0 (release-start + release-finish)
 	python3 tools/squad/gitflow.py release-start $(VERSION) && python3 tools/squad/gitflow.py release-finish $(VERSION)
 
-plantao: ## Plantão do Orquestrador fora da sessão (SQUAD_RUNNER=claude|codex)
+plantao: ## Plantão do Orquestrador fora da sessão (executor/modelo do papel via tools/squad/executores.py)
 	tools/squad/plantao.sh
 
-run-agent: ## make run-agent ROLE=qa TASK="..." [RUNNER=codex]
-	SQUAD_RUNNER=$(or $(RUNNER),claude) python3 tools/squad/run_agent.py $(ROLE) "$(TASK)"
+# D26 (ADR-027): executor e modelo vêm do resolvedor (tools/squad/executores.py); SQUAD_RUNNER/SQUAD_MODEL
+# só semeiam a primeira configuração. RUNNER/MODEL aqui apenas mostram o comando (--dry-run), nunca executam.
+run-agent: ## make run-agent ROLE=qa TASK="..." [DEMAND=<id>] [RUNNER=codex MODEL=<id> → só --dry-run]
+	python3 tools/squad/run_agent.py $(ROLE) "$(TASK)" $(if $(DEMAND),--demand $(DEMAND)) $(if $(or $(RUNNER),$(MODEL)),$(if $(RUNNER),--runner $(RUNNER)) $(if $(MODEL),--model $(MODEL)) --dry-run)
+
+executores: ## Executor e modelo resolvidos por papel e estado dos executores (executores.py show)
+	python3 tools/squad/executores.py show
+
+executores-checar: ## Checa instalação/login dos executores (claude, codex), ignorando o cache
+	python3 tools/squad/executores.py check --fresh
 
 ## ---------------------------------------------------------------------------
 ## Ambiente de teste compartilhado e produtivo local (D15, ADR-018,

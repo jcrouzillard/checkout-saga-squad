@@ -48,11 +48,14 @@ KIND_RULE = {"cycle-limit": "B3", "human-required": "B2", "gate-return": "B1", "
              # D15 (ADR-018, contrato ambiente-de-teste §6)
              "prod-update-failed": "B5", "test-env-failed": "A4", "test-env-divergent": "A5",
              # D19 (ADR-022, contrato delegacao-pela-conversa §5)
-             "pr-conflict": "B6", "handoff-stalled": "A6", "change-request-open": "A7"}
+             "pr-conflict": "B6", "handoff-stalled": "A6", "change-request-open": "A7",
+             # D26 (ADR-027, contrato executor-e-modelo-por-agente §6.3, §8.8)
+             "executor-indisponivel": "B8", "executor-divergente": "B9", "executor-fallback": "A8"}
 KIND_SEV = {"cycle-limit": "bloqueio", "human-required": "bloqueio", "gate-return": "bloqueio",
             "triage-open": "bloqueio", "low-confidence": "aviso", "agent-stalled": "aviso", "pr-waiting": "aviso",
             "prod-update-failed": "bloqueio", "test-env-failed": "aviso", "test-env-divergent": "aviso",
-            "pr-conflict": "bloqueio", "handoff-stalled": "aviso", "change-request-open": "aviso"}
+            "pr-conflict": "bloqueio", "handoff-stalled": "aviso", "change-request-open": "aviso",
+            "executor-indisponivel": "bloqueio", "executor-divergente": "aviso", "executor-fallback": "aviso"}
 GATE_KIND_ORDER = ["cycle-limit", "human-required", "gate-return", "low-confidence"]
 
 
@@ -853,3 +856,179 @@ def active_delegation(rows: list[dict], demand: str) -> dict | None:
     """Delegação ativa da demanda (sem `delegation-result`): no máximo uma (§2)."""
     act = [x for x in delegations_of(rows, demand) if x["result"] is None]
     return act[-1] if act else None
+
+
+# =============================================================== D26: B8, B9, A8 (ADR-027, contrato §6.3, §8.8, §9.3)
+EXEC_LABEL = {"claude": "Claude Code", "codex": "Codex"}
+FALLBACK_NO_DEMAND_S = 6 * 3600
+
+
+def exec_configured(rows: list[dict], demand: str, role: str) -> dict | None:
+    """Configurado do papel na demanda: última troca `executor-config{scope:demand}` (≠ null) > foto da demanda.
+    `since` = ts do evento que rege o papel (troca ou foto): só runs iniciadas a partir dele são comparadas."""
+    over = None
+    for e in rows:
+        if (e.get("type") == "executor-config" and e.get("scope") == "demand" and e.get("demand") == demand
+                and e.get("role") == role):
+            over = e
+    after = (over or {}).get("after")
+    if after and after.get("runner"):
+        return {"runner": after["runner"], "model": after.get("model"), "source": "demanda", "since": over.get("ts")}
+    snap = next((e for e in rows if e.get("type") == "executor-snapshot" and e.get("demand") == demand), None)
+    s = ((snap or {}).get("executors") or {}).get(role)
+    if not s:
+        return None
+    # troca "só nesta demanda" desfeita (after null): volta à foto, mas só vale para as runs depois da troca
+    since = max((x for x in (snap.get("ts"), (over or {}).get("ts")) if x), key=lambda x: ts_epoch(x) or 0,
+                default=None)
+    return {"runner": s["runner"], "model": s.get("model"), "source": s.get("source") or "squad", "since": since}
+
+
+def exec_governs(configured: dict | None, run: dict) -> bool:
+    """A run é posterior à foto/troca que rege o papel? (runs anteriores não são comparadas — nada retroativo)"""
+    if not configured:
+        return False
+    since = ts_epoch(configured.get("since"))
+    started = ts_epoch(run.get("started"))
+    return since is None or (started is not None and started >= since - 1)
+
+
+def fallback_runs(rows: list[dict], runs: list[dict]) -> set:
+    """Runs explicadas por um `executor-fallback{padrao}`: a do campo `run` ou, sem ele (eventos antigos), a
+    PRIMEIRA run do papel na demanda iniciada a partir do fallback. Só aquela run — nunca o papel para sempre."""
+    out = set()
+    by_pair = {}
+    for r in runs:
+        by_pair.setdefault((r.get("demand"), r.get("agent")), []).append(r)
+    for e in rows:
+        if e.get("type") != "executor-fallback":
+            continue
+        if e.get("run"):
+            out.add(e["run"])
+            continue
+        if e.get("action") != "padrao":
+            continue
+        t = ts_epoch(e.get("ts")) or 0
+        later = sorted((r for r in by_pair.get((e.get("demand"), e.get("role")), [])
+                        if (ts_epoch(r.get("started")) or 0) >= t - 1 and r.get("id") not in out),
+                       key=lambda r: ts_epoch(r.get("started")) or 0)
+        if later:
+            out.add(later[0].get("id"))
+    return out
+
+
+def exec_diff(configured: dict | None, run: dict) -> str | None:
+    """§9.3: motivo da diferença configurado × efetivo (None = igual)."""
+    if not configured:
+        return None
+    if run.get("fallback"):
+        return f"fallback:{(run['fallback'] or {}).get('reason') or 'indisponivel'}"
+    eff_runner = run.get("runner") or "claude"
+    if eff_runner != configured.get("runner"):
+        return "executor"
+    cm, model = configured.get("model"), (run.get("model") or "")
+    if not cm or cm == "default" or not model:
+        return None
+    if cm in ("opus", "sonnet", "haiku", "fable"):
+        if cm not in model.lower():
+            return "sessao" if run.get("agent") == "orquestrador" and not run.get("_external") else "modelo"
+        return None
+    return None if model == cm else "modelo"
+
+
+def executor_alerts(rows: list[dict], runs: list[dict], rules: "Rules", now: float) -> list[dict]:
+    codes = rules.codes
+    out = []
+    # B8 (bloqueio): `executor-fallback{action:parou}` sem run posterior do papel nem troca de configuração
+    last = {}
+    for i, e in enumerate(rows):
+        if e.get("type") == "executor-fallback" and e.get("action") == "parou":
+            last[(e.get("demand"), e.get("role"))] = (i, e)
+    for (d, role), (i, e) in last.items():
+        if d and rules._closed(d):
+            continue
+        later = rows[i + 1:]
+        if any((x.get("type") == "progress" and x.get("agent") == role and (x.get("demand") or None) == d
+                and str(x.get("title", "")).startswith("Iniciado via"))
+               or (x.get("type") == "executor-config" and (x.get("scope") != "demand" or
+                                                           (x.get("demand") == d and x.get("role") == role)))
+               or (x.get("type") == "executor-fallback" and x.get("role") == role and (x.get("demand") or None) == d
+                   and x.get("action") == "padrao") for x in later):
+            continue
+        conf = e.get("configured") or {}
+        code = codes.get(d) if d else None
+        href = f"#/demandas/{code or d}" if d else "#/squad/executores"
+        out.append({"id": f"executor-indisponivel:{e.get('id')}", "severity": "bloqueio",
+                    "kind": "executor-indisponivel", "kinds": ["executor-indisponivel"], "demand": d, "code": code,
+                    "gate": None, "owner": "humano", "agent": role,
+                    "rule": "B8 — executor configurado indisponível com a política `parar` (ADR-027 §2.6)",
+                    "title": f"{LABEL.get(role, role)}: {EXEC_LABEL.get(conf.get('runner'), conf.get('runner'))} "
+                             f"indisponível ({e.get('reason')}) — passo parado",
+                    "detail": trunc(e.get("title"), 300),
+                    "action": {"label": "Usar o padrão nesta demanda" if d else "Abrir Executores", "href": href,
+                               "external": None},
+                    "actions": [{"id": "tentar-de-novo", "label": "Tentar de novo"},
+                                *([{"id": "usar-padrao", "label": "Usar o padrão nesta demanda", "role": role,
+                                    "demand": d}] if d else [])],
+                    "openedAt": e.get("ts"), "source": {"event": e.get("id"), "file": None}})
+    # A8 (aviso): rodou no padrão por indisponibilidade
+    seen = {}
+    for e in rows:
+        if e.get("type") == "executor-fallback" and e.get("action") == "padrao":
+            seen[(e.get("demand"), e.get("role"))] = e
+    for (d, role), e in seen.items():
+        if d and rules._closed(d):
+            continue
+        if not d and now - (ts_epoch(e.get("ts")) or 0) > FALLBACK_NO_DEMAND_S:
+            continue
+        conf, eff = e.get("configured") or {}, e.get("effective") or {}
+        code = codes.get(d) if d else None
+        out.append({"id": f"executor-fallback:{e.get('id')}", "severity": "aviso", "kind": "executor-fallback",
+                    "kinds": ["executor-fallback"], "demand": d, "code": code, "gate": None, "owner": "humano",
+                    "agent": role, "rule": "A8 — executor indisponível; rodou no padrão da squad (política `padrao`)",
+                    "title": f"{LABEL.get(role, role)}: {EXEC_LABEL.get(conf.get('runner'), conf.get('runner'))} "
+                             f"indisponível ({e.get('reason')}) → {EXEC_LABEL.get(eff.get('runner'), eff.get('runner'))}",
+                    "detail": trunc(e.get("title"), 300),
+                    "action": {"label": "Abrir Executores", "href": "#/squad/executores", "external": None},
+                    "openedAt": e.get("ts"), "source": {"event": e.get("id"), "file": None}})
+    # B9 (aviso): run de um papel num executor diferente do configurado, sem `executor-fallback` que explique
+    fb_runs = fallback_runs(rows, runs)
+    for r in runs:
+        role, d = r.get("agent"), r.get("demand")
+        if role not in ROLES or not d or rules._closed(d):
+            continue
+        conf = exec_configured(rows, d, role)
+        eff = r.get("runner") or "claude"
+        if (not conf or not exec_governs(conf, r) or eff == conf["runner"] or r.get("fallback")
+                or r.get("id") in fb_runs):
+            continue
+        code = codes.get(d)
+        out.append({"id": f"executor-divergente:{r.get('id')}", "severity": "aviso", "kind": "executor-divergente",
+                    "kinds": ["executor-divergente"], "demand": d, "code": code, "gate": None, "owner": "orquestrador",
+                    "agent": role, "runId": r.get("id"),
+                    "rule": "B9 — papel rodou num executor diferente do configurado, sem `executor-fallback` (ADR-027 §2.5c)",
+                    "title": f"{LABEL.get(role, role)} rodou em {EXEC_LABEL.get(eff, eff)}, configurado "
+                             f"{EXEC_LABEL.get(conf['runner'], conf['runner'])}",
+                    "detail": trunc(f"run {r.get('id')} · configurado {conf['runner']}"
+                                    f"{' · ' + conf['model'] if conf.get('model') else ''} ({conf['source']}) · "
+                                    f"efetivo {eff}{' · ' + r['model'] if r.get('model') else ''}", 300),
+                    "action": {"label": "Ver demanda", "href": f"#/demandas/{code or d}", "external": None},
+                    "openedAt": r.get("started"), "source": {"event": None, "file": None}})
+    return out
+
+
+def demand_executors(rows: list[dict], runs: list[dict], demand: str) -> list[dict]:
+    """/api/state: por papel, configurado (foto/troca) × efetivo (runs) e a diferença (§9.3)."""
+    out = []
+    for role in ROLES:
+        conf = exec_configured(rows, demand, role)
+        eff = [r for r in runs if r.get("agent") == role and r.get("demand") == demand]
+        if not conf and not eff:
+            continue
+        effective = [{"runner": r.get("runner") or "claude", "model": r.get("model"),
+                      "modelProvider": r.get("modelProvider"), "run": r.get("id"),
+                      "at": r.get("started")} for r in sorted(eff, key=lambda x: x.get("started") or "")][-5:]
+        reasons = [x for x in (exec_diff(conf, r) for r in eff if exec_governs(conf, r)) if x]
+        out.append({"role": role, "configured": conf, "effective": effective, "diff": bool(reasons),
+                    "reason": reasons[-1] if reasons else None})
+    return out

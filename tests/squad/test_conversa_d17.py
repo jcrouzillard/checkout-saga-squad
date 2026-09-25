@@ -301,11 +301,12 @@ class T01BuildCmd(unittest.TestCase):
     def test_codex(self):
         c1 = cv.build_cmd("codex", {"dataRoot": self.root, "sessionId": None}, {"prompt": "P", "resume": False,
                                                                                 "systemPrompt": "SP"})
+        # D26 §7.1 perfil `leitura` no Codex: approval_policy="never" e sem MCP do ~/.codex/config.toml
         self.assertEqual(c1, ["codex", "exec", "--json", "-s", "read-only", "-C", self.root, "--skip-git-repo-check",
-                              "SP\n\nP"])
+                              "-c", 'approval_policy="never"', "-c", "mcp_servers={}", "SP\n\nP"])
         c2 = cv.build_cmd("codex", {"dataRoot": self.root, "sessionId": "th-1"}, {"prompt": "P", "resume": True})
         self.assertEqual(c2, ["codex", "exec", "resume", "th-1", "--json", "-c", 'sandbox_mode="read-only"',
-                              "--skip-git-repo-check", "P"])
+                              "--skip-git-repo-check", "-c", 'approval_policy="never"', "P"])
 
     def test_ambiente_por_lista_de_permissao(self):
         env = cv.child_env({"PATH": "/bin", "HOME": "/h", "GH_TOKEN": "x", "GITHUB_TOKEN": "y", "SQUAD_RUN": "r",

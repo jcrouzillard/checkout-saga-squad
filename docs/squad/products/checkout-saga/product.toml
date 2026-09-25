@@ -7,3 +7,10 @@ schema = 1
 id = "checkout-saga"
 name = "Checkout Saga"
 code_prefix = "D"
+
+# D26 (ADR-027, contrato executor-e-modelo-por-agente §3.1): guarda dos executores aceitos neste produto e semente
+# do padrão da squad quando o runtime (<cópia principal>/.squad/executores.json) ainda não existe nesta máquina.
+# A tela não edita esta tabela: a escolha por agente fica no runtime, por máquina.
+[executors]
+allowed = ["claude", "codex"]
+seed = { runner = "claude" }

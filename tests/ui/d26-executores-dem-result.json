@@ -1,0 +1,122 @@
+{
+  "phase": "dem",
+  "checks": [
+    {
+      "name": "código da demanda",
+      "ok": true,
+      "info": "D26"
+    },
+    {
+      "name": "demanda: TOC tem Executores",
+      "ok": true
+    },
+    {
+      "name": "demanda: Diferente com motivo executor (Arquiteto)",
+      "ok": true,
+      "info": "Executores desta demanda\nConfigurado (foto da demanda ou troca feita aqui) × efetivo (o que as execuções usaram). “Diferente” aparece quando não batem.\nPAPEL\tCONFIGURADO\tEFETIVO\t\nDIFERENÇA\n\n\n🎼\nOrquestrador\n\tClaude Code · claude-opus-5-5 configuração do agente\tsem execução\t\n\n📐\nArquiteto\n\tClaude Code · sonnet configuração do agente\t\ngpt-5.6-sol · OpenAI\nCodex · há 1 min 15 s\n\t▲ Diferente\nexecutor diferente do configurado\n\n\n⚙️\nDevOps\n\tCodex · padrão do executor trocado nesta demanda\tsem execução\t\n\n🔭\nObservabilidade\n\tClaude Code · padrão do executor padrão da squad\tsem execução\t\n\n🧩\nBackend\n\tCl"
+    },
+    {
+      "name": "demanda: Diferente fallback (QA sem login)",
+      "ok": true
+    },
+    {
+      "name": "demanda: origem trocado nesta demanda",
+      "ok": true
+    },
+    {
+      "name": "demanda: 2 marcas Diferente",
+      "ok": true,
+      "info": 2
+    },
+    {
+      "name": "demanda: B8 real com ações",
+      "ok": true,
+      "info": "BLOQUEIO D26Escolher o executor de IA (Claude Code ou Codex) e o modelo por agente ou para a squad inteira\nDevOps: Codex indisponível (sem-login) — passo parado\nQuem age: Você\nDesde: há 15 s\nTentar de novo\nUsar o padrão nesta demanda\n(DevOps na D26)\nVer executores\nPor quê?\nAVISO D26Escolher o execut"
+    },
+    {
+      "name": "demanda: B9 real (Arquiteto rodou em Codex)",
+      "ok": true
+    },
+    {
+      "name": "sino: B8 bloqueio",
+      "ok": true,
+      "info": "Notificações\n33 novas\n21:09:02\n BLOQUEIO\nD26 · DevOps: Codex indisponível (sem-login) — passo parado\nSua ação · Usar o padrão nesta demanda\n21:09:02\n AVISO\nD26 · QA: Codex indisponível (sem-login) → Claude Code\nSua ação · Abrir Executores\n21:08:02\n AVISO\nD26 · Arquiteto rodou em Codex, configurado C"
+    },
+    {
+      "name": "B8: tentar de novo → checar (real)",
+      "ok": true
+    },
+    {
+      "name": "B8: usar o padrão nesta demanda → POST 200",
+      "ok": true,
+      "info": {
+        "path": "/api/demand/executores",
+        "body": {
+          "demand": "50366913d891",
+          "role": "devops",
+          "runner": "claude",
+          "model": null,
+          "acknowledge": true
+        },
+        "status": 200
+      }
+    },
+    {
+      "name": "B8 fechado no servidor",
+      "ok": true
+    },
+    {
+      "name": "trocar: foco no papel",
+      "ok": true
+    },
+    {
+      "name": "trocar: Orquestrador Codex recusado (Q2)",
+      "ok": true
+    },
+    {
+      "name": "trocar: 409 real → Trocar mesmo assim",
+      "ok": true
+    },
+    {
+      "name": "trocar: POST backend codex ack → 200",
+      "ok": true,
+      "info": {
+        "path": "/api/demand/executores",
+        "body": {
+          "demand": "50366913d891",
+          "role": "backend",
+          "runner": "codex",
+          "model": null,
+          "acknowledge": true
+        },
+        "status": 200
+      }
+    },
+    {
+      "name": "trocar: mensagem ok",
+      "ok": true
+    },
+    {
+      "name": "demanda 1440 light: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "demanda 390 dark: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "demanda 1440 dark: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "demanda 390 light: sem rolagem horizontal",
+      "ok": true
+    },
+    {
+      "name": "sem erros de página",
+      "ok": true,
+      "info": []
+    }
+  ],
+  "errors": []
+}

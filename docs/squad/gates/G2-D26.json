@@ -1,0 +1,75 @@
+{
+  "gate": "G2",
+  "cycle": 1,
+  "demand": "50366913d891",
+  "code": "D26",
+  "kind": "operacao",
+  "from": "orquestrador",
+  "to": "qa",
+  "handoff": "2add660ba970",
+  "commits": ["8de313d", "05fd12a", "a7903cc"],
+  "recommendation": "APPROVE",
+  "confidence": 0.92,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) Resolvedor único, camadas, foto por demanda e API §10 aderentes ao contrato",
+      "status": "pass",
+      "source": "servidor do worktree na porta 17391, SQUAD_ROOT_DATA = cópia do log em scratchpad/g2-d26/data, claude/codex falsos no PATH. 1ª leitura criou .squad/executores.json + evento executor-config via:migracao (SQUAD_RUNNER=codex + SQUAD_MODEL=claude-* → par incompatível ignorado com aviso; SQUAD_MODEL dentro de SQUAD_RUN nunca migra). POST /api/executores: 200 (versão 2), baseVersion antigo → 409 versao_desatualizada, orquestrador=codex → 400 orquestrador_codex_pendente_q2, claude+gpt-5 → 400 modelo_incompativel, 'gemini' → 400 formato_invalido; aplicar-a-todos codex → squad codex, todos null, orquestrador fixado em claude + aviso Q2. executores.py snapshot grava 1 executor-snapshot por demanda; resolve --demand usa a foto (origem squad/agente/demanda). Runtime real (<cópia principal>/.squad/executores.json) continua ausente; nenhum evento executor-* no log real"
+    },
+    {
+      "name": "(B,3) Gancho guard-agent: com a configuração padrão nunca bloqueia; falha aberta em erro inesperado",
+      "status": "pass",
+      "source": "comando exato de .claude/settings.json rodado com CLAUDE_PROJECT_DIR=worktree e dados temporários: 132 combinações (8 papéis + Explore/general-purpose/claude × modelo ausente/opus/sonnet/haiku/fable/claude-opus-5-5 × com/sem --demand) → 0 bloqueios; stdin inválido/lista/vazio → 0; runtime sem permissão (PermissionError) → 0 com aviso; log como diretório (IsADirectoryError) → 0 com aviso; script ausente → 0; data root inexistente → 0; ~0,05 s por chamada (sem checagem de login no gancho). Nega (2) só quando previsto: configuração ilegível e papel configurado para codex (mensagem traz o comando run_agent.py)"
+    },
+    {
+      "name": "(B,2) Perfis por papel × executor não ampliam permissões; run_agent não herda SQUAD_MODEL",
+      "status": "pass",
+      "source": "run_agent --runner sem --dry-run → código 2; SQUAD_MODEL=gpt-9 no ambiente → aviso 'ignorada', cmd com --model opus (frontmatter) e env do filho só SQUAD_RUN; triagem → leitura com --setting-sources project --settings perfis/leitura.json; Auditor codex → exec -s read-only; orquestrador codex → código 5. perfis/leitura.json e auditoria.json: dontAsk, allow = lista da matriz §7.1, deny Write/Edit/NotebookEdit/Web*/Task/Agent + caminhos sensíveis; escrita/orquestracao iguais a hoje"
+    },
+    {
+      "name": "(B,2) gate.py verify/record: lista fixa, sem shell, recusa parecer incoerente",
+      "status": "pass",
+      "source": "gate_checks.json = §7.4; subprocess com lista, testCmd só pelas 2 regex estritas, worktree temporário removido em finally. verify G2 no worktree → 4 checks n/a (diff não toca services/pom/compose) + evento evidence no log temporário. record: pass com check g2-mvn-package cuja verificação deu fail → recusado (2), idem casando pelo nome do critério; confidence 1.5 → recusado; sem bloco → recusado; RETURN coerente → grava G2-D26.json e evento gate (tudo em scratchpad)"
+    },
+    {
+      "name": "(B,2) Frontend contra o servidor real: /api/executores*, /api/state.demands[].executors, alertas B8/B9",
+      "status": "pass",
+      "source": "página servida (200) pelo servidor do worktree; formatos reais conferidos contra o código de squad-control/index.html: GET /api/executores (config, version, resolved, status, history, decisions, ignoredEnv, codexWarning), 409 executor_indisponivel/warnings, /api/state.demands = lista {id, code, executors:[{role, configured{runner,model,source}, effective[], diff, reason}]}, alerta B8 {kind executor-indisponivel, severity bloqueio, agent, demand, actions} e B9 {kind executor-divergente, runId, agent, demand} — campos que exAlertActionHtml/exDemandRows leem (a.role||a.agent, a.demand, x.executors). B8 gerado de verdade: política parar + codex sem login (CODEX_HOME simulado) → resolve sai 3 + executor-fallback parou + alerta. Checagem de sintaxe JS não feita (sem node na máquina)"
+    },
+    {
+      "name": "(2) Suítes tests/squad sem regressão além das 4 previstas",
+      "status": "pass",
+      "source": "clone do worktree em a7903cc, uma a uma, claude/codex falsos: OK alertas_d14 (20), ambiente_teste_d15 (41), bugs_d16_qa (18), bugs_d16 (38), conversa_tz_d20 (7), e2e_compose_seguro_d15 (11), governanca_d14_qa (19), produto_f2a (27, 1 skip), entrega_por_pr (script: todas passaram). Falhas = exatamente as previstas: instancia_d18 test_ca14, conversa_d17 T01BuildCmd.test_codex, conversa_anexos_d21 test_codex_imagem_primeiro_turno_e_resume, delegacao_d19 G_AgenteParadoHttp.test_ca10d_ca22. publicador_d24 não rodado (usa a 7070)"
+    },
+    {
+      "name": "(2) Alertas B8/B9/A8 corretos",
+      "status": "validate",
+      "source": "B8 e A8 corretos. B9 é RETROATIVO: alerts.executor_alerts/demand_executors comparam TODAS as runs da demanda com a foto/troca atual, sem limitar ao ts da foto ou da troca — ao tirar a foto (squad em codex) de uma demanda em andamento, 6 runs antigas em claude viraram 6 alertas executor-divergente e 'Diferente' em 4 papéis; o mesmo acontece após 'Trocar só nesta demanda'. Também (d, role) com qualquer fallback padrao suprime B9 do papel para sempre (o contrato diz 'para aquela run'). Com a configuração padrão (tudo claude) não há falso alerta"
+    },
+    {
+      "name": "(1) Desvios declarados aceitáveis até a resposta do humano",
+      "status": "validate",
+      "source": "Q2 desligada (Orquestrador em codex recusado) = padrão do G1. Q3 desligada: Auditor no Claude mantém o perfil escrita (igual a hoje, não amplia nada) — o G1 recomendou somente leitura com a R1, mas a R1 (gate.py verify) foi implementada e mudar o protocolo do gate é decisão humana: aceitável até a resposta, desde que DECISOES.Q3 seja ligada logo após o aceite. A8 (numeração) ok. B8 fechando com qualquer executor-config de escopo não-demanda: aceitável (o próximo ciclo reabre se continuar indisponível). .squad/runs/verify-* ignorado pelo servidor (server.py:459) ok. triage --runner ignorado com aviso (compatibilidade) ok"
+    },
+    {
+      "name": "(1) Makefile (DevOps) coerente com o resolvedor",
+      "status": "pass",
+      "source": "8de313d: run-agent sem SQUAD_RUNNER; RUNNER/MODEL só viram --dry-run; alvos executores (show) e executores-checar (check --fresh)"
+    }
+  ],
+  "confidence_calc": "pesos 3+3+2+2+2+2+2+1+1 = 18; 'validate' (50%) em 2+1 → 18 − 1,5 = 16,5 → 0,92",
+  "open_risks": [
+    "QA-1 (corrigir antes do G3, dono Orquestrador; teste do QA): B9/'Diferente' retroativos — considerar só runs com started ≥ ts da foto (ou da troca por demanda que rege o papel); restringir a supressão por executor-fallback à run (ou às runs posteriores ao fallback).",
+    "QA-2: test_executores_d26.py cobrindo CA-1..CA-20 com dados temporários, incluindo: gancho com configuração padrão (matriz papel × modelo × demanda = 0 bloqueios) e falha aberta (runtime sem permissão, log ilegível, JSON inválido); ajustar as 4 suítes quebradas previstas.",
+    "QA-3: trava ocupada > 5 s (ExecError trava_executores, EXIT_CONFIG) faz o gancho NEGAR com a mensagem 'configuração ilegível' — deveria falhar aberto (só ilegível de verdade nega). Baixa probabilidade; incluir teste e ajuste.",
+    "QA-4: executor-dispatch é gravado a cada Agent/Task com papel detectado (subagent_type de um dos 8 ou 'agente **Papel**'/--agent no prompt) direto no log real, sem a trava do servidor; volume ~1 evento por despacho — aceitável, mas medir num ciclo do plantão; o gancho também cria a foto da demanda e o executores.json (migração) no primeiro Agent após o merge.",
+    "Q3 (humano): antes de ligar DECISOES.Q3, endurecer o perfil auditoria no Claude — Bash(git diff:*)/Bash(git log:*) permitem 'git diff --output=<arquivo>' (escrita) e 'git diff --no-index <arquivo>' (lê ~/.ssh etc. contornando os Read(...) negados); preferir o diff no <dados> e tirar o Bash, ou negar --output/--no-index/--ext-diff.",
+    "Codex leitura/auditoria/escrita não desligam MCP do ~/.codex/config.toml (só a conversa usa -c mcp_servers={}); não amplia em relação a hoje, mas o auditoria no Codex deveria receber -c mcp_servers={} (errata ao contrato §7.1).",
+    "gate.py record só recusa 'pass' incoerente quando consegue mapear a evidência a um check (campo check, 'verify:<id>' ou nome do critério); um 'pass' com nome livre passa. Cobrir no prompt do Auditor (já pede check) e no teste.",
+    "triage.py registra o runner resolvido sem checagem; se o run_agent cair no padrão (fallback), o progress da triagem mostra o executor configurado, não o efetivo (o run tem o efetivo).",
+    "CA-11 e CA-H1..H3 (runs reais) continuam com o humano; CA-H2 depende da Q2."
+  ],
+  "human_required": false,
+  "rationale": "Verificado no repositório e contra o servidor real do worktree com dados em cópia e executores falsos: resolvedor único com camadas e foto por demanda, migração com evento, checagem de instalação/login com política padrao|parar (B8 real gerado), run_agent sem herdar SQUAD_MODEL e --runner só em dry-run, perfis leitura/auditoria com --setting-sources project --settings sem ampliar nada, gate.py com lista fixa sem shell que recusa parecer incoerente, e o gancho guard-agent que com a configuração padrão nunca bloqueou (132 combinações) e falha aberto em todos os erros inesperados testados. Frontend casa com os formatos reais das rotas. Suítes: só as 4 falhas previstas. Aprovado com ressalvas para o QA: B9 retroativo (falso alerta após foto/troca em demanda em andamento), trava ocupada tratada como 'ilegível' no gancho, e o endurecimento do perfil auditoria antes de ligar a Q3. Risco moderado porque o gancho passa a valer para a sessão do plantão e toca todos os caminhos de acionamento."
+}

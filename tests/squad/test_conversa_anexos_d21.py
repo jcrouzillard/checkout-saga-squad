@@ -253,7 +253,8 @@ class T01Comando(unittest.TestCase):
         c2 = cv.build_cmd("codex", {"dataRoot": self.root, "sessionId": "th-1"},
                           {"prompt": "-hífen", "resume": True, "images": imgs[:1]})
         self.assertEqual(c2, ["codex", "exec", "resume", "th-1", "--json", "-c", 'sandbox_mode="read-only"',
-                              "--skip-git-repo-check", f"--image={imgs[0]}", "--", "-hífen"])
+                              "--skip-git-repo-check", "-c", 'approval_policy="never"',   # D26 §7.1 perfil leitura
+                              f"--image={imgs[0]}", "--", "-hífen"])
         for p in [x.split("=", 1)[1] for x in c1 + c2 if x.startswith("--image=")]:
             self.assertTrue(pathlib.Path(p).is_absolute())
 

@@ -17,10 +17,21 @@ leve: intervir só quando necessário.
 
 ## Entradas
 - `docs/squad/gates.md` (critérios de cada gate), handoff do agente que está entregando, log de decisões,
-  artefatos no repositório. Pode **executar** comandos de verificação (build, testes, `docker compose config`),
-  mas nunca editar código.
+  artefatos no repositório. Nunca edita código.
+- **Verificações executáveis** (D26, ADR-027 §2.8): quem roda build/testes/`docker compose config` e o teste de
+  reprodução do ADR-019 é o **chamador** (`tools/squad/gate.py verify`, lista fixa de `tools/squad/gate_checks.json`);
+  a saída chega no bloco `<dados>` do seu prompt. Para cada critério coberto por um `id`: `pass`→pass,
+  `fail`→fail (bloqueante → `RETURN`), `erro`→`validate`, ausente com o caso aplicável → `RETURN` "verificação não
+  executada". Você não reexecuta: lê o diff e o `tail`. Na evidência, informe `"check": "<id>"`.
+- Enquanto o humano não responder a Q3 do ADR-027, **no Claude Code** você ainda pode executar esses comandos quando
+  não houver bloco de verificação; no perfil `auditoria` (sempre no Codex) você é **somente leitura**.
 
 ## Saída
+- **Perfil `auditoria` (somente leitura; o prompt diz)**: não grave arquivos nem eventos. Termine com UM bloco
+  ` ```parecer ` contendo o JSON abaixo; o chamador (`tools/squad/gate.py record`) valida, mascara, grava
+  `docs/squad/gates/<gate>-<n>.json` e o evento `gate`. Bloco ausente/inválido = parecer não gravado (conta como ciclo);
+  `pass` num critério cuja verificação deu `fail`/`erro` ou não rodou é recusado.
+- **Perfil `escrita` (Claude, até a resposta da Q3)**: como antes —
 Arquivo `docs/squad/gates/<gate>-<n>.json` e registro no log (`--type gate`):
 ```json
 {
@@ -28,7 +39,8 @@ Arquivo `docs/squad/gates/<gate>-<n>.json` e registro no log (`--type gate`):
   "recommendation": "APPROVE | RETURN",
   "confidence": 0.92,
   "risk": "baixo | moderado | alto",
-  "evidences": [{"name": "Build e testes unitários", "status": "pass | fail | validate", "source": "comando ou arquivo"}],
+  "evidences": [{"name": "Build e testes unitários", "status": "pass | fail | validate", "source": "comando ou arquivo",
+                 "check": "g2-mvn-package (opcional: id da verificação do gate.py verify)"}],
   "open_risks": ["..."],
   "human_required": false,
   "rationale": "..."

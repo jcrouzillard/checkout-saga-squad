@@ -11,6 +11,8 @@ run_agent.py). `SQUAD_LOG=<arquivo>` grava em outro log (testes).
 Delegação (D19, ADR-022): `--type delegation` é RECUSADO (código 2; só o servidor grava, na confirmação do humano).
 `--delegation <id>` (padrão: $SQUAD_DELEGATION, exportado por run_agent.py --delegation) liga o evento à delegação;
 `--change-request <id> --resolution aceita|recusada` num `decision` fecha um change-request; `--refs <id>` = `--ref`.
+Executores (D26, ADR-027): `--runner-configured/--model-configured/--config-source/--profile/--fallback` (opcionais)
+registram o configurado ao lado do efetivo. Os eventos `executor-*` NÃO passam por aqui (executores.py/servidor).
 Passo (D14, ADR-017): `--step "F2 · implementação"` (opcional) em `progress`/`handoff` alimenta o cartão do integrante.
 """
 import argparse
@@ -88,6 +90,12 @@ def main() -> None:
     p.add_argument("--release", help="versão da release (eventos de release/hotfix)")
     p.add_argument("--merge-commit", help="commit de merge do PR")
     p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
+    # D26 (ADR-027, contrato §9.2): configurado × efetivo — opcionais, gravados por run_agent.py
+    p.add_argument("--runner-configured", choices=["claude", "codex"], help="executor configurado para o papel")
+    p.add_argument("--model-configured", help="modelo configurado (alias, ID ou ausente = padrão do executor)")
+    p.add_argument("--config-source", choices=["demanda", "agente", "squad"], help="camada que decidiu o executor")
+    p.add_argument("--profile", choices=["leitura", "auditoria", "escrita", "orquestracao"], help="perfil de permissão")
+    p.add_argument("--fallback", help='JSON {"reason","from"} quando rodou no padrão por indisponibilidade')
     p.add_argument("--ref", "--refs", dest="ref", action="append", default=[],
                    help="arquivo ou id de evento relacionado (D19: id do handoff pendente)")
     p.add_argument("--delegation", default=os.environ.get("SQUAD_DELEGATION") or None,
@@ -121,6 +129,13 @@ def main() -> None:
     if a.type == "delegation-result" and len(a.detail) > 1500:
         a.detail = a.detail[:1499] + "…"
 
+    fallback = None
+    if a.fallback:
+        try:
+            fallback = json.loads(a.fallback)
+        except json.JSONDecodeError:
+            p.error("--fallback deve ser JSON")
+
     evidences = []
     for e in a.evidence:
         name, _, status = e.rpartition("=")
@@ -144,6 +159,11 @@ def main() -> None:
         "run": a.run,
         "runner": a.runner,
         "model": a.model,
+        "runnerConfigured": a.runner_configured,
+        "modelConfigured": a.model_configured,
+        "configSource": a.config_source,
+        "profile": a.profile,
+        "fallback": fallback,
         "status": a.status,
         "questions": [{"id": f"q{i}", "dimension": q.split("::", 1)[0].strip() if "::" in q else "escopo",
                        "text": q.split("::", 1)[-1].strip()} for i, q in enumerate(a.question, 1)],

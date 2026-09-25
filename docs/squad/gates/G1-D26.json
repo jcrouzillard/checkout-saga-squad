@@ -1,0 +1,89 @@
+{
+  "gate": "G1",
+  "cycle": 1,
+  "demand": "50366913d891",
+  "code": "D26",
+  "kind": "operacao",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "handoff": "4310b7518c7d",
+  "artifacts": [
+    "docs/adr/027-executor-e-modelo-por-agente.md",
+    "docs/contracts/executor-e-modelo-por-agente.md"
+  ],
+  "commit": "b620b5b",
+  "recommendation": "APPROVE",
+  "confidence": 0.86,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) Aderência aos pedidos da demanda",
+      "status": "pass",
+      "source": "demanda inbox/done/50366913d891.json × contrato: camadas embutido→product.toml→squad→agente ('usar o padrão' = null herda executor e modelo)→demanda (§3.2, §4); tela com tabela agente/executor/modelo e 'Aplicar a todos' com confirmação na tela (§10, §11.1); todos os acionamentos — run_agent, triagem, conversa, plantao.sh, /loop, delegação, gates (§8.1–8.7); subagentes nativos com via + gancho PreToolUse guard-agent + alerta B9 (§8.5, §8.6, §8.8); checagem na hora de salvar (409 + 'Salvar mesmo assim') e na execução com política padrao|parar (§6.2, §6.3); configurado × efetivo por run e bloco da demanda D10 com 'Diferente' (§9.2, §9.3, §11.2); trilha executor-config com before/after/by/user/machine/ts (§9.1); aceite do humano mapeado em CA-H1..H3 com prova de baixo custo (§12)"
+    },
+    {
+      "name": "(B,3) Os 3 problemas do código atual confirmados",
+      "status": "pass",
+      "source": "(1) docs/squad/prompts/plantao.md:95-96 'use a ferramenta nativa de subagentes do seu runner, se existir' → sessão /loop do Claude Code delega sempre em Claude, SQUAD_RUNNER não é lido; (2) run_agent.py:163 --model default = $SQUAD_MODEL e :232-235 exporta SQUAD_MODEL=known_model ao filho → um run_agent aninhado recebe o ID do pai como --model/-m (também SQUAD_RUNNER herdado via os.environ em :161); (3) run_agent.py:61-65 RUNNERS não distingue papel: auditor recebe acceptEdits+Write/Edit (claude) e workspace-write (codex); READ_ONLY claude (:57) = só --allowedTools Read Glob Grep, que pré-aprova e não retira Bash/Write — o bloqueio depende do modo/regras de settings do usuário (ex.: defaultMode bypass anula), diferente da conversa (conversa.py:268-270 --tools + --disallowedTools)"
+    },
+    {
+      "name": "(B,2) Flags e comandos citados existem nos CLIs locais",
+      "status": "pass",
+      "source": "claude 2.1.280: 'claude auth status --json' (JSON é o padrão), --tools, --allowedTools, --disallowedTools, --permission-mode {acceptEdits,auto,bypassPermissions,manual,dontAsk,plan}, --strict-mcp-config, --session-id, --settings; hooks de settings existem (--bare/--safe-mode os desligam; --include-hook-events). codex-cli 0.156.1: 'codex login status', exec -s {read-only,workspace-write,danger-full-access}, -C, --add-dir (help: 'writable'), --skip-git-repo-check, -o, -m; 'exec resume' sem -s/-C (confirma §7.2/§13.2). Campo 'loggedIn' do JSON e a forma do stdin do gancho (tool_input.subagent_type/model) não verificáveis só pelo --help — o contrato trata como 'desconhecido' não bloqueante e cobre por CA-8/CA-9"
+    },
+    {
+      "name": "(B,2) Permissões iguais por papel e Auditor somente leitura coerente com o protocolo",
+      "status": "validate",
+      "source": "§7.1/§7.2 mapeiam leitura/auditoria/escrita/orquestracao sem ampliar; §7.3 gate.py record grava o parecer (Auditor sem escrita nos dois executores). PORÉM: (a) gates.md G2 (B,3) 'mvn -q package passa' e (B,2) 'docker compose config -q' são verificados pelo Auditor, e G2 é Backend→QA — o QA ainda não rodou, então 'exige a evidência do QA' (ADR §3, contrato §7.3) não se aplica ao G2; (b) o critério ADR-019 de G1/G3 para demanda de bug manda o Auditor rodar 'git worktree add /tmp/g1-<id>' e o teste — impossível em read-only; o contrato não diz quem passa a produzir essa evidência; (c) auditor.md 'Entradas' diz que ele pode executar build/testes — lista de alterações no §1 cobre auditor.md e gates.md mas sem o texto novo desses critérios"
+    },
+    {
+      "name": "(2) Alinhamento ADR-024 §4.2/§4.5/§4.9 e ADR-026 §4; F3",
+      "status": "pass",
+      "source": "product.toml só com guarda allowed + semente (PR), runtime por máquina em <runtime_dir>/executores.json (hoje data_root/.squad — .gitignore:7 '.squad/'; product.py:171-172 já deriva runs_dir/locks_dir de data_root), F3 → $SQUAD_HOME/products/<id>/runtime (mudança fora do escopo §15, declarada); troca por demanda e foto no log (viaja com a demanda); codexAck só com 2+ produtos (§4.9); product.toml existe em docs/squad/products/checkout-saga/"
+    },
+    {
+      "name": "(2) Sobreposição com a D24 em voo",
+      "status": "validate",
+      "source": "git diff develop...feature/D24-publicar-squad-control: além de server.py, log.py e index.html (declarados), a D24 altera conversa.py (+34, shutdown/_interrupted_msg), plantao.sh (+2), AGENTS.md (+4), Makefile (+21), testenv.py e instance.py — conversa.py, plantao.sh, AGENTS.md e Makefile também são tocados pela D26 e não estão listados no ADR §3/contrato §14. alerts.py: regras hoje B1–B6 (B7 livre no código; o 'B7' do mapa multiproduto é outro namespace); a D24 não cria regra B, então B8/B9 estão livres (salto do B7 sem motivo, só cosmético)"
+    },
+    {
+      "name": "(1) Limitações do Codex declaradas",
+      "status": "pass",
+      "source": "§13 (leitura não isolada ADR-024 §4.9 com máscara e aviso CODEX_WARNING; resume fora de git c1b28e123d53; sem subagentes; sandbox herdado por aninhados; .git protegido; modelo efetivo só pelo cabeçalho; ganchos não se aplicam) + §7.2 tabela sem equivalente exato"
+    },
+    {
+      "name": "(1) Critérios de aceite verificáveis e de custo baixo",
+      "status": "pass",
+      "source": "§12 CA-1..CA-18 com atalhos falsos de claude/codex (custo zero), CA-11 run real curta, CA-H1..H3 = texto do aceite da demanda, prova 'responder OK' cancelada após o G1"
+    },
+    {
+      "name": "(1) Donos por arquivo completos",
+      "status": "validate",
+      "source": "§1 cobre Orquestrador/Frontend/QA; faltam Makefile (DevOps: alvo run-agent usa SQUAD_RUNNER=$(RUNNER), Makefile:62-63, e alvo plantao documenta SQUAD_RUNNER) e CLAUDE.md (Orquestrador: '/loop 3m' e SQUAD_RUNNER no texto), que ficariam enganosos quando as variáveis passarem a ser ignoradas"
+    },
+    {
+      "name": "(1) Riscos e rollback",
+      "status": "pass",
+      "source": "§14/§16; gancho ignorável coberto pela detecção B9 independente. Observação: além de --dangerously-skip-permissions, --bare e --safe-mode desligam hooks (claude --help) — acrescentar à linha de risco"
+    }
+  ],
+  "confidence_calc": "pesos 3+3+2+2+2+2+1+1+1+1 = 18; 'validate' (50%) em 2+2+1 → 18 − 2.5 = 15.5 → 0.86",
+  "open_risks": [
+    "R1 (obrigatória antes de mexer em auditor.md/gates.md; depende da Q3): o Auditor somente leitura deixa sem dono as verificações que hoje ele executa — G2 (mvn package, docker compose config) e o critério ADR-019 de demanda de bug no G1/G3 (git worktree add + rodar o teste). Errata no contrato §7.3 definindo quem produz essa evidência. Sugestão: gate.py (chamador, Orquestrador) ganha um passo 'verify' com lista fixa de comandos (mvn -q package -DskipTests, docker compose -p <proj> config -q, worktree temporário do ADR-019) cuja saída entra no <dados> do Auditor como evidência; 'exige evidência do QA' fica só para o G3. Sem isso, a mudança enfraquece um gate bloqueante.",
+    "R2: Q2 (Orquestrador no Codex com danger-full-access) condiciona o CA-H2 ('a próxima demanda roda inteira no Codex', incluindo o Orquestrador via plantao.sh). Sem aceite, o CA-H2 fica pendente/parcial; o contrato deve dizer isso explicitamente em vez de só 'risco de falhar'.",
+    "R3: sobreposição com a D24 maior que a declarada — incluir conversa.py, plantao.sh, AGENTS.md e Makefile na lista e implementar após o merge da D24 (rebase de plano, não de branch).",
+    "R4: §1 sem Makefile (DevOps, alvo run-agent com SQUAD_RUNNER) e CLAUDE.md; abrir solicitação ao DevOps na implementação.",
+    "R5: §14 — acrescentar --bare/--safe-mode como formas de desligar o gancho; o formato do stdin do PreToolUse (tool_input.subagent_type/model) e o campo loggedIn do 'claude auth status' precisam ser confirmados no CA-8/CA-9 com a versão instalada (2.1.280).",
+    "R6: o perfil 'auditoria' no Claude usa --allowedTools Bash(git …:*) com dontAsk; regras 'allow' de ~/.claude/settings.json e .claude/settings.local.json continuam valendo e podem ampliar o Bash — considerar --setting-sources project (ou --settings dedicado) nos perfis leitura/auditoria para que a restrição não dependa da máquina."
+  ],
+  "human_questions": {
+    "blocking_G1": "nenhuma",
+    "Q1": "não bloqueia; padrão: 'padrao' (é o que o aceite pede: aviso e não quebra)",
+    "Q2": "não bloqueia o G1 nem o restante da implementação; bloqueia o perfil 'orquestracao' no Codex e o CA-H2. Padrão até a resposta: NÃO habilitar danger-full-access; Orquestrador no Codex recusado na tela com motivo, CA-H2 pendente",
+    "Q3": "bloqueia a mudança do Auditor (auditor.md, gates.md, gate.py) até a resposta — mudança de protocolo de gate é decisão humana. Padrão: aceitar somente leitura COM a R1 (verificação executada pelo chamador); sem a R1, manter o Auditor como hoje no Claude e só no Codex usar read-only com aviso",
+    "Q4": "não bloqueia; padrão: por máquina, trilha no log",
+    "Q5": "não bloqueia; padrão: foto por demanda + 'Trocar só nesta demanda'"
+  },
+  "human_required": false,
+  "rationale": "ADR-027 e contrato cobrem todos os pedidos da demanda com precedência, eventos, API, tela e aceite verificáveis; os três defeitos apontados existem no código (run_agent.py, plantao.md); flags e comandos citados existem nos CLIs instalados. Aprovado com ressalvas: a passagem do Auditor para somente leitura conflita com critérios bloqueantes de gates.md (G2 build/compose e ADR-019) e precisa de errata (R1) antes da implementação dessa parte, que também depende da Q3; a sobreposição com a D24 é maior que a declarada (R3). Confiança 0.86, risco moderado (mexe em todos os caminhos de acionamento e no protocolo de gate)."
+}

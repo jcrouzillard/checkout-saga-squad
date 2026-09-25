@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Executa um papel da squad com o fornecedor de IA escolhido (Claude Code ou Codex).
+"""Executa um papel da squad no executor configurado para ele (Claude Code ou Codex).
 
-  SQUAD_RUNNER=codex  python3 tools/squad/run_agent.py qa "Validar o cenário X" --demand <id>
-  SQUAD_RUNNER=claude python3 tools/squad/run_agent.py arquiteto @docs/tarefa.md
-  python3 tools/squad/run_agent.py auditor "..." --runner codex --dry-run
+  python3 tools/squad/run_agent.py qa "Validar o cenário X" --demand <id>
+  python3 tools/squad/run_agent.py arquiteto @docs/tarefa.md
+  python3 tools/squad/run_agent.py auditor "..." --demand <id> --gate G2 [--worktree <dir>]
+  python3 tools/squad/run_agent.py auditor "..." --runner codex --dry-run     # --runner/--model só com --dry-run
+
+- D26 (ADR-027): o executor e o modelo vêm de `tools/squad/executores.py resolve` (camadas squad → agente → demanda;
+  foto por demanda). `SQUAD_RUNNER`/`SQUAD_MODEL` NÃO configuram mais (aviso se diferirem); `SQUAD_MODEL` do pai nunca
+  vira `--model` do filho. O comando segue o perfil do papel (leitura · auditoria · escrita · orquestracao, §7.1).
+  Código 3 = política `parar` com o executor indisponível (nada é iniciado); 4 = configuração ilegível.
 
 - O prompt do papel é o corpo de `.claude/agents/<papel>.md` (o frontmatter só serve ao Claude Code); o Orquestrador
   usa `docs/squad/orquestrador.md`. As regras comuns vêm de `AGENTS.md`.
@@ -13,7 +19,7 @@
 - Modelo (ADR-012): `--model <id>` (ou `SQUAD_MODEL`) vira `-m` no codex / `--model` no claude. O modelo GRAVADO no
   run é o efetivo: cabeçalho `model:`/`provider:` da saída do codex; `message.model` da transcrição do `claude -p`
   (identificada por `--session-id`). O alias do frontmatter (ex.: `opus`) só vai em `modelRequested`.
-  O filho recebe `SQUAD_RUN` (e `SQUAD_MODEL`, se o ID já é conhecido) para os eventos herdarem run/modelo.
+  O filho recebe `SQUAD_RUN` (e `SQUAD_MODEL` SÓ com o modelo efetivo desta run, se o ID já é conhecido).
 - Delegação (D19, ADR-022): `--delegation <id>` marca a run (`delegation` no `.squad/runs/<id>.json` e nos `progress`
   de início/fim — uma run delegada que parar não é delegável de novo), exporta `SQUAD_DELEGATION` e `SQUAD_LOG` (log
   ÚNICO da cópia principal, mesmo que o agente chame `log.py` relativo no worktree) e monta o prompt do
@@ -36,6 +42,7 @@ DELEGATION_PROMPT = ROOT / "docs/squad/prompts/delegacao.md"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from server import codex_header, provider_of, scan_transcript, model_fields  # noqa: E402
 import product  # noqa: E402  (D23, F2a §6: runs no data_root resolvido e caminho exato da transcrição)
+import executores as ex  # noqa: E402  (D26: resolvedor único de executor/modelo)
 
 PRODUCT = product.resolve()
 RUNS = PRODUCT.runs_dir          # = ROOT/.squad/runs sem $SQUAD_ROOT_DATA (o mesmo RUNS_DIR do servidor)
@@ -53,17 +60,9 @@ def claude_transcript(session_id: str, cwd: pathlib.Path = ROOT) -> pathlib.Path
     """D23 (F2a §6): pasta do cwd EFETIVO do filho (o worktree, com --worktree), mesma regra do servidor."""
     return product.transcript_dir_for(cwd) / f"{session_id}.jsonl"
 
-READ_ONLY = {
-    "claude": lambda prompt: ["claude", "-p", prompt, "--allowedTools", "Read", "Glob", "Grep"],
-    "codex": lambda prompt: ["codex", "exec", "-C", str(ROOT), "-s", "read-only", prompt],
-}
-RUNNERS = {
-    # Claude Code em modo não interativo: edições aceitas, Bash liberado para build/testes/log.py.
-    "claude": lambda prompt, cwd=ROOT: ["claude", "-p", prompt, "--permission-mode", "acceptEdits",
-                                        "--allowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
-    # Codex CLI em modo não interativo, com escrita restrita ao repositório (ou ao worktree da demanda).
-    "codex": lambda prompt, cwd=ROOT: ["codex", "exec", "-C", str(cwd), "-s", "workspace-write", prompt],
-}
+# D26 (ADR-027, contrato §7.1): o comando vem do PERFIL do papel × executor resolvido (executores.profile_cmd).
+# Mantidos só como referência dos perfis antigos; nenhum caminho os usa para montar o comando.
+RUNNERS = ("claude", "codex")
 
 
 def _data(text: str) -> str:
@@ -139,9 +138,17 @@ def effective_model(runner: str, out_path: pathlib.Path, session_id: str | None,
 
 
 def log(role: str, title: str, run_id: str, runner: str, demand: str | None, detail: str = "",
-        model: str | None = None, delegation: str | None = None):
+        model: str | None = None, delegation: str | None = None, res: dict | None = None):
     args = [sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", role, "--type", "progress",
             "--title", title, "--run", run_id, "--runner", runner]
+    if res:   # D26 §9.2: configurado × efetivo
+        args += ["--runner-configured", res["configured"]["runner"], "--config-source", res["source"],
+                 "--profile", res["profile"]]
+        if res["configured"].get("model"):
+            args += ["--model-configured", res["configured"]["model"]]
+        if res.get("fallback"):
+            args += ["--fallback", json.dumps({"reason": res["fallback"]["reason"], "from": res["fallback"]["from"]},
+                                              ensure_ascii=False)]
     if demand:
         args += ["--demand", demand]
     if delegation:
@@ -154,20 +161,83 @@ def log(role: str, title: str, run_id: str, runner: str, demand: str | None, det
     subprocess.run(args, cwd=ROOT, capture_output=True, env=env)
 
 
+def auth_failed_early(out_path: pathlib.Path, run_id: str) -> bool:
+    """§6.3: saída casa falha de autenticação nas 50 primeiras linhas e o agente não registrou nenhum progress."""
+    try:
+        head = "\n".join(out_path.read_text(encoding="utf-8", errors="ignore").splitlines()[:50])
+    except OSError:
+        return False
+    if not ex.AUTH_FAIL_RE.search(head):
+        return False
+    return not any(e.get("type") == "progress" and e.get("run") == run_id
+                   and not str(e.get("title", "")).startswith(("Iniciado via", "Finalizado via")) for e in read_events())
+
+
+def verify_block(a, cwd: pathlib.Path) -> str:
+    """§7.4: roda `gate.py verify` (lista fixa) ANTES do Auditor e devolve o JSON para o bloco <dados>."""
+    if not (a.gate and a.demand):
+        return ""
+    p = subprocess.run([sys.executable, str(ROOT / "tools/squad/gate.py"), "verify", "--gate", a.gate, "--demand",
+                        a.demand, "--worktree", str(cwd), "--json"], cwd=ROOT, capture_output=True, text=True,
+                       env={**os.environ, "SQUAD_LOG": str(MAIN_LOG)})
+    return p.stdout.strip() or json.dumps({"gate": a.gate, "demand": a.demand, "erro": p.stderr.strip()[-500:]})
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("role")
     p.add_argument("task", help="texto da tarefa ou @arquivo")
-    p.add_argument("--runner", default=os.environ.get("SQUAD_RUNNER", "claude"), choices=sorted(RUNNERS))
+    p.add_argument("--runner", choices=sorted(RUNNERS), help="SÓ com --dry-run (a escolha real vem do painel)")
     p.add_argument("--demand")
-    p.add_argument("--model", default=os.environ.get("SQUAD_MODEL") or None,
-                   help="modelo pedido ao fornecedor (-m no codex, --model no claude); padrão: $SQUAD_MODEL")
+    p.add_argument("--model", help="SÓ com --dry-run (a escolha real vem do painel)")
     p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--read-only", action="store_true", help="sem escrita nem shell (ex.: triagem de demandas)")
+    p.add_argument("--read-only", action="store_true", help="perfil `leitura` (= --context triagem)")
+    p.add_argument("--context", choices=ex.CONTEXTS, help="plantao|conversa|triagem|passo (padrão: passo; "
+                                                          "plantao para o orquestrador sem --demand)")
+    p.add_argument("--no-snapshot", action="store_true", help="não cria a foto da demanda (triagem)")
+    p.add_argument("--gate", choices=["G1", "G2", "G3"], help="D26: gate avaliado (auditor: gate.py verify/record)")
+    p.add_argument("--fallback-of", help="D26 §6.3: run que falhou por autenticação (usa o padrão da squad; 1 vez)")
     p.add_argument("--delegation", help="D19: id do evento `delegation` que esta run executa")
     p.add_argument("--worktree", help="D19: worktree da demanda (cwd do agente)")
     p.add_argument("--dados", help="D19: arquivo com dados (diff, conflitos, trechos do log) — vai entre <dados>")
     a = p.parse_args()
+    if (a.runner or a.model) and not a.dry_run:
+        print("run_agent: --runner/--model só valem com --dry-run; use o painel (Squad Control → Executores) ou "
+              "`tools/squad/executores.py`", file=sys.stderr)
+        sys.exit(2)
+    role_file(a.role)
+    ctx_name = a.context or ("triagem" if a.read_only else "plantao" if a.role == "orquestrador" and not a.demand
+                             else "passo")
+    forced = None
+    # G2-D26: o id da run nasce ANTES do resolvedor para o `executor-fallback` apontar a run que explica (B9 por run)
+    run_id = f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{a.role}-{uuid.uuid4().hex[:6]}"
+    try:
+        ectx = ex.context(MAIN_LOG)
+        if a.fallback_of:
+            prev = ex.resolve(a.role, a.demand, ctx_name, make_snapshot=not a.no_snapshot, do_check=False, ctx=ectx,
+                              record=False, persist=not a.dry_run)
+            forced = {"runner": prev["runner"], "detail": "sem-login"}
+        res = ex.resolve(a.role, a.demand, ctx_name, make_snapshot=not a.no_snapshot, do_check=not a.dry_run,
+                         ctx=ectx, forced_unavailable=forced, persist=not a.dry_run, run=run_id)
+    except ex.ExecError as e:
+        print(f"run_agent: {e.message}", file=sys.stderr)   # código 3: `executor-fallback{action:parou}` já gravado
+        sys.exit(e.exit_code)
+    except product.ProductError as e:
+        print(f"run_agent: {e}", file=sys.stderr)
+        sys.exit(ex.EXIT_CONFIG)
+    for w in res["warnings"]:
+        if w.startswith("variavel_ignorada:"):
+            print(f"run_agent: aviso: {w.split(':', 1)[1]} ignorada (a configuração vem do painel/executores.py)",
+                  file=sys.stderr)
+    if a.dry_run and a.runner:   # simulação: outro executor/modelo só para ver o comando
+        res = {**res, "runner": a.runner, "model": a.model, "profile": ex.profile_of(a.role, a.runner, ctx_name)}
+        res["modelArg"] = a.model or (role_model_alias(a.role) if a.runner == "claude" else None)
+        res["via"] = ex.via_of(a.runner, a.model)
+    elif a.dry_run and a.model:
+        res = {**res, "model": a.model, "modelArg": a.model, "via": ex.via_of(res["runner"], a.model)}
+    if a.read_only:
+        res["profile"] = "leitura"
+    runner, model_arg, profile = res["runner"], res["modelArg"], res["profile"]
 
     task = (ROOT / a.task[1:]).read_text(encoding="utf-8") if a.task.startswith("@") else a.task
     cwd = pathlib.Path(a.worktree).resolve() if a.worktree else ROOT
@@ -176,7 +246,12 @@ def main():
     if a.delegation:
         extra = pathlib.Path(a.dados).read_text(encoding="utf-8", errors="ignore")[:20000] if a.dados else ""
         task = f"{task}\n\n{delegation_prompt(a.delegation, str(cwd) if a.worktree else None, extra)}"
-    run_id = f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{a.role}-{uuid.uuid4().hex[:6]}"
+    audit_ro = a.role == "auditor" and profile == "auditoria"
+    if audit_ro and not a.dry_run:
+        vb = verify_block(a, cwd)
+        if vb:
+            task += f"\n\n<dados>\n{_data(vb)}\n</dados>"
+    read_only = profile in ("leitura", "auditoria")
     prompt = (
         "Você é um agente da squad do projeto neste repositório. Leia primeiro `AGENTS.md` (regras comuns, "
         "ownership, protocolo de handoff, Git Flow e limites de autonomia) e siga-o.\n\n"
@@ -190,22 +265,41 @@ def main():
         + (f", sempre com `--demand {a.demand}`" if a.demand else "") + ".\n"
         "- Não faça commit, push nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.\n"
     )
-    if a.read_only:
+    if read_only:
         prompt = prompt.replace("- Registre marcos do seu trabalho", "- Modo SOMENTE LEITURA: não escreva arquivos nem rode comandos; ignore a linha abaixo sobre registrar marcos.\n- (Não) Registre marcos do seu trabalho")
+    if audit_ro:
+        prompt += ("- Perfil `auditoria` (somente leitura): NÃO grave `docs/squad/gates/*.json` nem o evento `gate`. "
+                   "Termine com UM bloco ```parecer contendo o JSON do parecer (formato de `docs/squad/gates.md` e "
+                   "`.claude/agents/auditor.md`); quem grava é o chamador (`tools/squad/gate.py record`). Use o "
+                   "`status` de cada verificação do `gate.py verify` (bloco <dados>) como evidência, com `\"check\": "
+                   "\"<id>\"`; não reexecute build/testes.\n")
     if a.delegation:
         prompt = prompt.replace("`python3 tools/squad/log.py", f"`python3 \"{ROOT / 'tools/squad/log.py'}\"")
-    cmd = READ_ONLY[a.runner](prompt) if a.read_only else RUNNERS[a.runner](prompt, cwd)
+    try:
+        cmd = ex.profile_cmd(profile, runner, prompt, cwd, product.resolve().data_root, MAIN_LOG.parent, RUNS)
+    except ex.ExecError as e:
+        print(f"run_agent: {e.message}", file=sys.stderr)
+        sys.exit(e.exit_code)
     session_id = None
-    if a.runner == "claude":
+    if runner == "claude":
         session_id = str(uuid.uuid4())
-        cmd += ["--session-id", session_id] + (["--model", a.model] if a.model else [])
-    elif a.model:
-        cmd = cmd[:-1] + ["-m", a.model, cmd[-1]]  # prompt continua sendo o último argumento
-    requested = a.model or (role_model_alias(a.role) if a.runner == "claude" else None)
-    known_model = a.model if is_exact_id(a.model) else None
+        cmd += ["--session-id", session_id]
+    cmd = ex.with_model(cmd, runner, model_arg)
+    requested = model_arg
+    known_model = model_arg if is_exact_id(model_arg) else None   # só o efetivo desta run (nunca o do pai)
+    configured_fields = {"runnerConfigured": res["configured"]["runner"],
+                         "modelConfigured": res["configured"].get("model"), "configSource": res["source"],
+                         "profile": profile,
+                         "fallback": ({"reason": res["fallback"]["reason"], "from": res["fallback"]["from"]}
+                                      if res.get("fallback") else None)}
+    if a.fallback_of:
+        configured_fields["fallbackOf"] = a.fallback_of
     if a.dry_run:
-        print(json.dumps({"runner": a.runner, "cmd": cmd[:-1] if a.runner == "codex" else cmd[:2] + ["<prompt>"] + cmd[3:],
-                          "sessionId": session_id, "modelRequested": requested,
+        prompt_idx = 2
+        shown = cmd[:-1] if runner == "codex" else cmd[:prompt_idx] + ["<prompt>"] + cmd[prompt_idx + 1:]
+        print(json.dumps({"runner": runner, "cmd": shown,
+                          "sessionId": session_id, "modelRequested": requested, "via": res["via"],
+                          **configured_fields,
                           "env": {"SQUAD_RUN": run_id, **({"SQUAD_MODEL": known_model} if known_model else {}),
                                   **({"SQUAD_DELEGATION": a.delegation, "SQUAD_LOG": str(MAIN_LOG)}
                                      if a.delegation else {})},
@@ -215,9 +309,12 @@ def main():
 
     RUNS.mkdir(parents=True, exist_ok=True)
     meta_path, out_path = RUNS / f"{run_id}.json", RUNS / f"{run_id}.log"
-    meta = {"id": run_id, "agent": a.role, "runner": a.runner, "demand": a.demand,
+    meta = {"id": run_id, "agent": a.role, "runner": runner, "demand": a.demand,
             "description": f"{a.role.capitalize()} · {task.strip().splitlines()[0][:80]}",
-            "started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "status": "trabalhando"}
+            "started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "status": "trabalhando",
+            **configured_fields}
+    if a.gate:
+        meta["gate"] = a.gate
     if requested:
         meta["modelRequested"] = requested
     if session_id:
@@ -226,10 +323,10 @@ def main():
     if a.delegation:
         meta["delegation"] = a.delegation
         meta["worktree"] = str(cwd)
-    log(a.role, f"Iniciado via {a.runner}: {task.strip().splitlines()[0][:100]}", run_id, a.runner, a.demand,
-        model=known_model, delegation=a.delegation)
+    log(a.role, f"Iniciado via {runner}: {task.strip().splitlines()[0][:100]}", run_id, runner, a.demand,
+        model=known_model, delegation=a.delegation, res=res)
     child_env = {**os.environ, "SQUAD_RUN": run_id}
-    child_env.pop("SQUAD_MODEL", None)
+    child_env.pop("SQUAD_MODEL", None)          # D26: nunca herda o modelo do pai
     child_env.pop("SQUAD_DELEGATION", None)
     if known_model:
         child_env["SQUAD_MODEL"] = known_model
@@ -243,12 +340,30 @@ def main():
         code = proc.wait()
     meta.update({"status": "concluído" if code == 0 else "falhou", "exitCode": code,
                  "ended": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-    meta.update(effective_model(a.runner, out_path, session_id,
+    meta.update(effective_model(runner, out_path, session_id,
                                 pathlib.Path(meta["transcript"]) if meta.get("transcript") else None))
+    retry = code != 0 and not a.fallback_of and auth_failed_early(out_path, run_id)
+    if retry:
+        meta["authFailure"] = True
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     tail = out_path.read_text(encoding="utf-8", errors="ignore").strip().splitlines()[-15:]
-    log(a.role, f"Finalizado via {a.runner} (código {code})", run_id, a.runner, a.demand, "\n".join(tail)[-1500:],
-        model=meta.get("model"), delegation=a.delegation)
+    log(a.role, f"Finalizado via {runner} (código {code})", run_id, runner, a.demand, "\n".join(tail)[-1500:],
+        model=meta.get("model"), delegation=a.delegation, res=res)
+    if retry:   # §6.3: falha de autenticação na saída → mesma política, UMA vez (nova run com --fallback-of)
+        ex.invalidate(ectx, runner)
+        argv = [sys.executable, str(pathlib.Path(__file__).resolve()), *[x for x in sys.argv[1:]], "--fallback-of", run_id]
+        sys.exit(subprocess.run(argv, env={k: v for k, v in os.environ.items()}).returncode)
+    if audit_ro:   # §7.3: o parecer do Auditor somente leitura é gravado pelo chamador
+        rec = [sys.executable, str(ROOT / "tools/squad/gate.py"), "record", "--from-output", str(out_path),
+               "--run", run_id, "--worktree", str(cwd)]
+        if a.demand:
+            rec += ["--demand", a.demand]
+        if meta.get("model"):
+            rec += ["--model", meta["model"]]
+        if a.delegation:
+            rec += ["--delegation", a.delegation]
+        r = subprocess.run(rec, cwd=ROOT, capture_output=True, text=True, env={**os.environ, "SQUAD_LOG": str(MAIN_LOG)})
+        print((r.stdout + r.stderr).strip())
     print(out_path.read_text(encoding="utf-8", errors="ignore")[-4000:])
     sys.exit(code)
 

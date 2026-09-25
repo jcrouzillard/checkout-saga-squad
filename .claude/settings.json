@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/tools/squad/executores.py\"; [ -f \"$f\" ] || exit 0; python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null || { echo 'guard-agent: python3 < 3.11 no PATH; gancho ignorado (falha aberta)' >&2; exit 0; }; python3 \"$f\" guard-agent",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
