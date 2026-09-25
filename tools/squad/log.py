@@ -8,12 +8,16 @@ Exemplo:
 
 Modelo (ADR-012): `--model <ID exato>` ou env `SQUAD_MODEL`; `--run` herda de `SQUAD_RUN` (exportados por
 run_agent.py). `SQUAD_LOG=<arquivo>` grava em outro log (testes).
+Delegação (D19, ADR-022): `--type delegation` é RECUSADO (código 2; só o servidor grava, na confirmação do humano).
+`--delegation <id>` (padrão: $SQUAD_DELEGATION, exportado por run_agent.py --delegation) liga o evento à delegação;
+`--change-request <id> --resolution aceita|recusada` num `decision` fecha um change-request; `--refs <id>` = `--ref`.
 Passo (D14, ADR-017): `--step "F2 · implementação"` (opcional) em `progress`/`handoff` alimenta o cartão do integrante.
 """
 import argparse
 import json
 import os
 import pathlib
+import sys
 import uuid
 from datetime import datetime, timezone
 
@@ -24,10 +28,25 @@ TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "hum
          "test-env-request", "test-env-publishing", "test-env-published", "test-env-failed", "test-env-released",
          "test-env-reset", "prod-updated", "prod-update-failed",
          # D16 (ADR-019): evidência acrescentada a uma demanda de bug — gravado pelo servidor (POST /api/bug/evidence)
-         "bug-evidence"}
+         "bug-evidence",
+         # D19 (ADR-022): delegação pela conversa — o tipo `delegation` NÃO entra aqui (só o servidor o grava)
+         "delegation-start", "delegation-result", "review-updated", "pr-conflict", "pr-conflict-cleared"}
+DELEGATION_STATUS = {"ok", "falhou", "obsoleta", "recusada", "cancelada"}
+# campos obrigatórios por tipo novo (contrato delegacao-pela-conversa §3.2)
+REQUIRED = {"delegation-start": ("demand", "delegation", "branch", "to"),
+            "delegation-result": ("demand", "delegation", "status"),
+            "review-updated": ("demand", "pr", "url", "branch", "sha", "delegation"),
+            "pr-conflict": ("demand", "pr", "url", "mergeable"),
+            "pr-conflict-cleared": ("demand", "pr", "url", "mergeable")}
 
 
 def main() -> None:
+    argv = sys.argv[1:]
+    for i, tok in enumerate(argv):   # D19 §10: só o servidor grava `delegation` (confirmação humana no cartão)
+        if tok in ("--type=delegation",) or (tok == "--type" and i + 1 < len(argv) and argv[i + 1] == "delegation"):
+            print("log.py: o tipo `delegation` só é gravado pelo servidor na confirmação do humano (ADR-022)",
+                  file=sys.stderr)
+            sys.exit(2)
     p = argparse.ArgumentParser()
     p.add_argument("--agent", required=True, choices=sorted(AGENTS))
     p.add_argument("--type", required=True, choices=sorted(TYPES))
@@ -45,7 +64,8 @@ def main() -> None:
                    help="id da execução (tools/squad/run_agent.py); padrão: $SQUAD_RUN")
     p.add_argument("--model", default=os.environ.get("SQUAD_MODEL") or None,
                    help="ID exato do modelo que produziu o evento (ex.: claude-opus-5-5); padrão: $SQUAD_MODEL")
-    p.add_argument("--status", choices=["ok", "perguntas"], help="resultado da validação agêntica")
+    p.add_argument("--status", choices=["ok", "perguntas", *sorted(DELEGATION_STATUS - {"ok"})],
+                   help="resultado da validação agêntica (ok|perguntas) ou da delegação (delegation-result)")
     p.add_argument("--question", action="append", default=[], help='pergunta da validação: "dimensão::texto"')
     p.add_argument("--suggested-kind", choices=["produto", "operacao"])
     p.add_argument("--kind", choices=["produto", "operacao"], help="tipo da demanda")
@@ -54,12 +74,38 @@ def main() -> None:
     p.add_argument("--release", help="versão da release (eventos de release/hotfix)")
     p.add_argument("--merge-commit", help="commit de merge do PR")
     p.add_argument("--runner", help="fornecedor que executou (claude, codex, ...)")
-    p.add_argument("--ref", action="append", default=[], help="arquivo relacionado")
+    p.add_argument("--ref", "--refs", dest="ref", action="append", default=[],
+                   help="arquivo ou id de evento relacionado (D19: id do handoff pendente)")
+    p.add_argument("--delegation", default=os.environ.get("SQUAD_DELEGATION") or None,
+                   help="id do evento `delegation` a que este evento pertence (D19); padrão: $SQUAD_DELEGATION")
+    p.add_argument("--change-request", help="id do change-request que este `decision` fecha (D19)")
+    p.add_argument("--resolution", choices=["aceita", "recusada"], help="desfecho do change-request (D19)")
+    p.add_argument("--sha", help="commit (D19: review-updated, pr-conflict-cleared, delegation-result)")
+    p.add_argument("--mergeable", choices=["MERGEABLE", "CONFLICTING"], help="estado de merge do PR (D19)")
     p.add_argument("--evidence", action="append", default=[], help="nome=pass|fail|validate")
     p.add_argument("--step", help="passo atual, curto (≤ 40 caracteres), ex.: 'F2 · implementação' (D14, ADR-017)")
     a = p.parse_args()
     if a.step is not None and len(a.step.strip()) > 40:
         p.error("--step deve ter no máximo 40 caracteres")
+    if a.status is not None and a.type == "delegation-result" and a.status not in DELEGATION_STATUS:
+        p.error("--status de delegation-result: ok|falhou|obsoleta|recusada|cancelada")
+    if a.status is not None and a.type != "delegation-result" and a.status not in ("ok", "perguntas"):
+        p.error(f"--status {a.status} só vale com --type delegation-result")
+    if (a.change_request or a.resolution) and a.type != "decision":
+        p.error("--change-request/--resolution só valem com --type decision")
+    if bool(a.change_request) != bool(a.resolution):
+        p.error("--change-request exige --resolution aceita|recusada (e vice-versa)")
+    if a.resolution == "recusada" and not a.detail.strip():
+        p.error("--resolution recusada exige a justificativa em --detail")
+    if a.type == "pr-conflict" and a.mergeable not in (None, "CONFLICTING"):
+        p.error("pr-conflict exige --mergeable CONFLICTING")
+    if a.type == "pr-conflict-cleared" and a.mergeable not in (None, "MERGEABLE"):
+        p.error("pr-conflict-cleared exige --mergeable MERGEABLE")
+    missing = [f for f in REQUIRED.get(a.type, ()) if getattr(a, f) in (None, "")]
+    if missing:
+        p.error(f"--type {a.type} exige: " + ", ".join("--" + f for f in missing))
+    if a.type == "delegation-result" and len(a.detail) > 1500:
+        a.detail = a.detail[:1499] + "…"
 
     evidences = []
     for e in a.evidence:
@@ -96,6 +142,12 @@ def main() -> None:
         "refs": a.ref,
         "evidences": evidences,
         "step": a.step.strip() if a.step else None,   # opcional: ausente não altera o formato gravado
+        # D19 (ADR-022) — ausentes não são gravados
+        "delegation": a.delegation,
+        "changeRequest": a.change_request,
+        "resolution": a.resolution,
+        "sha": a.sha,
+        "mergeable": a.mergeable,
     }
     entry = {k: v for k, v in entry.items() if v not in (None, [], "")}
     LOG.parent.mkdir(parents=True, exist_ok=True)

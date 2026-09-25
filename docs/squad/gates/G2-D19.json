@@ -1,0 +1,108 @@
+{
+  "gate": "G2",
+  "demand": "402e76f187f9",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "handoff": [
+    "6bd06fab474f",
+    "a222c07771e7"
+  ],
+  "decision_deviations": "94c228264536",
+  "diff": "a5e9dd2..2bf324f (cad0c95 Orquestrador, 562df8b Frontend, 2bf324f correção do A2 de run delegada)",
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "Testes do scratchpad: test_unit_d19 (38), test_http_d19 (7), test_gitflow_d19 (fluxo completo)",
+      "status": "pass",
+      "source": "python3 scratchpad/d19/test_*_d19.py com SQUAD_CHAT_RUNNER=fake (rodados pelo Auditor, um a um)"
+    },
+    {
+      "name": "Suítes tests/squad/*.py uma a uma (alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 11, conversa_d17 44, e2e_compose_seguro_d15 11, entrega_por_pr, governanca_d14_qa 19)",
+      "status": "pass",
+      "source": "scratchpad/g2-d19/summary.txt; todas rc=0"
+    },
+    {
+      "name": "Servidor sem poder de escrita além do `delegation`: record_delegation é o único gravador e só é chamado por Engine._confirm_delegation",
+      "status": "pass",
+      "source": "tools/squad/server.py:1103, conversa.py:1334"
+    },
+    {
+      "name": "log.py recusa `delegation` (--type delegation e --type=delegation → código 2; abreviações caem no choices sem o tipo)",
+      "status": "pass",
+      "source": "tools/squad/log.py:44-48, TYPES; execução com SQUAD_LOG temporário (arquivo ficou vazio)"
+    },
+    {
+      "name": "Revalidação sob log_lock (LOG_WRITE_LOCK) comparando demand/category/target/owner/attemptKey/attempt; risco alto sem riskAck → 422 sem gravar; 2ª confirmação → 409 ja_decidida",
+      "status": "pass",
+      "source": "conversa.py:1334-1370; test_http_d19 03/04/05"
+    },
+    {
+      "name": "Limites: attemptKey estável; agente parado 1 por (demanda, agente, passo) com passo 'inicio'; conflito por (demanda, tipo, PR) até 2; sem alvo conta desde o último ok",
+      "status": "pass",
+      "source": "conversa.py:450-461, 590-660; test_unit_d19"
+    },
+    {
+      "name": "CA-10(d) após 2bf324f: A2 de run com delegation string → delegable=false (precondicao_falhou), também em 2ª anotação; run sem delegation → true",
+      "status": "pass",
+      "source": "scratchpad/g2-d19/ca10d.py (verificação do Auditor; não há teste automatizado dessa via)"
+    },
+    {
+      "name": "pending.py: state e mergeable na MESMA chamada gh pr view --json state,mergeable, cache 30 s, UNKNOWN ignorado, transições pelo último pr-conflict/cleared",
+      "status": "pass",
+      "source": "pending.py:82-103; test_unit_d19"
+    },
+    {
+      "name": "gitflow.py demand-worktree/feature-sync/review-update: git só no worktree, recusa cópia principal e *-teste, merge --no-ff sem rebase/force, --abort limpo, STATE inteiro recusado (código 4, inbox incluído), mesmo PR via gh pr list --head, nenhum review/PR novo",
+      "status": "pass",
+      "source": "gitflow.py:395-583; test_gitflow_d19 (cópia principal com HEAD/status iguais, log do worktree intacto)"
+    },
+    {
+      "name": "Injeção pelo log: tarefa entre <tarefa_confirmada_pelo_humano>, alvo/dados entre <dados>, marcas de fechamento neutralizadas; log.py absoluto e SQUAD_LOG da cópia principal",
+      "status": "pass",
+      "source": "run_agent.py delegation_prompt/_data; test_unit_d19 (montagem do prompt)"
+    },
+    {
+      "name": "UI: conteúdo do modelo (tarefa, alvo, título) por textContent/esc; innerHTML só com HTML fixo ou escapado; pedido preenche o campo sem enviar; 'Entendo o risco' bloqueia no cliente e o servidor exige riskAck",
+      "status": "pass",
+      "source": "squad-control/index.html (bloco D19); capturas scratchpad/d19-front/shots"
+    },
+    {
+      "name": "Log real intocado pelos testes (567 linhas, 0 eventos delegation antes e depois); worktree limpo; cópia principal em develop",
+      "status": "pass",
+      "source": "wc/grep no decisions.jsonl da cópia principal; git status"
+    },
+    {
+      "name": "CA-1 ponta a ponta com PR real e plantão (seção D) executando",
+      "status": "validate",
+      "source": "não executado no G2 — responsabilidade do QA/G3"
+    }
+  ],
+  "deviations_assessment": [
+    "Aceito: `delegations` só no /api/state (o /api/live mantém as chaves fixadas pelo test_alertas_d14; mudança de delegação muda `version` e força a recarga). Diverge do texto do §7 do contrato → change-request ao Arquiteto para registrar, não bloqueia.",
+    "Aceito: pending.py parseia o JSON de `--json state,mergeable` em vez de `-q`; continua uma única chamada por PR (§8.1 preservado).",
+    "Aceito com ressalva: A6/A7 usam o fechamento do Rules._closed (inclui G3 APPROVE sem PR). Evita avisos de demandas antigas, mas um handoff parado entre o G3 APPROVE e a abertura do PR não gera A6. O QA deve registrar o caso."
+  ],
+  "open_risks": [
+    "feature_sync ignora o código de saída do `git merge`: se o merge falhar sem deixar MERGE_HEAD (ex.: arquivo não rastreado seria sobrescrito), imprime 'já contém a origin/develop (nada a integrar)' e sai 0. Recomendo verificar returncode ou `git merge-base --is-ancestor origin/develop HEAD` antes de declarar sucesso. Não bloqueia (o wt_dirty com -uall reduz o caso), mas o QA deve cobrir.",
+    "CA-10(d) pela via do servidor (annotate_delegations → runDelegation) não tem teste automatizado; verificado ad hoc pelo Auditor. O QA deve fixar em tests/squad/.",
+    "test_http_d19 checa o log real com `... == REAL_SHA or True` (asserção inócua). A suíte do QA deve usar uma asserção real (ex.: nenhuma linha com id gerado pelo teste no log real).",
+    "Autenticidade do `delegation` é por convenção (log.py + par `confirmada` na conversa + delegation-check); um agente que escreva direto no jsonl ainda forjaria o evento, barrado só pelo par na conversa. Conforme o contrato §14.",
+    "delegables()/alert_delegation rodam o validador por alerta a cada /api/live; vigiar custo com log grande.",
+    "Decisões provisórias do §17 do contrato seguem para o humano no PR."
+  ],
+  "qa_must_prove": [
+    "CA-1 ponta a ponta: com PR real (preferível) ou repositório temporário com origin local e `gh` simulado que responde UNKNOWN na 1ª e CONFLICTING na 2ª consulta — pending.py → pr-conflict → B6 no /api/live → GET /api/conversas/pedido → conversa (runner fake) com bloco delegar → cartão → confirmar → `delegation` no log → server.py --delegation-check 0 → demand-worktree → feature-sync (3 e depois commit) → gate G3 APPROVE com --delegation → review-update (mesmo PR, sem --force) → delegation-result ok → pending vê MERGEABLE → pr-conflict-cleared → B6 fecha; `gh pr list --head` com 1 PR e nenhuma chamada `gh pr merge`.",
+    "CA-14/CA-15: delegation injetado sem par `confirmada` → --delegation-check 3 (recusada); conflito resolvido antes → 4 (obsoleta), sem delegation-start.",
+    "CA-10(d) e CA-22 completos pela via HTTP: run_agent --delegation (dry-run) marca a run; A2 dessa run sem ação Delegar no /api/live; 2ª proposta → limite_tentativas.",
+    "CA-19/20/21/25/30: QA obrigatório quando muda código; ambiente-teste sem test-env-* e prod-fingerprint igual; change-request fechado por decision --change-request/--resolution e A7 fecha; pause/cancel; --refs no handoff.",
+    "CA-23/24: injeção no handoff/conflito só dentro de <dados>; pedidos de merge/cancelar/pausar/nova demanda/publicar no teste no chat não geram bloco delegar válido.",
+    "CA-26 e UI: seção Delegações, badge, 1440/390 claro/escuro, teclado, sem innerHTML de texto do modelo; pedido preenchido e NÃO enviado.",
+    "feature-sync com merge que falha sem MERGE_HEAD (ressalva 1) e A6 entre G3 APPROVE e abertura do PR (desvio 3).",
+    "Log real e cópia principal intactos em todas as execuções; SQUAD_CHAT_RUNNER=fake; nenhum POST ao :7070."
+  ],
+  "human_required": false,
+  "rationale": "Implementação aderente ao contrato v2 e ao ADR-022, com as três ressalvas do G1-D19-2 resolvidas (run_agent --delegation, STATE inteiro no review-update, passo 'inicio' no CA-22). O servidor só ganhou o poder de gravar `delegation` na confirmação humana, revalidada sob o lock do log; o log.py recusa o tipo; o gitflow nunca toca a cópia principal e recusa memória no PR. A correção 2bf324f fecha o laço do A2 de run delegada (verificado). Todas as suítes e os testes do scratchpad passam, e o log real não mudou. Confiança = testes (B,3) + segurança do gravador/revalidação (B,3) + aderência ao contrato (B,2) + UI (B,2) + cópia principal e log intactos (2) + CA-10(d) verificado (1) + CA-1 ponta a ponta (1, validar: 0,5) + robustez do feature-sync (1, validar: 0,5) = 14/15 ≈ 0,93, descontada para 0,90 porque o CA-10(d) e o caso do merge falho não têm teste automatizado. Risco moderado: ferramental da squad que faz push em branch de PR; o produto não muda. Ressalvas não bloqueiam e vão para o QA."
+}

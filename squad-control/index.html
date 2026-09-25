@@ -642,6 +642,36 @@
   .c-prop .actions { margin-top: 8px; }
   .c-prop .actions .btn { height: 40px; padding: 0 14px; flex-grow: 0; }
   .c-prop .res { margin: 6px 0 0; font-size: 13px; }
+  /* ================= D19 (ADR-022, contrato delegacao-pela-conversa §11): cartão de delegação, ações nos alertas, seção Delegações ================= */
+  .c-prop.deleg { border-left-color: var(--accent); }
+  .c-prop.deleg.alto { border-left-color: var(--danger); }
+  .c-prop .dg-count { float: right; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--dim); }
+  .c-prop .dg-count.over { color: var(--danger); font-weight: 600; }
+  .c-prop .dg-ack { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; padding: 6px 8px; min-height: 44px; border: 1px solid var(--danger); border-radius: 4px; background: var(--danger-soft); color: var(--text); font-size: 13px; cursor: pointer; }
+  .c-prop .dg-ack input { margin-top: 2px; width: 18px; height: 18px; flex: none; }
+  .c-prop .dg-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .dg-risk, .dg-st { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+  .dg-risk svg { flex: none; }
+  .dg-risk.baixo { color: var(--ok); } .dg-risk.moderado { color: var(--warn); } .dg-risk.alto { color: var(--danger); }
+  .dg-st .ic { width: 14px; text-align: center; }
+  .dg-st.pedida, .dg-st.aguardando-gate { color: var(--warn); } .dg-st.em-execucao { color: var(--accent); } .dg-st.concluida { color: var(--ok); }
+  .dg-st.falhou, .dg-st.recusada { color: var(--danger); } .dg-st.obsoleta, .dg-st.cancelada { color: var(--muted); }
+  .dg-busy { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--accent); min-height: 32px; }
+  .dg-used { display: inline-flex; align-items: center; font-size: 12.5px; color: var(--muted); min-height: 32px; }
+  .tag.dg { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .dg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .dg-item { border: 1px solid var(--line); border-left: 3px solid var(--accent); background: var(--surface); padding: 10px 12px; font-size: 13px; }
+  .dg-item.concluida { border-left-color: var(--ok); } .dg-item.falhou, .dg-item.recusada { border-left-color: var(--danger); } .dg-item.obsoleta, .dg-item.cancelada { border-left-color: var(--line-strong); }
+  .dg-item .hd { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+  .dg-item h3 { margin: 0; font-size: 14px; }
+  .dg-item dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 8px 0 0; }
+  .dg-item dt { color: var(--muted); } .dg-item dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .dg-item .task { white-space: pre-wrap; }
+  .dg-item .links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+  .dg-item .links a { min-height: 32px; display: inline-flex; align-items: center; }
+  .dg-item .evs { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 600px) { .dg-item dl, .c-prop.deleg dl { grid-template-columns: minmax(0, 1fr); } .dg-item dt, .c-prop.deleg dt { margin-top: 4px; } }
+  /* ================= fim D19 ================= */
   .c-status { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .c-status[hidden] { display: none; }
   .c-status .ic { flex: none; width: 16px; text-align: center; }
@@ -1184,6 +1214,7 @@ function renderSquadStrip() { return `<div class="squad">${agentsNow().map(ag =>
 const seenAlerts = { get() { try { return new Set(JSON.parse(localStorage.getItem("sc-seen-alerts") || "[]")); } catch (e) { return new Set(); } },
   add(id) { try { const s = this.get(); s.add(id); localStorage.setItem("sc-seen-alerts", JSON.stringify([...s].slice(-300))); } catch (e) {} } };
 function alertActionHtml(a, cls = "btn xs") {
+  { const dg = delegAlertActionHtml(a, cls); if (dg != null) return dg; }   // D19: B6/A6/A7/A2 delegáveis
   const dis = isStale() && a.owner === "humano" ? ` aria-disabled="true" title="Sem dados atuais — reconectando"` : "";
   const code = alertCode(a);
   if (a.action?.external) return `${extLink(a.action.external, esc(a.action.label || "Abrir"), cls + " primary")}${code ? `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>` : ""}`;
@@ -1361,7 +1392,7 @@ function gateDecisionHtml(g, demand) {
 function timelineHtml(pipe) {
   return `<ol class="tl">${pipe.map(p => `
     <li><div class="step ${p.st}">${esc(p.id)}</div>
-      <div><b>${esc(p.title)}</b>${p.entry?.type && eventHasModel(p.entry) ? `<div class="mrow">${eventModelChip(p.entry)}</div>` : ""}<p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — abra o agente para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
+      <div><b>${esc(p.title)}</b>${p.entry?.delegation ? delegMarkHtml(p.entry) : ""}${p.entry?.type && eventHasModel(p.entry) ? `<div class="mrow">${eventModelChip(p.entry)}</div>` : ""}<p>${esc(p.entry?.detail || p.entry?.title || p.entry?.rationale || (p.st === "now" ? "Em andamento — abra o agente para ver ao vivo." : "Aguardando encaminhamento do Orquestrador."))}</p></div>
       <span class="when">${p.st === "done" ? (p.ts ? hhmm(p.ts) : "concluído") : p.st === "fail" ? "devolvido" : p.st === "now" ? "agora" : "próximo"}</span></li>`).join("")}</ol>`;
 }
 const crumbs = items => `<nav class="crumbs" aria-label="Trilha"><ol>${items.map((it, i) => i < items.length - 1 ? `<li><a href="${it[1]}">${esc(it[0])}</a></li>` : `<li><span aria-current="page">${esc(it[0])}</span></li>`).join("")}</ol></nav>`;
@@ -1656,6 +1687,7 @@ function renderDemanda(ref) {
       ${start?.override ? `<span class="tag validate" title="Iniciada sem a validação concluída">iniciada com override</span>` : ""}
       ${issue ? extLink(issue.url, `issue #${esc(issue.number)}`, "tag") : `<span class="tag">issue: sincronizando…</span>`}
       ${pr?.pr ? extLink(pr.url, `PR #${esc(pr.pr)}`, "tag") : ""}
+      ${delegBadgeHtml(info)}
     </div>
     ${start || info.work.length ? demandModelsHtml(id) : ""}
   </div>${isClosed(info) || info.preStart ? "" : runPill(w.length > 0)}</div>
@@ -1667,8 +1699,9 @@ function renderDemanda(ref) {
   ${stepperHtml(info)}
   ${alertsFor(id).length ? `<div class="dem-alerts" role="region" aria-label="Bloqueios e avisos da ${esc(code)}"><ul class="alist">${alertsFor(id).map(x => alertItemHtml(x, seenAlerts.get())).join("")}</ul></div>` : ""}
   ${next}
-  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${(info.bug ? [["bug", "Bug"], ...SECTIONS] : SECTIONS).map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${delegToc(info, info.bug ? [["bug", "Bug"], ...SECTIONS] : SECTIONS).map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
   ${info.bug ? bugSectionHtml(info) : ""}
+  ${delegSectionHtml(info)}
   <section class="dsec" id="sec-execucao" aria-labelledby="h-execucao"><h2 id="h-execucao" tabindex="-1">Execução</h2>
     <div class="sub" style="margin-top:0">${esc(now ? `Agora: ${now.title}` : isClosed(info) ? `Demanda ${info.status.toLowerCase()}.` : info.preStart || info.inBacklog ? "Ainda não iniciada." : "Aguardando o próximo passo do Orquestrador.")}</div>
     ${involved.length ? `<div class="mrow" style="margin:10px 0 0"><span class="lbl">Agentes envolvidos:</span></div><div class="squad" style="margin-bottom:12px">${involved.filter(ag => ROLES.includes(ag)).map(ag => agentCard(agentOf(ag))).join("")}</div>` : ""}
@@ -1683,7 +1716,7 @@ function renderDemanda(ref) {
   <section class="dsec" id="sec-registro" aria-labelledby="h-registro"><h2 id="h-registro" tabindex="-1">Registro</h2>
     <details id="reg-${id}" ${sec === "registro" ? "open" : ""}><summary style="cursor:pointer;color:var(--accent);font-size:13px">${evs.length} eventos desta demanda</summary>
       <div class="tbl" style="margin-top:8px"><table><thead><tr><th>Hora</th><th>Agente</th><th>Tipo</th><th>Registro</th></tr></thead><tbody>
-      ${evs.map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td><td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div></details>
+      ${evs.map(e => `<tr><td>${hhmm(e.ts)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span>${e.delegation ? delegMarkHtml(e) : ""}</td><td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div></details>
     <p style="font-size:13px"><a href="#/auditoria/eventos?demanda=${code}">Ver na Auditoria</a></p>
   </section>`;
 }
@@ -2352,7 +2385,7 @@ function renderAuditoria() {
       ${fd || fa || ft ? `<a href="#/auditoria/eventos" style="font-size:13px;min-height:36px;display:inline-flex;align-items:center">Limpar filtros</a>` : ""}
       <span class="muted" style="font-size:12px;align-self:center">${rows.length} de ${state.log.length} eventos · <code>docs/squad/memory/decisions.jsonl</code> (append-only)</span></div>
     <div class="tbl"><table><thead><tr><th>Hora</th><th>Demanda</th><th>Agente</th><th>Tipo</th><th>Registro</th><th>Para</th></tr></thead><tbody>
-    ${rows.map(e => `<tr><td>${hhmm(e.ts)}</td><td>${codeLink(e.demand)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span></td>
+    ${rows.map(e => `<tr><td>${hhmm(e.ts)}</td><td>${codeLink(e.demand)}</td><td>${esc(AGENTS[e.agent]?.label || e.agent)}${eventHasModel(e) ? `<div class="mrow">${eventModelChip(e)}</div>` : ""}</td><td><span class="tag">${esc(e.type)}${e.gate ? " · " + esc(e.gate) : ""}</span>${e.delegation ? delegMarkHtml(e) : ""}</td>
       <td><b>${esc(e.title)}</b>${e.detail ? `<div class="muted">${esc(e.detail)}</div>` : ""}${(e.evidences || []).length ? `<div>${e.evidences.map(v => `<span class="${esc(v.status)}">● </span>${esc(v.name)}`).join(" &nbsp; ")}</div>` : ""}${e.url ? `<div>${extLink(e.url, e.pr != null ? `PR #${esc(e.pr)}` : "link")}</div>` : ""}</td>
       <td>${esc(AGENTS[e.to]?.label || e.to || "")}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">Nenhum evento com esses filtros.</td></tr>`}</tbody></table></div>`;
   }
@@ -2515,7 +2548,7 @@ function canonical(h) {
   if (r.view === "produto" && !r.parts.length) return "#/produto/grafana" + (r.params.toString() ? "?" + r.params : "");
   return null;
 }
-const keyOf = r => `${r.view}/${r.parts.join("/")}?${[...r.params].filter(([k]) => k !== "agente" && k !== "conversa").map(([k, v]) => `${k}=${v}`).join("&")}`;
+const keyOf = r => `${r.view}/${r.parts.join("/")}?${[...r.params].filter(([k]) => k !== "agente" && k !== "conversa" && k !== "pedido").map(([k, v]) => `${k}=${v}`).join("&")}`;
 let pendingFocus = false;
 function applyRoute() {
   const c = canonical(location.hash);
@@ -2835,7 +2868,7 @@ async function poll() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 // Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
-const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append],[data-chat-confirm]";
+const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append],[data-chat-confirm],[data-deleg-confirm]";
 function applyStale() {
   const stale = isStale();
   document.querySelectorAll(STALE_SEL).forEach(el => {
@@ -3110,7 +3143,7 @@ const keepChat = h => { const r = parseHash(h); if (chat.id || route.params.get(
 const fmtWhen = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
 const fmtSecs = ms => typeof ms === "number" && isFinite(ms) ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : null;
 // O bloco ```destravar é do servidor (vira `proposal`); no texto que chega em trechos ele é escondido desde a abertura.
-const stripProposal = t => String(t || "").replace(/```destravar[\s\S]*?(```|$)/g, "").replace(/\s+$/, "");
+const stripProposal = t => String(t || "").replace(/```(?:destravar|delegar)[\s\S]*?(```|$)/g, "").replace(/\s+$/, "");
 
 // ---- Markdown mínimo por DOM (§9): parágrafo, lista, título, bloco de código, `código`, **negrito**, links seguros e Dn ----
 const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
@@ -3177,6 +3210,7 @@ function chatSync() {
   if (wasHidden || (p === "nova" ? chat.id !== null : p !== chat.id)) chatReset(p === "nova" ? null : p);
   if (wasHidden) { chatLoadList(); setTimeout(() => C("chat-text").focus({ preventScroll: true }), 0); }
   else chatRenderList();
+  delegPedidoSync();   // D19: ?pedido=<alerta> preenche o campo sem enviar
 }
 function chatClose() {
   const panel = C("chat"), had = panel.contains(document.activeElement);
@@ -3500,7 +3534,7 @@ function chatMsgEl(m, isLastOrq) {
       if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = "Tentar de novo"; foot.append(bt); }
     }
     if (foot.childNodes.length) li.append(foot);
-    if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(chatPropEl(m.proposal));
+    if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(m.proposal.kind === "delegar" ? delegPropEl(m.proposal) : chatPropEl(m.proposal));   // D19: kind ausente = destravar
   }
   return li;
 }
@@ -3642,6 +3676,268 @@ C("chat").addEventListener("click", ev => {
   const cf = ev.target.closest("[data-chat-confirm]"); if (cf) { chatDecide(cf.dataset.chatConfirm, "confirmar", cf); return; }
   const ds = ev.target.closest("[data-chat-discard]"); if (ds) { chatDecide(ds.dataset.chatDiscard, "descartar", ds); return; }
 });
+// ================= D19 (ADR-022, contrato delegacao-pela-conversa §7 e §11): delegação de tarefas pela conversa =================
+// A conversa propõe (bloco ```delegar → `proposal` com kind "delegar"); o servidor valida e define agente/risco; o humano confirma
+// no cartão; o servidor grava o evento `delegation`; o plantão executa. A UI não decide nada: mostra, pede a confirmação e
+// acompanha o estado derivado do log (pedida → em-execucao → aguardando-gate → concluida | falhou | obsoleta | recusada | cancelada).
+const DG_TASK_MAX = 2000, DG_REF_RE = /^(pr-conflict|handoff-stalled|change-request-open|agent-stalled|test-env-failed|test-env-divergent):[A-Za-z0-9:_.-]{1,80}$/;
+const DG_TYPES = {
+  "conflito-develop": "Conflito do PR com a develop", "gate-travado": "Gate travado", "teste-quebrado": "Teste quebrado",
+  "ambiente-teste": "Erro no ambiente de teste (só diagnóstico e correção na branch)", "pendencia-handoff": "Pendência: handoff sem continuidade",
+  "pendencia-change-request": "Pendência: change-request aberto", "pendencia-agente-parado": "Pendência: agente parado (nova tentativa única)",
+  "ajuste-pontual": "Ajuste pontual dentro da demanda" };
+const DG_RISK = { baixo: ["Baixo", "info"], moderado: ["Moderado", "aviso"], alto: ["Alto", "bloqueio"] };
+const DG_STATES = { pedida: ["Pedida · aguardando o plantão", "◷"], "em-execucao": ["Em execução", "●"], "aguardando-gate": ["Aguardando o parecer do Auditor", "◷"],
+  concluida: ["Concluída", "✓"], falhou: ["Falhou · volta para você", "✕"], obsoleta: ["Obsoleta · nada a fazer", "○"], recusada: ["Recusada", "■"], cancelada: ["Cancelada", "■"] };
+const DG_RESULT = { ok: "concluida", falhou: "falhou", obsoleta: "obsoleta", recusada: "recusada", cancelada: "cancelada" };
+const DG_ACTIVE = new Set(["pedida", "em-execucao", "aguardando-gate"]);
+const DG_REASON = { ...PROP_REASON, tipo_invalido: "o tipo de tarefa está fora da lista permitida", demanda_encerrada: "a demanda está cancelada ou já foi entregue",
+  delegacao_ativa: "já existe uma delegação em andamento nesta demanda; aguarde o resultado", limite_tentativas: "as tentativas acabaram — volta para você decidir",
+  alvo_de_outra_demanda: "o alvo citado pertence a outra demanda", precondicao_falhou: "a situação que justificava a delegação não vale mais",
+  acao_proibida: "é uma ação reservada a você (merge, fechar PR, cancelar, pausar, repriorizar, operar o ambiente de teste ou o produtivo, abrir demanda)",
+  tarefa_invalida: "a tarefa está vazia ou passa de 2 000 caracteres" };
+Object.assign(CHAT_ERR, {
+  risco_nao_confirmado: "Risco alto: marque “Entendo o risco” antes de confirmar.", tarefa_grande: "A tarefa passa de 2 000 caracteres.",
+  tarefa_vazia: "Escreva a tarefa antes de confirmar.", alerta_nao_encontrado: "Esse alerta não está mais aberto (talvez já tenha sido resolvido). Nada foi preenchido.",
+  nao_delegavel: "Esse alerta não pode ser delegado agora (delegação em andamento ou tentativas esgotadas). Decisão sua.",
+  demanda_nao_encontrada: "Demanda não encontrada." });
+const dgWhoLabel = o => !o || o === "a-definir" ? "Definido pelo Orquestrador (dono do diretório)" : who(o);
+const dgEv = id => id && state ? state.log.find(e => e.id === id) || null : null;
+const dgRiskHtml = r => { const [l, i] = DG_RISK[r] || [r || "—", "info"]; return `<span class="dg-risk ${esc(DG_RISK[r] ? r : "")}">${ICON[i]}${esc(l)}</span>`; };
+const dgStateHtml = s => { const [l, i] = DG_STATES[s] || [s || "—", "○"]; return `<span class="dg-st ${esc(s || "")}"><span class="ic" aria-hidden="true">${i}</span>${esc(l)}</span>`; };
+const dgMax = cat => cat === "pendencia-agente-parado" ? 1 : 2;
+// Alvo em linguagem clara (§11): "PR #171 em conflito com a develop", handoff/change-request citados, run parada.
+function dgTargetText(cat, target, x = {}) {
+  const raw = String(target || ""), id = raw.replace(/^(pr-conflict|handoff-stalled|change-request-open|agent-stalled|test-env-failed|test-env-divergent):/, ""), ev = dgEv(id);
+  if (cat === "conflito-develop" || /^pr-conflict:/.test(raw)) { const pr = ev?.pr ?? x.pr; return pr != null ? `PR #${pr} em conflito com a develop` : "PR em conflito com a develop"; }
+  if (/^agent-stalled:/.test(raw) || cat === "pendencia-agente-parado") { const run = state?.runs?.find(r => r.id === id); return `${run ? who(run.agent) : "Agente"} parado (execução ${id.slice(0, 8) || "?"})`; }
+  if (/^test-env-failed:/.test(raw)) return "Falha ao publicar no ambiente de teste";
+  if (/^test-env-divergent:/.test(raw)) return "Ambiente de teste divergente do PR";
+  if (!raw) return cat === "ajuste-pontual" ? "Ajuste dentro do escopo da demanda" : cat === "teste-quebrado" ? "Sem evidência indicada (o Orquestrador identifica)" : "—";
+  if (ev?.type === "handoff") return `Handoff de ${who(ev.agent)} para ${who(ev.to)} sem continuidade: “${String(ev.title || "").slice(0, 120)}”`;
+  if (ev?.type === "change-request") return `Change-request de ${who(ev.agent)} para ${who(ev.to)}: “${String(ev.title || "").slice(0, 120)}”`;
+  if (ev?.type === "human") return `Sua decisão em ${ev.gate || "gate"} sem ação do Orquestrador`;
+  if (ev) return `${ev.type} · “${String(ev.title || "").slice(0, 120)}”`;
+  return raw;
+}
+// Delegações de uma demanda: GET /api/delegacoes?demand=<id> (§7) quando existe; sem a rota, o mesmo formato derivado do log.
+const dgApi = {};
+function dgDerive(demandId) {
+  if (!state) return [];
+  const log = state.log;
+  return log.filter(e => e.type === "delegation" && e.demand === demandId).map(d => {
+    const start = log.find(e => e.type === "delegation-start" && e.delegation === d.id), res = log.find(e => e.type === "delegation-result" && e.delegation === d.id);
+    const evs = log.filter(e => e.delegation === d.id && e.type !== "delegation");
+    let st = "pedida";
+    if (res) st = DG_RESULT[res.status] || res.status || "concluida";
+    else if (start) { const ho = [...evs].reverse().find(e => e.type === "handoff" && e.to === "auditor"); st = ho && !evs.some(e => e.type === "gate" && String(e.ts) > String(ho.ts)) ? "aguardando-gate" : "em-execucao"; }
+    return { id: d.id, ts: d.ts, demand: d.demand, code: demandCode(d.demand), category: d.category, target: d.target || null, owner: d.owner || null, risk: d.risk || null,
+      attempt: d.attempt || 1, title: d.title || "", task: d.detail || "", pr: d.pr ?? null, state: st, startedAt: start?.ts || null, endedAt: res?.ts || null,
+      result: res ? { status: res.status, detail: res.detail || "", pr: res.pr ?? null, sha: res.sha || null } : null,
+      events: evs.map(e => ({ id: e.id, ts: e.ts, agent: e.agent, type: e.type, title: e.title || "", gate: e.gate || null, recommendation: e.recommendation || null, url: e.url || null, sha: e.sha || null, pr: e.pr ?? null })) };
+  }).reverse();
+}
+function dgFetch(info) {
+  const id = info.d.id, c = dgApi[id];
+  if (c && (c.busy || Date.now() - c.at < 5000)) return;
+  dgApi[id] = { ...(c || {}), busy: true, at: Date.now() };
+  chatApi("GET", `/api/delegacoes?demand=${encodeURIComponent(id)}`).then(r => {
+    const prev = JSON.stringify(dgApi[id]?.items || null), items = r.ok && Array.isArray(r.j.items) ? r.j.items : null;
+    dgApi[id] = { busy: false, at: Date.now(), items };
+    if (items && JSON.stringify(items) !== prev && route.view === "demandas" && findDemand(route.parts[0])?.d.id === id && !editing()) render();
+  });
+}
+function dgItems(info) {
+  if (!info || !state) return [];
+  if (route.view === "demandas") dgFetch(info);
+  const derived = dgDerive(info.d.id), api = dgApi[info.d.id]?.items;
+  if (!api) return derived;
+  // A rota é a fonte do estado; os eventos ligados vêm do log (trazem gate/parecer/sha), senão os da rota.
+  return api.map(x => { const d = derived.find(y => y.id === x.id); return { ...d, ...x, events: d?.events?.length ? d.events : Array.isArray(x.events) ? x.events : [] }; });
+}
+// Fonte extra: /api/state `delegations` {demandId: ativa resumida} (decisão do Orquestrador 94c228264536).
+const dgActiveOf = info => dgItems(info).find(x => DG_ACTIVE.has(x.state)) || (state?.delegations?.[info.d.id] ? { target: null, ...state.delegations[info.d.id] } : null);
+const dgStateOfEvent = id => { const d = dgEv(id); if (!d) return null; const info = findDemand(d.demand); return info ? dgItems(info).find(x => x.id === id)?.state || "pedida" : "pedida"; };
+
+// ---- Cartão de delegação na conversa (§11) ----
+chat.dgTask = {}; chat.dgAck = {};
+function delegPropEl(p) {
+  const box = mk("div", "c-prop deleg"), dec = chat.decisions[p.id], pm = chat.propMsg[p.id];
+  box.setAttribute("role", "group"); box.setAttribute("aria-labelledby", `cp-h-${p.id}`);
+  const h = mk("h4"); h.id = `cp-h-${p.id}`; h.tabIndex = -1;
+  const info = state && p.demand ? findDemand(p.demand) : null, code = info?.code || (/^D\d+$/i.test(p.demand || "") ? String(p.demand).toUpperCase() : null);
+  const demHref = code ? keepChat(`#/demandas/${code}`) : null, dgHref = code ? keepChat(`#/demandas/${code}/delegacoes`) : null;
+  if (!p.valid) {
+    box.classList.add("invalid"); h.innerHTML = `${ICON.aviso}<span>Delegação não acionável</span>`; box.append(h);
+    const t = mk("p", "res"); t.textContent = `O Orquestrador sugeriu uma delegação que não pode ser feita por aqui: ${DG_REASON[p.reason] || p.reason || "motivo não informado"}.`; box.append(t);
+    if (p.reason === "limite_tentativas") { const t2 = mk("p", "res"); t2.textContent = "A squad já tentou o que podia sozinha. Volta para você decidir: revise a demanda, cancele ou abra uma nova demanda."; box.append(t2); }
+    if (demHref) { const a = mk("a"); a.href = demHref; a.textContent = `Abrir ${code}`; box.append(a); }
+    return box;
+  }
+  const alto = p.risk === "alto"; if (alto) box.classList.add("alto");
+  h.innerHTML = `${alto ? ICON.bloqueio : ICON.info}<span>Proposta de delegação · precisa da sua confirmação</span>`; box.append(h);
+  const dl = mk("dl"), row = (k, v) => { const dt = mk("dt"), dd = mk("dd"); dt.textContent = k; if (v instanceof Node) dd.append(v); else if (v && v.html) dd.innerHTML = v.html; else dd.textContent = v; dl.append(dt, dd); };
+  const dem = document.createDocumentFragment();
+  if (code && info) { const a = mk("a"); a.href = demHref; a.textContent = code; dem.append(a, ` · ${info.eff?.title || ""}`); } else dem.append(code || p.demand || "—");
+  row("Demanda", dem);
+  row("Tipo", DG_TYPES[p.category] || p.category || "—");
+  row("Alvo", p.targetLabel || dgTargetText(p.category, p.target, p));
+  row("Agente responsável", dgWhoLabel(p.owner));
+  row("Risco", { html: dgRiskHtml(p.risk) });
+  row("Tentativa", `${p.attempt || 1}/${p.maxAttempts || dgMax(p.category)}${p.category === "pendencia-agente-parado" ? " (nova tentativa única)" : ""}`);
+  row("Efeito", "A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu.");
+  box.append(dl);
+  if (dec) {
+    box.classList.add("done");
+    const t = mk("p", "res"), when = dec.ts ? ` às ${hhmm(dec.ts)}` : "";
+    if (dec.decision === "confirmada") {
+      t.classList.add("ok-msg"); t.textContent = `Delegação confirmada${when}${dec.event ? ` (evento ${String(dec.event).slice(0, 12)})` : ""}. Estado: `;
+      const s = mk("span"); s.dataset.delegLive = dec.event || ""; s.innerHTML = dgStateHtml(dgStateOfEvent(dec.event) || "pedida"); t.append(s);
+    } else { t.classList.add("muted"); t.textContent = dec.decision === "obsoleta" ? `Obsoleta${when}: o estado mudou antes da confirmação; nada foi registrado.` : `Descartada${when}: nada foi registrado.`; }
+    box.append(t);
+    if (dec.decision === "confirmada") { const n = mk("p", "dg-note"); n.textContent = "O plantão começa em até ~3 min. Acompanhe na seção Delegações da demanda."; box.append(n); }
+    if (dgHref && dec.decision === "confirmada") { const a = mk("a"); a.href = dgHref; a.textContent = `Ver delegações da ${code}`; box.append(a); }
+    return box;
+  }
+  const tid = `cp-task-${p.id}`, lab = mk("label"); lab.htmlFor = tid;
+  const val = chat.dgTask[p.id] ?? p.task ?? "";
+  lab.innerHTML = `Tarefa (editável, até 2 000 caracteres)<span class="dg-count num${val.length > DG_TASK_MAX ? " over" : ""}" id="cp-tc-${esc(p.id)}" aria-hidden="true">${val.length}/${DG_TASK_MAX}</span>`;
+  const ta = mk("textarea"); ta.id = tid; ta.rows = 4; ta.value = val; ta.dataset.delegTask = p.id; ta.setAttribute("aria-describedby", `cp-tn-${p.id}`);
+  box.append(lab, ta);
+  const note = mk("p", "dg-note"); note.id = `cp-tn-${p.id}`; note.textContent = "Nada é registrado até você confirmar. Depois, o plantão começa em até ~3 min.";
+  box.append(note);
+  if (alto) {
+    const ack = mk("label", "dg-ack"), cb = mk("input"); cb.type = "checkbox"; cb.id = `cp-ack-${p.id}`; cb.dataset.delegAck = p.id; cb.checked = !!chat.dgAck[p.id];
+    const sp = mk("span"); sp.innerHTML = "<b>Entendo o risco.</b> Risco alto: a decisão de seguir é minha (AGENTS.md, limites de autonomia).";
+    ack.htmlFor = cb.id; ack.append(cb, sp); box.append(ack);
+  }
+  const acts = mk("div", "actions");
+  const ok = mk("button", `btn ${alto ? "danger" : "primary"}`); ok.type = "button"; ok.dataset.delegConfirm = p.id; ok.textContent = "Confirmar delegação";
+  const no = mk("button", "btn"); no.type = "button"; no.dataset.chatDiscard = p.id; no.textContent = "Descartar";
+  acts.append(ok, no); box.append(acts);
+  if (pm) { const t = mk("p", `res ${pm.ok ? "ok-msg" : "fail"}`); t.setAttribute("role", "status"); t.textContent = pm.text; box.append(t); }
+  return box;
+}
+async function delegDecide(pid, btn) {
+  if (!CHAT_PID_RE.test(pid) || !chat.id) return;
+  const p = chat.msgs.map(m => m.proposal).find(x => x && x.id === pid) || {};
+  const task = String(chat.dgTask[pid] ?? p.task ?? "").trim(), ack = !!chat.dgAck[pid];
+  const fail = (code, focusId) => { chat.propMsg[pid] = { ok: false, text: CHAT_ERR[code] }; chatRender(); announceErr(CHAT_ERR[code]); C(focusId)?.focus({ preventScroll: true }); };
+  if (!task) return fail("tarefa_vazia", `cp-task-${pid}`);
+  if (task.length > DG_TASK_MAX) return fail("tarefa_grande", `cp-task-${pid}`);
+  if (p.risk === "alto" && !ack) return fail("risco_nao_confirmado", `cp-ack-${pid}`);
+  btn.disabled = true;
+  const g = chat.gen, r = await chatApi("POST", `/api/conversas/${chat.id}/propostas/${pid}/confirmar`, { task, riskAck: ack });
+  if (g !== chat.gen) return;
+  if (r.ok) {
+    chat.propMsg[pid] = { ok: true, text: "Delegação registrada pelo servidor. Aguardando o plantão (até ~3 min)." };
+    chat.decisions[pid] = { id: pid, decision: "confirmada", event: r.j.event?.id || null, ts: r.j.event?.ts || new Date().toISOString() };
+  } else {
+    chat.propMsg[pid] = { ok: false, text: chatErrText(r) };
+    if (r.j.code === "proposta_obsoleta") chat.decisions[pid] = { id: pid, decision: "obsoleta", ts: new Date().toISOString() };
+  }
+  await chatCatchUp(); if (g !== chat.gen) return;
+  chatRender();
+  const text = chat.propMsg[pid].text; if (r.ok) announce(text); else announceErr(text);
+  C(r.ok || r.j.code === "proposta_obsoleta" ? `cp-h-${pid}` : r.j.code === "risco_nao_confirmado" ? `cp-ack-${pid}` : `cp-task-${pid}`)?.focus({ preventScroll: true });
+  if (r.ok) refresh();
+}
+C("chat").addEventListener("input", ev => {
+  const pid = ev.target.dataset?.delegTask;
+  if (pid) { chat.dgTask[pid] = ev.target.value; const c = C(`cp-tc-${pid}`); if (c) { c.textContent = `${ev.target.value.length}/${DG_TASK_MAX}`; c.classList.toggle("over", ev.target.value.length > DG_TASK_MAX); } }
+});
+C("chat").addEventListener("change", ev => { const pid = ev.target.dataset?.delegAck; if (pid) chat.dgAck[pid] = ev.target.checked; });
+C("chat").addEventListener("click", ev => { const b = ev.target.closest("[data-deleg-confirm]"); if (b && !b.disabled) delegDecide(b.dataset.delegConfirm, b); });
+// Estado da delegação confirmada acompanha o log sem redesenhar a conversa.
+setInterval(() => { if (C("chat").hidden) return; document.querySelectorAll("#chat [data-deleg-live]").forEach(el => { const s = dgStateOfEvent(el.dataset.delegLive) || "pedida", h = dgStateHtml(s); if (el.innerHTML !== h) el.innerHTML = h; }); }, 2000);
+
+// ---- Painel: "Delegar correção" abre a conversa nova com o pedido NO CAMPO, sem enviar (§11; ADR-022 decisão 7.iv) ----
+async function delegPedidoSync() {
+  const ref = route.params.get("pedido");
+  if (!ref || C("chat").hidden) return;
+  const h = hrefWith({ pedido: null }); history.replaceState(null, "", h); route = parseHash(h);   // consumido uma vez; F5 não repete
+  if (!DG_REF_RE.test(ref)) { chatSetStatus("err", "Pedido de delegação inválido."); announceErr("Pedido de delegação inválido."); return; }
+  chat.status = { kind: "info", icon: "◌", text: "Preparando o pedido…" }; chatRenderStatus();
+  const g = chat.gen, r = await chatApi("GET", `/api/conversas/pedido?ref=${encodeURIComponent(ref)}`);
+  if (g !== chat.gen) return;
+  const ta = C("chat-text");
+  if (r.ok && typeof r.j.text === "string" && r.j.text.trim()) {
+    ta.value = r.j.text.slice(0, CHAT_MAX); chatCount();
+    const t = `Pedido preenchido${r.j.demand ? ` para a ${r.j.demand}` : ""}. Revise e envie quando quiser: nada foi enviado.`;
+    chat.status = { kind: "info", icon: "✎", text: t }; chatRenderStatus(); announce(t);
+    ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length);
+  } else {
+    const t = r.status === 404 && !r.j.code ? "O servidor ainda não oferece a delegação pela conversa (rota /api/conversas/pedido ausente). Reinicie o Squad Control na versão com a D19." : chatErrText(r);
+    chat.status = { kind: r.status === 409 ? "warn" : "err", icon: r.status === 409 ? "▲" : "✕", text: t }; chatRenderStatus(); announceErr(t);
+  }
+}
+const DG_ALERT = { "pr-conflict": "Delegar correção", "handoff-stalled": "Delegar continuidade", "change-request-open": "Delegar ao dono" };
+const DG_SIDE = { "agent-stalled": "Delegar nova tentativa (única)", "test-env-failed": "Delegar diagnóstico", "test-env-divergent": "Delegar diagnóstico" };
+// Servidor (annotate_delegations): `delegable`, `delegateReason`, `attempt`/`maxAttempts`, `delegation` {id,state} da ativa no mesmo alvo.
+function delegAlertActionHtml(a, cls) {
+  const dgKind = Object.keys(DG_ALERT).find(k => hasKind(a, k)), side = !dgKind ? Object.keys(DG_SIDE).find(k => hasKind(a, k)) : null;
+  if (!dgKind && !side) return null;
+  const code = alertCode(a), info = code && state ? findDemand(code) : null;
+  if (!info) return null;
+  const flag = a.delegable ?? a.delegavel, a2 = side === "agent-stalled";
+  if (side && !a2 && flag !== true && !(a.delegation && typeof a.delegation === "object")) return null;   // A4/A5: só quando o servidor oferece
+  // A2/A4/A5 mantêm a ação original e ganham a delegação ao lado; o `kinds` neutro evita recursão.
+  const base = side ? alertActionHtml({ ...a, kind: `${side}-base`, kinds: [`${side}-base`] }, cls) : "";
+  const act = dgActiveOf(info), dgHref = `#/demandas/${code}/delegacoes`, srv = a.delegation && typeof a.delegation === "object" ? a.delegation : null;
+  const fromSrv = /[?&]pedido=([^&#]+)/.exec(a.action?.href || ""), ref = a.action?.pedido || (fromSrv ? decodeURIComponent(fromSrv[1]) : a.id);
+  const busy = srv || (act && (act.target === a.id || act.target === ref || act.target === a.source?.event) ? act : null);
+  if (busy) return `${base}<span class="dg-busy" role="note"><span aria-hidden="true">●</span>Delegado · ${esc((DG_STATES[busy.state] || [busy.state || "em execução"])[0])}</span><a class="${cls}" href="${esc(dgHref)}">Ver delegação<span class="sr-only"> da ${esc(code)}</span></a>`;
+  if (act) return `${base}<span class="dg-used">Outra delegação em andamento na ${esc(code)}</span><a class="${cls}" href="${esc(dgHref)}">Ver delegação</a>`;
+  const run = a2 ? state.runs?.find(r => r.id === (a.runId || a.source?.run || String(a.id).replace(/^agent-stalled:/, ""))) : null;
+  let used, off = false;
+  if (a2) used = !!run?.delegation || (flag === false && !["demanda_encerrada", "tipo_invalido"].includes(a.delegateReason))
+    || (flag == null && dgItems(info).some(x => x.category === "pendencia-agente-parado" && x.owner === a.agent));
+  else { used = flag === false && a.delegateReason === "limite_tentativas"; off = flag === false && !used; }
+  if (a2 && !used && flag === false) return base;
+  if (used) return `${base}<span class="dg-used">${a2 ? "Nova tentativa já usada — decisão sua" : "Tentativas esgotadas — decisão sua"}</span>${side ? "" : `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>`}`;
+  if (off) return `${base}<span class="dg-used" title="${esc(DG_REASON[a.delegateReason] || a.delegateReason || "")}">Não delegável agora</span>${side ? "" : `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>`}`;
+  const lbl = side ? DG_SIDE[side] : /^Delegar/.test(a.action?.label || "") ? a.action.label : DG_ALERT[dgKind];
+  const label = !a2 && Number(a.attempt) > 1 && a.maxAttempts ? `${lbl} · tentativa ${a.attempt}/${a.maxAttempts}` : lbl;
+  const href = hrefWith({ conversa: "nova", pedido: ref, agente: null });
+  const dis = isStale() ? ` aria-disabled="true" title="Sem dados atuais — reconectando"` : "";
+  return `${base}<a class="${cls} ${!side && a.owner === "humano" ? "primary" : ""}" href="${esc(href)}" data-deleg-ask="${esc(ref)}"${dis}>${esc(label)}<span class="sr-only"> na ${esc(code)} (abre a conversa com o pedido preenchido, sem enviar)</span></a>${side ? "" : `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>`}`;
+}
+
+// ---- Tela da demanda: seção "Delegações", badge no cabeçalho, marca nos eventos (§11) ----
+const delegMarkHtml = e => `<span class="tag dg" title="Evento da delegação ${esc(e.delegation)}"><span aria-hidden="true">↳ </span>delegação<span class="sr-only"> ${esc(String(e.delegation).slice(0, 12))}</span></span>`;
+function delegBadgeHtml(info) {
+  const x = dgActiveOf(info); if (!x) return "";
+  return `<a class="tag dg" href="#/demandas/${esc(info.code)}/delegacoes" title="${esc(DG_TYPES[x.category] || x.category || "")}"><span aria-hidden="true">● </span>Delegação em andamento · ${esc((DG_STATES[x.state] || [x.state])[0])}</a>`;
+}
+const delegToc = (info, list) => dgItems(info).length ? list.flatMap(s => s[0] === "execucao" ? [["delegacoes", "Delegações"], s] : [s]) : list;
+function dgPrUrl(info, x) {
+  const upd = [...(x.events || [])].reverse().find(e => e.type === "review-updated" && e.url);
+  if (upd) return upd.url;
+  const n = x.result?.pr ?? x.pr, rv = [...info.related].reverse().find(e => e.type === "review" && e.url && (n == null || e.pr === n));
+  return rv?.url || null;
+}
+function delegSectionHtml(info) {
+  const items = dgItems(info); if (!items.length) return "";
+  const code = info.code;
+  const li = x => {
+    const gate = [...(x.events || [])].reverse().find(e => e.type === "gate"), prUrl = dgPrUrl(info, x), pr = x.result?.pr ?? x.pr;
+    const sha = x.result?.sha || [...(x.events || [])].reverse().find(e => e.sha)?.sha || null;
+    const commitUrl = sha && prUrl ? prUrl.replace(/\/pull\/\d+.*$/, `/commit/${sha}`) : null;
+    const resTxt = x.result ? (x.result.detail || (DG_STATES[x.state] || [x.state])[0]) : x.state === "pedida" ? "Aguardando o plantão (até ~3 min)." : x.state === "aguardando-gate" ? "Trabalho entregue; aguardando o parecer do Auditor." : "A squad está trabalhando na branch da demanda.";
+    const evs = x.events || [];
+    return `<li class="dg-item ${esc(x.state)}"><div class="hd"><h3>${esc(DG_TYPES[x.category] || x.category || "Delegação")}</h3>${dgStateHtml(x.state)}</div>
+      <dl><dt>Quando</dt><dd>${esc(fmtWhen(x.ts))} · ${ageSpan(x.ts)}</dd><dt>Quem pediu</dt><dd>Você, pela conversa</dd>
+        <dt>Agente</dt><dd>${esc(dgWhoLabel(x.owner))}</dd><dt>Risco</dt><dd>${dgRiskHtml(x.risk)}</dd>
+        <dt>Tentativa</dt><dd>${esc(`${x.attempt || 1}/${dgMax(x.category)}`)}</dd><dt>Alvo</dt><dd>${esc(dgTargetText(x.category, x.target, x))}</dd>
+        <dt>Tarefa</dt><dd class="task">${esc(x.task || x.title || "—")}</dd><dt>Resultado</dt><dd>${esc(resTxt)}${x.endedAt ? ` <span class="muted">· ${esc(fmtWhen(x.endedAt))}</span>` : ""}</dd></dl>
+      <div class="links">${gate ? `<a href="#/demandas/${code}/gates">Parecer ${esc(gate.gate || "")}${gate.recommendation ? ` · ${esc(gate.recommendation)}` : ""}</a>` : ""}${prUrl ? extLink(prUrl, `PR #${esc(pr ?? "?")}`) : ""}${commitUrl ? extLink(commitUrl, `commit&nbsp;<code>${esc(String(sha).slice(0, 7))}</code>`) : sha ? `<span>commit&nbsp;<code>${esc(String(sha).slice(0, 7))}</code></span>` : ""}<a href="#/auditoria/eventos?demanda=${code}">Eventos na Auditoria</a></div>
+      ${evs.length ? `<details id="dg-ev-${esc(x.id)}"><summary style="cursor:pointer;font-size:13px;color:var(--accent);min-height:32px;display:inline-flex;align-items:center">${evs.length} evento${evs.length === 1 ? "" : "s"} desta delegação</summary><ul class="evs">${evs.map(e => `<li>${esc(hhmm(e.ts))} · ${esc(who(e.agent))} · <span class="tag">${esc(e.type)}</span> ${esc(e.title || "")}</li>`).join("")}</ul></details>` : ""}</li>`;
+  };
+  return `<section class="dsec" id="sec-delegacoes" aria-labelledby="h-delegacoes"><h2 id="h-delegacoes" tabindex="-1">Delegações</h2>
+    <div class="sub" style="margin-top:0">Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu.</div>
+    <ul class="dg-list" style="margin-top:10px">${items.map(li).join("")}</ul></section>`;
+}
+// ================= fim D19 =================
 window.addEventListener("hashchange", applyRoute);
 fetch("/api/project").then(r => r.json()).then(p => {
   project = p;

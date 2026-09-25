@@ -14,6 +14,12 @@
   run é o efetivo: cabeçalho `model:`/`provider:` da saída do codex; `message.model` da transcrição do `claude -p`
   (identificada por `--session-id`). O alias do frontmatter (ex.: `opus`) só vai em `modelRequested`.
   O filho recebe `SQUAD_RUN` (e `SQUAD_MODEL`, se o ID já é conhecido) para os eventos herdarem run/modelo.
+- Delegação (D19, ADR-022): `--delegation <id>` marca a run (`delegation` no `.squad/runs/<id>.json` e nos `progress`
+  de início/fim — uma run delegada que parar não é delegável de novo), exporta `SQUAD_DELEGATION` e `SQUAD_LOG` (log
+  ÚNICO da cópia principal, mesmo que o agente chame `log.py` relativo no worktree) e monta o prompt do
+  `docs/squad/prompts/delegacao.md`: a tarefa confirmada pelo humano vai entre `<tarefa_confirmada_pelo_humano>`; o
+  alvo (handoff, change-request, gate, evidência) e `--dados <arquivo>` (diffs, conflitos) vão entre `<dados>`.
+  `--worktree <caminho>` = cwd do agente (worktree da demanda).
 """
 import argparse
 import json
@@ -27,6 +33,8 @@ from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 RUNS = ROOT / ".squad/runs"
+MAIN_LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or ROOT / "docs/squad/memory/decisions.jsonl")
+DELEGATION_PROMPT = ROOT / "docs/squad/prompts/delegacao.md"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from server import codex_header, provider_of, scan_transcript, model_fields  # noqa: E402
 
@@ -49,11 +57,51 @@ READ_ONLY = {
 }
 RUNNERS = {
     # Claude Code em modo não interativo: edições aceitas, Bash liberado para build/testes/log.py.
-    "claude": lambda prompt: ["claude", "-p", prompt, "--permission-mode", "acceptEdits",
-                              "--allowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
-    # Codex CLI em modo não interativo, com escrita restrita ao repositório.
-    "codex": lambda prompt: ["codex", "exec", "-C", str(ROOT), "-s", "workspace-write", prompt],
+    "claude": lambda prompt, cwd=ROOT: ["claude", "-p", prompt, "--permission-mode", "acceptEdits",
+                                        "--allowedTools", "Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+    # Codex CLI em modo não interativo, com escrita restrita ao repositório (ou ao worktree da demanda).
+    "codex": lambda prompt, cwd=ROOT: ["codex", "exec", "-C", str(cwd), "-s", "workspace-write", prompt],
 }
+
+
+def _data(text: str) -> str:
+    """Neutraliza marcas de fechamento dentro de dados/tarefa (nada sai da própria seção)."""
+    return re.sub(r"</?\s*(dados|tarefa_confirmada_pelo_humano)\s*>", lambda m: m.group(0).replace("<", "&lt;"),
+                  text or "", flags=re.I)
+
+
+def read_events() -> list[dict]:
+    try:
+        return [json.loads(l) for l in MAIN_LOG.read_text(encoding="utf-8").splitlines() if l.strip()]
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def delegation_prompt(delegation_id: str, worktree: str | None, extra_data: str = "") -> str:
+    """Seção da delegação no prompt do executor (contrato §8.3, §10). Só a tarefa confirmada é instrução do humano."""
+    rows = read_events()
+    dl = next((e for e in rows if e.get("id") == delegation_id and e.get("type") == "delegation"), None)
+    if dl is None:
+        sys.exit(f"delegação {delegation_id} não encontrada em {MAIN_LOG}")
+    try:
+        base = DELEGATION_PROMPT.read_text(encoding="utf-8").strip()
+    except OSError:
+        base = "# Delegação\nExecute só a tarefa confirmada pelo humano, dentro das regras de AGENTS.md."
+    fill = {"{LOG_PY}": str(ROOT / "tools/squad/log.py"), "{GITFLOW_PY}": str(ROOT / "tools/squad/gitflow.py"),
+            "{LOG}": str(MAIN_LOG), "{WORKTREE}": worktree or "(o Orquestrador informa)",
+            "{DELEGATION}": delegation_id, "{DEMAND}": dl.get("demand") or "", "{BRANCH}": dl.get("branch") or ""}
+    for k, v in fill.items():
+        base = base.replace(k, v)
+    target = dl.get("target") or ""
+    tid = target.split(":", 1)[-1] if target.startswith(("handoff-stalled:", "change-request-open:")) else target
+    related = [e for e in rows if e.get("id") in (tid, (target.split(":", 1)[-1] if ":" in target else None))]
+    data = {"delegacao": {k: dl.get(k) for k in ("id", "demand", "category", "target", "owner", "risk", "attempt",
+                                                 "pr", "branch", "run", "title")},
+            "alvo": [{k: e.get(k) for k in ("id", "type", "agent", "to", "title", "detail", "refs", "evidences",
+                                            "gate", "recommendation") if e.get(k) is not None} for e in related]}
+    return (f"{base}\n\n<tarefa_confirmada_pelo_humano>\n{_data(dl.get('detail') or '')}\n</tarefa_confirmada_pelo_humano>\n\n"
+            f"<dados>\n{_data(json.dumps(data, ensure_ascii=False, indent=1))}"
+            + (f"\n{_data(extra_data)}" if extra_data else "") + "\n</dados>")
 
 
 def role_file(role: str) -> pathlib.Path:
@@ -88,16 +136,18 @@ def effective_model(runner: str, out_path: pathlib.Path, session_id: str | None)
 
 
 def log(role: str, title: str, run_id: str, runner: str, demand: str | None, detail: str = "",
-        model: str | None = None):
+        model: str | None = None, delegation: str | None = None):
     args = [sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", role, "--type", "progress",
             "--title", title, "--run", run_id, "--runner", runner]
     if demand:
         args += ["--demand", demand]
+    if delegation:
+        args += ["--delegation", delegation]
     if model:
         args += ["--model", model]
     if detail:
         args += ["--detail", detail]
-    env = {k: v for k, v in os.environ.items() if k not in ("SQUAD_MODEL", "SQUAD_RUN")}
+    env = {k: v for k, v in os.environ.items() if k not in ("SQUAD_MODEL", "SQUAD_RUN", "SQUAD_DELEGATION")}
     subprocess.run(args, cwd=ROOT, capture_output=True, env=env)
 
 
@@ -111,9 +161,18 @@ def main():
                    help="modelo pedido ao fornecedor (-m no codex, --model no claude); padrão: $SQUAD_MODEL")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--read-only", action="store_true", help="sem escrita nem shell (ex.: triagem de demandas)")
+    p.add_argument("--delegation", help="D19: id do evento `delegation` que esta run executa")
+    p.add_argument("--worktree", help="D19: worktree da demanda (cwd do agente)")
+    p.add_argument("--dados", help="D19: arquivo com dados (diff, conflitos, trechos do log) — vai entre <dados>")
     a = p.parse_args()
 
     task = (ROOT / a.task[1:]).read_text(encoding="utf-8") if a.task.startswith("@") else a.task
+    cwd = pathlib.Path(a.worktree).resolve() if a.worktree else ROOT
+    if a.worktree and not cwd.is_dir():
+        sys.exit(f"worktree inexistente: {cwd}")
+    if a.delegation:
+        extra = pathlib.Path(a.dados).read_text(encoding="utf-8", errors="ignore")[:20000] if a.dados else ""
+        task = f"{task}\n\n{delegation_prompt(a.delegation, str(cwd) if a.worktree else None, extra)}"
     run_id = f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{a.role}-{uuid.uuid4().hex[:6]}"
     prompt = (
         "Você é um agente da squad do projeto neste repositório. Leia primeiro `AGENTS.md` (regras comuns, "
@@ -122,14 +181,17 @@ def main():
         "# Registro\n\n"
         f"- Registre marcos do seu trabalho: `python3 tools/squad/log.py --agent {a.role} --type progress "
         f"--run {run_id} --title \"<o que está fazendo>\"`"
-        + (f" --demand {a.demand}" if a.demand else "") + ".\n"
+        + (f" --demand {a.demand}" if a.demand else "")
+        + (f" --delegation {a.delegation}" if a.delegation else "") + ".\n"
         "- Handoffs, pareceres e evidências seguem o protocolo de `AGENTS.md`"
         + (f", sempre com `--demand {a.demand}`" if a.demand else "") + ".\n"
         "- Não faça commit, push nem merge: quem integra é o Orquestrador, via `tools/squad/gitflow.py`.\n"
     )
     if a.read_only:
         prompt = prompt.replace("- Registre marcos do seu trabalho", "- Modo SOMENTE LEITURA: não escreva arquivos nem rode comandos; ignore a linha abaixo sobre registrar marcos.\n- (Não) Registre marcos do seu trabalho")
-    cmd = (READ_ONLY if a.read_only else RUNNERS)[a.runner](prompt)
+    if a.delegation:
+        prompt = prompt.replace("`python3 tools/squad/log.py", f"`python3 \"{ROOT / 'tools/squad/log.py'}\"")
+    cmd = READ_ONLY[a.runner](prompt) if a.read_only else RUNNERS[a.runner](prompt, cwd)
     session_id = None
     if a.runner == "claude":
         session_id = str(uuid.uuid4())
@@ -141,7 +203,10 @@ def main():
     if a.dry_run:
         print(json.dumps({"runner": a.runner, "cmd": cmd[:-1] if a.runner == "codex" else cmd[:2] + ["<prompt>"] + cmd[3:],
                           "sessionId": session_id, "modelRequested": requested,
-                          "env": {"SQUAD_RUN": run_id, **({"SQUAD_MODEL": known_model} if known_model else {})},
+                          "env": {"SQUAD_RUN": run_id, **({"SQUAD_MODEL": known_model} if known_model else {}),
+                                  **({"SQUAD_DELEGATION": a.delegation, "SQUAD_LOG": str(MAIN_LOG)}
+                                     if a.delegation else {})},
+                          "cwd": str(cwd), "delegation": a.delegation,
                           "prompt": prompt}, ensure_ascii=False, indent=2))
         return
 
@@ -154,14 +219,20 @@ def main():
         meta["modelRequested"] = requested
     if session_id:
         meta["sessionId"] = session_id
+    if a.delegation:
+        meta["delegation"] = a.delegation
+        meta["worktree"] = str(cwd)
     log(a.role, f"Iniciado via {a.runner}: {task.strip().splitlines()[0][:100]}", run_id, a.runner, a.demand,
-        model=known_model)
+        model=known_model, delegation=a.delegation)
     child_env = {**os.environ, "SQUAD_RUN": run_id}
     child_env.pop("SQUAD_MODEL", None)
+    child_env.pop("SQUAD_DELEGATION", None)
     if known_model:
         child_env["SQUAD_MODEL"] = known_model
+    if a.delegation:   # log único: mesmo um `log.py` relativo no worktree grava no log da cópia principal
+        child_env.update(SQUAD_DELEGATION=a.delegation, SQUAD_LOG=str(MAIN_LOG))
     with out_path.open("w", encoding="utf-8") as out:
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
+        proc = subprocess.Popen(cmd, cwd=cwd, stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
                                 env=child_env)
         meta["pid"] = proc.pid
         meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
@@ -172,7 +243,7 @@ def main():
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     tail = out_path.read_text(encoding="utf-8", errors="ignore").strip().splitlines()[-15:]
     log(a.role, f"Finalizado via {a.runner} (código {code})", run_id, a.runner, a.demand, "\n".join(tail)[-1500:],
-        model=meta.get("model"))
+        model=meta.get("model"), delegation=a.delegation)
     print(out_path.read_text(encoding="utf-8", errors="ignore")[-4000:])
     sys.exit(code)
 
