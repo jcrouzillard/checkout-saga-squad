@@ -522,3 +522,71 @@ def strip_image_metadata(data: bytes) -> tuple[bytes, int]:
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+# ---------------------------------------------------------------- D21 (ADR-023): dimensões e integridade (só acréscimo)
+_JPEG_SOF = set(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
+
+
+def image_size(data: bytes) -> tuple[int, int]:
+    """(largura, altura) lidas do cabeçalho, sem decodificar: PNG IHDR, JPEG SOF0–SOF15 (exceto C4/C8/CC), WEBP
+    VP8/VP8L/VP8X. Cabeçalho ausente/ilegível → EvidenceError 422 `imagem_invalida`."""
+    kind = image_kind(data)
+    try:
+        if kind == "png":
+            if data[12:16] != b"IHDR":
+                raise ValueError("sem IHDR")
+            return struct.unpack(">II", data[16:24])
+        if kind == "jpeg":
+            pos = 2
+            while pos + 4 <= len(data):
+                if data[pos] != 0xFF:
+                    raise ValueError("marcador")
+                marker = data[pos + 1]
+                if marker == 0xFF:
+                    pos += 1
+                    continue
+                if marker in (0x01, *range(0xD0, 0xD8)):
+                    pos += 2
+                    continue
+                if marker in (0xD9, 0xDA):
+                    break
+                (length,) = struct.unpack(">H", data[pos + 2:pos + 4])
+                if marker in _JPEG_SOF:
+                    h, w = struct.unpack(">HH", data[pos + 5:pos + 9])
+                    return w, h
+                pos += 2 + length
+            raise ValueError("sem SOF")
+        if kind == "webp":
+            ctype = data[12:16]
+            if ctype == b"VP8X":
+                w = int.from_bytes(data[24:27], "little") + 1
+                h = int.from_bytes(data[27:30], "little") + 1
+                return w, h
+            if ctype == b"VP8 ":
+                if data[23:26] != b"\x9d\x01\x2a":
+                    raise ValueError("VP8")
+                w, h = struct.unpack("<HH", data[26:30])
+                return w & 0x3FFF, h & 0x3FFF
+            if ctype == b"VP8L":
+                if data[20] != 0x2F:
+                    raise ValueError("VP8L")
+                bits = int.from_bytes(data[21:25], "little")
+                return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+            raise ValueError("WEBP sem VP8/VP8L/VP8X")
+    except (struct.error, IndexError, ValueError):
+        pass
+    raise EvidenceError(422, "imagem_invalida", "imagem corrompida ou incompleta")
+
+
+def image_complete(data: bytes) -> bool:
+    """G1-D21 ressalva 3: imagem truncada. PNG termina no bloco IEND; JPEG tem EOI (FFD9) no fim (tolerando bytes nulos
+    de preenchimento); WEBP tem o tamanho do RIFF igual ao do arquivo."""
+    kind = image_kind(data)
+    if kind == "png":
+        return len(data) >= 20 and data[-12:] == b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    if kind == "jpeg":
+        return data.rstrip(b"\x00")[-2:] == b"\xff\xd9"
+    if kind == "webp":
+        return len(data) >= 12 and struct.unpack("<I", data[4:8])[0] + 8 == len(data)
+    return False

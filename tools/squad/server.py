@@ -1171,6 +1171,10 @@ def chat() -> "cv.Engine":
         if _CHAT is None:
             store = cv.Store(DATA_ROOT)
             store.recover()          # turnos pendentes de uma execução anterior viram `interrompida`
+            try:
+                store.cleanup_attachments()   # D21: anexos pendentes > 24 h apagados na subida
+            except OSError:
+                pass
             _CHAT = cv.Engine(store, chat_state, LOG_WRITE_LOCK)
         return _CHAT
 
@@ -1184,11 +1188,14 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
-    def _json(self, obj, status=200):
+    def _json(self, obj, status=200, close=False):
         body = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        if close:          # D21: recusa sem ler o corpo → a conexão não pode ser reaproveitada
+            self.close_connection = True
+            self.send_header("Connection", "close")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -1245,9 +1252,79 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(eng.view(cid, after))
             if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "stream" and parts[2].isdigit():
                 return self._chat_stream(eng, cid, int(parts[2]))
+            if len(parts) == 3 and parts[1] == "anexos":
+                return self._send_attachment(eng.store.attachment_path(cid, parts[2]))
         except cv.ChatError as e:
             return self._chat_err(e)
         return self._json({"error": "rota não encontrada", "code": "nao_encontrado"}, 404)
+
+    # ------------------------------------------------------------ D21 (ADR-023): imagens na conversa
+    def _send_attachment(self, path: "pathlib.Path | None"):
+        """GET /api/conversas/<id>/anexos/<aid>: tipo real (pelos bytes), nosniff, CSP restrita.
+        Cache-Control `no-store` (desvio consciente do `private, immutable` do contrato, risco apontado no G1): prints
+        podem ter segredos/dados pessoais e não devem ficar no cache de disco do navegador; o servidor é local
+        (recarregar custa só E/S local) e é o mesmo cabeçalho das evidências da D16."""
+        if path is None:
+            return self._json({"error": "anexo não encontrado", "code": "anexo_nao_encontrado"}, 404)
+        body = path.read_bytes()
+        mime = cv.ATTACH_MIME.get(er.image_kind(body) or "")
+        if not mime:
+            return self._json({"error": "anexo não encontrado", "code": "anexo_nao_encontrado"}, 404)
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Disposition", "inline")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _chat_upload(self, cid: str, length: int):
+        """POST /api/conversas/<id>/anexos (§4): recusas 403/400/413/415/404 ANTES de ler qualquer byte do corpo."""
+        if not self._local_ok():
+            self.close_connection = True
+            return self._forbidden()
+        fname = self.headers.get("X-Filename")
+        label = er.sanitize_name(urllib.parse.unquote(fname[:1024], errors="replace")) if fname else "imagem"
+        if length <= 0 or "Content-Length" not in self.headers:
+            return self._json({"error": "Content-Length inválido", "code": "content_length_invalido"}, 400, close=True)
+        if length > er.MAX_IMAGE:
+            mb = f"{length / 1048576:.1f}".replace(".", ",")
+            return self._json({"error": f"{label}: imagem acima de 5 MB ({mb} MB).", "code": "arquivo_grande"}, 413,
+                              close=True)
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if ctype not in cv.UPLOAD_TYPES:
+            msg = (f"{label}: HEIC não é aceito. Exporte como JPEG ou PNG." if ctype in ("image/heic", "image/heif")
+                   else f"{label}: formato não aceito. Envie PNG, JPEG ou WEBP.")
+            return self._json({"error": msg, "code": "tipo_nao_permitido"}, 415, close=True)
+        eng = chat()
+        if not eng.store.exists(cid):
+            return self._json({"error": "conversa não encontrada", "code": "conversa_nao_encontrada"}, 404, close=True)
+        data = self.rfile.read(length)
+        if len(data) != length:
+            return self._json({"error": "corpo incompleto", "code": "content_length_invalido"}, 400, close=True)
+        try:
+            status, out = eng.store.upload(cid, data, urllib.parse.unquote(fname[:1024], errors="replace")
+                                           if fname else None)
+        except cv.ChatError as e:
+            return self._chat_err(e)
+        return self._json(out, status)
+
+    def do_DELETE(self):
+        """D21: DELETE /api/conversas/<id>/anexos/<aid> — mesmo efeito de POST …/remover (anexo não usado)."""
+        parts = self._chat_parts(self.path) if self.path.startswith("/api/conversas/") else []
+        if not self._local_ok():
+            self.close_connection = True
+            return self._forbidden()
+        if len(parts) != 3 or parts[1] != "anexos":
+            return self._json({"error": "rota não encontrada", "code": "nao_encontrado"}, 404, close=True)
+        try:
+            if not chat().store.exists(parts[0]):
+                raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
+            return self._json(chat().store.remove_attachment(parts[0], parts[2]))
+        except cv.ChatError as e:
+            return self._chat_err(e)
 
     def _chat_pedido(self):
         """D19 §7: GET /api/conversas/pedido?ref=<alertId> — texto pré-preenchido; nada é gravado."""
@@ -1362,7 +1439,10 @@ class Handler(SimpleHTTPRequestHandler):
             if not eng.store.exists(cid):
                 raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
             if len(parts) == 2 and parts[1] == "mensagens":
-                return self._json(eng.send(cid, data.get("text"), t0=self._t0), 202)
+                return self._json(eng.send(cid, data.get("text"), t0=self._t0, attachments=data.get("attachments")),
+                                  202)
+            if len(parts) == 4 and parts[1] == "anexos" and parts[3] == "remover":
+                return self._json(eng.store.remove_attachment(cid, parts[2]), 200)
             if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "cancelar" and parts[2].isdigit():
                 return self._json(eng.cancel(cid, int(parts[2])), 202)
             if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "confirmar":
@@ -1605,6 +1685,9 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
+        m = cv.UPLOAD_ROUTE_RE.match(urllib.parse.urlsplit(self.path).path)
+        if m:   # D21 §4: rota de anexo casada ANTES do teto de 32 KB; teto próprio de 5 MB antes de ler o corpo
+            return self._chat_upload(m.group(1), length)
         if self.path == "/api/conversas" or self.path.startswith(("/api/conversas/", "/api/conversas?")):
             # D17: origem local e corpo ≤ 32 KB checados ANTES de ler o corpo.
             if not self._local_ok():
