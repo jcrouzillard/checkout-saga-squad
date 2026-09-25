@@ -1543,12 +1543,17 @@ class Handler(SimpleHTTPRequestHandler):
                        "source": meta.get("source"), "dir": f"docs/squad/{kind}/bugs/{demand}",
                        "evidences": meta["evidences"], "consent": consent,
                        "extracted": meta.get("extracted"), "warnings": meta.get("warnings") or []}
+                mark = store.mark(kind)
                 store.put_bug(kind, demand, doc, blobs)
-                entry = self._append_log({"id": demand, "agent": "humano", "type": "task", "to": "orquestrador",
-                                          "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
-                                          "priority": data.get("priority", "normal"), "kind": kind,
-                                          "backlog": True if when == "backlog" else None,
-                                          "nature": "bug", "bug": self._bug_task_meta(doc)})
+                try:
+                    entry = self._append_log({"id": demand, "agent": "humano", "type": "task", "to": "orquestrador",
+                                              "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
+                                              "priority": data.get("priority", "normal"), "kind": kind,
+                                              "backlog": True if when == "backlog" else None,
+                                              "nature": "bug", "bug": self._bug_task_meta(doc)})
+                except BaseException:   # QA-D23-2: task não gravado → nada fica gravado (pasta e índice revertidos)
+                    store.discard_bug(kind, demand, mark)
+                    raise
                 import shutil
                 shutil.rmtree(d, ignore_errors=True)
         except er.EvidenceError as e:

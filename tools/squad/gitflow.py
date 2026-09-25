@@ -172,7 +172,10 @@ def pr(base: str, head: str, title: str, body: str) -> str:
 # ---------------------------------------------------------------- feature
 def feature_start(a):
     if a.demand and product is not None:   # D23 (F2a §5.1): o código da branch = o resolvido para a demanda
-        expected = demand_code(a.demand)
+        expected = product.demand_codes(events(), PRODUCT.with_log(LOG)).get(a.demand)
+        if not expected:   # QA-D23-1: demanda ausente do log também sai 2 (contrato §5.1), não 1
+            print(f"demanda {a.demand} não encontrada no log", file=sys.stderr)
+            sys.exit(2)
         if a.code != expected:
             print(f"código {a.code} ≠ {expected} da demanda {a.demand}", file=sys.stderr)
             sys.exit(2)

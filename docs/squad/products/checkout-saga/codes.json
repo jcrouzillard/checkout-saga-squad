@@ -2,13 +2,13 @@
   "schema": 1,
   "product": "checkout-saga",
   "prefix": "D",
-  "generatedAt": "2026-09-25T17:44:35+00:00",
+  "generatedAt": "2026-09-25T18:23:41+00:00",
   "rule": "posicional do painel em 2026-09-25: n-ésimo task com agent=humano no log",
   "source": {
     "log": "docs/squad/memory/decisions.jsonl",
-    "lines": 666,
-    "sha256": "f90cf9350240dcc2301c7903ded33f569a59e80e13a2a650ca9ca949e4438e61",
-    "lastTaskId": "cf7a120591b0"
+    "lines": 701,
+    "sha256": "e0aa5ca59d4b6b0e8e3b548a37bd741b4a6c6897b6370c9a586702b266d3704e",
+    "lastTaskId": "50366913d891"
   },
   "codes": {
     "13e55010e3f5": "D1",
@@ -34,7 +34,9 @@
     "71b7d9bc3313": "D21",
     "b26da7851764": "D22",
     "6450aecde7f9": "D23",
-    "cf7a120591b0": "D24"
+    "cf7a120591b0": "D24",
+    "233278d0cfa9": "D25",
+    "50366913d891": "D26"
   },
   "aliases": [
     {

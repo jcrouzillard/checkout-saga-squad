@@ -541,6 +541,24 @@ class GitDirStore(BugStore):
             f.write(json.dumps(idx, ensure_ascii=False) + "\n")
         return doc
 
+    def mark(self, kind) -> int:
+        """Tamanho atual do índice do tipo — ponto de retorno para `discard_bug` (QA-D23-2)."""
+        idx = self.base(kind) / "index.jsonl"
+        return idx.stat().st_size if idx.is_file() else -1
+
+    def discard_bug(self, kind, demand, mark: int) -> None:
+        """Desfaz um `put_bug` cujo `task` não foi gravado (ex.: 503 trava_de_codigos): remove a pasta e a linha do
+        índice, para que nada fique órfão e o reenvio funcione (QA-D23-2)."""
+        if not DEMAND_RE.match(demand or ""):
+            return
+        shutil.rmtree(self.base(kind) / demand, ignore_errors=True)
+        idx = self.base(kind) / "index.jsonl"
+        if mark < 0:
+            idx.unlink(missing_ok=True)
+        elif idx.is_file():
+            with idx.open("r+b") as f:
+                f.truncate(mark)
+
     def add_evidence(self, demand, items, files):
         d = self.dir_of(demand)
         doc = json.loads((d / "bug.json").read_text(encoding="utf-8"))
