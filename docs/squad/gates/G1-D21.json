@@ -1,0 +1,104 @@
+{
+  "gate": "G1",
+  "demand": "71b7d9bc3313",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "APPROVE",
+  "confidence": 0.875,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "Requisitos da demanda e respostas da triagem refletidos",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "inbox/done/71b7d9bc3313.json x contrato §2/§5/§8/§10: colar Cmd+V (§8.1, CA-I1), miniatura+remover (§8.2, CA-I6), texto+até 3 imagens (CA-I7), Orquestrador enxerga (CA-I14/I15), histórico após F5 (CA-I12), validação D16 PNG/JPEG/WEBP ≤5 MB por bytes + metadados (CA-I8/I10), texto na imagem é dado (§7, CA-I16), somente leitura (CA-I17). Triagem: dois runners (§5.1/§5.2, CA-I15 reprova se codex falhar); arrastar (§8.1, CA-I3); animação de upload (anel determinado + processando + mínimo 400 ms, CA-I5); aceite do humano (CA-I23)."
+    },
+    {
+      "name": "Premissas técnicas batem com código e CLIs locais",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "claude 2.1.280 --help: --input-format text|stream-json (só com --print), --include-partial-messages/--replay-user-messages exigem stream-json; -p é flag (prompt posicional pode sumir). codex-cli 0.156.1: `codex exec -i, --image <FILE>...` (variádico, confirma o risco), `codex exec resume [SESSION_ID] [PROMPT]` com `-i, --image <FILE>` → `--image=<abs>` + `--` antes do prompt é correto nos dois. conversa.py:158-184 build_cmd (claude `-p <prompt>`, codex resume com -c sandbox_mode=\"read-only\"), conversa.py:1128 Popen stdin=DEVNULL; server.py:1608-1618 teto 32 KB antes de ler; server.py:1380-1395 _send_evidence com nosniff/CSP; evidence_rules.py:33 MAX_IMAGE=5 MB, :71 image_kind, :509 strip_image_metadata, :523 sha256. Não verificável sem chamada real: stream-json + --resume no mesmo turno (coberto só parcialmente pelos CAs, ver ressalva 1)."
+    },
+    {
+      "name": "Segurança do upload e do serving",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "contrato §4 ordem em do_POST: rota de anexo casada ANTES do teto 32 KB → _local_ok → Content-Length → 413 (Connection: close) → 415 pelo Content-Type → só então rfile.read; tipo decidido pelos bytes; dimensões ≤ 8000 px do cabeçalho; strip sempre + releitura com 0 blocos (CA-I10); GET com Content-Type do tipo real, nosniff, CSP default-src 'none' (CA-I11); ids por regex ^c-[0-9a-f]{12}$ / ^[0-9a-f]{64}$ + resolve/is_relative_to; X-Filename só rótulo via er.sanitize_name; _local_ok (server.py:1197) aceita <img> same-origin (sem Origin, Sec-Fetch-Site same-origin). Ressalvas 3 e 4 (detecção de truncado, nome no bloco do prompt)."
+    },
+    {
+      "name": "Somente leitura preservado nos dois runners",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "§5.1: turno com imagem troca só a entrada (stdin stream-json), mesmas --tools Read Glob Grep, --disallowedTools, --strict-mcp-config, --add-dir; turno sem imagem idêntico ao D17 (CA-I13 exige argv igual). §5.2: codex continua -s read-only / -c sandbox_mode=\"read-only\" no resume; caminhos conferidos com is_relative_to(anexos). §6/§7: sem ferramenta nova, propostas continuam validadas no servidor e confirmadas pelo humano (ADR-020/022); CA-I16/CA-I17."
+    },
+    {
+      "name": "Armazenamento, limites e expiração",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "§3: <DATA_ROOT>/.squad/conversas/<id>/anexos/<sha256>.<ext> (fora do git, .squad/ ignorado; CA-I20 com git check-ignore), gravação atômica sob lock, dedupe por hash (200/201), .jsonl só metadados; §2 tetos 100 MB/conversa e 500 MB total com códigos 413 próprios, pendentes > 24 h apagados na subida e a cada upload, referenciados nunca apagados (CA-I19 com tetos por variável de teste)."
+    },
+    {
+      "name": "Compatibilidade com D17/D19/D20",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "Aditivo sobre D17 (attachments opcional, texto 0–8000 só com imagem, 32 KB da rota de mensagens mantido, sessionReset com marcador, 'Tentar de novo' reenvia anexos) e D19 (delegar/destravar inalterados, sem imagem nas propostas §9). Classes do v2 conferidas em origin/feature/D20-visual-do-chat (c-msg--hum, c-body c-bubble, §3.7 Enviar↔Parar, §3.8 tokens). Parcial: PR #191 (D20) está OPEN/MERGEABLE, não integrado — a UI da D21 depende dele."
+    },
+    {
+      "name": "Critérios de aceite verificáveis e custo dos testes reais",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "CA-I1..I23 objetivos (códigos HTTP, cabeçalhos, argv, sha256 do stdin, capturas nomeadas); fake runner lê stdin e grava fake_last_stdin.json; custo ≈ 5 turnos reais com imagens ≤ 300 KB, uma vez pelo QA + aceite. Lacunas: nenhum CA real manda imagem num turno retomado (claude stream-json + --resume; codex exec resume --image) e nenhum exercita imagem perto de 5 MB no fornecedor (ressalvas 1 e 2)."
+    },
+    {
+      "name": "Donos por arquivo e protocolo de handoff",
+      "status": "validate",
+      "weight": 1,
+      "blocking": false,
+      "source": "§1 respeita AGENTS.md (tools/squad/** e prompts → Orquestrador; squad-control/** → Frontend; tests/** → QA). Evento handoff 8f5999acacca no log; não há brief em docs/squad/memory/handoffs/ para a D21 (o log cobre o essencial)."
+    },
+    {
+      "name": "ADR registrado",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "docs/adr/023-imagens-na-conversa.md (Proposto), decisão 451883c9d261, alternativas e consequências explícitas; commit fb43af3 só com ADR e contrato."
+    }
+  ],
+  "blocking_corrections": [],
+  "conditions": [
+    "1. (Contrato, antes do QA) CA-I14 e CA-I15 ganham um 3º turno COM imagem numa sessão retomada: claude com --input-format stream-json + --resume; codex com `exec resume <thread> --image=<abs> -- <prompt>`. É a combinação nova que nenhum CA real exercita (+1 turno por runner, custo aceitável). CA-I13 deve cobrir também o argv do codex resume com imagem começando por '-' no prompt.",
+    "2. (Implementação/QA) Limite do fornecedor: a API da Anthropic recusa imagem acima de 5 MB e o limite pode valer sobre o base64 (≈ 3,75 MB de arquivo). Adicionar um teste real único com PNG de ~4,8 MB no claude; se o fornecedor recusar, aplicar o plano B do §5.1 (Read do caminho) só para imagens cujo base64 passe de 5 MB, ou mostrar erro claro — nunca turno quebrado sem mensagem. Registrar a decisão por nota no contrato.",
+    "3. (Implementação) '422 imagem_invalida' para truncado: strip_image_metadata só levanta erro de struct (e como 415). Definir a checagem: PNG termina em IEND, JPEG em EOI (FFD9), WEBP com tamanho RIFF == len(data); mapear exceção do strip para 422, não 415.",
+    "4. (Implementação) O nome exibido e o que entra em <anexos_do_humano> é sempre o de er.sanitize_name (minúsculo, [a-z0-9._-]); o exemplo do §3 com 'Captura de Tela … às …' não sobrevive a essa função — alinhar o texto do contrato por nota. Isso também garante que X-Filename não injete '</anexos_do_humano>' no prompt.",
+    "5. (Implementação) Upload, remover, envio (validação de attachments) e limpeza de pendentes sob o mesmo Store.lock, para não apagar um anexo que está sendo referenciado; a limpeza considera referenciado também o anexo do turno em andamento.",
+    "6. (Sequência) Backend/servidor/prompt/testes do Orquestrador e QA podem começar agora; o Frontend (squad-control/index.html) só começa depois do merge humano do PR #191 (D20). Se a D20 mudar no PR, nota de ajuste no contrato antes do G2."
+  ],
+  "human_questions": {
+    "bloqueia": [
+      "Q6 D20 antes da D21 — bloqueia apenas o início do Frontend (não este G1): depende do merge humano do PR #191. Padrão: servidor primeiro, UI após o merge."
+    ],
+    "nao_bloqueiam_padrao": {
+      "Q1 tetos 100 MB/conversa e 500 MB total": "seguir o contrato (100/500 MB, ajustável por variável de teste); humano pode mudar depois sem ADR novo (é número do contrato).",
+      "Q2 privacidade/aviso": "seguir o contrato: aviso fixo na bandeja + regra 4 do prompt, sem OCR/máscara; mesmo risco já aceito para texto no D17.",
+      "Q3 orientação de fotos JPEG": "fora do escopo como no contrato (prints não têm EXIF de orientação).",
+      "Q4 colar texto+imagem → só texto": "seguir o contrato (caso Excel/Office); a imagem pode ser anexada por arrastar/botão.",
+      "Q5 modelo do codex via SQUAD_CHAT_MODEL": "não mudar nada na D21: usar o modelo padrão do codex da máquina (tem visão); SQUAD_CHAT_MODEL é compartilhado pelos dois runners, então só usar se CA-I15 falhar e com o humano ciente."
+    }
+  },
+  "open_risks": [
+    "stream-json de entrada do claude é interface menos estável que -p; mitigado por claude_stdin isolado, CA-I13/I14 e plano B.",
+    "Imagens (possíveis segredos/dados pessoais) vão ao fornecedor e ficam em ~/.claude/projects e ~/.codex/sessions; só há aviso.",
+    "Cache-Control immutable guarda o print no cache do navegador; aceitável (conteúdo por hash, local), diferente do no-store da D16.",
+    "D20 (PR #191) ainda aberta; retrabalho de UI se a estrutura mudar."
+  ],
+  "human_required": false,
+  "rationale": "ADR-023 e o contrato cobrem todos os pedidos da demanda e as duas respostas da triagem (dois runners, arrastar, animação), com decisões verificadas no código (build_cmd, do_POST 32 KB, _send_evidence, _local_ok, evidence_rules) e nos --help locais (claude --input-format stream-json só com --print; codex exec -i variádico e exec resume -i, tornando corretos --image=<abs> e --). Segurança: 413/415 antes de ler, validação por bytes, strip reaproveitado da D16, limite de pixels, serving com nosniff/CSP, ids por regex + is_relative_to, somente leitura sem nenhuma flag nova. Nada bloqueante falhou; as ressalvas (turno com imagem em sessão retomada, limite de 5 MB do fornecedor sobre base64, detecção de truncado, nome sanitizado, lock na limpeza, D20 antes da UI) são corrigíveis por nota e na implementação. Confiança ≥ 0,70 e risco moderado → intervenção humana opcional; só o merge da D20 é pré-requisito do Frontend."
+}
