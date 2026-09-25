@@ -733,6 +733,8 @@ def annotate_delegations(alerts: list[dict], rows: list[dict], rules, now: float
         cur = active.get(a.get("demand"))
         hit = cur if cur and (cur.get("target") in (a["id"], (a.get("source") or {}).get("event"))
                               or (cur.get("run") and cur.get("run") == a.get("runId"))) else None
+        if isinstance(a.get("delegation"), str):   # A2: a run parada foi iniciada por delegação (CA-10d) — preserva
+            a["runDelegation"] = a["delegation"]
         a["delegation"] = {"id": hit["id"], "state": hit["state"]} if hit else None
         try:
             info = cv.alert_delegation(state, a)

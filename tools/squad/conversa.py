@@ -652,7 +652,7 @@ def validate_delegation(raw, state: dict) -> dict:
         if _prior_delegations(rows, key, False) >= max_att:
             return {**out, "target": target, "owner": owner, "run": run, "attemptKey": key, "maxAttempts": max_att,
                     "reason": "limite_tentativas"}
-        if a.get("delegation"):
+        if a.get("runDelegation") or isinstance(a.get("delegation"), str):
             return {**fail, "target": target}      # run iniciada por delegação: nunca delegável de novo
     else:   # ajuste-pontual
         if not out["branch"]:
