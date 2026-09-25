@@ -549,6 +549,7 @@
   .c-list a small { color: var(--dim); font-size: 11.5px; font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
   .c-list a .cm { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
   .c-list .none { padding: 12px 14px; color: var(--muted); font-size: 13px; }
+  .c-log { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
   .c-msgs { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 14px 20px; list-style: none; margin: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
   .c-msg { max-width: 88%; min-width: 0; font-size: 13.5px; line-height: 1.55; }
   .c-msg.humano { align-self: flex-end; }
@@ -676,7 +677,7 @@
   </div>
   <p class="c-note">Canal direto e somente leitura. O Orquestrador responde pelo estado registrado; ações só com sua confirmação.</p>
   <div class="c-warn" id="chat-warn" hidden></div>
-  <ol class="c-msgs" id="chat-msgs" role="log" aria-live="off" aria-label="Mensagens da conversa"></ol>
+  <div class="c-log" id="chat-log" role="log" aria-live="off" aria-label="Mensagens da conversa"><ol class="c-msgs" id="chat-msgs"></ol></div>
   <div class="c-status" id="chat-status" hidden></div>
   <form class="c-comp" id="chat-form" novalidate>
     <label for="chat-text"><span>Sua pergunta ao Orquestrador</span><span class="num" id="chat-count" aria-hidden="true">0/8000</span></label>
