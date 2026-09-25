@@ -236,7 +236,8 @@ class ContratoHTTP(unittest.TestCase):
     STATE_KEYS_ANTES = {"now", "log", "gates", "runs", "handoffs", "github", "usage", "version", "thresholds",
                         "summary", "alerts", "alertsHistory", "agents", "serverMs", "testEnv",
                         "delegations",   # D19 (ADR-022) acrescentou `delegations` antes da D18
-                        "codes"}         # D23 (F2a §4.6) acrescentou `codes` (id → código); /api/live não muda
+                        "codes",         # D23 (F2a §4.6) acrescentou `codes` (id → código); /api/live não muda
+                        "demands"}       # D26 (contrato §10) acrescentou `demands[].executors`; /api/live não muda
     LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv",
                  "publication"}   # D24 (ADR-025, contrato publicacao-do-squad-control §4.5): sempre presente, null sem supervisor
     LIVE_HEADERS = {"content-type", "cache-control", "etag", "x-squad-version", "content-length"}

@@ -646,7 +646,10 @@ class G_AgenteParadoHttp(HttpBase):
                             ignore=shutil.ignore_patterns("__pycache__"))
         b = cls.root / "bin"
         b.mkdir()
-        (b / "claude").write_text("#!/bin/sh\nsleep 1\nkill -9 $PPID\nexit 0\n")      # run_agent morre → 'interrompido'
+        # D26: o run_agent checa o executor (`claude --version`, `claude auth status --json`) antes de rodar; o falso
+        # responde a checagem e só mata o pai (run_agent) na execução do agente (`-p`) → 'interrompido'
+        (b / "claude").write_text('#!/bin/sh\ncase "$1" in\n  --version) echo "2.1.280 (Claude Code)"; exit 0;;\n'
+                                  '  auth) echo \'{"loggedIn": true}\'; exit 0;;\nesac\nsleep 1\nkill -9 $PPID\nexit 0\n')
         (b / "claude").chmod(0o755)
         cls.renv = {**cls.env, "PATH": f"{b}:/usr/bin:/bin"}
 

@@ -95,6 +95,10 @@ def main():
     if base.exists() and any(base.iterdir()):
         shutil.rmtree(base)
     base.mkdir(parents=True, exist_ok=True)
+    # `python3` chamado pelos scripts (gitflow → log.py) = este intérprete: o /usr/bin/python3 do macOS é 3.9, sem
+    # tomllib (product.py, D23)
+    (base / "pybin").mkdir()
+    (base / "pybin/python3").symlink_to(sys.executable)
     main_ = base / "plankton"
     origin = base / "origin.git"
     wt = base / "plankton-d1"
@@ -102,7 +106,9 @@ def main():
     genv = {k: v for k, v in os.environ.items() if not k.startswith(("SQUAD_", "GIT_"))}
     genv.update(GIT_AUTHOR_NAME="qa", GIT_AUTHOR_EMAIL="qa@t", GIT_COMMITTER_NAME="qa", GIT_COMMITTER_EMAIL="qa@t",
                 GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", QA_GH_BASE=str(base),
-                PATH=f"{base / 'bin'}:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin")
+                # D26: `claude`/`codex` FALSOS antes do /opt/homebrew/bin (a checagem de executores nunca toca o login real)
+                PATH=f"{base / 'bin'}:{base / 'pybin'}:{REPO / 'tests/squad/fixtures/d26/bin'}:/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin",
+                CODEX_HOME=str(base / "codexhome"), CLAUDE_CONFIG_DIR=str(base / "claudecfg"))
     env = {**genv, "SQUAD_ROOT_DATA": str(main_), "SQUAD_LOG": str(log), "SQUAD_TRANSCRIPTS": str(base / "tr"),
            "SQUAD_TESTENV_PROBE": "0", "SQUAD_TESTENV_SPAWN": "0", "SQUAD_CHAT_RUNNER": "fake",
            "SQUAD_CHAT_FAKE": str(FAKE), "SQUAD_CHAT_TIMEOUT_S": "10"}
