@@ -1,0 +1,26 @@
+{
+  "gate": "G1", "demand": "41bdb8b49835", "code": "D20", "from": "arquiteto", "to": "qa",
+  "recommendation": "RETURN",
+  "confidence": 0.71,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Bug: commit do teste que reproduz (red) + evidence reproducao=FAIL antes do G1 (gates.md G1, contrato demandas-de-bug §7)", "status": "fail", "source": "git log develop..feature/D20-visual-do-chat = 1 commit (2977776, só o contrato); nenhum evento reproducao=FAIL do QA para 41bdb8b49835 em decisions.jsonl"},
+    {"name": "(3) Diagnóstico a–d confere com o código e com a captura", "status": "pass", "source": "index.html l.344 `.live{display:inline-flex;color:var(--ok);font-weight:500}` × l.3444 chatLiveEl `c-msg orquestrador live`; l.3460 caret anexado ao bub quando último bloco é UL; l.3456 `.ph` + l.3494 chatRenderStatus (fase duplicada) + l.3497 'Resposta concluída'; conversa.py l.249 `ts` cru UTC e l.257 now_iso() UTC; conversa.md sem regra de horário; captura mostra exatamente o layout em linha, verde/500, ○ e 11:47 x 08:47"},
+    {"name": "(2) CA-V1..V12 verificáveis e CA-V1 reproduz a evidência", "status": "pass", "source": "critérios com medidas de DOM/computed style, fuso Playwright, capturas nomeadas; CA-V1/V2/V3 falham no código atual pelo motivo do bug (servem de teste red)"},
+    {"name": "(2) Mudança `tz` no servidor mínima e segura", "status": "pass", "source": "campo opcional, regex antes de zoneinfo (bloqueia '../x'), fallback silencioso, sem rota nova, registros continuam UTC. Ressalva: a função se chama build_context (conversa.py l.223), não context_block; tz precisa atravessar send()→turno (l.694)"},
+    {"name": "(1) Alteração do D17 §9 (campo editável durante o turno)", "status": "pass", "source": "conversa-com-o-orquestrador.md l.220 dizia 'desabilitada'; v2 declara a substituição; Enter bloqueado e servidor já recusa turno concorrente"},
+    {"name": "(1) Impacto de merge D18/D19", "status": "validate", "source": "D18 (PR #171) mexe em `.live .lw` e `#hdr .live` — D20 não pode alterar a regra global .live (CA-V12 já exige). D19 contrato §6.1 altera build_context e §11 põe o cartão de delegação na mensagem → conflito provável em conversa.py e chatMsgEl"}
+  ],
+  "open_risks": [
+    "Conflito textual com D19 em tools/squad/conversa.py (build_context) e no render de mensagens/cartão; quem integrar depois faz rebase e reroda CA-V1..V3 + CA da D19.",
+    "D18 muda o cabeçalho `.live`; CA-V12 deve ser verificado depois do merge do PR #171 na develop.",
+    "Escopo visual amplo (rolagem, composição, separador de dia, tabelas) numa demanda de bug: o red cobre a–d; o restante é melhoria pedida pelo humano ('mais visual e entendível') e deve ficar em commits separados da correção."
+  ],
+  "corrections": [
+    "QA: commitar teste que reproduz (red) antes de qualquer correção — ex.: tests/squad/test_conversa_visual_d20.py com (1) build_context com evento ts +00:00 e tz America/Sao_Paulo esperando -03:00 e atributo fuso (falha hoje: sem parâmetro tz); (2) roteiro de navegador CA-V1/V2/V3 com SQUAD_CHAT_RUNNER=fake e texto FX (falha hoje: li.live flex em linha, cor --ok, fase 2x). Registrar `--type evidence --evidence reproducao=FAIL --ref <teste>`.",
+    "Arquiteto: trocar `context_block()` por `build_context()` no contrato (§1 d, §3.4.2, CA-V5) e citar que o tz vai de Engine.send até build_context; incluir no §4/CA-V12 que a verificação ocorre após o rebase sobre D18.",
+    "Opcional: nota cruzada no D17 §9 apontando para ui-conversa-visual-v2 §3.7."
+  ],
+  "human_required": false,
+  "rationale": "Diagnóstico está correto e comprovado no código e na captura; os critérios são objetivos e a mudança de servidor é pequena e segura. Porém a D20 é demanda de bug (nature=bug) e o critério bloqueante de G1 (ADR-019/gates.md) exige o commit do teste red e o evento reproducao=FAIL do QA antes do G1 — não existem na branch. Devolver para o QA produzir a reprodução (os CA-V1/V2/V3/V5 já servem) e para o Arquiteto corrigir o nome da função; depois reavaliar G1 (ciclo 2)."
+}
