@@ -1231,7 +1231,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not eng.store.exists(cid):
                 raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
             if len(parts) == 2 and parts[1] == "mensagens":
-                return self._json(eng.send(cid, data.get("text"), t0=self._t0), 202)
+                return self._json(eng.send(cid, data.get("text"), t0=self._t0, tz=data.get("tz")), 202)
             if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "cancelar" and parts[2].isdigit():
                 return self._json(eng.cancel(cid, int(parts[2])), 202)
             if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "confirmar":
