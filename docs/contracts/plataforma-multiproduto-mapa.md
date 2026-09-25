@@ -19,6 +19,15 @@ Destinos citados: `$SQUAD_HOME` (padrão `~/.squad`), `mem:` = `$SQUAD_HOME/prod
 próprio), `run:` = `$SQUAD_HOME/products/<id>/runtime/` (fora do git; inclui `run:conversas/`, ADR-020/023), `plat:` = repositório `squad-platform`,
 `cad:` = campo do cadastro `products/<id>/product.toml` no repositório da plataforma, `prod:` = repositório do produto.
 
+**Revisão D25 (ADR-026, `233278d0cfa9`) — leia as seções A–G com estas trocas de destino:**
+- `mem:` passa a ser o **cache local** `$SQUAD_HOME/products/<id>/memory/` (mesmo formato de arquivo de hoje), sincronizado
+  com o **Postgres no Neon** (esquema `squad_<id>`) pelo sincronizador do `server.py`. O cache **não** é um repositório
+  git (o backend `git` do ADR-024 §4.3 vira opção). Estado do sync em `$SQUAD_HOME/products/<id>/sync/`. `run:` não muda.
+- Sentido B: `plat:` é **este repositório** (renomeado `squad-platform`); os pontos PLAT **ficam no lugar** e não há calços.
+  Quem se move é o `prod:` (novo `checkout-saga`), extraído na F4. A fase F3 vira F3a (backend `local`), F3b (Neon) e
+  F3c (exportação de evidências).
+- Pontos cujo destino ou fase mudou: ver a tabela H0; pontos novos: H1–H10.
+
 ## A. Raiz, caminhos e ponto de entrada (a plataforma assume que mora dentro do produto)
 
 | # | Onde | O que assume | Classe | Destino | Fase |
@@ -128,6 +137,42 @@ próprio), `run:` = `$SQUAD_HOME/products/<id>/runtime/` (fora do git; inclui `r
 | G6 | uma instância do servidor por cópia de repositório (porta 7070 = produtivo do Squad Control, ADR-021) | painel acoplado ao checkout | PLAT | um servidor da plataforma por host servindo N produtos | F4/F5 |
 | G7 | textos de caminho da memória no painel: `index.html:826` (`docs/squad/orquestrador.md`), `:2413` (`docs/squad/memory/decisions.jsonl`), `:2423` (`docs/squad/gates/`), `:2447` (`handoffs/`), `:2462` (`docs/squad/gates.md`), `:2487` (`docs/squad/project.json`) | a memória e as políticas moram em `docs/squad/` do produto | PLAT | textos vêm de `/api/p/<id>/policy` e de um campo `paths` do estado (caminho `mem:` real) | F3 |
 
+## H. Revisão D25 — sentido B, memória no Neon com cache local, evidências (ADR-026)
+
+**H0 — pontos existentes com destino ou fase alterados**
+
+| # | Antes (ADR-024) | Agora (ADR-026) |
+|---|---|---|
+| A1 | `ROOT` da plataforma só para achar `squad-control/` | igual; o `repo_path` do checkout passa a ser o clone novo na F4 |
+| A2, A6 | `mem:` git / `run:` | `mem:` cache local + Neon (F3a/F3b); `run:` igual |
+| A3, A5, A7, B13 | movem para `plat:` na F4 | **ficam** (este repo é a plataforma); nada a mover |
+| A4 | CLI `squad` + apelidos no Makefile do produto | Makefile da plataforma mantém os alvos da squad; os alvos do produto (`e2e`, Compose) vão para o Makefile de `checkout-saga` (F4) |
+| A8 | CI do produto intacta; CI nova na plataforma | `ci.yml` (Maven/e2e) **vai** para `checkout-saga`; a plataforma ganha CI de `tests/squad` (F4) |
+| A9, D2, D4, D7 | produto recebe constituição gerada | igual, no clone novo (F4) |
+| B1–B6, B14, B16 | `mem:` (repo git) na F3 | `mem:` cache local na F3a; envio ao Neon na F3b (B7, B8, B10, B11, B16 permanecem em `run:`, nunca no Neon) |
+| B12 | no-op na F3, removido na F4 | igual; **sem** `git filter-repo` na F3 (legado importado como máquina `legado`, arquivos congelados no git) |
+| B14 | `codes.json` congelado (F2a) | + reserva de código no Neon (`UNIQUE`), código provisório offline, `feature-start` exige confirmado (F3b) |
+| B15 | produto implícito pelo local do log | + `machine`, `mseq`, `prev`, `hash` em todo evento (F3a) |
+| D1, D3, D5, D6, D13, E2 | movem para `plat:` (F4) | **ficam**; só o texto de produto sai para `prod:` |
+| E1 | ficam no produto | **movem** para `checkout-saga` com os mesmos números (F4) |
+| F5 | `link_base` por Q4 | issues antigas: válidas pelo redirecionamento do repo renomeado; novas: id do evento + resumo (ADR-024 §4.12, caso "só local") |
+| G3, G6 | versão/servidor da plataforma a partir de `$SQUAD_PLATFORM` | igual ao de hoje (cópia principal deste repo, publicador ADR-025) |
+
+**Pontos novos**
+
+| # | Onde | O que muda | Classe | Destino | Fase |
+|---|---|---|---|---|---|
+| H1 | `log.py` e demais gravadores (`gitflow`, `github_sync`, `triage`, `pending`, `server.py`) | gravam só no cache local com `flock`, sem rede e sem segredo; campos `machine/mseq/prev/hash` | PLAT | `MemoryStore` | F3a |
+| H2 | sincronizador (thread do `server.py`) + `squad memory {setup,init,sync,verify,push --all,migrate,export}` | push/pull idempotente por id, cursor e `acked` locais, conexão curta | PLAT | `plat:tools/squad/memory*.py` | F3b |
+| H3 | `memory_neon.py` + `$SQUAD_HOME/venv` com `psycopg[binary]` fixo | única exceção à regra "só stdlib"; `squad doctor` verifica | PLAT | `plat:` | F3b |
+| H4 | `.env` da cópia principal da plataforma: `SQUAD_MEMORY_URL_<ID>` | segredo lido só pelo servidor/CLI humano; lista de permissão do ambiente dos filhos; filtro de mensagens | CFG | `cad:memory.url_env` (nome, nunca valor) | F3b |
+| H5 | `/api/live` (`memory` ≤ 200 B, sem rede), `POST /api/memory/sync`, selo no painel | status Sincronizado / Offline · N pendentes / Erro; botão só do humano | PLAT | `server.py`, `index.html` | F3b |
+| H6 | `alerts.py` | alertas `sync-conflict` (tabela de sentido) e de integridade; bloqueio da demanda no `gitflow` e no plantão até `conflict-resolved` | PLAT | `plat:` | F3b |
+| H7 | Neon: esquema `squad_<id>`, papel `squad_writer_<id>` só `SELECT, INSERT`; gatilho contra `UPDATE`/`DELETE`; tabelas `events`, `docs`, `codes`, `sync_runs` | log só de inclusão com ordem de chegada | MEM | Neon | F3b |
+| H8 | máscara ADR-019 reaplicada antes do envio; evidências > 1 MB só locais | nada sem máscara sai da máquina | PLAT | sincronizador | F3b |
+| H9 | `docs/evidencias/squad/<versão>/` + `verificar.py` + `release-start`; tag `entrega-desafio-<data>` | retrato congelado e verificável para o §14 do desafio | PROD (gerado) | `prod:` (`checkout-saga`) | F3c |
+| H10 | extração do produto: `services/`, `checkout-console/`, `infra/`, `Dockerfile`, `docker-compose.yml`, `pom.xml`, `tests/e2e`, `docs/architecture`, ADRs/contratos E1, `docs/desafio.md`, `README.md` do produto; mudança do Compose `checkout-saga` de diretório; renomeação do repo | sentido B | PROD | `prod:` novo `checkout-saga` | F4 |
+
 ## Contagem
 
 74 pontos (67 do G1 + 7 acrescentados pelas ressalvas do G1-D22: A10, B16, C16–C18, F5, G7; cada linha agrupa todas as ocorrências do mesmo padrão; as ocorrências individuais citadas somam mais de
@@ -142,3 +187,8 @@ próprio), `run:` = `$SQUAD_HOME/products/<id>/runtime/` (fora do git; inclui `r
 
 Por fase de migração (primeira fase em que o ponto muda): **F2a = 4** (A1, B1, B13, B14), **F2b = 25**,
 **F3 = 17**, **F4 = 20**, **F5 = 7**, sem mudança = 1 (E1).
+
+**Revisão D25**: +10 pontos novos (H1–H10) = **84 pontos**. Classes dos novos: PLAT 6 (H1, H2, H3, H5, H6, H8), CFG 1 (H4),
+MEM 1 (H7), PROD 2 (H9, H10). Fases dos novos: F3a = 1, F3b = 7, F3c = 1, F4 = 1. Com o sentido B, dos 20 pontos da
+F4 original, 9 deixam de exigir movimento (A3, A5, A7, D1, D3, D5, D6, D13, E2 — o texto de produto contido neles ainda
+sai para `prod:`) e E1 passa a mover; a contagem por fase acima segue a do ADR-024 para rastreabilidade.
