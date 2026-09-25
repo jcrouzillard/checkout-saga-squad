@@ -33,6 +33,18 @@ from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LOG = ROOT / "docs/squad/memory/decisions.jsonl"
+if (pathlib.Path(__file__).resolve().parent / "product.py").exists():
+    # D23 (F2a §5.1): log e código da demanda pelo resolvedor ($SQUAD_LOG > $SQUAD_ROOT_DATA > repositório). Sem
+    # product.py ao lado (cópia isolada do script, testes antigos), o comportamento de antes.
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import product
+    try:
+        PRODUCT = product.resolve()
+    except product.ProductError as _e:
+        sys.exit(f"gitflow.py: {_e}")
+    LOG = PRODUCT.log
+else:
+    product = PRODUCT = None
 CHANGELOG = ROOT / "CHANGELOG.md"
 REPO = "jcrouzillard/checkout-saga-squad"
 TRAILER = "\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -45,8 +57,22 @@ def sh(*cmd: str, check=True, capture=True, cwd=None) -> str:
     return (out.stdout or "").rstrip()  # rstrip: o porcelain do git começa com espaço significativo
 
 
+def log_env() -> dict:
+    """D23 (F2a §5.1): o filho log.py grava SEMPRE no log resolvido (SQUAD_LOG explícito). Sem product.py ao lado,
+    o ambiente herdado (comportamento de antes)."""
+    return {**os.environ, "SQUAD_LOG": str(LOG)} if product is not None else dict(os.environ)
+
+
+def log_py(*args: str):
+    out = subprocess.run(["python3", "tools/squad/log.py", *args], cwd=ROOT, capture_output=True, text=True,
+                         env=log_env())
+    if out.returncode != 0:
+        sys.exit(f"falhou: log.py {' '.join(args[:4])}\n{(out.stderr or out.stdout).strip()}")
+    return (out.stdout or "").rstrip()
+
+
 def log(title: str, detail: str = "", demand: str | None = None, ref: str | None = None, branch: str | None = None):
-    args = ["python3", "tools/squad/log.py", "--agent", "orquestrador", "--type", "decision", "--title", title]
+    args = ["--agent", "orquestrador", "--type", "decision", "--title", title]
     if detail:
         args += ["--detail", detail]
     if demand:
@@ -55,7 +81,23 @@ def log(title: str, detail: str = "", demand: str | None = None, ref: str | None
         args += ["--ref", ref]
     if branch:
         args += ["--branch", branch]
-    sh(*args)
+    log_py(*args)
+
+
+def memory_in_repo() -> bool:
+    """D23 (F2a §5.1): só com o log DENTRO do repositório (o caso de hoje) as operações de memória no git agem."""
+    try:
+        return LOG.resolve() == (ROOT / "docs/squad/memory/decisions.jsonl").resolve()
+    except OSError:
+        return False
+
+
+def skip_memory(step: str) -> bool:
+    """True (e avisa) quando a memória está fora do repositório: a etapa é pulada e nunca toca o log do repositório."""
+    if memory_in_repo():
+        return False
+    print(f"memória fora do repositório (SQUAD_LOG={LOG}): {step} ignorada")
+    return True
 
 
 def current() -> str:
@@ -73,6 +115,8 @@ def porcelain() -> list[str]:
 
 
 def snapshot_state():
+    if skip_memory("snapshot_state"):
+        return
     changed = [l[3:] for l in porcelain() if l[3:].startswith(STATE)]
     if changed:
         sh("git", "add", "--", *changed)
@@ -127,6 +171,11 @@ def pr(base: str, head: str, title: str, body: str) -> str:
 
 # ---------------------------------------------------------------- feature
 def feature_start(a):
+    if a.demand and product is not None:   # D23 (F2a §5.1): o código da branch = o resolvido para a demanda
+        expected = demand_code(a.demand)
+        if a.code != expected:
+            print(f"código {a.code} ≠ {expected} da demanda {a.demand}", file=sys.stderr)
+            sys.exit(2)
     clean_tree()
     slug = re.sub(r"[^a-z0-9]+", "-", a.slug.lower()).strip("-")
     branch = f"feature/{a.code}-{slug}"
@@ -137,11 +186,11 @@ def feature_start(a):
 
 
 def event(kind: str, title: str, **fields):
-    args = ["python3", "tools/squad/log.py", "--agent", "orquestrador", "--type", kind, "--title", title]
+    args = ["--agent", "orquestrador", "--type", kind, "--title", title]
     for k, v in fields.items():
         if v is not None:
             args += [f"--{k.replace('_', '-')}", str(v)]
-    sh(*args)
+    log_py(*args)
 
 
 def pr_number(url: str) -> int:
@@ -150,6 +199,8 @@ def pr_number(url: str) -> int:
 
 def import_memory(branch: str):
     """Na develop: acrescenta ao log os eventos que só existem na branch (append-only, deduplicado por id)."""
+    if skip_memory("import_memory"):
+        return
     theirs = sh("git", "show", f"{branch}:{LOG.relative_to(ROOT).as_posix()}", check=False)
     have = {e.get("id") for e in events()}
     new = [l for l in theirs.splitlines() if l.strip() and json.loads(l).get("id") not in have]
@@ -161,6 +212,8 @@ def import_memory(branch: str):
 def align_memory(branch: str):
     """Leva a develop para dentro da branch em revisão com a memória IGUAL à da develop. Assim o PR não mexe no
     log e o merge humano no GitHub não conflita com o que a squad segue registrando na develop (defeito a66b91c8a0d6)."""
+    if skip_memory("align_memory"):
+        return
     switch(branch)
     out = subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "develop"], cwd=ROOT, capture_output=True, text=True)
     for path in STATE:  # um por vez: um caminho ausente não pode impedir os outros
@@ -220,7 +273,7 @@ def feature_finish(a):
     amap = {x["id"]: x["text"] for x in (ans[-1].get("answers", []) if ans else [])}
     qa = [f"- **{q['text']}**\n  → {amap.get(q['id'], '(sem resposta)')}" for q in (val[-1].get("questions", []) if val else [])]
     try:
-        issue = json.loads((ROOT / "docs/squad/memory/github-sync.json").read_text())["issues"].get(a.demand, {}).get("number")
+        issue = json.loads((LOG.parent / "github-sync.json").read_text())["issues"].get(a.demand, {}).get("number")
     except (OSError, json.JSONDecodeError, KeyError):
         issue = None
     stat = sh("git", "diff", "--stat", "origin/develop...HEAD", check=False).splitlines()[-12:]
@@ -413,6 +466,12 @@ def owner_of(path: str) -> str:
 
 
 def demand_code(demand: str) -> str:
+    """D23 (F2a §5.1): código resolvido (congelado > gravado > posicional) = product.demand_codes(events())[id]."""
+    if product is not None:
+        code = product.demand_codes(events(), PRODUCT.with_log(LOG)).get(demand)
+        if code:
+            return code
+        sys.exit(f"demanda {demand} não encontrada no log")
     n = 0
     for e in events():
         if e.get("type") == "task" and e.get("agent") == "humano" and e.get("id"):
@@ -450,6 +509,8 @@ def wt_dirty(wt: pathlib.Path) -> list[str]:
 
 def discard_state(wt: pathlib.Path):
     """O worktree da demanda não commita a memória da squad (§8.3): alterações locais em STATE são descartadas."""
+    if skip_memory("discard_state"):
+        return
     for path in STATE:
         sh("git", "checkout", "--", path, cwd=wt, check=False)
     for l in sh("git", "status", "--porcelain", "-uall", cwd=wt).splitlines():
@@ -521,11 +582,13 @@ def feature_sync(a):
             sys.exit("merge da origin/develop falhou sem deixar merge em andamento:\n"
                      + (res.stderr or res.stdout).strip())
     # memória da squad = versão da develop (mesma regra do align_memory), inclusive arquivos só da branch
-    for path in STATE:
-        sh("git", "checkout", "origin/develop", "--", path, cwd=wt, check=False)
-    for f in sh("git", "diff", "--cached", "--name-only", "origin/develop", "--", *STATE, cwd=wt, check=False).splitlines():
-        if subprocess.run(["git", "cat-file", "-e", f"origin/develop:{f}"], cwd=wt, capture_output=True).returncode:
-            sh("git", "rm", "-q", "-f", "--", f, cwd=wt, check=False)
+    if not skip_memory("feature_sync (STATE)"):
+        for path in STATE:
+            sh("git", "checkout", "origin/develop", "--", path, cwd=wt, check=False)
+        for f in sh("git", "diff", "--cached", "--name-only", "origin/develop", "--", *STATE, cwd=wt,
+                    check=False).splitlines():
+            if subprocess.run(["git", "cat-file", "-e", f"origin/develop:{f}"], cwd=wt, capture_output=True).returncode:
+                sh("git", "rm", "-q", "-f", "--", f, cwd=wt, check=False)
     unmerged = sorted(set(sh("git", "diff", "--name-only", "--diff-filter=U", cwd=wt).splitlines()) - {""})
     unmerged = [f for f in unmerged if not f.startswith(STATE)]
     if unmerged:

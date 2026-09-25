@@ -26,11 +26,17 @@ for d in [r for r in rows if r.get("type") == "task" and r.get("agent") == "huma
     if not busy:
         pending.append(f"validação: {d['id']}")
 # D19 §8.2: delegações confirmadas pelo humano e ainda não iniciadas (depois das validações, antes da fila C)
-codes, n = {}, 0
-for r in rows:
-    if r.get("type") == "task" and r.get("agent") == "humano" and r.get("id"):
-        n += 1
-        codes[r["id"]] = f"D{n}"
+codes = {}
+if (pathlib.Path(__file__).resolve().parent / "product.py").exists():   # D23 (F2a §4.4): cálculo único
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import product
+    codes = product.demand_codes(rows)
+else:   # cópia isolada do script (testes antigos): a regra posicional de antes
+    n = 0
+    for r in rows:
+        if r.get("type") == "task" and r.get("agent") == "humano" and r.get("id"):
+            n += 1
+            codes[r["id"]] = f"D{n}"
 paused = {}
 for r in rows:
     if r.get("type") == "control" and r.get("demand") and r.get("action") in ("pause", "resume"):

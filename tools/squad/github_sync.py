@@ -25,10 +25,17 @@ import subprocess
 import sys
 import time
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
-LOG = ROOT / "docs/squad/memory/decisions.jsonl"
-STATE = ROOT / "docs/squad/memory/github-sync.json"
-HANDOFFS = ROOT / "docs/squad/memory/handoffs"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import product  # noqa: E402  (D23, F2a §5.2: caminhos pelo resolvedor)
+
+try:
+    PRODUCT = product.resolve()
+except product.ProductError as _e:
+    sys.exit(f"github_sync.py: {_e}")
+ROOT = PRODUCT.repo_root
+LOG = PRODUCT.log                                   # $SQUAD_LOG > $SQUAD_ROOT_DATA > repositório
+STATE = PRODUCT.memory_dir / "github-sync.json"     # companheiro do log: nunca grava o real com log temporário
+HANDOFFS = PRODUCT.handoffs_dir
 REPO = os.environ.get("SQUAD_GH_REPO", "jcrouzillard/checkout-saga-squad")
 OWNER = os.environ.get("SQUAD_GH_OWNER", REPO.split("/")[0])
 PROJECT = os.environ.get("SQUAD_GH_PROJECT", "1")
