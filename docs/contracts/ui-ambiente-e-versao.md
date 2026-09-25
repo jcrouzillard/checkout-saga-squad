@@ -24,7 +24,8 @@ Avaliada **uma vez na subida** do servidor, na ordem; a primeira que decide venc
 - **Cópia principal** = o worktree cujo branch é `develop`, resolvido **pela mesma função** de
   `testenv.main_root()` (reuso, não cópia). Comparação por caminho resolvido (`Path.resolve()`).
 - `reason` (texto curto, pt-BR) explica a decisão, ex.: `worktree plankton-d16, porta 7170`.
-- **Dados compartilhados**: `dataIsMain = (DATA_ROOT == cópia principal)`. Em `teste` com `dataIsMain=true` o selo
+- **Dados compartilhados**: `dataIsMain = (DATA_ROOT == cópia principal) ou (SQUAD_LOG resolvido está dentro da cópia
+  principal)` — o log efetivamente usado pela instância (`environment.log`, §4) também conta. Em `teste` com `dataIsMain=true` o selo
   diz "dados do produtivo" (a instância grava no log real).
 - Rótulos: `produtivo` → "Produtivo"; `teste` → "Teste"; `desconhecido` → "Ambiente desconhecido".
 
@@ -44,11 +45,14 @@ Calculada **uma vez na subida** (`startedAt`), timeout de 2 s por comando, falha
 
 ## 3. Atualidade ("desatualizado — reinicie")
 - `headNow` = `git rev-parse HEAD`, com **cache de 30 s**, calculado **somente** ao responder `/api/state` ou
-  `/api/instance` (nunca em `/api/live`). Até 1 comando git extra por janela de 30 s.
+  `/api/instance` (nunca em `/api/live`).
+- **Custo por janela de 30 s**: `git rev-parse HEAD` + `git status --porcelain` (recalcula `dirty` e `display`, que
+  acompanham o disco). `git diff --name-only <commitFull> <headNow> -- tools/squad squad-control` roda **só quando o
+  HEAD muda** (resultado memorizado por `headNow`); HEAD igual a `commitFull` → 0 arquivos, sem diff.
 - `state`:
-  - `atual` — `headNow == commitFull`, ou `git diff --quiet <commitFull> <headNow> -- tools/squad squad-control`
-    retorna 0 (commits só de memória/docs **não** desatualizam);
-  - `desatualizado` — o diff acima retorna 1 (`changedPaths` = nº de arquivos, `git diff --name-only | wc -l`);
+  - `atual` — `headNow == commitFull`, ou o diff acima lista 0 arquivos (commits só de memória/docs **não**
+    desatualizam);
+  - `desatualizado` — o diff lista ≥ 1 arquivo (`changedPaths` = nº de arquivos listados);
   - `indeterminado` — git falhou/timeout ou `commitFull` nulo.
 - Texto: "Desatualizado: o código mudou desde a subida. Reinicie (`make squad`)."
 
@@ -61,7 +65,8 @@ chave nova `instance`. **`version` existente não muda** (é a versão dos dados
   "environment": { "name": "teste", "label": "Teste", "source": "inferido",
                    "reason": "worktree plankton-d16, porta 7170",
                    "port": 7170, "worktree": "plankton-d16", "root": "/…/plankton-d16",
-                   "dataRoot": "/…/plankton", "dataIsMain": true },
+                   "dataRoot": "/…/plankton", "log": "/…/plankton/docs/squad/memory/decisions.jsonl",
+                   "dataIsMain": true },
   "build": { "release": "v1.0.0", "pom": "1.1.0-SNAPSHOT", "commit": "91e3a64",
              "commitFull": "91e3a64ed9d19d34380effac73d9b771e356e85f", "branch": "develop",
              "dirty": false, "startedAt": "2026-09-24T20:09:34Z",
@@ -69,6 +74,8 @@ chave nova `instance`. **`version` existente não muda** (é a versão dos dados
   "freshness": { "state": "atual", "headNow": "91e3a64", "changedPaths": 0, "checkedAt": "2026-09-24T21:00:00Z" }
 }
 ```
+- `environment.log` (acréscimo alinhado ao G3): caminho resolvido do log que a instância usa (`SQUAD_LOG`, padrão
+  `DATA_ROOT/docs/squad/memory/decisions.jsonl`); é base do aviso "dados do produtivo" (§1).
 - Caminhos absolutos aparecem **só** no detalhe (instância local, 127.0.0.1); nada de segredo ou variável além das listadas.
 - Servidor antigo (sem a rota) responde 404 → a UI mostra o selo em `desconhecido` com "servidor sem suporte à versão
   — reinicie" (é exatamente o caso "desatualizado").
@@ -80,14 +87,21 @@ chave nova `instance`. **`version` existente não muda** (é a versão dos dados
      `--ok/--ok-soft`, `desconhecido` `--muted/--raised`; 
   2. `display` em `IBM Plex Mono` 12 px (quebra permitida em `·`);
   3. se `dataIsMain` em teste: "dados do produtivo"; se `dirty`: "alterações locais não commitadas";
-  4. se `desatualizado`/`indeterminado`: linha em `--danger` com o texto da §3 (ou "Não foi possível verificar a versão").
+  4. se `desatualizado`/`indeterminado` (⚠ nos dois): linha em `--danger` com o texto da §3 (ou "Não foi possível verificar a versão").
 - **< 900 px** (menu vira barra horizontal): selo **compacto** no cabeçalho, ao lado de "Squad Control": rótulo do
-  ambiente + `commit` (ex.: `TESTE · 91e3a64`), com "⚠" textual quando desatualizado. Mesmo detalhe ao tocar.
-  A 390 px não pode gerar rolagem horizontal do corpo nem empurrar o sino para fora da tela.
+  ambiente + `commit` (ex.: `TESTE · 91e3a64`), com "⚠" textual quando desatualizado **ou indeterminado**
+  (QA-D18-1). Mesmo detalhe ao tocar. A 390 px não pode gerar rolagem horizontal do corpo nem empurrar o sino para
+  fora da tela.
+- **Desvios de layout aceitos no G2** (prevalecem sobre o item acima):
+  - 600–900 px: o cabeçalho omite o nome do produto e usa rótulos curtos para caber o selo;
+  - 600–780 px: o selo compacto oculta o `commit` (só rótulo + ⚠); o commit segue no detalhe e no `aria-label`;
+  - < 600 px: o selo compacto fica **fixo no canto inferior esquerdo** (não no cabeçalho), e os toasts sobem 64 px
+    para não o cobrir.
 - **Detalhe**: o selo é um `<button aria-expanded>` que abre painel com todos os campos da §4 (tag, pom, commit
   completo, branch, worktree, porta, origem dos dados, subiu em, HEAD atual, motivo do ambiente) e botão "Copiar".
   Também `title` com `display`. Fecha com Esc e clique fora.
-- **Acessibilidade**: `aria-label` = "Ambiente: <label>. Versão <display>[. Desatualizado, reinicie]"; contraste AA
+- **Acessibilidade**: `aria-label` = "Ambiente: <label>. Versão <display>[. Desatualizado, reinicie | . Não foi possível verificar a
+  versão]" (o segundo sufixo em `indeterminado`/ausente, QA-D18-1); contraste AA
   nos dois temas; estado nunca só por cor.
 - **Carga**: lê `instance` do `/api/state` já buscado; atualiza por `GET /api/instance` a cada 60 s e ao voltar o
   foco à aba. Sem novas chamadas no ciclo de 1,5 s.
@@ -108,10 +122,10 @@ chave nova `instance`. **`version` existente não muda** (é a versão dos dados
 | CA10 | Commit novo que só altera `docs/squad/memory/**` → `freshness.state=atual` | repo temporário |
 | CA11 | Commit novo que altera `tools/squad/**` ou `squad-control/**` após a subida → `desatualizado`, `changedPaths ≥ 1`, e a UI mostra o texto de reinício | repo temporário + tela |
 | CA12 | Arquivo modificado não commitado em `squad-control/` → `dirty=true` e "+alterações"; modificado só em `docs/squad/memory/` → `dirty=false` | repo temporário |
-| CA13 | `/api/live` não executa git (0 subprocessos) e seu payload/headers não mudam; `/api/instance` não roda git mais de 1× em 30 s | teste com contador de `subprocess` |
+| CA13 | `/api/live` não executa git (0 subprocessos) e seu payload/headers não mudam; `/api/instance` roda no máximo `rev-parse` + `status` por janela de 30 s, e `diff --name-only` só quando o HEAD muda | teste com contador de `subprocess` |
 | CA14 | `/api/state` mantém todas as chaves anteriores (incl. `version`) e acrescenta `instance` | teste de contrato |
 | CA15 | 1440 px: selo visível no rodapé do menu sem rolar, em página longa rolada até o fim | Playwright (`tests/ui`) |
-| CA16 | 390 px: selo compacto no cabeçalho; sem rolagem horizontal do corpo; sino visível | Playwright |
+| CA16 | 390 px: selo compacto fixo no canto inferior esquerdo (desvio G2), toasts 64 px acima; sem rolagem horizontal do corpo; sino visível | Playwright |
 | CA17 | Selo abre/fecha por teclado (Enter/Esc) e o detalhe lista os campos da §4; `aria-label` conforme §5 | Playwright + axe sem violações novas |
 | CA18 | Tema claro e escuro: estado legível por texto; contraste AA | axe / inspeção |
 | CA19 | Servidor antigo (sem `/api/instance` → 404) com UI nova: selo "desconhecido" com texto de reinício, sem erro no console | Playwright com rota interceptada |
