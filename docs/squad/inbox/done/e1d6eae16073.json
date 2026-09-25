@@ -1,0 +1,35 @@
+{
+  "demand": "e1d6eae16073",
+  "title": "Conversar com o Orquetrador",
+  "detail": "Preciso de um espaco onde eu consigo realizar conversa direto com o Orquetrador.\nPode ser uma opçao que aparece nele que quando acianda abre algum tipo de bate papo para fazer perguntar e conversar diretamente com ele",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T00:11:30+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Como o Orquestrador deve responder? (a) Na hora, com uma sessão dedicada ao chat que responde em segundos; ou (b) pelo plantão (`plantao.sh` / `/loop 3m`), que lê as mensagens e responde no próximo ciclo, com alguns minutos de atraso.",
+      "dimension": "objetivo",
+      "answer": "Na hora com uma sessao dedicada que responde o mais instantenao possivel"
+    },
+    {
+      "question": "No chat o Orquestrador só responde perguntas (estado da squad, demandas, gates, decisões), sem nenhum efeito colateral? Ou também pode agir a partir da conversa, por exemplo registrar demanda, cancelar, repriorizar ou decidir gate? Se puder agir, cada ação precisa de confirmação explícita sua?",
+      "dimension": "escopo",
+      "answer": "Ele so responde perguntas sem causar efeito colateral. So a possibilidade de poder destravar alguma fase que foi devolvida ou esta travada."
+    },
+    {
+      "question": "O que torna a demanda pronta? Sugestão: (1) uma opção no Squad Control abre um painel de conversa; (2) você envia uma pergunta e recebe a resposta do Orquestrador no mesmo painel; (3) o histórico continua lá depois de recarregar a página. Confirma, ou ajusta estes critérios?",
+      "dimension": "aceite",
+      "answer": "Opcao 3, Somente é um canal direto com o Orquestrador."
+    },
+    {
+      "question": "A conversa fica registrada no log de auditoria (`decisions.jsonl`, append-only, visível na linha do tempo)? Ou em um armazenamento separado, fora do log da squad? E deve ficar ligada a uma demanda, ou ser uma conversa geral?",
+      "dimension": "restricoes",
+      "answer": "Vamos cirar um lugar apartado para ficar registrada todas as conversas e tambem termo todo o log e ou historico. Ela não fica ligada a uma demanda."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
