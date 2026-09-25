@@ -164,9 +164,14 @@ def append_event(ctx: Ctx, entry: dict, writer=None) -> dict:
              or k in ("before", "after", "model", "acknowledged", "warnings")}
     if writer is not None:
         return writer(entry)
+    # mesmo caminho e mesma disciplina do log.py: O_APPEND, UMA escrita por linha (sem ler/regravar o arquivo)
     ctx.log.parent.mkdir(parents=True, exist_ok=True)
-    with ctx.log.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    data = (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
+    fd = os.open(ctx.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
     return entry
 
 
@@ -838,6 +843,86 @@ def view(ctx: Ctx, rows: list[dict] | None = None, runs: list[dict] | None = Non
 DENY_BASE = ["Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Agent"]
 AUDIT_ALLOW = ["Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)",
                "Bash(git status:*)", "Bash(ls:*)"]
+# G2-D26 (antes da Q3): as regras `Bash(git diff:*)` são por PREFIXO — `git diff HEAD --output=x` ou
+# `git diff --no-index ~/.ssh/id x` passariam. O perfil ganha um gancho PreToolUse(Bash) que valida o comando
+# inteiro (lista branca, falha FECHADA): git diff|log|show|status e ls, sem opções que escrevem/leem fora do repo.
+AUDIT_GIT_SUB = {"diff", "log", "show", "status"}
+AUDIT_FORBIDDEN_OPT = ("--output", "--no-index", "--ext-diff", "--textconv", "--git-dir", "--work-tree",
+                       "--exec", "--upload-pack", "--receive-pack", "--paginate", "--config-env", "--attr-source",
+                       "--orderfile", "--ignore-revs-file", "--contents", "--pathspec-from-file", "--exclude-from")
+AUDIT_METACHARS = set(";&|<>`$\n\r\\")
+
+
+def audit_bash_ok(command: str, cwd: str | None = None) -> tuple[bool, str]:
+    """(permitido, motivo) de um comando Bash no perfil `auditoria`. Sem shell: metacaractere → negado."""
+    import shlex
+    cmd = (command or "").strip()
+    if not cmd:
+        return False, "comando vazio"
+    bad = sorted({c for c in cmd if c in AUDIT_METACHARS})
+    if bad:
+        return False, f"metacaractere de shell não permitido: {''.join(bad)!r}"
+    try:
+        tok = shlex.split(cmd)
+    except ValueError as e:
+        return False, f"comando ilegível ({e})"
+    base = pathlib.Path(cwd or os.getcwd()).resolve()
+
+    def inside(arg: str) -> bool:
+        if arg.startswith("~"):
+            return False
+        try:
+            return (base / arg).resolve().is_relative_to(base)
+        except (OSError, ValueError):
+            return False
+
+    if tok[0] == "git":
+        if len(tok) < 2 or tok[1] not in AUDIT_GIT_SUB:
+            return False, "git só com diff|log|show|status (sem opções antes do subcomando)"
+        for t in tok[2:]:
+            if t == "--":
+                continue
+            if t.startswith("--"):
+                name = t.split("=", 1)[0].lower()
+                # o git aceita abreviações de opções longas: `--outp=x` = `--output=x`
+                if any(f == name or (len(name) >= 4 and f.startswith(name)) for f in AUDIT_FORBIDDEN_OPT):
+                    return False, f"opção não permitida no perfil auditoria: {t}"
+                continue
+            if t.startswith("-O"):
+                return False, f"opção não permitida no perfil auditoria: {t} (lê arquivo arbitrário)"
+            if t.startswith("-"):
+                continue
+            if ("/" in t or t.startswith(".") or t.startswith("~")) and ":" not in t and not inside(t):
+                return False, f"caminho fora do repositório: {t}"
+        return True, ""
+    if tok[0] == "ls":
+        for t in tok[1:]:
+            if not t.startswith("-") and not inside(t):
+                return False, f"caminho fora do repositório: {t}"
+        return True, ""
+    return False, "no perfil auditoria só git diff|log|show|status e ls"
+
+
+def cmd_audit_bash(_a) -> int:
+    """Gancho PreToolUse(Bash) do perfil `auditoria`: falha FECHADA (qualquer erro nega)."""
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+        ti = payload.get("tool_input") or {}
+        ok, why = audit_bash_ok(ti.get("command") or "", payload.get("cwd"))
+    except Exception as e:   # noqa: BLE001
+        ok, why = False, f"validador falhou ({type(e).__name__})"
+    if not ok:
+        print(f"perfil auditoria: {why}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def audit_settings() -> str:
+    """perfis/auditoria.json + o gancho de Bash com caminho absoluto (o worktree auditado pode não ter o validador)."""
+    cfg = json.loads((PERFIS_DIR / "auditoria.json").read_text(encoding="utf-8"))
+    hook = f'python3 "{pathlib.Path(__file__).resolve()}" audit-bash'
+    cfg["hooks"] = {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": hook, "timeout": 10}]}]}
+    return json.dumps(cfg, ensure_ascii=False)
 
 
 def claude_deny_paths(data_root: pathlib.Path) -> list[str]:
@@ -861,7 +946,7 @@ def profile_cmd(profile: str, runner: str, prompt: str, cwd: pathlib.Path, data_
                     "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--permission-mode", "dontAsk"]
         if profile == "auditoria":
             return ["claude", "-p", prompt, "--setting-sources", "project",
-                    "--settings", str(PERFIS_DIR / "auditoria.json"), "--tools", "Read", "Glob", "Grep", "Bash",
+                    "--settings", audit_settings(), "--tools", "Read", "Glob", "Grep", "Bash",
                     "--allowedTools", *AUDIT_ALLOW,
                     "--disallowedTools", *DENY_BASE, *claude_deny_paths(data_root), "--permission-mode", "dontAsk"]
         # escrita e orquestracao: como hoje (fontes de settings padrão)
@@ -870,8 +955,8 @@ def profile_cmd(profile: str, runner: str, prompt: str, cwd: pathlib.Path, data_
     common = ["--skip-git-repo-check", "-c", 'approval_policy="never"']
     if profile == "leitura":
         return ["codex", "exec", "-s", "read-only", "-C", cwd, *common, "-c", "mcp_servers={}", prompt]
-    if profile == "auditoria":
-        return ["codex", "exec", "-s", "read-only", "-C", cwd, *common, prompt]
+    if profile == "auditoria":   # errata §7.1 (G2-D26): sem MCP do ~/.codex/config.toml, como o leitura
+        return ["codex", "exec", "-s", "read-only", "-C", cwd, *common, "-c", "mcp_servers={}", prompt]
     if profile == "orquestracao":
         if not DECISOES["Q2"]:
             raise ExecError(EXIT_NOT_ALLOWED, "orquestrador_codex_pendente_q2", Q2_REASON)
@@ -920,6 +1005,8 @@ def guard(payload: dict, ctx: Ctx | None = None) -> tuple[int, str]:
     try:
         r = resolve(role, demand, "passo", do_check=False, ctx=ctx, record=False)
     except ExecError as e:
+        if e.code == "trava_executores":   # G2-D26: trava ocupada não é configuração ilegível → falha ABERTA
+            return 0, f"executores guard-agent: {e.message}; subagente permitido sem checar a configuração"
         if e.exit_code == EXIT_CONFIG:
             return 2, (f"executores: configuração ilegível ({e.message}); corrija {ctx.config_path} "
                        "no painel antes de delegar")
@@ -937,12 +1024,24 @@ def guard(payload: dict, ctx: Ctx | None = None) -> tuple[int, str]:
         return 2, (f"executores: {LABEL[role]} está configurado com o modelo {r['model']}, não {asked}; "
                    f"omita `model` ou use model={r['model']}")
     try:
-        append_event(ctx, {"agent": "orquestrador", "type": "executor-dispatch", "demand": demand, "role": role,
-                           "via": "nativo", "configured": r["configured"], "source": r["source"],
-                           "title": f"{LABEL[role]}: subagente nativo ({_pair_title(r['configured'])})"})
+        if dispatch_changed(read_rows(ctx), demand, role, r["configured"]):
+            append_event(ctx, {"agent": "orquestrador", "type": "executor-dispatch", "demand": demand, "role": role,
+                               "via": "nativo", "configured": r["configured"], "source": r["source"],
+                               "title": f"{LABEL[role]}: subagente nativo ({_pair_title(r['configured'])})"})
     except OSError:
         pass
     return 0, ""
+
+
+def dispatch_changed(rows: list[dict], demand: str | None, role: str, configured: dict) -> bool:
+    """Decisão D26 (volume): `executor-dispatch` só no 1º despacho nativo de (papel, demanda) ou quando o
+    executor/modelo configurado muda — não a cada Agent/Task."""
+    pair = {"runner": configured.get("runner"), "model": configured.get("model")}
+    for e in reversed(rows):
+        if e.get("type") == "executor-dispatch" and e.get("role") == role and (e.get("demand") or None) == demand:
+            c = e.get("configured") or {}
+            return {"runner": c.get("runner"), "model": c.get("model")} != pair
+    return True
 
 
 def cmd_guard_agent(_a) -> int:
@@ -953,7 +1052,7 @@ def cmd_guard_agent(_a) -> int:
         if not isinstance(payload, dict):
             return 0
         code, msg = guard(payload)
-        if code:
+        if msg:
             print(msg, file=sys.stderr)
         return code
     except Exception as e:   # noqa: BLE001 — o gancho nunca derruba a sessão
@@ -1102,6 +1201,8 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_snapshot)
     s = sub.add_parser("guard-agent")
     s.set_defaults(fn=cmd_guard_agent)
+    s = sub.add_parser("audit-bash", help="gancho PreToolUse(Bash) do perfil auditoria (falha fechada)")
+    s.set_defaults(fn=cmd_audit_bash)
     s = sub.add_parser("check-session")
     s.add_argument("role", choices=["orquestrador"])
     s.add_argument("--runner", default="claude", choices=RUNNERS)

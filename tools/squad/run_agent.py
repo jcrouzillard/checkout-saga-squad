@@ -209,6 +209,8 @@ def main():
     ctx_name = a.context or ("triagem" if a.read_only else "plantao" if a.role == "orquestrador" and not a.demand
                              else "passo")
     forced = None
+    # G2-D26: o id da run nasce ANTES do resolvedor para o `executor-fallback` apontar a run que explica (B9 por run)
+    run_id = f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{a.role}-{uuid.uuid4().hex[:6]}"
     try:
         ectx = ex.context(MAIN_LOG)
         if a.fallback_of:
@@ -216,7 +218,7 @@ def main():
                               record=False, persist=not a.dry_run)
             forced = {"runner": prev["runner"], "detail": "sem-login"}
         res = ex.resolve(a.role, a.demand, ctx_name, make_snapshot=not a.no_snapshot, do_check=not a.dry_run,
-                         ctx=ectx, forced_unavailable=forced, persist=not a.dry_run)
+                         ctx=ectx, forced_unavailable=forced, persist=not a.dry_run, run=run_id)
     except ex.ExecError as e:
         print(f"run_agent: {e.message}", file=sys.stderr)   # código 3: `executor-fallback{action:parou}` já gravado
         sys.exit(e.exit_code)
@@ -249,7 +251,6 @@ def main():
         vb = verify_block(a, cwd)
         if vb:
             task += f"\n\n<dados>\n{_data(vb)}\n</dados>"
-    run_id = f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{a.role}-{uuid.uuid4().hex[:6]}"
     read_only = profile in ("leitura", "auditoria")
     prompt = (
         "Você é um agente da squad do projeto neste repositório. Leia primeiro `AGENTS.md` (regras comuns, "

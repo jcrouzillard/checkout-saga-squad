@@ -272,28 +272,42 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
 
+def _check_id(e: dict, known: dict) -> str | None:
+    cid = e.get("check")
+    if not cid:
+        m = re.search(r"verify:([a-z0-9-]+)", str(e.get("name")) + " " + str(e.get("source") or ""))
+        cid = m.group(1) if m else None
+    if not cid:
+        name = _norm(e.get("name"))
+        cid = next((k for k, c in known.items() if _norm(c.get("criterion")) and _norm(c["criterion"]) in name), None)
+    return cid if cid in known else None
+
+
 def incoherent(parecer: dict, ver: dict | None, applicable_ids: set) -> list[str]:
-    """`pass` num critério cuja verificação deu fail/erro ou está ausente (com o caso aplicável)."""
+    """(a) `pass` num critério cuja verificação deu fail/erro ou está ausente (com o caso aplicável);
+    (b) G2-D26: APPROVE com uma verificação aplicável em fail/erro que NENHUMA evidência não-pass registra —
+    pega o `pass` de nome livre que não foi ligado à verificação (a verificação manda, não o texto do parecer)."""
     checks = {c["id"]: c for c in (ver or {}).get("checks") or []}
     known = {c["id"]: c for c in load_checks()}
-    bad = []
+    gate = parecer.get("gate")
+    bad, acknowledged = [], set()
     for e in parecer.get("evidences") or []:
-        if e.get("status") != "pass":
+        cid = _check_id(e, known)
+        if not cid or gate not in gates_of(known[cid]):
             continue
-        cid = e.get("check")
-        if not cid:
-            m = re.search(r"verify:([a-z0-9-]+)", str(e.get("name")) + " " + str(e.get("source") or ""))
-            cid = m.group(1) if m else None
-        if not cid:
-            name = _norm(e.get("name"))
-            cid = next((k for k, c in known.items() if _norm(c.get("criterion")) and _norm(c["criterion"]) in name), None)
-        if not cid or cid not in known or parecer.get("gate") not in gates_of(known[cid]):
+        if e.get("status") != "pass":
+            acknowledged.add(cid)
             continue
         st = (checks.get(cid) or {}).get("status")
         if st in ("fail", "erro"):
             bad.append(f"{cid}: verificação {st}")
         elif st is None and cid in applicable_ids:
             bad.append(f"{cid}: verificação não executada")
+    if parecer.get("recommendation") == "APPROVE":
+        for cid, c in checks.items():
+            if (c.get("status") in ("fail", "erro") and cid in known and gate in gates_of(known[cid])
+                    and cid not in acknowledged and not any(b.startswith(cid + ":") for b in bad)):
+                bad.append(f"{cid}: verificação {c['status']} sem evidência que a registre (APPROVE)")
     return bad
 
 

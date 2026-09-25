@@ -46,6 +46,22 @@ def build_task(d: dict) -> str:
     return task
 
 
+def _triage_runs(demand: str) -> list[dict]:
+    """Runs do Arquiteto nesta demanda (metadados de .squad/runs), em ordem de início."""
+    out = []
+    try:
+        for f in product.resolve().runs_dir.glob("*-arquiteto-*.json"):
+            try:
+                m = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if m.get("demand") == demand and m.get("agent") == "arquiteto":
+                out.append(m)
+    except (OSError, product.ProductError):
+        return []
+    return sorted(out, key=lambda m: (m.get("started") or "", m.get("id") or ""))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("demand")
@@ -61,7 +77,15 @@ def main():
         print("demanda cancelada: triagem não executada")
         return
     try:
-        runner = ex.resolve("arquiteto", None, "triagem", do_check=False, ctx=ex.context(LOG))["runner"]
+        # G2-D26: executor EFETIVO (com a checagem de instalação/login e a política), não só o configurado;
+        # record=False — quem grava o `executor-fallback` é o run_agent abaixo (uma vez só)
+        try:
+            runner = ex.resolve("arquiteto", None, "triagem", do_check=True, ctx=ex.context(LOG), record=False)["runner"]
+        except ex.ExecError as e:
+            if e.exit_code != ex.EXIT_STOP:
+                raise
+            # política `parar`: o run_agent grava o fallback e sai 3; a triagem segue para registrar a falha
+            runner = ex.resolve("arquiteto", None, "triagem", do_check=False, ctx=ex.context(LOG))["runner"]
     except ex.ExecError as e:
         sys.exit(f"triage.py: {e.message}")
     subprocess.run([sys.executable, str(ROOT / "tools/squad/log.py"), "--agent", "arquiteto", "--type", "progress",
@@ -71,12 +95,16 @@ def main():
     tmp = ROOT / ".squad" / f"triagem-{a.demand}.md"
     tmp.parent.mkdir(exist_ok=True)
     tmp.write_text(task, encoding="utf-8")
+    before_runs = _triage_runs(a.demand)
     out = subprocess.run([sys.executable, str(ROOT / "tools/squad/run_agent.py"), "arquiteto", f"@{tmp.relative_to(ROOT)}",
                           "--demand", a.demand, "--context", "triagem", "--no-snapshot", "--read-only"],
                          cwd=ROOT, capture_output=True, text=True, env=CHILD_ENV)
     if out.returncode in (ex.EXIT_STOP, ex.EXIT_CONFIG, ex.EXIT_NOT_ALLOWED):   # D26: executor indisponível/config
         print(out.stderr.strip())
     out = out.stdout
+    new_runs = [m for m in _triage_runs(a.demand) if m.get("id") not in {x.get("id") for x in before_runs}]
+    if new_runs and new_runs[-1].get("runner") in ("claude", "codex"):
+        runner = new_runs[-1]["runner"]   # o efetivo da run (fallback de autenticação na saída incluído)
     result, dec = None, json.JSONDecoder()
     for i, ch in enumerate(out):
         if ch == "{":

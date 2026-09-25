@@ -864,17 +864,57 @@ FALLBACK_NO_DEMAND_S = 6 * 3600
 
 
 def exec_configured(rows: list[dict], demand: str, role: str) -> dict | None:
-    """Configurado do papel na demanda: última troca `executor-config{scope:demand}` (≠ null) > foto da demanda."""
+    """Configurado do papel na demanda: última troca `executor-config{scope:demand}` (≠ null) > foto da demanda.
+    `since` = ts do evento que rege o papel (troca ou foto): só runs iniciadas a partir dele são comparadas."""
     over = None
     for e in rows:
         if (e.get("type") == "executor-config" and e.get("scope") == "demand" and e.get("demand") == demand
                 and e.get("role") == role):
-            over = e.get("after")
-    if over and over.get("runner"):
-        return {"runner": over["runner"], "model": over.get("model"), "source": "demanda"}
+            over = e
+    after = (over or {}).get("after")
+    if after and after.get("runner"):
+        return {"runner": after["runner"], "model": after.get("model"), "source": "demanda", "since": over.get("ts")}
     snap = next((e for e in rows if e.get("type") == "executor-snapshot" and e.get("demand") == demand), None)
     s = ((snap or {}).get("executors") or {}).get(role)
-    return {"runner": s["runner"], "model": s.get("model"), "source": s.get("source") or "squad"} if s else None
+    if not s:
+        return None
+    # troca "só nesta demanda" desfeita (after null): volta à foto, mas só vale para as runs depois da troca
+    since = max((x for x in (snap.get("ts"), (over or {}).get("ts")) if x), key=lambda x: ts_epoch(x) or 0,
+                default=None)
+    return {"runner": s["runner"], "model": s.get("model"), "source": s.get("source") or "squad", "since": since}
+
+
+def exec_governs(configured: dict | None, run: dict) -> bool:
+    """A run é posterior à foto/troca que rege o papel? (runs anteriores não são comparadas — nada retroativo)"""
+    if not configured:
+        return False
+    since = ts_epoch(configured.get("since"))
+    started = ts_epoch(run.get("started"))
+    return since is None or (started is not None and started >= since - 1)
+
+
+def fallback_runs(rows: list[dict], runs: list[dict]) -> set:
+    """Runs explicadas por um `executor-fallback{padrao}`: a do campo `run` ou, sem ele (eventos antigos), a
+    PRIMEIRA run do papel na demanda iniciada a partir do fallback. Só aquela run — nunca o papel para sempre."""
+    out = set()
+    by_pair = {}
+    for r in runs:
+        by_pair.setdefault((r.get("demand"), r.get("agent")), []).append(r)
+    for e in rows:
+        if e.get("type") != "executor-fallback":
+            continue
+        if e.get("run"):
+            out.add(e["run"])
+            continue
+        if e.get("action") != "padrao":
+            continue
+        t = ts_epoch(e.get("ts")) or 0
+        later = sorted((r for r in by_pair.get((e.get("demand"), e.get("role")), [])
+                        if (ts_epoch(r.get("started")) or 0) >= t - 1 and r.get("id") not in out),
+                       key=lambda r: ts_epoch(r.get("started")) or 0)
+        if later:
+            out.add(later[0].get("id"))
+    return out
 
 
 def exec_diff(configured: dict | None, run: dict) -> str | None:
@@ -952,16 +992,15 @@ def executor_alerts(rows: list[dict], runs: list[dict], rules: "Rules", now: flo
                     "action": {"label": "Abrir Executores", "href": "#/squad/executores", "external": None},
                     "openedAt": e.get("ts"), "source": {"event": e.get("id"), "file": None}})
     # B9 (aviso): run de um papel num executor diferente do configurado, sem `executor-fallback` que explique
-    fb_runs = {e.get("run") for e in rows if e.get("type") == "executor-fallback" and e.get("run")}
-    fb_pairs = {(e.get("demand"), e.get("role")) for e in rows
-                if e.get("type") == "executor-fallback" and e.get("action") == "padrao"}
+    fb_runs = fallback_runs(rows, runs)
     for r in runs:
         role, d = r.get("agent"), r.get("demand")
         if role not in ROLES or not d or rules._closed(d):
             continue
         conf = exec_configured(rows, d, role)
         eff = r.get("runner") or "claude"
-        if not conf or eff == conf["runner"] or r.get("fallback") or r.get("id") in fb_runs or (d, role) in fb_pairs:
+        if (not conf or not exec_governs(conf, r) or eff == conf["runner"] or r.get("fallback")
+                or r.get("id") in fb_runs):
             continue
         code = codes.get(d)
         out.append({"id": f"executor-divergente:{r.get('id')}", "severity": "aviso", "kind": "executor-divergente",
@@ -989,7 +1028,7 @@ def demand_executors(rows: list[dict], runs: list[dict], demand: str) -> list[di
         effective = [{"runner": r.get("runner") or "claude", "model": r.get("model"),
                       "modelProvider": r.get("modelProvider"), "run": r.get("id"),
                       "at": r.get("started")} for r in sorted(eff, key=lambda x: x.get("started") or "")][-5:]
-        reasons = [x for x in (exec_diff(conf, r) for r in eff) if x]
+        reasons = [x for x in (exec_diff(conf, r) for r in eff if exec_governs(conf, r)) if x]
         out.append({"role": role, "configured": conf, "effective": effective, "diff": bool(reasons),
                     "reason": reasons[-1] if reasons else None})
     return out
