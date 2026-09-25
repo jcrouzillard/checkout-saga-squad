@@ -1439,7 +1439,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not eng.store.exists(cid):
                 raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
             if len(parts) == 2 and parts[1] == "mensagens":
-                return self._json(eng.send(cid, data.get("text"), t0=self._t0, attachments=data.get("attachments")),
+                return self._json(eng.send(cid, data.get("text"), t0=self._t0, tz=data.get("tz"),
+                                              attachments=data.get("attachments")),
                                   202)
             if len(parts) == 4 and parts[1] == "anexos" and parts[3] == "remover":
                 return self._json(eng.store.remove_attachment(cid, parts[2]), 200)

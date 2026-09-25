@@ -33,7 +33,7 @@ const dropAll = () => { for (const s of [...sockets]) s.destroy(); };
 (async () => {
   await relay(PORT); await relay(PORT2);
   const axe = fs.existsSync('/work/axe.min.js') ? fs.readFileSync('/work/axe.min.js', 'utf8') : null;
-  const b = await puppeteer.launch({ args: ['--no-sandbox'] });
+  const b = await puppeteer.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'], executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
   const page = async (w, theme = 'light', base = BASE, hash = '#/painel') => {
     const p = await b.newPage();
     await p.setViewport({ width: w, height: w > 500 ? 900 : 844, deviceScaleFactor: 1 });
@@ -104,6 +104,8 @@ const dropAll = () => { for (const s of [...sockets]) s.destroy(); };
   await waitIdle(p);
   const fim = await st(p);
   const bubble = await lastBubble(p);
+  // announce() escreve no #sr-live 50 ms depois de limpar: espera o anúncio (até 2 s) antes de ler.
+  await p.waitForFunction(() => window.__live.some(t => /Resposta do Orquestrador recebida/.test(t)), { timeout: 2000 }).catch(() => {});
   const lives = await p.evaluate(() => ({ live: [...window.__live], alert: [...window.__alert] }));
   R('CA2-estados', { ok: humanNow && pensandoMs <= 300 && lendo && durante.textDisabled !== undefined && fim.msgs === 2 && /Resposta simulada/.test(bubble) && !/\*\*/.test(bubble),
     vazio, humanNow, pensandoMs, lendo, lendoTxt, durante, fim, bubble: bubble.slice(0, 200), model: /claude-fake-1-20260901/.test(bubble) });
@@ -156,12 +158,27 @@ const dropAll = () => { for (const s of [...sockets]) s.destroy(); };
   R('reconexao-f5-no-meio', { ok: dupB === 3 && meio.open, meioStop: meio.stopVisible, dupB });
 
   // ===== estados de erro, cancelada, tempo esgotado, ocupado
-  await typeSend(p, 'FALHAR agora'); await waitIdle(p);
+  // D20 (contrato ui-conversa-visual-v2 §3.1/§3.5, CA-V3): o resultado do turno com erro aparece SÓ no rodapé da
+  // mensagem (flag "Erro" + "Tentar de novo"); o texto do erro aparece 1 vez em #chat e a barra #chat-status fica oculta.
+  await typeSend(p, 'FALHAR agora'); await waitIdle(p); await sleep(400);
   const erro = await st(p);
-  const retry = await p.$('[data-chat-retry], [data-chat-retry-text]');
+  const errFoot = () => p.evaluate(() => { const li = [...document.querySelectorAll('#chat-msgs > li.c-msg')].at(-1), foot = li && li.querySelector(':scope > .c-foot');
+    return { flag: foot?.querySelector('.c-flag--err')?.textContent.trim() || null, retryNoRodape: !!foot?.querySelector('[data-chat-retry]'),
+      retryNaBarra: !!document.querySelector('#chat-status [data-chat-retry-text]'), statusHidden: document.getElementById('chat-status').hidden,
+      // ocorrências na ÚLTIMA mensagem + barra (turnos com erro anteriores continuam no histórico, cada um com o seu rodapé)
+      ocorrencias: ((li ? li.innerText : '') + (document.getElementById('chat-status').hidden ? '' : document.getElementById('chat-status').innerText)).match(/Invalid API key/g)?.length || 0, msgs: document.querySelectorAll('#chat-msgs > li.c-msg').length }; });
+  const e1 = await errFoot();
   const alertErr = await p.evaluate(() => [...window.__alert]);
-  R('estado-erro', { ok: /Erro|indispon/i.test(erro.status) && !!retry, status: erro.status, retry: !!retry, alert: alertErr.slice(-2) });
-  if (retry) { await retry.click(); await sleep(400); await waitIdle(p); R('tentar-de-novo', { status: (await st(p)).status, msgs: (await st(p)).msgs }); }
+  R('estado-erro', { ok: /Erro/.test(e1.flag || '') && e1.retryNoRodape && !e1.retryNaBarra && e1.statusHidden && erro.status === '' && e1.ocorrencias === 1, ...e1, status: erro.status, alert: alertErr.slice(-2) });
+  const retry = await p.$('#chat-msgs > li.c-msg:last-child > .c-foot [data-chat-retry]');
+  if (retry) {
+    await retry.click(); await sleep(400); await waitIdle(p); await sleep(400);
+    const e2 = await errFoot(), s2 = await st(p);
+    // "Tentar de novo" reenvia a mesma pergunta (novo turno: +1 humana, +1 resposta); FALHAR falha de novo → erro só no rodapé da NOVA mensagem.
+    const turns = await p.evaluate(() => [...document.querySelectorAll('#chat-msgs > li.c-msg.c-msg--hum')].slice(-2).map(li => li.querySelector('.c-body').textContent));
+    R('tentar-de-novo', { ok: e2.msgs === e1.msgs + 2 && turns.every(t => t === 'FALHAR agora') && /Erro/.test(e2.flag || '') && e2.retryNoRodape && e2.statusHidden && e2.ocorrencias === 1 && s2.focus === 'chat-text',
+      antes: e1.msgs, depois: e2.msgs, turns, flag: e2.flag, ocorrencias: e2.ocorrencias, status: s2.status, focus: s2.focus });
+  } else R('tentar-de-novo', { ok: false, erro: 'botão Tentar de novo ausente no rodapé' });
   await typeSend(p, 'DORMIR e depois pare');
   await p.waitForFunction(() => !document.getElementById('chat-stop').hidden, { timeout: 5000 });
   await p.waitForFunction(() => /parcial/.test(document.querySelector('#chat-live .bub')?.textContent || ''), { timeout: 8000 }).catch(() => {});

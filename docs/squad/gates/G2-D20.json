@@ -1,0 +1,31 @@
+{
+  "gate": "G2", "cycle": 1, "demand": "41bdb8b49835", "code": "D20", "from": "orquestrador+frontend", "to": "qa",
+  "recommendation": "APPROVE",
+  "confidence": 0.77,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Teste de reprodução agora passa e suítes de tests/squad verdes", "status": "pass", "source": "SQUAD_CHAT_RUNNER=fake python3 -m unittest: test_conversa_tz_d20 7 OK; test_conversa_d17 44 OK; test_alertas_d14 20 OK; test_ambiente_teste_d15 41 OK; test_bugs_d16 38 OK; test_bugs_d16_qa 18 OK; test_governanca_d14_qa 19 OK; test_e2e_compose_seguro_d15 11 OK (docker falso); test_entrega_por_pr.py (script) 'Todas as verificações passaram'"},
+    {"name": "(B,3) Roteiro de navegador d20 (CA-V1..V4, V6/V8/V9/V10/V11/V12 parciais)", "status": "validate", "source": "scratchpad/fix-d20/d20-ui-final.json: 10/10 ok, pageErrors []; não reexecutado pelo Auditor (servidor+Playwright da Frontend)"},
+    {"name": "(B,2) Nenhuma chamada fora do contrato", "status": "pass", "source": "diff: único acréscimo de API é o campo opcional tz no POST /api/conversas/{id}/mensagens (contrato v2 §3.4); server.py repassa data.get('tz') sem novo erro"},
+    {"name": "(2) Segurança: tz IANA validado antes de ZoneInfo, registros em UTC, conteúdo do modelo sem innerHTML, links seguros", "status": "pass", "source": "conversa.py valid_tz: isinstance+len≤64+TZ_RE antes de ZoneInfo, inválido→fuso do servidor; now_iso() inalterado (UTC), tz só em Turn.tz para build_context; index.html mdInline/mdBlocks usam textContent/append; safeLink aceita só '#/' e http(s) com target=_blank rel=noopener noreferrer; innerHTML restante só com esc() (chatTimeHtml, meta, status) ou literais (CHAT_HINT, fase)"},
+    {"name": "(2) Acessibilidade e responsividade", "status": "validate", "source": "d20-ui-final.json CA-V9/V10/V11 parciais ok (contraste, aria-live, larguras); CA-V7 (rolagem) e capturas escuro-streaming/claro-390 ainda não cobertas"},
+    {"name": "(1) Aderência ao contrato v2 e regra .live global intocada", "status": "validate", "source": "git show HEAD~1 vs HEAD: regras .live (l.344-347, 457) idênticas; removida só .c-msg.live. Desvios declarados avaliados abaixo"}
+  ],
+  "deviations_assessment": [
+    "Fase como irmã do corpo (div.c-phase após .c-body) em vez de 'última linha do corpo' (§3.5): aceito — mantém body.innerHTML ao vivo == final (CA-V2) sem precisar remover a linha; visualmente equivalente. Registrar na próxima revisão do contrato.",
+    "Tempos só no rodapé da última resposta (anteriores no title do horário): aceito — §3.5 pede total só no rodapé; informação preservada.",
+    "Classes antigas mantidas como apelidos (ex.: 'humano' junto de c-msg--hum): aceito como transição; nenhum seletor global de layout novo. Remover quando o d17-conversa.js migrar.",
+    "d17-conversa.js 'estado-erro' falha (status vazio, retry true): esperado — contrato v2 §3.5 move o erro de turno para o rodapé da mensagem; o QA deve atualizar o teste (não é regressão).",
+    "maxlength removido: aceito — contador 0/8000, bloqueio no cliente (CHAT_MAX) e 413 mensagem_grande no servidor permanecem.",
+    "Dica de atalhos oculta ≤ 480 px (sr-only, aria-describedby mantido): conforme §3.7 do contrato."
+  ],
+  "open_risks": [
+    "QA: atualizar tests/ui/d17-conversa.js 'estado-erro' para procurar o erro no rodapé da mensagem (1 ocorrência, barra oculta) e reexecutar 'tentar-de-novo' (ficou null).",
+    "QA: cobrir CA-V7 (rolagem), CA-V10 completo (4 capturas claro/escuro × streaming/final) e CA-V5 com runner real no G3.",
+    "CA-V12 só vale após rebase sobre D18 (PR #171, #hdr .live) — reverificar cabeçalho.",
+    "Conflito provável com D19 em conversa.py (build_context) e render de mensagens."
+  ],
+  "corrections": [],
+  "human_required": false,
+  "rationale": "Correção de servidor e UI verificadas no repositório: o unitário de reprodução passa, todas as suítes de tests/squad passam uma a uma com runner falso, o tz é validado antes do zoneinfo e só afeta o contexto, registros seguem em UTC, o conteúdo do modelo é montado via DOM/textContent e links são restritos a '#/' e http(s) com noopener. A regra .live global não mudou. Desvios declarados são aceitáveis; o único teste antigo que falha reflete mudança prevista no contrato v2. Pendências de cobertura (V7, V10 completo, V5 real) ficam para o QA no G3."
+}

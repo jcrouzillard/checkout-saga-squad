@@ -28,6 +28,7 @@ import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import alerts as al  # noqa: E402
@@ -122,6 +123,53 @@ REASON_TEXT = {"nao_destravavel": "este item não pode ser destravado pela conve
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# D20 (ui-conversa-visual-v2 §3.4): fuso do humano para o contexto. O registro continua em UTC (now_iso()).
+TZ_RE = re.compile(r"^[A-Za-z]+(?:/[A-Za-z0-9_+\-]+){0,2}$")
+
+
+def valid_tz(tz) -> str | None:
+    """Nome IANA validado (regex ≤ 64 chars ANTES do zoneinfo, que bloqueia '../x'); inválido/ausente → None."""
+    if not isinstance(tz, str) or len(tz) > 64 or not TZ_RE.match(tz):
+        return None
+    try:
+        ZoneInfo(tz)
+    except Exception:
+        return None
+    return tz
+
+
+def _server_tz_name() -> str:
+    """Nome do fuso local do servidor (TZ ou /etc/localtime), só para o cabeçalho do contexto."""
+    name = valid_tz(os.environ.get("TZ", "").lstrip(":"))
+    if name:
+        return name
+    try:
+        link = os.path.realpath("/etc/localtime")
+        if "zoneinfo/" in link:
+            name = valid_tz(link.split("zoneinfo/", 1)[1])
+    except OSError:
+        name = None
+    return name or "local"
+
+
+def _offset(d: datetime) -> str:
+    o = d.strftime("%z") or "+0000"
+    return f"{o[:3]}:{o[3:]}"
+
+
+def to_zone(ts, zone) -> str | None:
+    """ISO do registro (UTC, `Z` ou `+00:00`) → ISO com o deslocamento do fuso (`zone` None = fuso do servidor)."""
+    if not isinstance(ts, str) or not ts:
+        return ts
+    try:
+        d = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return ts
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(zone).isoformat(timespec="seconds")
 
 
 class ChatError(Exception):
@@ -279,8 +327,11 @@ def _stage(rows: list[dict], rules, d: str) -> str:
     return "backlog" if task.get("backlog") else "aguardando início"
 
 
-def build_context(state: dict, data_root: pathlib.Path | None = None) -> str:
+def build_context(state: dict, data_root: pathlib.Path | None = None, tz: str | None = None) -> str:
     rows, rules = state["rows"], state["rules"]
+    tz = valid_tz(tz)
+    zone = ZoneInfo(tz) if tz else None          # None → astimezone() usa o fuso local do servidor
+    tz_name = tz or _server_tz_name()
     codes = rules.codes
     titles = _effective_titles(rows)
     demands = []
@@ -318,7 +369,7 @@ def build_context(state: dict, data_root: pathlib.Path | None = None) -> str:
         agents.append({"agente": a.get("agent"), "estado": a.get("state"), "demanda": task.get("code"),
                        "passo": al.trunc(task.get("step") or a.get("lastActivity"), TITLE_MAX)})
     te_state = state.get("testEnv") or {}
-    recent = [{"ts": e.get("ts"), "agente": e.get("agent"), "tipo": e.get("type"),
+    recent = [{"ts": to_zone(e.get("ts"), zone), "agente": e.get("agent"), "tipo": e.get("type"),
                "demanda": codes.get(e.get("demand")) if e.get("demand") else None,
                "titulo": al.trunc(e.get("title"), TITLE_MAX)} for e in rows[-RECENT_EVENTS:] if isinstance(e, dict)]
     ctx = {"demandas": demands, "alertas": alerts, "agentes": agents,
@@ -327,7 +378,9 @@ def build_context(state: dict, data_root: pathlib.Path | None = None) -> str:
 
     def dump() -> str:
         body = json.dumps(ctx, ensure_ascii=False, separators=(",", ":"))
-        return f'<dados_da_squad gerado="{now_iso()}">\n{mask(body, data_root)}\n</dados_da_squad>'
+        now = datetime.now(timezone.utc).astimezone(zone)
+        return (f'<dados_da_squad gerado="{now.isoformat(timespec="seconds")}" fuso="{tz_name}" utc="{_offset(now)}">\n'
+                f'{mask(body, data_root)}\n</dados_da_squad>')
 
     out = dump()
     # ≤ 24 KB: corta primeiro eventos antigos, depois demandas encerradas, depois as mais antigas.
@@ -1235,6 +1288,7 @@ class Turn:
         self.stop_reason: str | None = None     # "cancelada" | "tempo_esgotado"
         self.first_text_ms: int | None = None
         self.attachments: list[dict] = []       # D21: anexos DESTE turno (metadados + `file`)
+        self.tz: str | None = None              # D20: fuso IANA do humano (validado) só para o contexto
 
     # estado (phase/tool/sent) e eventos mudam juntos sob a mesma trava: o SSE tira um retrato consistente
     def emit(self, event: str, data: dict):
@@ -1308,8 +1362,9 @@ class Engine:
                 "active": active}
 
     # ---------------- envio
-    def send(self, cid: str, text, t0: float | None = None, attachments=None) -> dict:
+    def send(self, cid: str, text, t0: float | None = None, tz: str | None = None, attachments=None) -> dict:
         t0 = time.monotonic() if t0 is None else t0
+        tz = valid_tz(tz)                        # inválido/ausente → fuso do servidor, sem erro novo
         has_att = isinstance(attachments, list) and len(attachments) > 0
         if text is None and has_att:
             text = ""
@@ -1344,6 +1399,7 @@ class Engine:
                                 message=human)
             t = Turn(cid, n, t0)
             t.attachments = infos
+            t.tz = tz
             self.active = t
             self.turns[(cid, n)] = t
             for k in [k for k in self.turns if k != (cid, n)][:-20]:   # guarda só os últimos turnos em memória
@@ -1389,7 +1445,7 @@ class Engine:
             meta = self.store.meta(recs)
             sid, used = self.store.session(recs)
             try:
-                context = build_context(self.state_fn(), self.store.data_root)
+                context = build_context(self.state_fn(), self.store.data_root, tz=t.tz)
             except Exception as e:   # sem estado da squad ainda assim responde (e diz que não sabe)
                 context = f"<dados_da_squad erro=\"{type(e).__name__}\">{{}}</dados_da_squad>"
             model = meta.get("modelRequested")
