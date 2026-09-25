@@ -19,7 +19,14 @@ Palavras-chave na pergunta do humano (texto depois de "Pergunta do humano:"):
                    colunas, citação, tabela 4×3, link interno/externo, `**negrito` sem fechar e `<img onerror>` literal
   LONGO          → resposta longa (40 parágrafos curtos) em trechos a cada 0,25 s (~10 s; rolagem do CA-V7, D20)
   PROPOR:<json>  → termina a resposta com o bloco ```destravar <json>```
+  IMGECO         → diz quantas imagens vieram no stdin stream-json (D21)
+
+D21: com `--input-format stream-json` (turno com imagem) lê a linha do stdin, grava `fake_last_stdin.json` (argv,
+nº de linhas, ordem dos blocos, media_type e sha256 dos bytes de cada imagem, textos) e usa os textos como prompt;
+sem stream-json apaga `fake_last_stdin.json` (0 blocos image no turno).
 """
+import base64
+import hashlib
 import json
 import os
 import pathlib
@@ -28,10 +35,27 @@ import time
 
 MODEL = "claude-fake-1-20260901"
 argv = sys.argv[1:]
-prompt = argv[argv.index("-p") + 1] if "-p" in argv else ""
-question = prompt.split("Pergunta do humano:\n", 1)[-1]
 cwd = pathlib.Path.cwd()
 data_root = cwd.parents[2] if len(cwd.parents) > 2 else cwd
+n_images = 0
+if "--input-format" in argv and argv[argv.index("--input-format") + 1:][:1] == ["stream-json"]:
+    raw = sys.stdin.buffer.read()
+    lines = [ln for ln in raw.split(b"\n") if ln.strip()]
+    msg = json.loads(lines[0])
+    content = msg["message"]["content"]
+    imgs = [c for c in content if c.get("type") == "image"]
+    texts = [c["text"] for c in content if c.get("type") == "text"]
+    n_images = len(imgs)
+    (cwd / "fake_last_stdin.json").write_text(json.dumps({
+        "argv": argv, "lines": len(lines), "type": msg.get("type"), "role": msg["message"].get("role"),
+        "images": [{"media_type": c["source"]["media_type"],
+                    "sha256": hashlib.sha256(base64.b64decode(c["source"]["data"])).hexdigest()} for c in imgs],
+        "order": [c.get("type") for c in content], "texts": texts}))
+    prompt = "\n\n".join(texts)
+else:
+    (cwd / "fake_last_stdin.json").unlink(missing_ok=True)
+    prompt = argv[argv.index("-p") + 1] if "-p" in argv else ""
+question = prompt.split("Pergunta do humano:\n", 1)[-1]
 (cwd / "fake_last_argv.json").write_text(json.dumps({"argv": argv, "env": sorted(os.environ)}))
 
 
@@ -64,6 +88,8 @@ if "ECO" in question:
     text += "histórico: " + ("sim" if "<historico_da_conversa>" in prompt else "não") + ". "
 if "INJECAO" in question:
     text += "contexto contém injeção: " + ("sim" if "IGNORE AS REGRAS" in prompt else "não") + ". "
+if "IMGECO" in question:
+    text += f"imagens recebidas: {n_images}. "
 if "LENTO" in question:
     text += "Trecho longo da resposta para acompanhar o streaming. " * 3
 if "PROPOR:" in question:
