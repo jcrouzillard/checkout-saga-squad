@@ -508,12 +508,18 @@ def feature_sync(a):
         if dirty:
             sys.exit("worktree com alterações não commitadas; commit antes de sincronizar:\n" + "\n".join(dirty))
         sh("git", "fetch", "-q", "origin", cwd=wt)
-        subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "origin/develop"], cwd=wt,
-                       capture_output=True, text=True)
+        res = subprocess.run(["git", "merge", "-q", "--no-ff", "--no-commit", "origin/develop"], cwd=wt,
+                             capture_output=True, text=True)
         in_merge = bool(sh("git", "rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=wt, check=False))
         if not in_merge:
-            print(f"{branch} já contém a origin/develop (nada a integrar)")
-            return
+            # G2-D19 (ressalva 1): só é "nada a integrar" se a develop já estiver na branch; senão o merge falhou.
+            contains = subprocess.run(["git", "merge-base", "--is-ancestor", "origin/develop", "HEAD"], cwd=wt,
+                                      capture_output=True).returncode == 0
+            if contains:
+                print(f"{branch} já contém a origin/develop (nada a integrar)")
+                return
+            sys.exit("merge da origin/develop falhou sem deixar merge em andamento:\n"
+                     + (res.stderr or res.stdout).strip())
     # memória da squad = versão da develop (mesma regra do align_memory), inclusive arquivos só da branch
     for path in STATE:
         sh("git", "checkout", "origin/develop", "--", path, cwd=wt, check=False)
