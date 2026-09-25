@@ -1,0 +1,101 @@
+{
+  "gate": "G1",
+  "cycle": 1,
+  "demand": "6450aecde7f9",
+  "code": "D23",
+  "phase": "F2a (ADR-024 §6)",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "recommendation": "APPROVE",
+  "confidence": 0.87,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "(B,3) (a) D1–D23 do painel iguais aos de hoje e aliases das 4 divergências",
+      "status": "pass",
+      "source": "cópia do log real (660 linhas, 24 task do humano) + regra de alerts.demand_codes de origin/develop: D1–D23 idênticos à tabela §4.3 (23/23). Divergências D7↔D8 (349e5b1bf818/e31bdfb73679) e D9↔D10 (f2324e0f25de/174084ec85d0) confirmadas pelo campo demand dos pareceres G1/G2/G3-D7..D10, pelas branches origin/feature/D7..D10 e pelos contratos/ADR-011/012; varredura de docs/**/*.md e tests/**/*.md não achou nenhum 5º id divergente"
+    },
+    {
+      "name": "(B,3) Precedência do resolvedor e 'sem produto, tudo igual'",
+      "status": "pass",
+      "source": "contrato §2: argumento > SQUAD_PRODUCT > checkout-saga; SQUAD_LOG > SQUAD_ROOT_DATA > repo_root; produto implícito sem product.toml usa valores embutidos; CA-1 compara Path com as constantes atuais (server.py:43-44, gitflow.py:34-35, github_sync.py:28-30, triage.py:16-17, log.py:24, run_agent.py:51)"
+    },
+    {
+      "name": "(B,2) Escrita do code só por server.py e log.py sob flock",
+      "status": "pass",
+      "source": "únicos gravadores de task do humano conferidos: server.py:1535 (bug, id pré-gerado) e :1882 (comum) via _append_log, e log.py; nenhum outro módulo grava task humano. Contrato §4.2: append_task com fcntl.flock(locks_dir/codes.lock) entre processos, relê log, O_APPEND+fsync, timeout 5 s, recusa entry com code; CA-6 com 20 gravações concorrentes"
+    },
+    {
+      "name": "(B,2) demand_codes único substituindo os cálculos posicionais",
+      "status": "validate",
+      "source": "cálculos no código: alerts.py:93-100, gitflow.py:415-421, pending.py:30-33, testenv.py:385-390, conversa.py via rules.codes (alerts) e server.py:605/1132/1354 via al.demand_codes, index.html:2790 demandCode e :1413 findDemand (posicional all[n-1]) — todos cobertos. OMITIDO: index.html:1919 `const code = \\`D${index + 1}\\`` em demandInfo, que alimenta info.code (lista, rotas #/demandas/<code>, alertas, teFor); o escopo do Frontend no §1 ('só demandCode e findDemand') o exclui"
+    },
+    {
+      "name": "(2) Localização da tabela (E2) fora de docs/squad/memory/",
+      "status": "pass",
+      "source": "errata §11 E2 e contrato §4.3: docs/squad/products/checkout-saga/codes.json; STATE do gitflow.py:66 cobre só memory/, inbox/, produto/bugs/, operacao/bugs/ — a tabela não é descartada nem barrada pelo G3"
+    },
+    {
+      "name": "(2) (b) gitflow/github_sync/triage respeitando o log",
+      "status": "pass",
+      "source": "contrato §5 + CA-7/CA-8/CA-9 (sha256/tamanho/mtime do log real e do github-sync.json intactos; operações de memória no git puladas com SQUAD_LOG fora do repo; SQUAD_LOG explícito aos filhos)"
+    },
+    {
+      "name": "(2) (c) Transcrições (run_agent e server)",
+      "status": "pass",
+      "source": "regra do slug conferida em ~/.claude/projects (todo caractere fora de [A-Za-z0-9] vira '-'); defeitos atuais confirmados: run_agent.py:51 usa ROOT, server.py:69 usa DATA_ROOT. Contrato §6: transcript_dir_for único, caminho exato no metadado da run, runs em data_root (E6), varredura de worktrees com cache 30 s; CA-10..CA-12"
+    },
+    {
+      "name": "(1) (d) tests/squad verde e critérios verificáveis",
+      "status": "pass",
+      "source": "CA-14 e mapa (a)–(d) → CA no §8"
+    },
+    {
+      "name": "(1) Demandas em voo (§4.11) e janela da tabela",
+      "status": "validate",
+      "source": "o contrato diz 'não há branch em voo', mas já existe D24 cf7a120591b0 (task 17:30, antes do handoff 17:34) com worktree plankton-d24 em feature/D24-publicar-squad-control (Squad Control: provável conflito em server.py/index.html). O §4.5 já prevê --until até o último task"
+    },
+    {
+      "name": "(1) Brief de handoff em docs/squad/memory/handoffs/",
+      "status": "fail",
+      "source": "só o evento 9dd7e8b66dad; nenhum arquivo de brief da D23 (último é 12-arquiteto-d22-...)"
+    }
+  ],
+  "architect_questions": [
+    {
+      "q": "Quando gerar a tabela",
+      "blocking": false,
+      "default": "no worktree da D23 sobre CÓPIA do log da cópia principal (freeze-codes só lê o log); regenerar imediatamente antes do feature-finish com --until no último task do humano existente. Hoje isso já é cf7a120591b0 (D24) — congelar D1–D24 e dizer no PR"
+    },
+    {
+      "q": "Varrer transcrições de outros worktrees",
+      "blocking": false,
+      "default": "sim, como §6: git worktree list --porcelain da cópia principal, só pastas existentes, sem repetição, cache 30 s; SQUAD_TRANSCRIPTS continua exclusivo; runs novas pelo caminho exato gravado"
+    },
+    {
+      "q": "P1 já usado em feature/P1-portabilidade-entre-fornecedores (PR #32)",
+      "blocking": false,
+      "default": "não afeta a F2a (prefixo P só nasce na F5 e P1 não é demanda do log). Registrar como restrição da F5: a sequência P deve pular códigos que já são nome de branch (começar em P2 ou reservar P1 na tabela do squad-platform); gitflow já recusa branch existente"
+    },
+    {
+      "q": "Apelidos no painel",
+      "blocking": false,
+      "default": "não nesta fase (§7): UI mostra só o código congelado; resolve_code com source vale para conversa/gitflow/sino quando houver contexto; exibir apelidos fica para a F5"
+    }
+  ],
+  "corrections": [
+    "Orquestrador/Arquiteto (ajuste de texto, sem novo ciclo): incluir index.html:1919 (demandInfo: code = D${index+1}) na lista do §4.4 e no escopo do Frontend no §1; info.code deve vir de demandCode(d.id) (state.codes). findDemand deve usar o mapa, não all[n-1]",
+    "Gerar codes.json com --until cf7a120591b0 (D24 já existe); ajustar CA-6: com a tabela real a 1ª demanda nova grava D25 (não D24); o PR declara o último id congelado",
+    "Aplicar §4.11: registrar progress listando a D24 (plankton-d24, feature/D24-publicar-squad-control) como branch em voo e pedir a escolha ao humano (integrar antes ou absorver depois); corrigir a frase 'não há branch em voo'",
+    "Acrescentar às sources dos aliases: tests/ui/checklist-cancelar-d7.md (e31bdfb73679) e tests/ui/checklist-entrega-por-pr-d8.md (349e5b1bf818)",
+    "Arquiteto: gravar o brief em docs/squad/memory/handoffs/ (protocolo do AGENTS.md)"
+  ],
+  "open_risks": [
+    "Conflito de arquivos com a D24 em voo (server.py, squad-control/index.html) — resolve pela regra do §4.11",
+    "Lacuna entre a geração da tabela e o deploy: coberta pela regra posicional (consequência 3); depende de regenerar antes do feature-finish",
+    "Custo da varredura multi-worktree no /api/live (orçamento 300 ms, ADR-017) — cache de 30 s previsto; medir no G2",
+    "flock depende de FS local (macOS/Linux) — falha explícita, nada gravado"
+  ],
+  "human_required": false,
+  "rationale": "Contrato completo e verificável para os critérios (a)–(d) da F2a. Paridade recalculada sobre cópia do log real: D1–D23 idênticos à tabela congelada e exatamente as 4 divergências D7–D10 (confirmadas nos pareceres, branches e documentos). Precedência, 'sem produto, tudo igual', gravação única do code sob flock entre processos, tabela fora da memória viva (E2), scripts honrando SQUAD_LOG e transcrições com caminho exato estão especificados com CA objetivos. Lacunas não bloqueantes, corrigíveis sem novo ciclo: um 7º cálculo posicional omitido (index.html:1919), D24 já existente (tabela até D24 e CA-6 desloca para D25), D24 em voo sem registro do §4.11, 2 sources de alias faltando e brief de handoff ausente. Confiança 16,5/19 = 0,87; risco moderado (mexe na gravação do log e no painel)."
+}
