@@ -1,0 +1,25 @@
+{
+  "demand": "cf7a120591b0",
+  "title": "Atualizar e reiniciar o Squad Control automaticamente após merge (deploy local)",
+  "detail": "Problema: Merges que mexem em squad-control/** ou tools/squad/** não reiniciam o painel da porta 7070 (\"Produtivo atualizado: nada a reiniciar\"; ressalva R10 do G1-D15). As funções novas ficam indisponíveis até eu reiniciar à mão. Aconteceu com a D19 e a D21.\n\nO que eu quero:\n\nDepois de um merge que altere o painel ou as ferramentas, o painel é reiniciado sozinho na versão nova.\nAs mesmas travas do produtivo (ADR-018): só a cópia principal, só avanço simples da develop, checagem de saúde antes e depois e volta automática para a versão anterior se falhar.\nO reinício espera um ponto seguro, sem resposta da conversa em andamento, ou avisa na tela antes de reiniciar.\nUm evento no log e um aviso no painel (\"Squad Control atualizado para <versão>\" ou \"falhou, mantida a versão anterior\").\nUm botão \"Reiniciar Squad Control\" no painel, para quando eu precisar.\nRestrições: alinhado ao ADR-024 ([env.prod] kind = \"process\", update = \"restart\"), para não ser refeito na separação. Sem contêiner, porque o painel precisa de git, gh, dos CLIs dos agentes e do Docker da máquina.\n\nCritério de aceite: faço o merge de um PR que muda o painel e, em até 1 minuto, a função nova aparece sem eu tocar no terminal. Um merge com o servidor quebrado volta sozinho para a versão anterior e me avisa.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T17:33:39+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "O ponto seguro e o prazo de 1 minuto podem entrar em conflito. Se uma resposta da conversa ainda estiver em andamento quando a versão nova chegar, o que vale: esperar a resposta terminar, mesmo passando de 1 minuto, ou avisar na tela e reiniciar dentro do prazo, cortando a resposta? A mesma regra vale para o botão \"Reiniciar Squad Control\"?",
+      "dimension": "restricoes",
+      "answer": "Achgo que deveriamos ter um botao para publicar Squad control, o que acha?"
+    },
+    {
+      "question": "Hoje o painel é iniciado com `make` (`python3 tools/squad/server.py`) e roda num terminal aberto. Para reiniciar sozinho, ele precisa passar a rodar por um processo supervisor, em segundo plano, com os logs gravados em arquivo. Pode ser assim, ou o painel precisa continuar no terminal em que você o iniciou? Se puder, o comando de partida muda (por exemplo, um novo alvo `make`) ou o `make` atual tem de continuar funcionando como está?",
+      "dimension": "escopo",
+      "answer": "Vamos deixar essa publicaçao na responsabilidade o Orquestrador."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
