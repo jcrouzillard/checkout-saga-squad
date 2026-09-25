@@ -1409,11 +1409,19 @@ function queueData() {
   const queue = all.filter(x => x.queued).sort((a, b) => (PRIO_RANK[a.priority] ?? 1) - (PRIO_RANK[b.priority] ?? 1) || String(a.start.ts).localeCompare(String(b.start.ts)));
   return { backlog, queue, qpos: Object.fromEntries(queue.map((x, i) => [x.d.id, i + 1])) };
 }
-// Rota: "D13" (canônico) ou o id do log.
+// D23 (F2a §4.6): o código vem do servidor — state.codes[id] → task.code gravado → posicional (só servidor antigo).
+const CODE_RE = /^[A-Z][1-9][0-9]*$/;
+function codeOf(d, index) {
+  const c = state.codes?.[d.id];
+  if (typeof c === "string" && CODE_RE.test(c)) return c;
+  if (typeof d.code === "string" && CODE_RE.test(d.code)) return d.code;
+  return `D${index + 1}`;
+}
+// Rota: "D13" (canônico, pelo código resolvido acima) ou o id do log.
 function findDemand(ref) {
   const all = allInfos();
-  const m = /^d(\d+)$/i.exec(ref || "");
-  return (m ? all[Number(m[1]) - 1] : null) || all.find(x => x.d.id === ref) || null;
+  const r = String(ref || ""), up = r.toUpperCase();
+  return (CODE_RE.test(up) ? all.find(x => x.code === up) : null) || all.find(x => x.d.id === r) || null;
 }
 const statusCls = s => s.startsWith("Falha") ? "fail" : (s.startsWith("Concluída") || s.startsWith("Entregue")) ? "pass" : (s.startsWith("Devolvida") || s.startsWith("Cancelada") || s.startsWith("Com perguntas")) ? "fail" : s.startsWith("Registrada") ? "muted" : "validate";
 const extLink = (url, text, cls = "") => `<a class="ext ${cls}" href="${esc(url || "#")}" target="_blank" rel="noopener">${text}<span class="sr-only"> (abre em nova aba)</span></a>`;
@@ -1916,7 +1924,7 @@ function demandInfo(d, index) {
   const preStart = !canceled && !done && !paused && !work.length && !start;
   const queued = !canceled && !done && !paused && !work.length && !!start;
   // D15: ambiente de teste (só com o recurso no servidor) e se a demanda chegou a ser publicada no teste (passo "pulado").
-  const code = `D${index + 1}`;
+  const code = codeOf(d, index);
   const teInfo = inReview && !canceled && !paused ? teFor(d.id, code) : null;
   const tested = related.some(e => e.type === "test-env-published");
   const lastTe = related.filter(e => /^test-env-(publishing|published|failed|released)$/.test(e.type)).at(-1);
@@ -2787,7 +2795,7 @@ const editing = () => { const el = document.activeElement; return el && el.close
 // ---- Notificações: só o que merece atenção (ação necessária / novidade); o resto fica no log.
 const notifStore = { get(k, d) { try { return JSON.parse(localStorage.getItem("sc.notif." + k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("sc.notif." + k, JSON.stringify(v)); } catch (e) {} } };
 let notifOpen = false, lastSeen = notifStore.get("lastSeen", null);
-function demandCode(id) { const ds = state.log.filter(e => e.type === "task" && e.agent === "humano"); const i = ds.findIndex(d => d.id === id); return i >= 0 ? `D${i + 1}` : null; }
+function demandCode(id) { const ds = demandTasks(); const i = ds.findIndex(d => d.id === id); return i >= 0 ? codeOf(ds[i], i) : null; }
 // D14 §6.4: o sino tem três níveis — bloqueio | aviso (de alerts[]) | novidade (do log). A regra de "ação" não mora mais aqui.
 function classify(e) {
   const code = e.demand ? demandCode(e.demand) : null;
