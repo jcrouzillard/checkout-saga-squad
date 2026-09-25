@@ -75,18 +75,27 @@ papéis, isolamento), ADR-026 §4 (memória sincronizada; o runtime fica na máq
    papel tem no outro; onde o Codex não tem equivalente exato, usa-se a opção mais próxima que **não** amplia,
    e a diferença fica declarada. Consequência nova: **o Auditor passa a ser somente leitura nos dois executores**
    (sem Write/Edit e sem shell de escrita); o parecer sai como bloco JSON e quem grava `docs/squad/gates/*.json` e o
-   evento `gate` é o chamador (`tools/squad/gate.py record`), como a triagem já faz com `validation`.
+   evento `gate` é o chamador (`tools/squad/gate.py record`), como a triagem já faz com `validation`. As
+   verificações bloqueantes que o Auditor executava (G2: `mvn package`, testes da Saga, `docker compose config`;
+   ADR-019: `git worktree add` + teste de reprodução) passam ao **chamador**: `gate.py verify` roda uma lista fixa por
+   gate (`tools/squad/gate_checks.json`) e entrega a saída ao Auditor como evidência (contrato §7.4).
+9. **Perfis somente leitura não dependem da máquina**: no Claude, `leitura` e `auditoria` rodam com
+   `--setting-sources project` + `--settings` dedicado, para que regras `allow`/`defaultMode` do usuário não ampliem
+   o Bash (contrato §7.1).
 
 ## 3. Consequências
 - (+) Nenhum acionamento escolhe executor por conta própria; a escolha é auditável (configurado × efetivo × mudança).
 - (+) Corrige a herança indevida de `SQUAD_MODEL` e a permissão de escrita do Auditor via `run_agent`.
 - (+) Fica claro que plantão com Orquestrador no Codex = `plantao.sh`, não `/loop`.
 - (−) Um passo a mais em cada despacho (resolver) e um gancho no Claude Code (`.claude/settings.json`, novo arquivo).
-- (−) O Auditor deixa de rodar build/testes: passa a exigir a evidência do QA (a devolver com RETURN se faltar).
+- (−) O Auditor deixa de executar build/testes: a verificação passa ao `gate.py verify` (lista fixa) e, no G3, à
+  evidência do QA. O gate bloqueante não enfraquece; o `record` recusa parecer incoerente com a verificação.
 - (−) Orquestrador no Codex precisa de `danger-full-access` (§7 do contrato): no Claude ele já tem Bash sem sandbox,
-  e `workspace-write` quebraria `gh`, `git push` e o lançamento de outros executores. Pede aceite do humano.
+  e `workspace-write` quebraria `gh`, `git push` e o lançamento de outros executores. Pede aceite do humano (Q2);
+  até lá o Orquestrador no Codex é recusado com motivo e o aceite CA-H2 ("demanda inteira no Codex") fica pendente.
 - (−) Codex continua com leitura não isolada (ADR-024 §4.9); com 2+ produtos exige o reconhecimento por produto.
-- (−) Toca `server.py`, `log.py` e `index.html`, que a D24 também altera: implementar **depois** do merge da D24.
+- (−) Toca `server.py`, `log.py`, `index.html`, `conversa.py`, `plantao.sh`, `AGENTS.md` e `Makefile`, que a D24
+  (PR #226) também altera: implementar **só depois** do merge da D24. `Makefile` é do DevOps (solicitação de mudança).
 
 ## 4. Alternativas rejeitadas
 | Alternativa | Por que não |
@@ -108,3 +117,7 @@ papéis, isolamento), ADR-026 §4 (memória sincronizada; o runtime fica na máq
    somente leitura também no Codex)?
 4. **Q4** Configuração por máquina (não sincronizada pelo Neon do ADR-026) está bem, com a trilha de mudanças no log?
 5. **Q5** Foto por demanda: uma mudança geral não afeta demandas já iniciadas (use "Trocar só nesta demanda"). Ok?
+
+**Padrões adotados até a resposta (G1-D26)**: Q1 `padrao` · Q2 não habilitar (Orquestrador no Codex recusado com
+motivo; CA-H2 pendente) · Q3 somente leitura **com** a verificação pelo chamador (R1); sem resposta, nada muda no
+Auditor do Claude · Q4 por máquina, trilha no log · Q5 configuração fixada por demanda + "Trocar só nesta demanda".

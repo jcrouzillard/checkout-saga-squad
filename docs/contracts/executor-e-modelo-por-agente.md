@@ -1,7 +1,9 @@
 # Contrato — Executor e modelo por agente (D26, `50366913d891`, tipo operação)
 
 > Decisão: [ADR-027](../adr/027-executor-e-modelo-por-agente.md). Não toca contratos do checkout (eventos, API dos
-> serviços). Implementar **depois do merge da D24** (ADR-025), que também altera `server.py`, `log.py` e `index.html`.
+> serviços). Implementar **só depois do merge da D24** (ADR-025, PR #226), que também altera `server.py`, `log.py`,
+> `index.html`, `conversa.py`, `plantao.sh`, `AGENTS.md` e `Makefile` (G1-D26 R3): a implementação parte da `develop`
+> já com a D24 integrada (novo plano sobre o código novo, não rebase de branch). Revisão G1-D26 ciclo 1 aplicada (§17).
 > Termos: **executor** = CLI que roda o agente (`claude` = Claude Code, `codex` = Codex CLI); **modelo** = ID ou alias
 > pedido ao executor; **papel** ∈ `orquestrador, arquiteto, backend, devops, observabilidade, frontend, qa, auditor`.
 
@@ -9,10 +11,13 @@
 | Dono | Arquivos | O quê |
 |---|---|---|
 | **Orquestrador** | `tools/squad/executores.py` (novo) | resolvedor, CLI, checagem, gancho `guard-agent` (§4, §5, §6, §8.6) |
-| **Orquestrador** | `tools/squad/gate.py` (novo) | `record`: grava `docs/squad/gates/<G>-<n>.json` e o evento `gate` a partir do bloco `parecer` (§7.3) |
+| **Orquestrador** | `tools/squad/gate.py` (novo) | `verify`: roda a lista fixa de verificações do gate (§7.4); `record`: grava `docs/squad/gates/<G>-<n>.json` e o evento `gate` a partir do bloco `parecer` (§7.3) |
+| **Orquestrador** | `tools/squad/gate_checks.json` (novo) | lista fixa de verificações executáveis por gate (§7.4); mudança só com revisão do Arquiteto |
+| **Orquestrador** | `tools/squad/perfis/leitura.json`, `tools/squad/perfis/auditoria.json` (novos) | settings dedicados dos perfis somente leitura no Claude (§7.1, G1-D26 R6) |
 | **Orquestrador** | `tools/squad/run_agent.py`, `triage.py`, `conversa.py`, `plantao.sh`, `alerts.py`, `log.py`, `server.py`, `product.py` | uso do resolvedor, perfis de permissão, eventos, API, alerta `executor-divergente` |
 | **Orquestrador** | `docs/squad/prompts/plantao.md`, `docs/squad/orquestrador.md`, `docs/squad/gates.md` | despacho por `via`; parecer do Auditor gravado pelo chamador |
-| **Orquestrador** | `.claude/settings.json` (novo), `.claude/agents/auditor.md`, `AGENTS.md` | gancho `PreToolUse`; Auditor somente leitura; `.claude/**` na tabela de donos (Orquestrador) |
+| **Orquestrador** | `.claude/settings.json` (novo), `.claude/agents/auditor.md`, `AGENTS.md`, `CLAUDE.md` | gancho `PreToolUse`; Auditor somente leitura; `.claude/**` na tabela de donos (Orquestrador); `CLAUDE.md`/`AGENTS.md` deixam de citar `SQUAD_RUNNER` como escolha e explicam que `/loop` só serve com Orquestrador em `claude` (§8.5) |
+| **DevOps** (solicitação de mudança) | `Makefile` | alvo `run-agent` deixa de exportar `SQUAD_RUNNER=$(RUNNER)` (vira `--dry-run` quando `RUNNER` é dado, ou é removido); comentário do alvo `plantao` deixa de citar `SQUAD_RUNNER` (G1-D26 R4) |
 | **Orquestrador** | `docs/squad/products/checkout-saga/product.toml` | tabela `[executors]` (§3.1) |
 | **Frontend** | `squad-control/index.html` | tela Executores (§10.1) e bloco da demanda (§10.2) |
 | **QA** | `tests/squad/test_executores_d26.py` (novo), `tests/squad/fixtures/d26/**` (atalhos falsos de `claude`/`codex`), `tests/ui/**` | §12 |
@@ -152,13 +157,21 @@ próximo que não amplia, e a diferença fica na §7.2.
 ### 7.1 Matriz
 | Papel / contexto | Perfil | Claude Code | Codex CLI |
 |---|---|---|---|
-| Conversa (Orquestrador) | `leitura` | `--tools Read Glob Grep` · `--disallowedTools Bash Write Edit NotebookEdit WebFetch WebSearch Task Agent` + `claude_deny_paths` · `--strict-mcp-config` sem servidores · `--permission-mode dontAsk` | `exec -s read-only --skip-git-repo-check -c approval_policy="never" -c mcp_servers={}`; resume: `-c sandbox_mode="read-only"` |
+| Conversa (Orquestrador) | `leitura` | `--setting-sources project --settings tools/squad/perfis/leitura.json` · `--tools Read Glob Grep` · `--disallowedTools Bash Write Edit NotebookEdit WebFetch WebSearch Task Agent` + `claude_deny_paths` · `--strict-mcp-config` sem servidores · `--permission-mode dontAsk` | `exec -s read-only --skip-git-repo-check -c approval_policy="never" -c mcp_servers={}`; resume: `-c sandbox_mode="read-only"` |
 | Triagem (Arquiteto) | `leitura` | igual à conversa (troca o atual `--allowedTools`, que só pré-aprova) | igual à conversa |
-| Auditor (gates) | `auditoria` | `--tools Read Glob Grep Bash` · `--allowedTools Read Glob Grep "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(ls:*)"` · `--disallowedTools Write Edit NotebookEdit WebFetch WebSearch Task Agent` + `claude_deny_paths` · `--permission-mode dontAsk` | `exec -s read-only --skip-git-repo-check -c approval_policy="never"` |
+| Auditor (gates) | `auditoria` | `--setting-sources project --settings tools/squad/perfis/auditoria.json` · `--tools Read Glob Grep Bash` · `--allowedTools Read Glob Grep "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(ls:*)"` · `--disallowedTools Write Edit NotebookEdit WebFetch WebSearch Task Agent` + `claude_deny_paths` · `--permission-mode dontAsk` | `exec -s read-only --skip-git-repo-check -c approval_policy="never"` |
 | Arquiteto, Backend, DevOps, Observabilidade, Frontend, QA | `escrita` | `--permission-mode acceptEdits --allowedTools Bash Read Write Edit Glob Grep` (como hoje) | `exec -s workspace-write -C <cwd> --add-dir <dir do log> --add-dir <runs_dir> -c sandbox_workspace_write.network_access=true -c approval_policy="never" --skip-git-repo-check` |
-| Orquestrador (plantão) | `orquestracao` | igual a `escrita` | `exec -s danger-full-access -c approval_policy="never" --skip-git-repo-check` — **depende do aceite do humano** (Q2); sem aceite, `escrita` + `--add-dir` da cópia principal, do pai dos worktrees, `~/.claude` e `~/.codex`, com o risco da §13 |
+| Orquestrador (plantão) | `orquestracao` | igual a `escrita` | `exec -s danger-full-access -c approval_policy="never" --skip-git-repo-check` — **só com aceite do humano** (Q2). **Padrão até a resposta: desabilitado** — a tela, o CLI e o resolvedor recusam `orquestrador = codex` (400 `orquestrador_codex_pendente_q2`, motivo "Orquestrador no Codex exige danger-full-access; aguardando decisão do humano (Q2)") e "Aplicar a todos: Codex" grava todos os papéis **exceto** o Orquestrador, que fica `claude` e a tela diz isso |
 | Subagente nativo (sessão Claude Code) | do papel | frontmatter `tools:`; Auditor passa a `tools: Read, Glob, Grep` (+ `Bash(git …:*)` se a versão aceitar padrão no frontmatter; senão o diff vai no prompt) | — (Codex não tem subagentes; papel em `codex` sempre `via=run_agent`) |
 `<dir do log>` = pasta de `product.log` (cópia principal). Delegação (D19): perfil do papel com `cwd = worktree`.
+- **Settings dedicados nos perfis `leitura`/`auditoria` (G1-D26 R6)**: as regras `allow` de `~/.claude/settings.json`
+  (`user`) e `.claude/settings.local.json` (`local`) somam-se às da linha de comando e poderiam ampliar o Bash (ou um
+  `defaultMode` do usuário mudar o modo). Por isso esses perfis carregam **só** a fonte `project` (`--setting-sources
+  project`, cujo `.claude/settings.json` contém apenas o gancho, sem `permissions`) mais o arquivo dedicado
+  `tools/squad/perfis/<perfil>.json` com `permissions.defaultMode = "dontAsk"`, `permissions.allow` = exatamente a
+  lista da matriz e `permissions.deny` = `Write Edit NotebookEdit WebFetch WebSearch Task Agent` + `claude_deny_paths`.
+  Configurações *managed* (política da organização) continuam valendo e só restringem. Os perfis `escrita` e
+  `orquestracao` mantêm as fontes padrão (como hoje). Verificado no CA-19.
 
 ### 7.2 Sem equivalente exato
 | Claude Code | Codex | Tratamento |
@@ -177,8 +190,54 @@ recommendation, confidence, risk, evidências, observações). `tools/squad/gate
 <arquivo> [--run <id>]` valida o esquema, mascara o texto (`evidence_rules`), grava `docs/squad/gates/<G>-<n>.json` e o
 evento `gate` (`--agent auditor`, `--run`, `--model` efetivo). `run_agent.py auditor` chama `gate.py` ao terminar; no
 caminho nativo, o Orquestrador salva a resposta do subagente e chama `gate.py`. Bloco ausente/ inválido → `gate`
-não é gravado e `progress` "parecer inválido" (conta como ciclo de autocorreção). O Auditor deixa de rodar
-build/testes: exige a evidência do QA (RETURN se faltar).
+não é gravado e `progress` "parecer inválido" (conta como ciclo de autocorreção). O Auditor deixa de **executar**
+build/testes; as verificações bloqueantes que ele executava passam ao chamador (§7.4). "Exige a evidência do QA" vale
+só onde o QA já atuou (G3: suíte e2e, rastreabilidade); no G2 o QA ainda não rodou e a evidência vem da §7.4.
+`record` recusa (não grava, `progress` "parecer incoerente com a verificação") um parecer que marque `pass` num
+critério cuja verificação da §7.4 deu `fail` ou está ausente.
+
+### 7.4 Verificações executáveis rodadas pelo chamador (G1-D26 R1; vale com a resposta padrão da Q3)
+**Onde fica a lista**: `tools/squad/gate_checks.json` (Orquestrador; mudança revisada pelo Arquiteto). É a **única**
+fonte de comandos: nem o Auditor nem o prompt da demanda acrescentam comandos; placeholders só com valores validados.
+```json
+{ "schema": 1, "checks": [
+  { "id": "g2-mvn-package", "gate": "G2", "when": "backend", "cwd": "worktree", "timeoutS": 900,
+    "cmd": ["mvn", "-q", "package", "-DskipTests"], "expect": "exit0", "criterion": "G2 (B,3) mvn package" },
+  { "id": "g2-saga-unit", "gate": "G2", "when": "backend", "cwd": "worktree", "timeoutS": 900,
+    "cmd": ["mvn", "-q", "-pl", "services/saga-orchestrator", "-am", "test"], "expect": "exit0",
+    "criterion": "G2 (B,3) testes unitários da Saga" },
+  { "id": "g2-compose-config", "gate": "G2", "when": "devops", "cwd": "worktree", "timeoutS": 60,
+    "cmd": ["docker", "compose", "-p", "checkout-verify-{demand}", "config", "-q"], "expect": "exit0",
+    "criterion": "G2 (B,2) docker compose config" },
+  { "id": "g2-compose-healthcheck", "gate": "G2", "when": "devops", "cwd": "worktree", "timeoutS": 60,
+    "cmd": ["docker", "compose", "-p", "checkout-verify-{demand}", "config", "--format", "json"],
+    "expect": "healthcheck-todos", "criterion": "G2 (B,2) todos os serviços com healthcheck" },
+  { "id": "bug-repro-falha", "gate": ["G1", "G3"], "when": "bug", "cwd": "tmp-worktree:{testCommit}", "timeoutS": 900,
+    "cmd": "{testCmd}", "expect": "fail", "criterion": "ADR-019 teste falha no commit do teste" },
+  { "id": "bug-repro-passa", "gate": "G3", "when": "bug", "cwd": "worktree", "timeoutS": 900,
+    "cmd": "{testCmd}", "expect": "exit0", "criterion": "ADR-019 teste passa no head" }
+]}
+```
+- `when`: `backend` = diff da demanda toca `services/**` ou `pom.xml`; `devops` = toca `docker-compose.yml`,
+  `Dockerfile`, `infra/**`; `bug` = demanda de bug (D16). Fora do caso, a verificação é `n/a`.
+- `{demand}` = id de 12 hex; `{testCommit}` = SHA do evento `evidence reproducao=FAIL` do QA (validado com
+  `git cat-file -e`); `{testCmd}` = gerado pelo `gate.py` a partir do alvo do teste nesse evento, só nas formas
+  `mvn -q -pl services/<modulo> test -Dtest=<Classe>[#metodo]` ou `python3 -m pytest -q tests/<arquivo>.py[::teste]`
+  (regex estrito; fora disso → `validate` "alvo do teste não reconhecido", nunca shell livre). Nada roda por shell
+  (`subprocess` com lista).
+- `tmp-worktree:{sha}` = `git worktree add --detach <runtime_dir>/verify/<G>-<demand> <sha>` e `git worktree remove
+  --force` ao fim (sempre, inclusive em erro); não troca a branch de ninguém. `docker compose … config` não cria
+  containers nem volumes; o `-p` explícito cumpre o ADR-018.
+- **Execução**: `tools/squad/gate.py verify --gate <G> --demand <id> [--worktree <dir>]`, chamado pelo Orquestrador
+  (plantão/`run_agent.py auditor`) **antes** do Auditor, com o perfil `escrita` do Orquestrador. Saída:
+  `<runs_dir>/verify-<G>-<demand>-<ciclo>.json` = `{gate, demand, commit, checks:[{id, criterion, status:
+  pass|fail|n/a|erro, exit, durationMs, tail}]}` (`tail` = últimas 40 linhas mascaradas por `evidence_rules`;
+  `erro` = timeout ou ferramenta ausente) e um evento `evidence` (`--agent orquestrador`, `verify:<id>=<status>`).
+- **Como o Auditor consome**: o chamador injeta esse JSON no bloco `<dados>` do prompt (via `run_agent` e nativa). Para
+  cada critério da `gates.md` coberto por um `id`, o Auditor usa o `status` como evidência: `pass`→pass, `fail`→fail
+  (bloqueante → RETURN), `erro`→`validate`, ausente com `when` aplicável → RETURN "verificação não executada". O
+  Auditor não reexecuta (não tem shell de escrita); pode só ler o diff e o `tail`. `gates.md` troca "o Auditor roda"
+  por "status da verificação `<id>`" nesses critérios (texto novo na implementação, dono Orquestrador).
 
 ## 8. Como cada acionamento usa a escolha
 1. **`run_agent.py <papel>`**: chama `resolve` (contexto `passo`, ou `plantao` quando `papel = orquestrador` sem
@@ -237,7 +296,7 @@ modelo. Motivo exibido: `fallback:<reason>`, `sessao` (modelo da sessão interat
 |---|---|---|
 | `GET /api/executores` | — | `{config, version, resolved:[{role,runner,model,source,via,profile}], status:{claude:{…},codex:{…}}, allowed, policy, ignoredEnv:[…], lastEffective:{papel:{runner,model,modelProvider,run,at}}, history:[últimos 20 executor-config], plantao:{runner,via:"sessao"\|"plantao.sh",at}}` |
 | `POST /api/executores` | `{baseVersion, squad, agents, policy, acknowledge?}` | 200 `{version, warnings}` · 400 `executor_nao_permitido\|modelo_incompativel\|formato_invalido` · 409 `versao_desatualizada\|executor_indisponivel` |
-| `POST /api/executores/aplicar-a-todos` | `{baseVersion, runner, model, acknowledge?}` | idem; efeito: `squad = {runner, model}` e **todos** os `agents = null` (inclusive Orquestrador e Auditor); um `executor-config{scope:"apply-all"}` com o antes completo |
+| `POST /api/executores/aplicar-a-todos` | `{baseVersion, runner, model, acknowledge?}` | idem; efeito: `squad = {runner, model}` e **todos** os `agents = null` (inclusive Orquestrador e Auditor); um `executor-config{scope:"apply-all"}` com o antes completo. Com `runner = codex` e a Q2 sem aceite: `agents.orquestrador = {runner:"claude", model:<atual>}` e a resposta traz `warnings:["orquestrador_codex_pendente_q2"]` |
 | `POST /api/executores/checar` | — | `status` recalculado |
 | `POST /api/demand/executores` | `{demand, role, runner\|null, model?, acknowledge?}` | 200 · 404 demanda · 409 `demanda_encerrada` (entregue/cancelada) |
 `/api/state` acrescenta, por demanda, `executors: [{role, configured{runner,model,source}, effective:[{runner,model,
@@ -287,7 +346,9 @@ falsos** de `claude`/`codex` no `PATH` (`tests/squad/fixtures/d26/bin/`): imprim
 | CA-17 | Conversa usa o executor do Orquestrador; troca de executor abre sessão nova no próximo turno | `SQUAD_CHAT_RUNNER=fake` só para o atalho |
 | CA-18 | Tela: tabela, "Aplicar a todos", política, avisos por linha, histórico; bloco da demanda com "Diferente" | `tests/ui` + inspeção |
 | **CA-H1** (humano) | Orquestrador em `claude` (modelo Anthropic) e Arquiteto em `codex`; inicio uma demanda; o painel mostra o Arquiteto com modelo **OpenAI** e o Orquestrador com modelo **Anthropic**, sem "Diferente" | demanda de prova (abaixo) |
-| **CA-H2** (humano) | "Aplicar a todos: Codex"; a próxima demanda roda **inteira** no Codex (todas as runs `codex`, incluindo Orquestrador via `plantao.sh` e Auditor), e a demanda anterior mantém a foto | idem |
+| **CA-H2** (humano) | "Aplicar a todos: Codex"; a próxima demanda roda **inteira** no Codex (todas as runs `codex`, incluindo Orquestrador via `plantao.sh` e Auditor), e a demanda anterior mantém a foto | idem. **Depende da Q2** (Orquestrador no Codex com `danger-full-access`). Até a resposta, o CA-H2 fica **pendente**: verifica-se só a parte parcial (7 papéis em `codex`, Orquestrador em `claude`, recusa com motivo na tela) e o aceite total não é dado |
+| CA-19 | Perfis `leitura`/`auditoria` no Claude: com `CLAUDE_CONFIG_DIR` de teste contendo `permissions.allow: ["Bash"]` e `defaultMode: "bypassPermissions"`, o comando montado leva `--setting-sources project --settings tools/squad/perfis/<perfil>.json` e o atalho falso recebe só essas fontes | `--dry-run` + atalho falso |
+| CA-20 | `gate.py verify`: G2 com diff em `services/**` roda `g2-mvn-package`/`g2-saga-unit` (atalho falso de `mvn`), `fail` → parecer `pass` nesse critério recusado pelo `record`; bug: worktree temporário criado e removido, `{testCmd}` fora do regex → `validate`; comando fora de `gate_checks.json` nunca roda | repositório git temporário + atalhos falsos |
 | **CA-H3** (humano) | Com o Codex sem login (`CODEX_HOME` vazio no processo do plantão, sem mexer no login real), a demanda recebe aviso e **não quebra**: roda no padrão (`padrao`) ou fica parada com alerta B8 e retoma após "usar o padrão nesta demanda" (`parar`) | idem |
 **Prova de baixo custo para os CA-H**: uma demanda de operação "Prova D26: responder OK" sem mudança de arquivo; o
 humano a cancela depois do G1 (custo ≈ triagem + 1 ciclo do Orquestrador + 1 passo do Arquiteto + 1 do Auditor), com
@@ -310,12 +371,13 @@ os menores modelos de cada fornecedor (`haiku` no Claude; o menor modelo do Code
 ## 14. Riscos
 | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|
-| Conflito com a D24 em `server.py`/`log.py`/`index.html` | alta | médio | implementar após o merge da D24; lógica nova isolada em `executores.py` |
-| Gancho desligado/ignorado (ex.: `--dangerously-skip-permissions`, outra versão) | média | médio | detecção B9 no servidor independe do gancho (§8.8) |
+| Conflito com a D24 (PR #226) em `server.py`, `log.py`, `index.html`, `conversa.py`, `plantao.sh`, `AGENTS.md`, `Makefile` | alta | médio | implementar só após o merge da D24, a partir da `develop` nova; lógica nova isolada em `executores.py`/`gate.py` |
+| Gancho desligado/ignorado: `--dangerously-skip-permissions`, `--bare` e `--safe-mode` (desligam os hooks), outra versão | média | médio | detecção B9 no servidor independe do gancho (§8.8); formato do stdin do `PreToolUse` (`tool_input.subagent_type`/`model`) e o campo `loggedIn` confirmados no CA-8/CA-9 com a versão instalada (2.1.280) |
+| Settings do usuário ampliando o Bash dos perfis somente leitura | média | médio | `--setting-sources project` + `--settings` dedicado (§7.1, CA-19) |
 | Papel não detectado em subagente genérico | média | baixo | heurística declarada + B9 |
 | `claude auth status`/`codex login status` mudarem de formato | média | baixo | `desconhecido` não bloqueia; falha real na saída cai na §6.3 |
 | Orquestrador Codex com `danger-full-access` | — | alto | aceite explícito do humano (Q2); alternativa `escrita` declarada |
-| Auditor sem build/testes perde verificação | baixa | médio | G2/G3 exigem evidência do QA; RETURN se faltar |
+| Auditor sem build/testes perde verificação | baixa | médio | verificações bloqueantes rodadas pelo `gate.py verify` com lista fixa (§7.4); `record` recusa parecer incoerente; G3 exige evidência do QA |
 | Troca por demanda abusada para contornar a política | baixa | baixo | toda troca vira `executor-config` e aparece na demanda |
 
 ## 15. Fora do escopo
@@ -326,3 +388,14 @@ mover o arquivo para `$SQUAD_HOME` (F3), rotas `/api/p/<id>/executores` (F5).
 ## 16. Rollback
 Reverter o PR: os eventos novos ficam no log e são ignorados pelo código antigo; `executores.json` fica em `.squad/`
 sem efeito; as variáveis `SQUAD_RUNNER`/`SQUAD_CHAT_*` voltam a valer. `.claude/settings.json` sai junto (sem gancho).
+
+## 17. Ressalvas do G1-D26 e respostas padrão às perguntas
+Ressalvas: R1 → §7.3/§7.4 · R2 → §7.1 (Orquestrador) e CA-H2 · R3 → cabeçalho e §14 · R4 → §1 (`Makefile`,
+`CLAUDE.md`) · R5 → §14 · R6 → §7.1 e CA-19. Padrões adotados até o humano responder (ADR-027 §5):
+| Pergunta | Padrão | Efeito na implementação |
+|---|---|---|
+| Q1 política | `padrao` | `policy.onUnavailable = "padrao"` na criação do arquivo |
+| Q2 Orquestrador no Codex | **não habilitar** | recusa com motivo na tela/CLI; CA-H2 pendente |
+| Q3 Auditor | somente leitura **com a R1** (§7.4) | mudança em `auditor.md`/`gates.md`/`gate.py` só após a resposta; sem resposta, o Auditor fica como hoje no Claude e só no Codex usa `read-only` com aviso |
+| Q4 escopo | por máquina, trilha no log | §3.2, `executor-config` |
+| Q5 foto | configuração fixada por demanda + "Trocar só nesta demanda" | §4.1, §11.2 |
