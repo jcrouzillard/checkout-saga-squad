@@ -660,6 +660,19 @@
   .c-comp .row .hint { font-size: 12px; color: var(--dim); flex: 1 1 200px; }
   .c-comp .row .btn { height: 40px; flex-grow: 0; }
   @media (max-width: 900px) { .chat { width: 100%; } }
+  /* D18 × D17: de 600 a 900 px o cabeçalho divide a linha com o selo de ambiente → botão da conversa só com ícone
+     (o aria-label/title seguem completos), como já ocorre < 600 px; sem isso o rótulo empurra o selo sobre os contadores. */
+  /* Acima de 900 px (até 1100) o rótulo completo também empurrava o nome do projeto sobre o "Ao vivo" (visto a 920 px). */
+  @media (min-width: 600px) and (max-width: 1100px) {
+    .chat-btn { min-width: 36px; justify-content: center; padding: 0 8px; }
+    .chat-btn .cbt { display: none; }
+  }
+  /* 600–700 px: o botão da conversa soma ~44 px à linha do selo → a idade do "Ao vivo" sai (segue no status lido)
+     e as folgas do cabeçalho encolhem (a 610 px o selo ainda encostava no "Ao vivo") */
+  @media (min-width: 600px) and (max-width: 700px) { #hdr .live .age { display: none; } header#hdr { padding: 0 16px; } #hdr .gbar { column-gap: 8px; } }
+  /* ≤ 600 px o painel da conversa ocupa a tela e ficaria por cima do selo (focável, mas invisível): o selo sai
+     enquanto a conversa está aberta — o cabeçalho do painel já dá o contexto e o selo volta ao fechar. */
+  @media (max-width: 600px) { body:has(#chat:not([hidden])) #inst-c { display: none; } }
   @media (max-width: 600px) {
     .chat-btn { min-height: 44px; min-width: 44px; justify-content: center; padding: 0 8px; }
     .chat-btn .cbt { display: none; }
