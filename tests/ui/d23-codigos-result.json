@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "results": {
+    "log-reordenado": {
+      "ok": true,
+      "i7": 7,
+      "i8": 6
+    },
+    "api-state-codes-D1-D24": {
+      "ok": true,
+      "bad": []
+    },
+    "lista-todas": {
+      "ok": true,
+      "found": 26,
+      "total": 26,
+      "miss": []
+    },
+    "lista-sem-posicional": {
+      "ok": true,
+      "d7": "D7Entrega de alterações no produto",
+      "d8": "D8Avaliação e validação do Arquiteto."
+    },
+    "rotas": {
+      "ok": true,
+      "routes": {
+        "D7": {
+          "id": "349e5b1bf818",
+          "expectedId": "349e5b1bf818",
+          "h1": "Entrega de alterações no produto",
+          "ok": true
+        },
+        "D8": {
+          "id": "e31bdfb73679",
+          "expectedId": "e31bdfb73679",
+          "h1": "Avaliação e validação do Arquiteto.",
+          "ok": true
+        },
+        "D9": {
+          "id": "f2324e0f25de",
+          "expectedId": "f2324e0f25de",
+          "h1": "alinhar documentação, código e infraestrutura",
+          "ok": true
+        },
+        "D10": {
+          "id": "174084ec85d0",
+          "expectedId": "174084ec85d0",
+          "h1": "Modelo usado na demanda",
+          "ok": true
+        },
+        "D24": {
+          "id": "cf7a120591b0",
+          "expectedId": "cf7a120591b0",
+          "h1": "Atualizar e reiniciar o Squad Control automaticamente após merge (deploy local)",
+          "ok": true
+        }
+      }
+    },
+    "painel-alertas": {
+      "ok": true,
+      "links": 13,
+      "bad": []
+    },
+    "sem-erros-e-sem-post": {
+      "ok": true,
+      "errors": [],
+      "requests": []
+    }
+  },
+  "errors": [],
+  "console": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (File not found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "requests": []
+}

@@ -1,0 +1,9 @@
+# Cadastro mínimo do produto (D23 · F2a, contrato docs/contracts/f2a-resolvedor-de-produto.md §3).
+# Somente leitura para as ferramentas (tomllib); mudança = PR revisado pelo humano.
+# Tabelas do esboço do ADR-024 §3 ([repo], [git], [github], [env.*]…) são aceitas e ignoradas até a F2b.
+schema = 1
+
+[product]
+id = "checkout-saga"
+name = "Checkout Saga"
+code_prefix = "D"

@@ -6,8 +6,24 @@ mudança desses arquivos (reprodutível para auditoria). Somente stdlib.
 """
 import math
 import os
+import pathlib
 import re
+import sys
 from datetime import datetime, timezone
+
+
+def _load_product():
+    """D23 (F2a): tools/squad/product.py ao lado deste arquivo; None numa cópia isolada do script (testes antigos)."""
+    here = pathlib.Path(__file__).resolve().parent
+    if not (here / "product.py").exists():
+        return None
+    if str(here) not in sys.path:
+        sys.path.insert(0, str(here))
+    import product
+    return product
+
+
+_product = _load_product()
 
 # ---- Limites (§5.3, §9.5) — política: mudar exige atualizar o contrato.
 STALLED_S = int(os.environ.get("SQUAD_STALLED_S") or 600)   # A2: sem atividade com turno aberto
@@ -91,7 +107,10 @@ def is_low(conf) -> bool:
 
 
 def demand_codes(rows) -> dict:
-    """code(demand): D{n} pela ordem dos `task` do humano (mesma regra de demandCode do cliente)."""
+    """code(demand) — D23 (F2a §4.4): cálculo único `product.demand_codes` (congelado > gravado > posicional).
+    Sem product.py ao lado (cópia isolada do script), a regra posicional de antes."""
+    if _product is not None:
+        return _product.demand_codes(rows)
     out, n = {}, 0
     for e in rows:
         if e.get("type") == "task" and e.get("agent") == "humano" and e.get("id"):

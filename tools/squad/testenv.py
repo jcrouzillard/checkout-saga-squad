@@ -38,6 +38,19 @@ from datetime import datetime, timezone
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 DATA_ROOT = pathlib.Path(os.environ.get("SQUAD_ROOT_DATA") or ROOT).resolve()
 LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or DATA_ROOT / "docs/squad/memory/decisions.jsonl")
+def _load_product():
+    """D23 (F2a): tools/squad/product.py ao lado deste arquivo; None numa cópia isolada do script (testes antigos)."""
+    here = pathlib.Path(__file__).resolve().parent
+    if not (here / "product.py").exists():
+        return None
+    if str(here) not in sys.path:
+        sys.path.insert(0, str(here))
+    import product
+    return product
+
+
+_product = _load_product()
+
 # Lock fora do git: .squad/ é ignorado (docs/squad/memory/ é commitado pelo gitflow.snapshot_state).
 LOCK_FILE = DATA_ROOT / ".squad/test-env.lock"
 
@@ -383,6 +396,9 @@ def live_summary(v: dict) -> dict:
 
 
 def demand_codes(rows: list[dict]) -> dict:
+    """D23 (F2a §4.4): `product.demand_codes`; sem product.py ao lado (cópia isolada), a regra posicional de antes."""
+    if _product is not None:
+        return _product.demand_codes(rows)
     out, n = {}, 0
     for e in rows:
         if e.get("type") == "task" and e.get("agent") == "humano" and e.get("id"):

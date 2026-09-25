@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "product": "checkout-saga",
+  "prefix": "D",
+  "generatedAt": "2026-09-25T18:23:41+00:00",
+  "rule": "posicional do painel em 2026-09-25: n-ésimo task com agent=humano no log",
+  "source": {
+    "log": "docs/squad/memory/decisions.jsonl",
+    "lines": 701,
+    "sha256": "e0aa5ca59d4b6b0e8e3b548a37bd741b4a6c6897b6370c9a586702b266d3704e",
+    "lastTaskId": "50366913d891"
+  },
+  "codes": {
+    "13e55010e3f5": "D1",
+    "48b6ace91207": "D2",
+    "62f458c8038b": "D3",
+    "1cc732c62a2d": "D4",
+    "d91b7a8b31d9": "D5",
+    "c6f83b5bb5c7": "D6",
+    "349e5b1bf818": "D7",
+    "e31bdfb73679": "D8",
+    "f2324e0f25de": "D9",
+    "174084ec85d0": "D10",
+    "642a73cb38e5": "D11",
+    "1ac2708028fd": "D12",
+    "efe387a35d71": "D13",
+    "1e3d3c894630": "D14",
+    "518f89f27ae8": "D15",
+    "841f9a27e64a": "D16",
+    "e1d6eae16073": "D17",
+    "b72a6bd8caf3": "D18",
+    "402e76f187f9": "D19",
+    "41bdb8b49835": "D20",
+    "71b7d9bc3313": "D21",
+    "b26da7851764": "D22",
+    "6450aecde7f9": "D23",
+    "cf7a120591b0": "D24",
+    "233278d0cfa9": "D25",
+    "50366913d891": "D26"
+  },
+  "aliases": [
+    {
+      "alias": "D7",
+      "id": "e31bdfb73679",
+      "code": "D8",
+      "sources": [
+        "docs/contracts/ui-cancelar-demanda.md",
+        "tests/ui/checklist-cancelar-d7.md",
+        "feature/D7-cancelar-demanda-na-validacao",
+        "docs/squad/gates/G1-D7.json",
+        "docs/squad/gates/G2-D7.json",
+        "docs/squad/gates/G2-D7-2.json",
+        "docs/squad/gates/G3-D7.json",
+        "docs/adr/024-plataforma-multiproduto.md",
+        "docs/contracts/plataforma-multiproduto-mapa.md"
+      ]
+    },
+    {
+      "alias": "D8",
+      "id": "349e5b1bf818",
+      "code": "D7",
+      "sources": [
+        "docs/adr/011-merge-com-revisao-humana.md",
+        "docs/contracts/entrega-por-pr.md",
+        "tests/ui/checklist-entrega-por-pr-d8.md",
+        "feature/D8-entrega-por-pr-com-revisao-humana",
+        "docs/squad/gates/G1-D8.json",
+        "docs/squad/gates/G2-D8.json",
+        "docs/squad/gates/G2-D8-2.json",
+        "docs/squad/gates/G3-D8.json",
+        "docs/adr/024-plataforma-multiproduto.md",
+        "docs/contracts/plataforma-multiproduto-mapa.md"
+      ]
+    },
+    {
+      "alias": "D9",
+      "id": "174084ec85d0",
+      "code": "D10",
+      "sources": [
+        "docs/adr/012-modelo-no-log-da-squad.md",
+        "docs/contracts/ui-modelo-por-agente.md",
+        "feature/D9-modelo-usado-na-demanda",
+        "docs/squad/gates/G1-D9.json",
+        "docs/squad/gates/G2-D9.json",
+        "docs/squad/gates/G3-D9.json",
+        "docs/adr/024-plataforma-multiproduto.md",
+        "docs/contracts/plataforma-multiproduto-mapa.md"
+      ]
+    },
+    {
+      "alias": "D10",
+      "id": "f2324e0f25de",
+      "code": "D9",
+      "sources": [
+        "docs/contracts/d10-alinhamento.md",
+        "feature/D10-alinhar-documentacao-codigo-infra",
+        "docs/squad/gates/G1-D10.json",
+        "docs/squad/gates/G2-D10.json",
+        "docs/squad/gates/G3-D10.json",
+        "docs/adr/024-plataforma-multiproduto.md",
+        "docs/contracts/plataforma-multiproduto-mapa.md"
+      ]
+    }
+  ]
+}

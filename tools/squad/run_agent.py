@@ -32,11 +32,14 @@ import uuid
 from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-RUNS = ROOT / ".squad/runs"
-MAIN_LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or ROOT / "docs/squad/memory/decisions.jsonl")
 DELEGATION_PROMPT = ROOT / "docs/squad/prompts/delegacao.md"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from server import codex_header, provider_of, scan_transcript, model_fields  # noqa: E402
+import product  # noqa: E402  (D23, F2a §6: runs no data_root resolvido e caminho exato da transcrição)
+
+PRODUCT = product.resolve()
+RUNS = PRODUCT.runs_dir          # = ROOT/.squad/runs sem $SQUAD_ROOT_DATA (o mesmo RUNS_DIR do servidor)
+MAIN_LOG = PRODUCT.log           # $SQUAD_LOG > $SQUAD_ROOT_DATA > repositório
 
 ALIASES = {"opus", "sonnet", "haiku", "fable", "inherit", "default", "best", "opusplan"}
 
@@ -46,10 +49,9 @@ def is_exact_id(model: str | None) -> bool:
     return bool(model) and model.lower() not in ALIASES
 
 
-def claude_transcript(session_id: str) -> pathlib.Path:
-    base = os.environ.get("SQUAD_TRANSCRIPTS")
-    slug = re.sub(r"[^A-Za-z0-9]", "-", str(ROOT))
-    return (pathlib.Path(base) if base else pathlib.Path.home() / ".claude/projects" / slug) / f"{session_id}.jsonl"
+def claude_transcript(session_id: str, cwd: pathlib.Path = ROOT) -> pathlib.Path:
+    """D23 (F2a §6): pasta do cwd EFETIVO do filho (o worktree, com --worktree), mesma regra do servidor."""
+    return product.transcript_dir_for(cwd) / f"{session_id}.jsonl"
 
 READ_ONLY = {
     "claude": lambda prompt: ["claude", "-p", prompt, "--allowedTools", "Read", "Glob", "Grep"],
@@ -122,14 +124,15 @@ def role_model_alias(role: str) -> str | None:
     return mm.group(1) if mm else None
 
 
-def effective_model(runner: str, out_path: pathlib.Path, session_id: str | None) -> dict:
+def effective_model(runner: str, out_path: pathlib.Path, session_id: str | None,
+                    transcript: pathlib.Path | None = None) -> dict:
     """Modelo que de fato rodou: cabeçalho do codex ou transcrição do claude -p."""
     if runner == "codex" and out_path.exists():
         head = codex_header(out_path.read_text(encoding="utf-8", errors="ignore")[:20000])
         if head.get("model"):
             return {"model": head["model"], "modelProvider": provider_of(head["model"], head.get("provider"), runner)}
     if runner == "claude" and session_id:
-        f = model_fields(scan_transcript(claude_transcript(session_id))["models"], "anthropic")
+        f = model_fields(scan_transcript(transcript or claude_transcript(session_id))["models"], "anthropic")
         if f["model"]:
             return {"model": f["model"], "modelProvider": f["modelProvider"]}
     return {}
@@ -219,6 +222,7 @@ def main():
         meta["modelRequested"] = requested
     if session_id:
         meta["sessionId"] = session_id
+        meta["transcript"] = str(claude_transcript(session_id, cwd))   # D23 (F2a §6): caminho exato
     if a.delegation:
         meta["delegation"] = a.delegation
         meta["worktree"] = str(cwd)
@@ -239,7 +243,8 @@ def main():
         code = proc.wait()
     meta.update({"status": "concluído" if code == 0 else "falhou", "exitCode": code,
                  "ended": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-    meta.update(effective_model(a.runner, out_path, session_id))
+    meta.update(effective_model(a.runner, out_path, session_id,
+                                pathlib.Path(meta["transcript"]) if meta.get("transcript") else None))
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2))
     tail = out_path.read_text(encoding="utf-8", errors="ignore").strip().splitlines()[-15:]
     log(a.role, f"Finalizado via {a.runner} (código {code})", run_id, a.runner, a.demand, "\n".join(tail)[-1500:],

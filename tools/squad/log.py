@@ -21,7 +21,19 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
-LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or pathlib.Path(__file__).resolve().parents[2] / "docs/squad/memory/decisions.jsonl")
+HERE = pathlib.Path(__file__).resolve().parent
+if (HERE / "product.py").exists():   # D23 (F2a §2): caminho pelo resolvedor ($SQUAD_LOG > $SQUAD_ROOT_DATA > repositório)
+    sys.path.insert(0, str(HERE))
+    import product
+else:                                 # cópia isolada do script (testes antigos): comportamento de antes
+    product = None
+LOG = pathlib.Path(os.environ.get("SQUAD_LOG") or HERE.parents[1] / "docs/squad/memory/decisions.jsonl")
+if product is not None:
+    try:
+        LOG = product.resolve().log
+    except product.ProductError as _e:
+        print(f"log.py: {_e}", file=sys.stderr)
+        sys.exit(2)
 AGENTS = {"humano", "orquestrador", "arquiteto", "backend", "devops", "observabilidade", "qa", "auditor", "frontend"}
 TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "human", "evidence", "start", "control", "progress", "validation", "clarification", "edit", "review", "delivered", "review-rejected",
          # D15 (ADR-018): ambiente de teste e produtivo — gravados por tools/squad/testenv.py e prod.py
@@ -150,6 +162,18 @@ def main() -> None:
         "mergeable": a.mergeable,
     }
     entry = {k: v for k, v in entry.items() if v not in (None, [], "")}
+    if a.agent == "humano" and a.type == "task" and product is not None:
+        # D23 (F2a §4.2): demanda nova nasce com `code`/`code_prefix`, sob trava entre processos (codes.lock)
+        try:
+            entry = product.append_task(entry, product.resolve().with_log(LOG))
+        except product.LockTimeout as e:
+            print(f"log.py: {e}", file=sys.stderr)
+            sys.exit(1)
+        except product.ProductError as e:
+            print(f"log.py: {e}", file=sys.stderr)
+            sys.exit(2)
+        print(f"logged {entry['id']} {a.agent}:{a.type} {a.title} [{entry['code']}]")
+        return
     LOG.parent.mkdir(parents=True, exist_ok=True)
     with LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
