@@ -5,7 +5,12 @@
 > Respostas do humano (cartão da D23): **Q2** — numeração `D` global (D23, D24…) até a F5; a partir da F5 o produto
 > `squad-platform` usa `P` (P1…); o checkout continua em `D`; **D1–D23 congeladas como aparecem hoje no painel**.
 > **Q3** — D1–D21 inteiras na memória do checkout, sem dividir, visíveis como somente leitura na plataforma (F5).
-> D12 já foi integrada: não há branch em voo a registrar pela regra do §4.11.
+> **Branch em voo (§4.11)**: a **D24** (`cf7a120591b0`, `feature/D24-publicar-squad-control`, worktree `plankton-d24`)
+> está em andamento e mexe em `server.py`/`index.html`. Decisão do Orquestrador (log `31400c3b82d1`): quem for
+> integrada por último traz a `develop` e resolve os conflitos (como D18/D19/D20); o humano pode escolher outra ordem no PR.
+>
+> **Congelamento (ressalva do G1)**: a D24 já existe no log, portanto a tabela congela **D1–D24**; a primeira demanda
+> nova depois da F2a é a **D25**.
 >
 > **Regra de ouro da fase**: quem não informa produto (`--product`/`SQUAD_PRODUCT`) vê **exatamente** o comportamento de
 > hoje — mesmos caminhos, mesmos códigos, mesma saída. Nada é movido. Contratos de domínio (`events.md`, `api.md`) não mudam.
@@ -16,12 +21,12 @@
 |---|---|---|
 | **Orquestrador** | `tools/squad/product.py` (novo) | resolvedor (§2), códigos (§4), transcrições (§6), CLI `freeze-codes`/`codes` (§4.5) |
 | **Orquestrador** | `docs/squad/products/checkout-saga/product.toml` (novo) | cadastro mínimo (§3) |
-| **Orquestrador** | `docs/squad/products/checkout-saga/codes.json` (novo) | tabela congelada D1–D23 + apelidos (§4.3) |
+| **Orquestrador** | `docs/squad/products/checkout-saga/codes.json` (novo) | tabela congelada D1–D24 + apelidos (§4.3) |
 | **Orquestrador** | `tools/squad/{gitflow,github_sync,triage}.py` | caminhos pelo resolvedor (§5); `gitflow` usa o código congelado e valida `feature-start` (§5.1) |
 | **Orquestrador** | `tools/squad/{alerts,testenv,pending,conversa}.py` | cálculo de código substituído por `product.demand_codes` (§4.4); assinaturas públicas mantidas |
 | **Orquestrador** | `tools/squad/server.py`, `tools/squad/log.py` | gravação de `code` no `task` (§4.2); `codes` no `/api/state`; transcrições (§6) |
 | **Orquestrador** | `tools/squad/run_agent.py` | runs em `runs_dir` resolvido e caminho exato da transcrição no metadado (§6) |
-| **Frontend** | `squad-control/index.html` (só `demandCode` e `findDemand`) | usar o código do servidor (§4.6); nenhuma mudança visual |
+| **Frontend** | `squad-control/index.html` (só `demandCode`, `findDemand` e `demandInfo`) | usar o código do servidor (§4.6); nenhuma mudança visual |
 | **QA** | `tests/squad/test_produto_f2a.py` (novo), `tests/squad/fixtures/f2a/**` | critérios do §8 |
 | **Arquiteto** | este contrato, errata do ADR-024 §11 | — |
 
@@ -97,13 +102,13 @@ code_prefix = "D"             # obrigatório; ^[A-Z]$ (Q2: checkout = D; squad-p
 ## 4. Códigos de demanda congelados
 
 ### 4.1 Formato
-- `code` = `code_prefix` + número decimal sem zero à esquerda: `^[A-Z][1-9][0-9]*$` (ex.: `D24`).
+- `code` = `code_prefix` + número decimal sem zero à esquerda: `^[A-Z][1-9][0-9]*$` (ex.: `D25`).
 - O **id** do `task` continua sendo a chave canônica; o código é rótulo estável. Um código nunca é reutilizado
   (demanda cancelada mantém o seu).
 - Numeração por prefixo: `D` conta só códigos `D`. O `P` (F5) começa em `P1` e não interfere na sequência `D`.
 
 ### 4.2 Gravação em demandas novas (quem grava e como evitar corrida)
-- Todo `task` com `agent = "humano"` passa a sair com dois campos a mais: `"code": "D24", "code_prefix": "D"`.
+- Todo `task` com `agent = "humano"` passa a sair com dois campos a mais: `"code": "D25", "code_prefix": "D"`.
 - **Únicos gravadores**: `server.py` (`POST /api/demand`, os dois caminhos — demanda comum e bug, `server.py:1535` e
   `:1882`) e `log.py --agent humano --type task`. Os dois chamam `product.append_task(entry)`; nenhum outro código
   grava `task` do humano. `task` de outros agentes (hoje 66 do orquestrador) não recebe código.
@@ -127,8 +132,8 @@ ADR-024 §11, E2). Na F3 ela vai para `mem:codes.json` sem mudar de formato.
   "prefix": "D",
   "generatedAt": "2026-09-25T…+00:00",
   "rule": "posicional do painel em 2026-09-25: n-ésimo task com agent=humano no log",
-  "source": {"log": "docs/squad/memory/decisions.jsonl", "lines": 652, "sha256": "…", "lastTaskId": "6450aecde7f9"},
-  "codes": {"13e55010e3f5": "D1", "…": "…", "6450aecde7f9": "D23"},
+  "source": {"log": "docs/squad/memory/decisions.jsonl", "lines": 652, "sha256": "…", "lastTaskId": "cf7a120591b0"},
+  "codes": {"13e55010e3f5": "D1", "…": "…", "6450aecde7f9": "D23", "cf7a120591b0": "D24"},
   "aliases": [
     {"alias": "D7",  "id": "e31bdfb73679", "code": "D8",  "sources": ["…"]},
     {"alias": "D8",  "id": "349e5b1bf818", "code": "D7",  "sources": ["…"]},
@@ -150,15 +155,15 @@ refaz e o teste compara — CA-3):
 | D5 | `d91b7a8b31d9` | D13 | `efe387a35d71` | D21 | `71b7d9bc3313` |
 | D6 | `c6f83b5bb5c7` | D14 | `1e3d3c894630` | D22 | `b26da7851764` |
 | D7 | `349e5b1bf818` | D15 | `518f89f27ae8` | D23 | `6450aecde7f9` |
-| D8 | `e31bdfb73679` | D16 | `841f9a27e64a` | | |
+| D8 | `e31bdfb73679` | D16 | `841f9a27e64a` | D24 | `cf7a120591b0` |
 
 **Divergências (lista exata → `aliases`)**. Só estes 4 ids têm código citado diferente do painel; o levantamento varreu
-`docs/adr`, `docs/contracts`, `docs/architecture`, `docs/squad/**/*.md`, nomes de branch e de parecer:
+`docs/adr`, `docs/contracts`, `docs/architecture`, `docs/squad/**/*.md`, `tests/**/*.md`, nomes de branch e de parecer:
 
 | id | Painel (congelado) | Citado como | Onde (`sources`) |
 |---|---|---|---|
-| `e31bdfb73679` (cancelar demanda na validação) | **D8** | D7 | `docs/contracts/ui-cancelar-demanda.md`; branch `feature/D7-cancelar-demanda-na-validacao`; `docs/squad/gates/G1-D7.json`, `G2-D7.json`, `G2-D7-2.json`, `G3-D7.json`; ADR-024 §1 e mapa B14 (como exemplo) |
-| `349e5b1bf818` (entrega por PR) | **D7** | D8 | `docs/adr/011-merge-com-revisao-humana.md`; `docs/contracts/entrega-por-pr.md`; branch `feature/D8-entrega-por-pr-com-revisao-humana`; `G1-D8.json`, `G2-D8.json`, `G2-D8-2.json`, `G3-D8.json`; ADR-024 §1, mapa B14 |
+| `e31bdfb73679` (cancelar demanda na validação) | **D8** | D7 | `docs/contracts/ui-cancelar-demanda.md`; `tests/ui/checklist-cancelar-d7.md`; branch `feature/D7-cancelar-demanda-na-validacao`; `docs/squad/gates/G1-D7.json`, `G2-D7.json`, `G2-D7-2.json`, `G3-D7.json`; ADR-024 §1 e mapa B14 (como exemplo) |
+| `349e5b1bf818` (entrega por PR) | **D7** | D8 | `docs/adr/011-merge-com-revisao-humana.md`; `docs/contracts/entrega-por-pr.md`; `tests/ui/checklist-entrega-por-pr-d8.md`; branch `feature/D8-entrega-por-pr-com-revisao-humana`; `G1-D8.json`, `G2-D8.json`, `G2-D8-2.json`, `G3-D8.json`; ADR-024 §1, mapa B14 |
 | `174084ec85d0` (modelo usado na demanda) | **D10** | D9 | `docs/adr/012-modelo-no-log-da-squad.md`; `docs/contracts/ui-modelo-por-agente.md`; branch `feature/D9-modelo-usado-na-demanda`; `G1-D9.json`, `G2-D9.json`, `G3-D9.json`; ADR-024 §1, mapa B14 |
 | `f2324e0f25de` (alinhar documentação/código/infra) | **D9** | D10 | `docs/contracts/d10-alinhamento.md`; branch `feature/D10-alinhar-documentacao-codigo-infra`; `G1-D10.json`, `G2-D10.json`, `G3-D10.json`; ADR-024 §1, mapa B14 |
 
@@ -174,8 +179,9 @@ exatamente o que o `code` gravado no evento elimina daqui para frente.
   arquivo de parecer, branch ou documento antigo é renomeado.
 
 ### 4.4 Cálculo único — `product.demand_codes(rows, p)`
-Substitui os 6 cálculos posicionais (`alerts.py:93`, `gitflow.py:415`, `pending.py:33`, `testenv.py:385`,
-`conversa.py` via `rules.codes`, `index.html:2790`). Determinístico, só leitura:
+Substitui os 7 cálculos posicionais (`alerts.py:93`, `gitflow.py:415`, `pending.py:33`, `testenv.py:385`,
+`conversa.py` via `rules.codes`, `index.html:2790` `demandCode`, `index.html:1919` `demandInfo` — `D${index + 1}`,
+que alimenta `info.code`: lista, rotas `#/demandas/<código>`, alertas e `teFor`). Determinístico, só leitura:
 
 ```
 frozen = codes.json["codes"] (se o arquivo existe e prefix == p.code_prefix), senão {}
@@ -190,29 +196,31 @@ para t em tasks:
 ```
 - Consequência 1 (paridade): no log real de hoje, todo `task` do humano está em `frozen` → códigos idênticos ao painel.
 - Consequência 2 (logs sintéticos de `tests/squad`): nenhum id do congelado aparece → o laço dá D1, D2… exatamente
-  como hoje (a tabela só vale para ids presentes; nada "começa em D24" num log de teste).
+  como hoje (a tabela só vale para ids presentes; nada "começa em D25" num log de teste).
 - Consequência 3 (lacuna): `task` gravado entre a geração da tabela e o deploy do novo servidor, sem `code`, recebe o
   próximo posicional — o mesmo número que o painel de hoje mostraria.
 - Conflito (dois ids com o mesmo `code` gravado — só por edição manual): o primeiro no log fica; `product.py codes
   --check` sai 1 e lista. O servidor não cai.
 
 ### 4.5 Geração e verificação (CLI)
-- `python3 tools/squad/product.py freeze-codes --until 6450aecde7f9 [--log <arq>] --out <arq>`: aplica a regra
+- `python3 tools/squad/product.py freeze-codes --until cf7a120591b0 [--log <arq>] --out <arq>`: aplica a regra
   posicional atual (idêntica a `alerts.demand_codes` de `develop`) aos `task` até o id dado, inclusive; preenche
   `source` (linhas, sha256) e os `aliases` da tabela acima. **Só lê o log**; escreve apenas `--out`.
 - `python3 tools/squad/product.py codes [--check] [--json]`: imprime id → código resolvido e apelidos; `--check` falha
   em conflito, em id do congelado ausente do log e em divergência com a regra posicional para ids do congelado.
-- **Momento da geração**: no worktree da D23, sobre uma **cópia** do log da cópia principal; repetida pelo
-  Orquestrador imediatamente antes do `feature-finish` se entrou `task` novo depois (a lacuna da consequência 3 fica
-  coberta; a tabela da D23 termina em `6450aecde7f9` salvo se houver D24+ nessa janela — nesse caso `--until` vai até o
-  último `task` existente, e o PR diz isso).
+- **Momento da geração** (resposta-padrão do Auditor, G1): no worktree da D23, sobre uma **cópia** do log da cópia
+  principal (`freeze-codes` só lê o log); **regenerada pelo Orquestrador imediatamente antes do `feature-finish`** com
+  `--until` no último `task` do humano existente nesse momento. Hoje é `cf7a120591b0` (D24); se entrar D25+ na janela,
+  a tabela vai até ele. O PR informa o `lastTaskId` usado.
 
 ### 4.6 Painel (Frontend) e API
 - `GET /api/state` ganha `codes: {id: código}` (todas as demandas) e cada `task` do humano em `log` sai com `code`
   resolvido (acréscimo na resposta, como o `enrich_log`; o log em disco não muda). `GET /api/live` **não muda** de
   chaves (test_alertas_d14).
 - `index.html`: `demandCode(id)` = `state.codes?.[id]` → `task.code` → posicional (só com servidor antigo);
-  `findDemand(code)` usa o mesmo mapa. Nenhuma mudança visual; apelidos não aparecem na UI nesta fase.
+  `findDemand(code)` e `demandInfo` (`info.code`, hoje `D${index + 1}`) usam o mesmo mapa. Nenhuma mudança visual.
+- **Apelidos no painel** (resposta-padrão do Auditor, G1): **não** nesta fase (§7). A UI mostra só o código congelado;
+  `resolve_code` com `source` vale para conversa/`gitflow`/sino quando houver contexto; exibir apelidos fica para a F5.
 
 ## 5. Scripts que passam a respeitar o log configurado
 
@@ -253,7 +261,7 @@ servidor o do `DATA_ROOT` (errado quando os dados vêm de outra cópia).
 - `server.py`: para runs com `transcript`, usa-o; com só `sessionId` (runs antigas), procura `<sessionId>.jsonl` em
   `transcript_dirs()`. `collect_runs` e `enrich_log` varrem `transcript_dirs()`.
 - `transcript_dirs(p)` = `[$SQUAD_TRANSCRIPTS]` se definido (exclusivo, como hoje); senão, sem repetição e só as que
-  existem: slug de `data_root`, de `repo_root`, da cópia principal (`testenv.find_main_root`) e de cada worktree de
+  existem (resposta-padrão do Auditor, G1: varrer todos os worktrees): slug de `data_root`, de `repo_root`, da cópia principal (`testenv.find_main_root`) e de cada worktree de
   `git -C <cópia principal> worktree list --porcelain`. A lista é guardada em cache por 30 s (orçamento do `/api/live`,
   ADR-017). Worktrees removidos saem da varredura; suas runs continuam achadas pelo `transcript` gravado.
 
@@ -278,14 +286,14 @@ Mapa com o ADR-024 §6: (a) = CA-3…CA-6; (b) = CA-7…CA-9; (c) = CA-10…CA-1
   principal para um diretório temporário (só leitura na origem; sha256 da origem igual antes/depois) e compara
   `alerts.demand_codes` **da `develop`** (`git show origin/develop:tools/squad/alerts.py`, importado de arquivo
   temporário) com `product.demand_codes` novo: mapas **idênticos** para todos os `task` do humano; em particular
-  D1–D23 = tabela do §4.3.
+  D1–D24 = tabela do §4.3.
 - **CA-4 Imunidade à reordenação**: na cópia temporária, trocar de posição as linhas dos `task` D7 e D8 → o cálculo
   antigo troca os códigos, o novo não (congelado).
 - **CA-5 Apelidos**: para cada linha da tabela de divergências e cada `source`, `resolve_code(alias, rows, source=…)`
   = id da linha; `resolve_code(alias, rows)` sem `source` = id do código congelado; `product.py codes --check` sai 0
   sobre a cópia do log real.
 - **CA-6 Demandas novas**: em log temporário com a tabela real, `POST /api/demand` (servidor em porta livre com
-  `SQUAD_ROOT_DATA`/`SQUAD_LOG` temporários) grava `code="D24"`, `code_prefix="D"`; um segundo grava `D25`;
+  `SQUAD_ROOT_DATA`/`SQUAD_LOG` temporários) grava `code="D25"`, `code_prefix="D"`; um segundo grava `D26`;
   `log.py --agent humano --type task` grava o seguinte. **Corrida**: 20 gravações concorrentes (10 processos `log.py` +
   10 `POST`) produzem 20 códigos distintos e consecutivos; `append_task` com `code` já preenchido é recusado.
   Log sintético sem ids congelados: primeiro `task` = `D1`.
@@ -305,7 +313,7 @@ Mapa com o ADR-024 §6: (a) = CA-3…CA-6; (b) = CA-7…CA-9; (c) = CA-10…CA-1
   worktree registrado são varridas por `collect_runs`/`enrich_log`.
 - **CA-12 `SQUAD_TRANSCRIPTS`** continua exclusivo: definido, só essa pasta é lida (testes existentes intactos).
 - **CA-13 Painel**: `/api/state.codes` presente e igual a `product.demand_codes`; `/api/live` com o mesmo conjunto de
-  chaves de hoje; `index.html` mostra D1–D23 iguais aos de hoje (verificação visual em 1440 no painel com o log real
+  chaves de hoje; `index.html` mostra D1–D24 iguais aos de hoje (lista, rota `#/demandas/<código>` e alertas, via `demandInfo`) (verificação visual em 1440 no painel com o log real
   copiado) e usa `state.codes`.
 - **CA-14 `tests/squad` verde**: todos os arquivos `tests/squad/test_*.py` passam, inclusive os que usam logs sintéticos
   com códigos posicionais (D14, D15, D19).
@@ -318,8 +326,9 @@ Mapa com o ADR-024 §6: (a) = CA-3…CA-6; (b) = CA-7…CA-9; (c) = CA-10…CA-1
 | Colisão do apelido com o código congelado (`D7`) confundir humano/conversa | código sem contexto = sempre o congelado; apelido só com `source` (§4.3) |
 | Varredura de várias pastas de transcrição estourar os 300 ms do `/api/live` | cache de 30 s da lista; só pastas existentes; runs novas com caminho exato (§6) |
 | `flock` indisponível (FS de rede) | host é macOS/Linux local; falha da trava = erro explícito, nada gravado |
+| Conflito com a D24 em voo (`server.py`/`index.html`) | quem integrar por último traz a `develop` e resolve (decisão `31400c3b82d1`) |
 | Worktrees em voo rodando ferramentas antigas gravam `task` sem `code` | cálculo de lacuna cobre; só a cópia principal grava `task` (servidor 7070) |
-| Branch histórica `feature/P1-portabilidade-entre-fornecedores` (PR #32) usa `P1` | não é demanda do log; o prefixo `P` só nasce na F5, que deve evitar nome de branch já existente (o `gitflow` já recusa branch existente) |
+| Branch histórica `feature/P1-portabilidade-entre-fornecedores` (PR #32) usa `P1` | não afeta a F2a (não é demanda do log). **Restrição da F5** (resposta-padrão do Auditor, G1): a sequência `P` pula códigos que já são nome de branch (começa em `P2` ou reserva `P1` na tabela do `squad-platform`); o `gitflow` já recusa branch existente |
 
 ## 10. Rollback
 Reverter o PR: `code`/`code_prefix` gravados nesse meio-tempo são campos a mais, ignorados pelo código antigo; os

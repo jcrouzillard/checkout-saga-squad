@@ -470,7 +470,7 @@ como somente leitura na plataforma (§4.4.6 confirmado).
   do `gitflow.py`: descartada do worktree e proibida no PR pelo G3). Fica em
   `docs/squad/products/checkout-saga/codes.json`, como configuração imutável revisada no PR; na F3 vai para
   `mem:codes.json` sem mudar de formato. (Afeta §3, §4.4.1 e mapa B14.)
-- **E3 — alcance do congelamento.** Pela resposta à Q2, o congelamento cobre **D1–D23** (o §6, F2a (a), dizia D1–D22).
+- **E3 — alcance do congelamento.** Pela resposta à Q2, o congelamento cobre **D1–D23** (o §6, F2a (a), dizia D1–D22); ressalva do G1: como a D24 (`cf7a120591b0`) já existe no log, a tabela congela **D1–D24** e a primeira demanda nova é a D25 (regenerada antes do `feature-finish` até o último `task` existente — contrato F2a §4.5).
 - **E4 — semântica dos apelidos.** O apelido `D7` (citado para `e31bdfb73679`) colide com o código congelado `D7`
   (`349e5b1bf818`). "Continuar resolvendo" (§4.4.1) passa a significar: **no contexto do documento/branch/parecer que o
   cita**; um código sem contexto resolve sempre para o congelado.
