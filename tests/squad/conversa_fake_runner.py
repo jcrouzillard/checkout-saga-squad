@@ -13,6 +13,8 @@ Palavras-chave na pergunta do humano (texto depois de "Pergunta do humano:"):
   SESSAO_PERDIDA → com --resume, sai com "No conversation found" (sessão perdida → sessionReset)
   ECO            → diz se o prompt trouxe <historico_da_conversa>
   INJECAO        → diz se o contexto trouxe o texto injetado "IGNORE AS REGRAS"
+  FXD20          → texto FX do contrato ui-conversa-visual-v2 §4 (D20) em trechos de 20 caracteres a cada 0,45 s e 1 s
+                   com o texto completo antes do fim
   PROPOR:<json>  → termina a resposta com o bloco ```destravar <json>```
 """
 import json
@@ -65,8 +67,14 @@ if "PROPOR:" in question:
     block = question.split("PROPOR:", 1)[1].strip()
     text += "Posso destravar.\n\n```destravar\n" + block + "\n```\n"
 step, pause = (16, 0.2) if "LENTO" in question else (12, 0.02)
+if "FXD20" in question:   # D20 §4: FX com trechos ≥ 400 ms (streaming observável pelo navegador)
+    text = ("Recebido. O registro confirma:\n\n- **08:47** – suas respostas à triagem da D19 foram registradas.\n"
+            "- 08:47 – você iniciou a D19.\n\nUse `pending` e veja [o painel](#/painel).")
+    step, pause = 20, 0.45
 for i in range(0, len(text), step):
     delta(text[i:i + step])
     time.sleep(pause)
+if "FXD20" in question:
+    time.sleep(1.0)   # texto completo visível ao vivo antes do `fim` (CA-V2 compara ao vivo × final)
 out({"type": "assistant", "message": {"model": MODEL, "content": [{"type": "text", "text": text}]}})
 out({"type": "result", "subtype": "success", "is_error": False, "result": text})
