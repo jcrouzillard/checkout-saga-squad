@@ -855,6 +855,56 @@
     .pub-item .pub-ic { line-height: 44px; } .pub-item .pub-t { padding-block: 12px; }
     .pub-dlg .pub-dacts { flex-direction: column-reverse; align-items: stretch; } .pub-dlg button { min-height: 44px; }
   }
+  /* D26 (contrato executor-e-modelo-por-agente §11): tela Executores e bloco da demanda. */
+  .ex-in { min-height: 36px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 2px; font: inherit; font-size: 13px; background: var(--surface); color: var(--text); max-width: 100%; }
+  .ex-in:disabled { background: var(--raised); color: var(--muted); }
+  .ex-in[aria-invalid="true"] { border-color: var(--danger); }
+  .ex-in:focus-visible, .ex-pol input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .ex-tbl, .ex-dtbl, .ex-hist { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ex-tbl th, .ex-tbl td, .ex-dtbl th, .ex-dtbl td, .ex-hist th, .ex-hist td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+  .ex-tbl thead th, .ex-dtbl thead th, .ex-hist thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .ex-tbl tbody th { font-weight: 500; white-space: nowrap; }
+  .ex-tbl select.ex-in { width: 100%; min-width: 150px; } .ex-tbl input.ex-in { width: 100%; min-width: 150px; }
+  .ex-tbl tr.ex-squad th, .ex-tbl tr.ex-squad td { background: var(--accent-soft); }
+  .ex-tbl tr.ex-hasw th, .ex-tbl tr.ex-hasw td { border-bottom: 0; }
+  .ex-tbl .ex-wrow td { padding: 0 0 8px; } .ex-tbl .ex-wrow td:empty { display: none; }
+  .ex-res { font-size: 12px; white-space: normal; }
+  .ex-note { margin: 2px 0; font-size: 12.5px; } .ex-note.warn { color: var(--warn); } .ex-note.danger { color: var(--danger); } .ex-note.muted { color: var(--muted); }
+  .ex-st.ok { color: var(--ok); } .ex-st.warn { color: var(--warn); font-weight: 500; } .ex-st.danger { color: var(--danger); font-weight: 500; }
+  .ex-machine { margin-top: 16px; } .ex-machine h2 { font-size: 14px; margin: 0 0 6px; }
+  .ex-mlist { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 13px; }
+  .ex-pol { border: 1px solid var(--line); border-radius: 2px; margin: 16px 0 0; padding: 8px 14px 10px; font-size: 13px; }
+  .ex-pol legend { font-weight: 600; padding: 0 4px; }
+  .ex-pol label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin-right: 20px; cursor: pointer; }
+  .ex-pol input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .ex-actions .btn.primary, .ex-ack .btn.primary, .ex-confirm .btn.primary, .ex-allrow .btn { flex-grow: 0; }
+  .ex-ag { display: inline-flex; align-items: center; gap: 8px; }
+  .ex-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ex-msg { font-size: 13px; margin: 10px 0 0; } .ex-msg.ok { color: var(--ok); } .ex-msg.err { color: var(--danger); } .ex-msg.warn { color: var(--warn); }
+  .ex-ack, .ex-confirm { margin-top: 12px; padding: 10px 14px; border-left: 3px solid var(--warn); background: var(--warn-soft); font-size: 13px; }
+  .ex-confirm { border-left-color: var(--accent); background: var(--accent-soft); }
+  .ex-ack p, .ex-confirm p { margin: 0 0 6px; }
+  .ex-ack .actions, .ex-confirm .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .ex-allrow { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; margin-top: 8px; font-size: 13px; }
+  .ex-allrow label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+  .ex-allrow input.ex-in { min-width: 220px; }
+  .ex-eff { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 0 8px 2px 0; }
+  .ex-diff { display: inline-block; font-weight: 600; font-size: 12px; color: var(--warn); border: 1px solid var(--warn); background: var(--warn-soft); padding: 0 6px; white-space: nowrap; }
+  .ex-why { font-size: 12px; color: var(--muted); display: block; margin-top: 2px; }
+  .ex-dtbl tr.ex-isdiff th, .ex-dtbl tr.ex-isdiff td { background: var(--warn-soft); }
+  .ex-almsg { font-size: 12px; } .ex-almsg.ok { color: var(--ok); } .ex-almsg.err { color: var(--danger); }
+  #sec-executores .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  @media (max-width: 760px) {
+    .ex-tbl thead, .ex-dtbl thead, .ex-hist thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .ex-tbl, .ex-tbl tbody, .ex-tbl tr, .ex-tbl th, .ex-tbl td, .ex-dtbl, .ex-dtbl tbody, .ex-dtbl tr, .ex-dtbl th, .ex-dtbl td, .ex-hist, .ex-hist tbody, .ex-hist tr, .ex-hist td { display: block; width: 100%; }
+    .ex-tbl tr, .ex-dtbl tr, .ex-hist tr { border-bottom: 1px solid var(--line); padding: 6px 0; }
+    .ex-tbl tr.ex-hasw { border-bottom: 0; }
+    .ex-tbl th, .ex-tbl td, .ex-dtbl th, .ex-dtbl td, .ex-hist td { border: 0; padding: 3px 0; white-space: normal; }
+    .ex-tbl td[data-l]::before, .ex-dtbl td[data-l]::before, .ex-hist td[data-l]::before { content: attr(data-l); display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+    .ex-tbl .ex-wrow td { padding-bottom: 6px; }
+    .ex-tbl tr.ex-squad { background: var(--accent-soft); padding: 6px 8px; }
+    .ex-allrow label, .ex-allrow input.ex-in, .ex-allrow select.ex-in, .ex-allrow .btn { width: 100%; min-width: 0; }
+  }
 </style>
 </head>
 <body>
@@ -1367,6 +1417,7 @@ const seenAlerts = { get() { try { return new Set(JSON.parse(localStorage.getIte
   add(id) { try { const s = this.get(); s.add(id); localStorage.setItem("sc-seen-alerts", JSON.stringify([...s].slice(-300))); } catch (e) {} } };
 function alertActionHtml(a, cls = "btn xs") {
   { const dg = delegAlertActionHtml(a, cls); if (dg != null) return dg; }   // D19: B6/A6/A7/A2 delegáveis
+  { const ex = exAlertActionHtml(a, cls); if (ex != null) return ex; }      // D26: B8/B9/fallback de executor
   const dis = isStale() && a.owner === "humano" ? ` aria-disabled="true" title="Sem dados atuais — reconectando"` : "";
   const code = alertCode(a);
   if (a.action?.external) return `${extLink(a.action.external, esc(a.action.label || "Abrir"), cls + " primary")}${code ? `<a class="${cls}" href="#/demandas/${code}">Ver ${esc(code)}</a>` : ""}`;
@@ -1375,7 +1426,7 @@ function alertActionHtml(a, cls = "btn xs") {
 function alertItemHtml(a, seen) {
   const code = alertCode(a), info = code ? findDemand(code) : null;
   const isSeen = a.severity === "aviso" && seen.has(a.id);
-  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${info?.bug ? bugTag() : ""}${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : /^prod/.test(a.kind || "") ? "Produtivo local" : /^test-env/.test(a.kind || "") ? "Ambiente de teste" : "Squad"}</b>`;
+  const where = code ? `<a class="ttl" href="#/demandas/${code}"><span class="code">${esc(code)}</span>${info?.bug ? bugTag() : ""}${esc(info?.eff.title || "")}</a>` : `<b>${a.gate ? "Squad base" : a.kind === "pr-waiting" ? "Release" : /^prod/.test(a.kind || "") ? "Produtivo local" : /^test-env/.test(a.kind || "") ? "Ambiente de teste" : /^executor/.test(a.kind || "") ? "Executores" : "Squad"}</b>`;
   const auditHref = `#/auditoria/alertas?${new URLSearchParams(Object.entries({ demanda: code || "", tipo: a.kind || "" }).filter(([, v]) => v))}`;
   return `<li class="${esc(a.severity)} ${isSeen ? "seen" : ""}" data-alert="${esc(a.id)}"><div class="t">${sevHtml(a.severity)} ${where}
       <div><b>${esc(a.title || "")}</b></div>
@@ -1859,7 +1910,7 @@ function renderDemanda(ref) {
   ${stepperHtml(info)}
   ${alertsFor(id).length ? `<div class="dem-alerts" role="region" aria-label="Bloqueios e avisos da ${esc(code)}"><ul class="alist">${alertsFor(id).map(x => alertItemHtml(x, seenAlerts.get())).join("")}</ul></div>` : ""}
   ${next}
-  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${delegToc(info, info.bug ? [["bug", "Bug"], ...SECTIONS] : SECTIONS).map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
+  <nav class="toc" aria-label="Seções da demanda" style="position:sticky;top:calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px));z-index:4">${exToc(info, delegToc(info, info.bug ? [["bug", "Bug"], ...SECTIONS] : SECTIONS)).map(([k, t]) => `<a href="#/demandas/${code}/${k}" ${sec === k ? `aria-current="location"` : ""}>${t}</a>`).join("")}</nav>
   ${info.bug ? bugSectionHtml(info) : ""}
   ${delegSectionHtml(info)}
   <section class="dsec" id="sec-execucao" aria-labelledby="h-execucao"><h2 id="h-execucao" tabindex="-1">Execução</h2>
@@ -1867,6 +1918,7 @@ function renderDemanda(ref) {
     ${involved.length ? `<div class="mrow" style="margin:10px 0 0"><span class="lbl">Agentes envolvidos:</span></div><div class="squad" style="margin-bottom:12px">${involved.filter(ag => ROLES.includes(ag)).map(ag => agentCard(agentOf(ag))).join("")}</div>` : ""}
     ${pipe.length ? timelineHtml(pipe) : `<p class="muted">Sem passos de execução ainda.</p>`}
   </section>
+  ${exDemandSectionHtml(info)}
   <section class="dsec" id="sec-gates" aria-labelledby="h-gates"><h2 id="h-gates" tabindex="-1">Gates</h2>
     ${a?.order === 1 ? `<p class="warn-msg" style="font-size:13px">A decisão de ${esc(a.g.gate)} está em <a href="#/demandas/${code}">Próxima ação</a>, no topo da página.</p>` : ""}
     ${gatesHtml}${optionalDecision}
@@ -2511,7 +2563,7 @@ function renderSquad() {
   routeTitle = "Squad";
   const ags = agentsNow(), working = ags.filter(a => a.state === "trabalhando").length;
   const waits = ags.filter(a => a.waiting).sort((a, b) => String(a.waiting.since || "").localeCompare(String(b.waiting.since || "")));
-  return `<div class="page-head"><div><h1 tabindex="-1">Squad</h1><div class="sub">O que cada integrante está fazendo agora e se espera alguém — lido ao vivo das sessões. ${working} trabalhando.</div></div></div>
+  return `<div class="page-head"><div><h1 tabindex="-1">Squad</h1><div class="sub">O que cada integrante está fazendo agora e se espera alguém — lido ao vivo das sessões. ${working} trabalhando.</div></div><a class="btn sm" href="#/squad/executores">Executores e modelos</a></div>
   <div class="agents-grid">${ags.map(ag => `<section aria-label="${esc(AGENTS[ag.agent]?.label || ag.agent)}">${agentCard(ag)}</section>`).join("")}</div>
   <section class="dsec" aria-labelledby="h-esperas"><h2 id="h-esperas">Esperas <span class="squad-sum">(${waits.length})</span></h2>
     ${waits.length ? `<div class="tbl" style="margin-top:0"><table class="waits"><thead><tr><th>Quem espera</th><th>Por quem</th><th>O quê</th><th>Desde</th><th></th></tr></thead><tbody>
@@ -2763,7 +2815,7 @@ async function render() {
   updateCounts();
   const v = route.view;
   const html = v === "demandas" ? (route.parts[0] === "nova" ? renderNova : route.parts[0] === "bug" ? renderBug : route.parts[0] ? () => renderDemanda(route.parts[0]) : renderDemandas)
-    : v === "squad" ? renderSquad : v === "auditoria" ? renderAuditoria : v === "produto" ? renderProduto : renderPainel;
+    : v === "squad" ? (route.parts[0] === "executores" ? renderExecutores : renderSquad) : v === "auditoria" ? renderAuditoria : v === "produto" ? renderProduto : renderPainel;
   // Campos com data-keep sobrevivem ao redesenho do polling; o rascunho de Nova demanda (dem-*) sobrevive também à troca de tela.
   const sameRoute = !pendingFocus;
   for (const id of Object.keys(keepStore)) if (!id.startsWith("dem-")) delete keepStore[id];
@@ -2861,6 +2913,7 @@ function classify(e) {
     ? N({ title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), href: dem("validacao") || "#/demandas" })
     : N({ title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", href: dem() || "#/demandas" });
   if (e.type.startsWith("squad-")) return pubClassify(e, N);   // D24: eventos do publicador
+  if (e.type.startsWith("executor-")) return exClassify(e, N);   // D26: mudanças e fallback de executor
   return null;
 }
 const LEVEL_LABEL = { bloqueio: "Bloqueio", aviso: "Aviso", novidade: "Novidade" };
@@ -3029,7 +3082,7 @@ async function poll() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 // Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
-const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append],[data-chat-confirm],[data-deleg-confirm]";
+const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append],[data-chat-confirm],[data-deleg-confirm],[data-ex]";
 function applyStale() {
   const stale = isStale();
   document.querySelectorAll(STALE_SEL).forEach(el => {
@@ -4969,6 +5022,415 @@ setInterval(() => {
   try { const d = JSON.parse(raw || "null"), ta = C("chat-text"); if (d && d.text && ta && !ta.value) { ta.value = d.text; ta.dispatchEvent(new Event("input", { bubbles: true })); } } catch (e) {}
   pubRender();
 })();
+// ================= D26 (ADR-027, contrato executor-e-modelo-por-agente §10 e §11): executor e modelo por agente =================
+// A tela só mostra e pede: o servidor valida (executor permitido, modelo compatível, Q2, disponibilidade) e grava o
+// `executor-config`. Nada aqui decide executor efetivo nem simula dado: o "Diferente" da demanda vem do /api/state.
+const EX_RUNNERS = { claude: "Claude Code", codex: "Codex" };
+const EX_ALIASES = ["opus", "sonnet", "haiku", "fable", "default"];
+const EX_MODEL_RE = /^[A-Za-z0-9._:/\[\]-]+$/;
+const EX_Q2 = "Orquestrador no Codex exige danger-full-access; aguardando decisão do humano (Q2)";
+// Texto do CODEX_WARNING (tools/squad/conversa.py) — a limitação vale para a conversa, a triagem e o Auditor no Codex.
+const EX_CODEX_WARNING = "Com o runner codex o Orquestrador pode ler qualquer arquivo desta máquina (o sandbox read-only do Codex não restringe leitura). Segredos são filtrados da resposta, mas prefira o runner claude.";
+const EX_DETAIL = { ok: ["ok", "ok"], "nao-instalado": ["não instalado", "danger"], "sem-login": ["sem login", "warn"], desconhecido: ["estado desconhecido", "warn"], timeout: ["checagem expirou", "warn"] };
+const EX_SOURCE = { demanda: "trocado nesta demanda", foto: "foto da demanda", snapshot: "foto da demanda", agente: "configuração do agente", squad: "padrão da squad" };
+const EX_POLICY = { padrao: "Usar o padrão da squad", parar: "Parar e me avisar" };
+const EX_SCOPE = { squad: "Padrão da squad", agent: "Agente", demand: "Só na demanda", policy: "Política", "apply-all": "Aplicar a todos" };
+const EX_ERR = {
+  executor_nao_permitido: "executor fora dos permitidos neste produto (product.toml)",
+  modelo_incompativel: "o modelo não é deste executor (Claude Code → Anthropic; Codex → OpenAI)",
+  formato_invalido: "modelo em formato inválido (até 100 caracteres: letras, números e . _ : / [ ] -)",
+  orquestrador_codex_pendente_q2: EX_Q2,
+  versao_desatualizada: "A configuração mudou em outro lugar (outra aba ou o CLI) depois que você abriu a tela. Recarregue para ver a versão atual e refaça a mudança.",
+  executor_indisponivel: "executor indisponível nesta máquina",
+  demanda_encerrada: "a demanda está entregue ou cancelada: a configuração dela não muda mais",
+  demanda_nao_encontrada: "demanda não encontrada",
+  modelo_fornecedor_desconhecido: "fornecedor do modelo não reconhecido — aceito, confira o ID",
+  configuracao_ilegivel: "configuração de executores ilegível — nenhum agente é acionado até corrigir o arquivo" };
+const EX_DIFF = { executor: "executor diferente do configurado", modelo: "modelo diferente do configurado", sessao: "modelo da sessão interativa do Claude Code (/model)" };
+const exDiffText = r => { const s = String(r || ""); if (s.startsWith("fallback:")) { const k = s.slice(9); return `executor ${EX_DETAIL[k]?.[0] || k}: rodou no padrão da squad`; } return EX_DIFF[s] || s || "diferença sem motivo informado"; };
+const exRunner = r => EX_RUNNERS[r] || r || "—";
+const exErrText = j => { const c = j?.code || (typeof j?.error === "string" && EX_ERR[j.error] ? j.error : null); return EX_ERR[c] || j?.message || (typeof j?.error === "string" ? j.error : "") || c || "erro no servidor"; };
+const exPol = p => typeof p === "string" ? p : p?.onUnavailable || "padrao";
+const EX = { data: null, st: "idle", at: 0, busy: false, draft: null, base: null, rowWarn: {}, needAck: false, saving: false, msg: null,
+  all: { open: false, runner: "claude", model: "", needAck: false, busy: false, msg: null }, dem: {}, alMsg: {} };
+const exQ2ok = () => EX.data?.decisions?.Q2 === true;   // Q2 sem aceite → recusado (contrato §7.1; GET /api/executores `decisions`)
+const exAllowed = r => !Array.isArray(EX.data?.allowed) || EX.data.allowed.includes(r);
+function exFromConfig(c) {
+  const a = c?.agents || {}, agents = {};
+  for (const r of ROLES) agents[r] = a[r] && a[r].runner ? { runner: a[r].runner, model: a[r].model || "" } : null;
+  return { squad: { runner: c?.squad?.runner || "claude", model: c?.squad?.model || "" }, agents, policy: exPol(c?.policy ?? EX.data?.policy) };
+}
+const exSig = d => JSON.stringify(d ? [d.squad.runner, d.squad.model.trim(), ROLES.map(r => d.agents[r] ? [d.agents[r].runner, d.agents[r].model.trim()] : null), d.policy] : null);
+const exDirty = () => !!EX.data && !!EX.draft && exSig(EX.draft) !== exSig(exFromConfig(EX.data.config));
+// Executor que o papel usaria com o rascunho (só para mostrar o estado/avisos da linha; quem resolve é o servidor).
+const exRowRunner = r => r === "squad" ? EX.draft.squad.runner : (EX.draft.agents[r]?.runner || EX.draft.squad.runner);
+async function exApi(method, url, body) {
+  try { const r = await fetch(url, method === "GET" ? {} : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, j: j && typeof j === "object" ? j : {} };
+  } catch (e) { return { ok: false, status: 0, j: {} }; }
+}
+async function exFetch(force) {
+  if (EX.busy || (!force && Date.now() - EX.at < 15000)) return;
+  EX.busy = true;
+  const r = await exApi("GET", "/api/executores");
+  EX.busy = false; EX.at = Date.now();
+  const prev = JSON.stringify([EX.st, EX.data]), wasDirty = exDirty();
+  if (r.ok) {
+    EX.data = r.j; EX.st = "ok"; EX.errText = null;
+    if (!EX.draft || !wasDirty) { EX.draft = exFromConfig(r.j.config); EX.base = r.j.version ?? r.j.config?.version ?? null; }
+  } else { EX.st = r.status === 404 && !r.j.code ? "absent" : "err"; EX.errText = r.status ? exErrText(r.j) : "sem conexão com o servidor"; }
+  if (JSON.stringify([EX.st, EX.data]) !== prev && route.view === "squad" && route.parts[0] === "executores" && !editing()) render();
+}
+function exModelProblem(runner, m) {
+  const v = String(m || "").trim(); if (!v) return null;
+  if (v.length > 100 || !EX_MODEL_RE.test(v)) return EX_ERR.formato_invalido;
+  if (EX_ALIASES.includes(v.toLowerCase()) && runner !== "claude") return `“${v}” é um apelido do Claude Code; no Codex use o ID exato do modelo`;
+  const p = providerOf(v);
+  if ((p === "Anthropic" && runner === "codex") || (p === "OpenAI" && runner === "claude")) return `${EX_ERR.modelo_incompativel}: ${v} é ${p}`;
+  return null;
+}
+function exStatusHtml(runner, compact) {
+  const s = EX.data?.status?.[runner];
+  if (!s) return `<span class="muted">sem checagem</span>`;
+  const [l, c] = EX_DETAIL[s.detail] || (s.installed === false ? EX_DETAIL["nao-instalado"] : s.loggedIn === false ? EX_DETAIL["sem-login"] : EX_DETAIL.ok);
+  const parts = [s.installed === false ? "Não instalado" : "Instalado", s.installed === false ? "" : s.loggedIn === false ? "sem login" : s.loggedIn ? "Login ok" : "login ?", s.version ? String(s.version) : ""].filter(Boolean);
+  return `<span class="ex-st ${c}">${c === "ok" ? "" : `<span aria-hidden="true">▲ </span>`}${compact && c !== "ok" ? esc(l) : parts.map(esc).join(" · ")}</span>`;
+}
+const exUnavailable = runner => { const s = EX.data?.status?.[runner]; return !!s && (s.detail === "nao-instalado" || s.detail === "sem-login" || s.installed === false || s.loggedIn === false); };
+const exVal = v => v === null ? "usar o padrão" : v === undefined ? "—" : typeof v === "string" ? v
+  : v.onUnavailable ? EX_POLICY[v.onUnavailable] || v.onUnavailable
+  : v.squad ? `padrão ${exRunner(v.squad.runner)}${v.squad.model ? ` · ${v.squad.model}` : ""}${v.agents ? ` · ${Object.values(v.agents).filter(Boolean).length} agente(s) próprios` : ""}`
+  : v.runner === null || (!v.runner && "runner" in v) ? "usar o padrão" : `${exRunner(v.runner)} · ${v.model || "padrão do executor"}`;
+function exHistory() {
+  const h = Array.isArray(EX.data?.history) ? EX.data.history : state ? state.log.filter(e => e.type === "executor-config").slice(-20).reverse() : [];
+  return h.slice(0, 20);
+}
+function exHistoryHtml() {
+  const h = exHistory();
+  if (!h.length) return `<p class="muted">Nenhuma mudança registrada ainda.</p>`;
+  return `<div class="tbl" style="margin-top:0"><table class="ex-hist"><thead><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Antes → depois</th></tr></thead><tbody>${h.map(e => {
+    const what = `${EX_SCOPE[e.scope] || e.scope || "—"}${e.role ? ` · ${AGENTS[e.role]?.label || e.role}` : ""}${e.demand ? ` · ${demandCode(e.demand) || String(e.demand).slice(0, 12)}` : ""}`;
+    const whoTxt = `${e.by === "humano" || e.agent === "humano" ? "Humano" : e.via === "migracao" ? "Migração automática" : esc(e.by || e.agent || "—")}`;
+    return `<tr><td data-l="Quando">${esc(fullTime(e.ts))}<div class="muted">${ageSpan(e.ts)}</div></td>
+      <td data-l="Quem">${whoTxt}${e.user || e.machine ? `<div class="muted mono">${esc([e.user, e.machine].filter(Boolean).join(" @ "))}</div>` : ""}${e.via ? `<div class="muted">via ${esc(e.via)}</div>` : ""}</td>
+      <td data-l="O quê">${esc(what)}${e.acknowledged ? ` <span class="tag validate" title="Salvo com aviso de executor indisponível">salvo mesmo assim</span>` : ""}</td>
+      <td data-l="Antes → depois"><span class="muted">${esc(exVal(e.before))}</span> <span aria-hidden="true">→</span><span class="sr-only"> para </span> <b>${esc(exVal(e.after))}</b></td></tr>`; }).join("")}</tbody></table></div>`;
+}
+function exModelsDatalist() {
+  const ids = new Set();
+  for (const r of state?.runs || []) { const m = modelId(r.model, r.runner); if (m) ids.add(m); }
+  for (const v of Object.values(EX.data?.lastEffective || {})) { const m = modelId(v?.model, v?.runner); if (m) ids.add(m); }
+  return `<datalist id="ex-models">${EX_ALIASES.map(a => `<option value="${a}">apelido do Claude Code</option>`).join("")}${[...ids].sort().map(m => `<option value="${esc(m)}">${esc(providerOf(m) || "")}</option>`).join("")}</datalist>`;
+}
+function exRowHtml(role) {
+  const sq = role === "squad", d = EX.draft, cur = sq ? d.squad : d.agents[role], label = sq ? "Padrão da squad" : AGENTS[role]?.label || role;
+  const runner = cur ? cur.runner : "", eff = exRowRunner(role);
+  const q2block = role === "orquestrador" && !exQ2ok();
+  const opt = (v, t) => { const dis = (v === "codex" && q2block) || (v && !exAllowed(v)); return `<option value="${v}" ${runner === v ? "selected" : ""} ${dis ? "disabled" : ""}>${esc(t)}${v === "codex" && q2block ? " (aguardando Q2)" : v && !exAllowed(v) ? " (não permitido)" : ""}</option>`; };
+  const sel = `<select class="ex-in" id="ex-r-${role}" data-exf="runner" data-role="${role}" aria-label="Executor — ${esc(label)}" aria-describedby="ex-w-${role}">
+    ${sq ? "" : opt("", "Usar o padrão")}${opt("claude", "Claude Code")}${opt("codex", "Codex")}</select>`;
+  const inherit = !sq && !cur;
+  const mprob = !inherit ? exModelProblem(eff, cur?.model) : null;
+  const model = `<input class="ex-in" id="ex-m-${role}" data-exf="model" data-role="${role}" list="ex-models" autocomplete="off" spellcheck="false" maxlength="100"
+    value="${esc(inherit ? "" : cur.model)}" ${inherit ? "disabled" : ""} placeholder="${esc(inherit ? `herda: ${d.squad.model || "padrão"}` : "padrão do executor")}"
+    aria-label="Modelo — ${esc(label)}" aria-invalid="${mprob ? "true" : "false"}" aria-describedby="ex-w-${role}">`;
+  const le = sq ? null : EX.data?.lastEffective?.[role];
+  const recent = sq ? `<span class="muted">—</span>` : le ? `${modelChip(le.model, le.modelProvider, "run", le.runner)} <span class="muted">${esc(exRunner(le.runner))} · ${ageSpan(le.at || le.ts)}</span>` : `<span class="muted">sem execução ainda</span>`;
+  const res = sq ? null : (EX.data?.resolved || []).find(x => x.role === role);
+  const notes = [];
+  if (mprob) notes.push(["danger", mprob]);
+  if (EX.rowWarn[role]) notes.push(["warn", EX.rowWarn[role]]);
+  else if (exUnavailable(eff) && (sq || cur)) notes.push(["warn", `${exRunner(eff)} ${EX_DETAIL[EX.data.status[eff].detail]?.[0] || "indisponível"} nesta máquina: ao salvar você confirma; na execução vale a política abaixo`]);
+  if (role === "orquestrador" && q2block) {
+    if (!cur && d.squad.runner === "codex") notes.push(["danger", `Com o padrão da squad no Codex o Orquestrador precisa ficar em Claude Code: ${EX_Q2}.`]);
+    else notes.push(["muted", `Codex indisponível para o Orquestrador: ${EX_Q2}.`]);
+  }
+  if (role === "orquestrador" && eff === "codex" && EX.data?.plantao?.via === "sessao") notes.push(["warn", "O plantão desta sessão do Claude Code será suspenso; rode tools/squad/plantao.sh"]);
+  return `<tr class="${sq ? "ex-squad" : ""}${notes.some(n => n[0] !== "muted") ? " ex-hasw" : ""}">
+    <th scope="row" data-l="Agente">${sq ? `<b>${esc(label)}</b><div class="muted">vale para quem “usa o padrão”</div>` : `<span class="ex-ag">${av(role)}<span>${esc(label)}</span></span>${res?.error ? `<div class="ex-note danger ex-res">${esc(EX_ERR[res.error] || res.detail || res.error)}</div>` : res ? `<div class="muted ex-res">agora: ${esc(exRunner(res.runner))}${res.model ? ` · ${esc(res.model)}` : ""} · ${esc(EX_SOURCE[res.source] || res.source || "")}${res.via ? ` · ${esc(res.via === "nativo" ? "subagente nativo" : "run_agent")}` : ""}</div>` : ""}`}</th>
+    <td data-l="Executor">${sel}</td><td data-l="Modelo">${model}</td><td data-l="Efetivo recente">${recent}</td><td data-l="Estado">${exStatusHtml(eff)}</td></tr>
+    <tr class="ex-wrow"><td colspan="5" id="ex-w-${role}" class="ex-w">${notes.map(([c, t]) => `<p class="ex-note ${c}">${c === "muted" ? "" : `<span aria-hidden="true">▲ </span>`}${esc(t)}</p>`).join("")}</td></tr>`;
+}
+const exBlocked = () => { const d = EX.draft; if (!d) return true;
+  if (!exQ2ok() && ((d.agents.orquestrador?.runner || d.squad.runner) === "codex")) return true;
+  return ["squad", ...ROLES].some(r => { const c = r === "squad" ? d.squad : d.agents[r]; return c && exModelProblem(exRowRunner(r), c.model); }); };
+function renderExecutores() {
+  routeTitle = "Executores";
+  exFetch();
+  const head = `${crumbs([["Squad", "#/squad"], ["Executores", ""]])}<div class="page-head"><div><h1 tabindex="-1">Executores e modelos</h1>
+    <div class="sub">Qual CLI roda cada agente (Claude Code ou Codex) e com qual modelo, nesta máquina. Demandas já iniciadas mantêm a configuração delas (foto); para mudar uma só, use “Trocar só nesta demanda” na tela da demanda.</div></div></div>`;
+  if (EX.st === "absent") return `${head}<p class="notice">O servidor ainda não oferece a configuração de executores (rota /api/executores ausente). Reinicie o Squad Control na versão com a D26.</p>`;
+  if (!EX.data || !EX.draft) return `${head}${EX.st === "err" ? `<p class="notice err" role="alert">Não foi possível ler a configuração: ${esc(EX.errText || "")}. <button class="btn xs" data-ex="reload">Tentar de novo</button></p>` : `<p class="muted" role="status">Carregando a configuração…</p>`}`;
+  const d = EX.draft, dirty = exDirty(), blocked = exBlocked();
+  const anyCodex = ["squad", ...ROLES].some(r => exRowRunner(r) === "codex") || (EX.all.open && EX.all.runner === "codex");
+  const ign = Array.isArray(EX.data.ignoredEnv) ? EX.data.ignoredEnv : [];
+  const st = EX.data.status || {};
+  const msg = EX.msg ? `<p class="ex-msg ${EX.msg.kind}" role="${EX.msg.kind === "err" ? "alert" : "status"}">${esc(EX.msg.text)}${EX.msg.reload ? ` <button class="btn xs" data-ex="reload-discard">Recarregar a configuração</button>` : ""}</p>` : "";
+  const newer = EX.base != null && EX.data.version != null && EX.data.version !== EX.base && dirty;
+  const ackBox = EX.needAck ? `<div class="ex-ack" role="group" aria-labelledby="ex-ack-h"><p id="ex-ack-h"><b>Executor indisponível nesta máquina.</b> Os avisos estão nas linhas marcadas. Se salvar assim, na execução vale a política “${esc(EX_POLICY[d.policy])}”.</p>
+      <div class="actions"><button class="btn sm primary" data-ex="save-ack" id="ex-save-ack">Salvar mesmo assim</button><button class="btn sm" data-ex="ack-cancel">Voltar e ajustar</button></div></div>` : "";
+  const all = EX.all, allCodexQ2 = all.runner === "codex" && !exQ2ok();
+  const allBox = all.open ? `<div class="ex-confirm" role="group" aria-labelledby="ex-all-h"><p id="ex-all-h"><b>O padrão da squad passa a ser ${esc(exRunner(all.runner))}${all.model.trim() ? ` · ${esc(all.model.trim())}` : ""} e os 8 agentes voltam a usar o padrão. Demandas já iniciadas mantêm a configuração delas.</b></p>
+      ${allCodexQ2 ? `<p class="ex-note warn"><span aria-hidden="true">▲ </span>O Orquestrador fica em Claude Code: ${esc(EX_Q2)}.</p>` : ""}
+      ${dirty ? `<p class="ex-note warn"><span aria-hidden="true">▲ </span>As mudanças não salvas da tabela serão descartadas.</p>` : ""}
+      ${all.needAck ? `<p class="ex-note warn"><span aria-hidden="true">▲ </span>${esc(all.msg || "Executor indisponível nesta máquina.")}</p>` : all.msg ? `<p class="ex-msg err" role="alert">${esc(all.msg)}</p>` : ""}
+      <div class="actions"><button class="btn sm primary" data-ex="${all.needAck ? "all-ack" : "all-go"}" id="ex-all-go" ${all.busy ? "disabled" : ""}>${all.needAck ? "Aplicar mesmo assim" : "Confirmar: aplicar a todos"}</button><button class="btn sm" data-ex="all-cancel">Cancelar</button></div></div>` : "";
+  return `${head}
+  ${ign.length ? `<div class="notice">${ign.map(v => `<div>Variável <code>${esc(typeof v === "string" ? v : v.name || v.var || "")}</code> ignorada${typeof v === "object" && v.value ? ` (valor ${esc(v.value)})` : ""}: a configuração vem desta tela.</div>`).join("")}</div>` : ""}
+  <section class="ex-machine" aria-labelledby="ex-mh"><h2 id="ex-mh">Nesta máquina</h2>
+    <ul class="ex-mlist">${["claude", "codex"].map(r => `<li><b>${exRunner(r)}</b> ${exStatusHtml(r)}${st[r]?.checkedAt ? ` <span class="muted">· checado ${ageSpan(st[r].checkedAt)}</span>` : ""}${exAllowed(r) ? "" : ` <span class="tag">não permitido neste produto</span>`}</li>`).join("")}</ul>
+    <button class="btn xs" data-ex="check" ${EX.checking ? "disabled" : ""}>${EX.checking ? "Checando…" : "Checar de novo"}</button>
+    ${EX.data.plantao?.runner ? `<p class="muted" style="margin:6px 0 0;font-size:13px">Plantão: ${esc(exRunner(EX.data.plantao.runner))} · ${EX.data.plantao.via === "sessao" ? "sessão do Claude Code (/loop)" : "tools/squad/plantao.sh"}${EX.data.plantao.at ? ` · ${ageSpan(EX.data.plantao.at)}` : ""}</p>` : ""}
+  </section>
+  ${anyCodex ? `<p class="notice" role="note"><b>Codex:</b> ${esc(EX.data.codexWarning || EX_CODEX_WARNING)} Vale também para a triagem (Arquiteto) e o Auditor quando rodam no Codex.</p>` : ""}
+  <section class="dsec" aria-labelledby="ex-th"><h2 id="ex-th">Por agente</h2>
+    ${exModelsDatalist()}
+    <div class="tbl ex-wrap" style="margin-top:0"><table class="ex-tbl"><caption class="sr-only">Executor e modelo por agente; a primeira linha é o padrão da squad</caption>
+      <thead><tr><th scope="col">Agente</th><th scope="col">Executor</th><th scope="col">Modelo</th><th scope="col">Efetivo recente</th><th scope="col">Estado</th></tr></thead>
+      <tbody>${["squad", ...ROLES].map(exRowHtml).join("")}</tbody></table></div>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 0">Modelo vazio = padrão do executor (no Claude Code, o apelido do papel; no Codex, o do <code>~/.codex/config.toml</code>). Apelidos do Claude Code: ${EX_ALIASES.join(", ")}.</p>
+    <fieldset class="ex-pol"><legend>Se o executor escolhido não estiver disponível</legend>
+      ${Object.entries(EX_POLICY).map(([k, t]) => `<label><input type="radio" name="ex-policy" id="ex-pol-${k}" value="${k}" data-exf="policy" ${d.policy === k ? "checked" : ""}> ${esc(t)}${k === "padrao" ? " (recomendado)" : ""}</label>`).join("")}
+      <p class="muted" style="font-size:12.5px;margin:4px 0 0">${d.policy === "parar" ? "O agente não inicia; a demanda fica parada com um bloqueio no painel até você corrigir ou escolher “usar o padrão nesta demanda”." : "O agente roda no padrão da squad e o painel mostra um aviso na demanda."}</p></fieldset>
+    ${newer ? `<p class="notice">A configuração foi alterada em outro lugar (versão ${esc(EX.data.version)}). Ao salvar, o servidor vai recusar: descarte suas mudanças para ver a atual.</p>` : ""}
+    ${ackBox}
+    <div class="actions ex-actions"><button class="btn sm primary" data-ex="save" id="ex-save" ${!dirty || blocked || EX.saving || EX.needAck ? "disabled" : ""} ${blocked && dirty ? `aria-describedby="ex-blocked"` : ""}>${EX.saving ? "Salvando…" : "Salvar"}</button>
+      ${dirty ? `<button class="btn sm" data-ex="discard">Descartar mudanças</button>` : `<span class="muted" style="font-size:13px">Sem mudanças.</span>`}</div>
+    ${blocked && dirty ? `<p class="ex-note danger" id="ex-blocked"><span aria-hidden="true">▲ </span>Corrija as linhas marcadas para salvar.</p>` : ""}
+    ${msg}
+  </section>
+  <section class="dsec" aria-labelledby="ex-ah"><h2 id="ex-ah">Aplicar a todos</h2>
+    <div class="sub" style="margin-top:0">Troca o padrão da squad e faz os 8 agentes voltarem a usá-lo.</div>
+    <div class="ex-allrow"><label>Executor <select class="ex-in" id="ex-all-r" data-exf="all-runner">${["claude", "codex"].map(r => `<option value="${r}" ${all.runner === r ? "selected" : ""} ${exAllowed(r) ? "" : "disabled"}>${exRunner(r)}</option>`).join("")}</select></label>
+      <label>Modelo <input class="ex-in" id="ex-all-m" data-exf="all-model" list="ex-models" autocomplete="off" spellcheck="false" maxlength="100" value="${esc(all.model)}" placeholder="padrão do executor"></label>
+      <button class="btn sm" data-ex="all-open" id="ex-all-open" ${all.open || exModelProblem(all.runner, all.model) ? "disabled" : ""}>Aplicar a todos…</button></div>
+    ${exModelProblem(all.runner, all.model) ? `<p class="ex-note danger"><span aria-hidden="true">▲ </span>${esc(exModelProblem(all.runner, all.model))}</p>` : ""}
+    ${allBox}
+  </section>
+  <section class="dsec" aria-labelledby="ex-hh"><h2 id="ex-hh">Mudanças recentes</h2>
+    <div class="sub" style="margin-top:0">Últimas 20 mudanças de executor e modelo (quem, quando, antes → depois). A trilha completa fica na <a href="#/auditoria/eventos?tipo=executor-config">Auditoria</a>.</div>
+    ${exHistoryHtml()}</section>`;
+}
+function exBody() {
+  const d = EX.draft, agents = {};
+  for (const r of ROLES) agents[r] = d.agents[r] ? { runner: d.agents[r].runner, model: d.agents[r].model.trim() || null } : null;
+  return { baseVersion: EX.base, squad: { runner: d.squad.runner, model: d.squad.model.trim() || null }, agents, policy: { onUnavailable: d.policy } };
+}
+// Avisos do servidor: código simples ou objeto com o papel; o que não tem papel vai na mensagem geral.
+function exWarnings(ws) {
+  const general = [];
+  for (const w of Array.isArray(ws) ? ws : []) {
+    const m = typeof w === "string" ? /^(claude|codex):([\w-]+)$/.exec(w) : null;   // "codex:sem-login" (resposta 200)
+    const o = m ? { runner: m[1], detail: m[2] } : w;
+    const role = typeof o === "object" && o ? o.role || (o.scope === "squad" ? "squad" : null) : null;
+    const code = typeof o === "string" ? o : o?.code || o?.reason || o?.detail || "";
+    const t = typeof o === "object" && o?.message ? o.message : o?.runner ? `${exRunner(o.runner)} ${EX_DETAIL[o.detail || o.reason]?.[0] || EX_ERR[code] || code} nesta máquina` : EX_ERR[code] || EX_DETAIL[code]?.[0] || code;
+    if (role && (role === "squad" || ROLES.includes(role))) EX.rowWarn[role] = t;
+    else if (o?.runner && EX.draft) {   // 409 traz {runner, detail}: marca as linhas escolhidas com esse executor
+      let hit = false;
+      for (const r of ["squad", ...ROLES]) if ((r === "squad" || EX.draft.agents[r]) && exRowRunner(r) === o.runner) { EX.rowWarn[r] = t; hit = true; }
+      if (!hit) general.push(t);
+    } else if (t) general.push(t);
+  }
+  return general;
+}
+async function exSave(ack) {
+  if (EX.saving || !EX.draft) return;
+  EX.saving = true; EX.msg = null; if (!ack) EX.rowWarn = {}; render();
+  const r = await exApi("POST", "/api/executores", { ...exBody(), ...(ack ? { acknowledge: true } : {}) });
+  EX.saving = false;
+  if (r.ok) {
+    const g = exWarnings(r.j.warnings);
+    EX.needAck = false; EX.rowWarn = {};
+    EX.msg = { kind: "ok", text: `Configuração salva${r.j.version != null ? ` (versão ${r.j.version})` : ""}.${g.length ? ` Avisos: ${g.join("; ")}.` : ""}` };
+    EX.base = r.j.version ?? EX.base; EX.draft = null; await exFetch(true); refresh();
+    if (!EX.draft && EX.data) EX.draft = exFromConfig(EX.data.config);
+    announce(EX.msg.text); render(); $("#ex-save")?.focus({ preventScroll: true });
+    return;
+  }
+  const code = r.j.code;
+  if (r.status === 409 && code === "executor_indisponivel") {
+    const g = exWarnings(r.j.warnings); EX.needAck = true;
+    EX.msg = { kind: "warn", text: `Executor indisponível nesta máquina${g.length ? `: ${g.join("; ")}` : ""}. Revise os avisos por linha ou salve mesmo assim.` };
+    render(); announceErr(EX.msg.text); $("#ex-save-ack")?.focus({ preventScroll: true }); return;
+  }
+  EX.needAck = false;
+  if (r.j.role && (ROLES.includes(r.j.role) || r.j.role === "squad")) EX.rowWarn[r.j.role] = exErrText(r.j);
+  EX.msg = { kind: "err", text: r.status ? `Não salvo: ${exErrText(r.j)}.` : "Não salvo: sem conexão com o servidor.", reload: code === "versao_desatualizada" };
+  render(); announceErr(EX.msg.text);
+}
+async function exApplyAll(ack) {
+  const all = EX.all; if (all.busy) return;
+  all.busy = true; render();
+  const r = await exApi("POST", "/api/executores/aplicar-a-todos", { baseVersion: EX.data?.version ?? EX.base, runner: all.runner, model: all.model.trim() || null, ...(ack ? { acknowledge: true } : {}) });
+  all.busy = false;
+  if (r.ok) {
+    const ws = (Array.isArray(r.j.warnings) ? r.j.warnings : []).map(w => typeof w === "string" ? w : w?.code).filter(Boolean);
+    Object.assign(all, { open: false, needAck: false, msg: null });
+    EX.msg = { kind: "ok", text: `Aplicado a todos: padrão ${exRunner(all.runner)}${all.model.trim() ? ` · ${all.model.trim()}` : ""}.${ws.includes("orquestrador_codex_pendente_q2") ? ` O Orquestrador ficou em Claude Code: ${EX_Q2}.` : ""}` };
+    EX.draft = null; EX.needAck = false; EX.rowWarn = {}; await exFetch(true); if (!EX.draft && EX.data) EX.draft = exFromConfig(EX.data.config); refresh();
+    render(); announce(EX.msg.text); $("#ex-all-open")?.focus({ preventScroll: true }); return;
+  }
+  if (r.status === 409 && r.j.code === "executor_indisponivel") { all.needAck = true; const g = exWarnings(r.j.warnings); all.msg = `Executor indisponível nesta máquina${g.length ? `: ${g.join("; ")}` : ""}.`; }
+  else { all.needAck = false; all.msg = r.status ? `Não aplicado: ${exErrText(r.j)}.` : "Não aplicado: sem conexão com o servidor."; if (r.j.code === "versao_desatualizada") exFetch(true); }
+  render(); announceErr(all.msg); $("#ex-all-go")?.focus({ preventScroll: true });
+}
+async function exCheck() {
+  EX.checking = true; render();
+  const r = await exApi("POST", "/api/executores/checar", {});
+  EX.checking = false;
+  if (r.ok && EX.data) { if (r.j.status) EX.data.status = r.j.status; EX.msg = { kind: "ok", text: "Executores checados agora." }; }
+  else EX.msg = { kind: "err", text: r.status ? `Checagem falhou: ${exErrText(r.j)}.` : "Checagem falhou: sem conexão com o servidor." };
+  await exFetch(true); render(); announce(EX.msg.text);
+}
+
+// ---- Tela da demanda: bloco "Executores desta demanda" (§11.2) ----
+// Fonte: /api/state `demands[].executors` (servidor aplica a regra única da §9.3). Servidor antigo → só a foto e as runs,
+// sem marcar diferença (a regra é do servidor).
+function exDemandRows(id) {
+  const ds = state?.demands;
+  const x = Array.isArray(ds) ? ds.find(y => y && (y.id === id || y.demand === id)) : ds && typeof ds === "object" ? ds[id] : null;
+  if (x && Array.isArray(x.executors)) return { src: "server", rows: x.executors };
+  const snap = [...(state?.log || [])].reverse().find(e => e.type === "executor-snapshot" && e.demand === id);
+  const rows = [];
+  for (const role of ROLES) {
+    const ov = [...state.log].reverse().find(e => e.type === "executor-config" && e.scope === "demand" && e.demand === id && e.role === role);
+    const conf = ov && ov.after && ov.after.runner ? { ...ov.after, source: "demanda" } : snap?.executors?.[role] ? { ...snap.executors[role], source: snap.executors[role].source || "foto" } : null;
+    const effective = (state.runs || []).filter(r => r.demand === id && r.agent === role).map(r => ({ runner: r.runner, model: r.model, modelProvider: r.modelProvider, run: r.id, at: r.started || r.ts }));
+    if (conf || effective.length) rows.push({ role, configured: conf, effective, diff: null, reason: null });
+  }
+  return { src: snap || rows.length ? "log" : "none", rows };
+}
+const exDemandHas = info => !!(info.start || info.work.length) && (exDemandRows(info.d.id).rows.length > 0 || !isClosed(info));
+const exToc = (info, list) => exDemandHas(info) ? list.flatMap(s => s[0] === "execucao" ? [s, ["executores", "Executores"]] : [s]) : list;
+function exDemandSectionHtml(info) {
+  if (!exDemandHas(info)) return "";
+  const id = info.d.id, code = info.code, { src, rows } = exDemandRows(id), f = EX.dem[id] || {}, closed = isClosed(info);
+  const effHtml = list => { const l = Array.isArray(list) ? list : []; if (!l.length) return `<span class="muted">sem execução</span>`;
+    return l.slice(-3).reverse().map(e => `<span class="ex-eff">${modelChip(e.model, e.modelProvider, "run", e.runner)} <span class="muted">${esc(exRunner(e.runner))}${e.at ? ` · ${ageSpan(e.at)}` : ""}</span></span>`).join("") + (l.length > 3 ? `<span class="muted"> +${l.length - 3}</span>` : ""); };
+  const body = rows.length ? `<div class="tbl" style="margin-top:0"><table class="ex-dtbl"><thead><tr><th scope="col">Papel</th><th scope="col">Configurado</th><th scope="col">Efetivo</th><th scope="col"><span class="sr-only">Diferença</span></th></tr></thead><tbody>
+      ${rows.map(x => { const c = x.configured || {};
+        return `<tr class="${x.diff ? "ex-isdiff" : ""}"><th scope="row" data-l="Papel"><span class="ex-ag">${av(x.role)}<span>${esc(AGENTS[x.role]?.label || x.role)}</span></span></th>
+          <td data-l="Configurado">${x.configured ? `${esc(exRunner(c.runner))} · ${c.model ? `<code>${esc(c.model)}</code>` : `<span class="muted">padrão do executor</span>`} <span class="tag">${esc(EX_SOURCE[c.source] || c.source || "")}</span>` : `<span class="muted">sem foto</span>`}</td>
+          <td data-l="Efetivo">${effHtml(x.effective)}</td>
+          <td data-l="Diferença">${x.diff ? `<span class="ex-diff"><span aria-hidden="true">▲ </span>Diferente</span> <span class="ex-why">${esc(exDiffText(x.reason))}</span>` : ""}</td></tr>`; }).join("")}</tbody></table></div>`
+    : `<p class="muted">A configuração da demanda é fixada (foto) quando o plantão a inicia; até lá vale a configuração atual da squad (<a href="#/squad/executores">Executores</a>).</p>`;
+  const form = f.open ? (() => {
+    const role = f.role || "arquiteto", runner = f.runner ?? "claude", q2 = role === "orquestrador" && runner === "codex" && !exQ2ok(), mp = runner ? exModelProblem(runner, f.model) : null;
+    return `<div class="ex-confirm" role="group" aria-labelledby="exd-h-${id}"><p id="exd-h-${id}"><b>Trocar só nesta demanda</b> — vale para os próximos passos da ${esc(code)}; a configuração geral não muda.</p>
+      <div class="ex-allrow"><label>Papel <select class="ex-in" id="exd-role-${id}" data-exd="role" data-id="${id}">${ROLES.map(r => `<option value="${r}" ${r === role ? "selected" : ""}>${esc(AGENTS[r]?.label || r)}</option>`).join("")}</select></label>
+        <label>Executor <select class="ex-in" id="exd-runner-${id}" data-exd="runner" data-id="${id}"><option value="" ${!runner ? "selected" : ""}>Voltar à foto da demanda</option><option value="claude" ${runner === "claude" ? "selected" : ""}>Claude Code</option><option value="codex" ${runner === "codex" ? "selected" : ""}>Codex</option></select></label>
+        <label>Modelo <input class="ex-in" id="exd-model-${id}" data-exd="model" data-id="${id}" list="ex-models" autocomplete="off" spellcheck="false" maxlength="100" value="${esc(runner ? f.model || "" : "")}" ${runner ? "" : "disabled"} placeholder="padrão do executor"></label></div>
+      ${exModelsDatalist()}
+      ${q2 ? `<p class="ex-note danger"><span aria-hidden="true">▲ </span>${esc(EX_Q2)}.</p>` : mp ? `<p class="ex-note danger"><span aria-hidden="true">▲ </span>${esc(mp)}</p>` : ""}
+      ${runner === "codex" && !q2 ? `<p class="ex-note warn"><span aria-hidden="true">▲ </span>${esc(EX_CODEX_WARNING)}</p>` : ""}
+      ${f.needAck ? `<p class="ex-note warn"><span aria-hidden="true">▲ </span>${esc(f.msg || "Executor indisponível nesta máquina.")}</p>` : f.msg ? `<p class="ex-msg err" role="alert">${esc(f.msg)}</p>` : ""}
+      <div class="actions"><button class="btn sm primary" data-ex="dem-go" data-id="${id}" id="exd-go-${id}" ${f.busy || q2 || mp ? "disabled" : ""}>${f.needAck ? "Trocar mesmo assim" : "Trocar"}</button><button class="btn sm" data-ex="dem-cancel" data-id="${id}">Cancelar</button></div></div>`; })() : "";
+  return `<section class="dsec" id="sec-executores" aria-labelledby="h-executores"><h2 id="h-executores" tabindex="-1">Executores desta demanda</h2>
+    <div class="sub" style="margin-top:0">Configurado (foto da demanda ou troca feita aqui) × efetivo (o que as execuções usaram). “Diferente” aparece quando não batem.${src === "log" ? " <span class=\"muted\">Servidor sem o cálculo de diferença: mostrando só a foto e as execuções.</span>" : ""}</div>
+    ${body}
+    ${f.okMsg ? `<p class="ex-msg ok" role="status">${esc(f.okMsg)}</p>` : ""}
+    ${closed ? `<p class="muted" style="font-size:13px">Demanda ${esc(info.status.toLowerCase())}: a configuração dela não muda mais.</p>` : f.open ? form : `<div class="actions"><button class="btn sm" data-ex="dem-open" data-id="${id}" id="exd-open-${id}">Trocar só nesta demanda</button><a class="btn sm" href="#/squad/executores">Configuração da squad</a></div>`}
+  </section>`;
+}
+async function exDemandPost(id, body, onDone) {
+  const r = await exApi("POST", "/api/demand/executores", { demand: id, ...body });
+  onDone(r);
+}
+async function exDemandGo(id, ack) {
+  const f = EX.dem[id]; if (!f || f.busy) return;
+  const runner = f.runner ?? "claude";
+  f.busy = true; f.msg = null; render();
+  await exDemandPost(id, { role: f.role || "arquiteto", runner: runner || null, ...(runner ? { model: String(f.model || "").trim() || null } : {}), ...(ack ? { acknowledge: true } : {}) }, r => {
+    f.busy = false;
+    if (r.ok) { const who = AGENTS[f.role || "arquiteto"]?.label || f.role; EX.dem[id] = { okMsg: runner ? `${who}: ${exRunner(runner)}${f.model ? ` · ${f.model}` : ""} nesta demanda.` : `${who}: voltou à foto da demanda.` }; announce(EX.dem[id].okMsg); refresh(); render(); $(`#exd-open-${id}`)?.focus({ preventScroll: true }); return; }
+    if (r.status === 409 && r.j.code === "executor_indisponivel") { f.needAck = true; const g = exWarnings(r.j.warnings); f.msg = `Executor indisponível nesta máquina${g.length ? `: ${g.join("; ")}` : ""}.`; }
+    else { f.needAck = false; f.msg = r.status ? `Não trocado: ${exErrText(r.j)}.` : "Não trocado: sem conexão com o servidor."; }
+    render(); announceErr(f.msg); $(`#exd-go-${id}`)?.focus({ preventScroll: true });
+  });
+}
+
+// ---- Alertas B8 (executor-indisponivel, bloqueio) e B9 (executor-divergente, aviso) + executor-fallback (aviso) ----
+const EX_KINDS = ["executor-indisponivel", "executor-divergente", "executor-fallback"];
+function exAlertActionHtml(a, cls) {
+  if (!EX_KINDS.some(k => hasKind(a, k))) return null;
+  const code = alertCode(a), dem = code ? `#/demandas/${code}/executores` : "#/squad/executores", m = EX.alMsg[a.id];
+  const dis = isStale() ? ` disabled title="Sem dados atuais — reconectando"` : "";
+  const role = a.role || a.agent, roleL = AGENTS[role]?.label || role || "";
+  if (hasKind(a, "executor-indisponivel")) {
+    return `<button class="${cls} primary" data-ex="al-retry" data-al="${esc(a.id)}"${dis}>Tentar de novo</button>${a.demand && role ? `<button class="${cls}" data-ex="al-default" data-al="${esc(a.id)}" data-demand="${esc(a.demand)}" data-role="${esc(role)}"${dis}>Usar o padrão nesta demanda<span class="sr-only"> (${esc(roleL)}${code ? ` na ${esc(code)}` : ""})</span></button>` : ""}<a class="${cls}" href="${esc(dem)}">Ver executores</a>${m ? `<span class="ex-almsg ${m.ok ? "ok" : "err"}" role="status">${esc(m.text)}</span>` : ""}`;
+  }
+  const href = a.action?.href && !/^\?/.test(a.action.href) ? a.action.href : dem;
+  return `<a class="${cls}" href="${esc(href)}">${esc(a.action?.label || "Ver executores da demanda")}${code ? `<span class="sr-only"> na ${esc(code)}</span>` : ""}</a>`;
+}
+async function exAlertDefault(btn) {
+  const id = btn.dataset.al, demand = btn.dataset.demand, role = btn.dataset.role;
+  btn.disabled = true;
+  if (!EX.data) await exFetch(true);
+  const sq = EX.data?.config?.squad;
+  if (!sq?.runner) { EX.alMsg[id] = { ok: false, text: "Não foi possível ler o padrão da squad." }; render(); return; }
+  await exDemandPost(demand, { role, runner: sq.runner, model: sq.model || null, acknowledge: true }, r => {
+    EX.alMsg[id] = r.ok ? { ok: true, text: `${AGENTS[role]?.label || role} vai usar o padrão (${exRunner(sq.runner)}) nesta demanda; o plantão retoma no próximo ciclo.` } : { ok: false, text: r.status ? `Não trocado: ${exErrText(r.j)}.` : "Sem conexão com o servidor." };
+    (r.ok ? announce : announceErr)(EX.alMsg[id].text); refresh(); render();
+  });
+}
+async function exAlertRetry(btn) {
+  const id = btn.dataset.al; btn.disabled = true;
+  const r = await exApi("POST", "/api/executores/checar", {});
+  EX.alMsg[id] = r.ok ? { ok: true, text: "Checado agora; o plantão tenta de novo no próximo ciclo." } : { ok: false, text: r.status ? `Checagem falhou: ${exErrText(r.j)}.` : "Sem conexão com o servidor." };
+  (r.ok ? announce : announceErr)(EX.alMsg[id].text); EX.at = 0; refresh(); render();
+}
+function exClassify(e, N) {
+  const code = e.demand ? demandCode(e.demand) : null, pre = code ? `${code} · ` : "";
+  if (e.type === "executor-config") return N({ title: `${pre}Executores: ${e.title || EX_SCOPE[e.scope] || "mudança"}`, body: `${exVal(e.before)} → ${exVal(e.after)}`, href: code ? `#/demandas/${code}/executores` : "#/squad/executores" });
+  if (e.type === "executor-fallback") return N({ title: `${pre}${AGENTS[e.role]?.label || e.role || "Agente"}: ${exRunner(e.configured?.runner)} ${EX_DETAIL[e.reason]?.[0] || e.reason || "indisponível"}`,
+    body: e.action === "parou" ? "Não iniciou (política: parar)." : `Rodou no padrão: ${exRunner(e.effective?.runner)}.`, href: code ? `#/demandas/${code}/executores` : "#/squad/executores" });
+  return null;   // executor-snapshot e executor-dispatch ficam na Auditoria
+}
+function exSetDraft(el) {
+  const k = el.dataset.exf, role = el.dataset.role;
+  if (k === "all-runner") { EX.all.runner = el.value; EX.all.needAck = false; EX.all.msg = null; return true; }
+  if (k === "all-model") { EX.all.model = el.value; return false; }
+  if (!EX.draft) return false;
+  if (k === "policy") { EX.draft.policy = el.value; return true; }
+  if (k === "runner") {
+    if (role === "squad") EX.draft.squad.runner = el.value;
+    else EX.draft.agents[role] = el.value ? { runner: el.value, model: EX.draft.agents[role]?.model || "" } : null;
+    delete EX.rowWarn[role]; EX.needAck = false; return true;
+  }
+  if (k === "model") { const c = role === "squad" ? EX.draft.squad : EX.draft.agents[role]; if (c) c.model = el.value; return false; }
+  return false;
+}
+document.addEventListener("input", ev => {
+  const el = ev.target; if (!el.closest?.("#main")) return;
+  if (el.dataset?.exf) { exSetDraft(el); return; }
+  if (el.dataset?.exd === "model") { (EX.dem[el.dataset.id] ||= { open: true }).model = el.value; }
+});
+document.addEventListener("change", ev => {
+  const el = ev.target; if (!el.closest?.("#main")) return;
+  if (el.dataset?.exf) { exSetDraft(el); EX.msg = null; render(); return; }   // select/radio/blur do modelo: redesenha avisos e botões
+  if (el.dataset?.exd) { const f = (EX.dem[el.dataset.id] ||= { open: true }); f[el.dataset.exd] = el.value; f.needAck = false; f.msg = null; render(); }
+});
+document.addEventListener("click", ev => {
+  const b = ev.target.closest?.("[data-ex]"); if (!b || b.disabled || b.getAttribute("aria-disabled") === "true") return;
+  const act = b.dataset.ex, id = b.dataset.id;
+  if (act === "save") exSave(false);
+  else if (act === "save-ack") exSave(true);
+  else if (act === "ack-cancel") { EX.needAck = false; EX.msg = null; render(); $("#ex-r-squad")?.focus(); }
+  else if (act === "discard") { EX.draft = EX.data ? exFromConfig(EX.data.config) : null; EX.base = EX.data?.version ?? null; EX.rowWarn = {}; EX.needAck = false; EX.msg = { kind: "ok", text: "Mudanças descartadas." }; render(); announce("Mudanças descartadas."); $("#ex-save")?.focus(); }
+  else if (act === "reload" || act === "reload-discard") { if (act === "reload-discard") { EX.draft = null; EX.rowWarn = {}; EX.needAck = false; } EX.msg = null; exFetch(true).then(() => { if (!EX.draft && EX.data) { EX.draft = exFromConfig(EX.data.config); EX.base = EX.data.version ?? null; } render(); $("#main h1")?.focus(); }); }
+  else if (act === "check") exCheck();
+  else if (act === "all-open") { Object.assign(EX.all, { open: true, needAck: false, msg: null }); render(); $("#ex-all-go")?.focus(); }
+  else if (act === "all-cancel") { Object.assign(EX.all, { open: false, needAck: false, msg: null }); render(); $("#ex-all-open")?.focus(); }
+  else if (act === "all-go") exApplyAll(false);
+  else if (act === "all-ack") exApplyAll(true);
+  else if (act === "dem-open") { EX.dem[id] = { open: true, role: "arquiteto", runner: "claude", model: "" }; if (!EX.data) exFetch(); render(); $(`#exd-role-${id}`)?.focus(); }
+  else if (act === "dem-cancel") { EX.dem[id] = {}; render(); $(`#exd-open-${id}`)?.focus(); }
+  else if (act === "dem-go") exDemandGo(id, !!EX.dem[id]?.needAck);
+  else if (act === "al-retry") exAlertRetry(b);
+  else if (act === "al-default") exAlertDefault(b);
+});
+// ================= fim D26 =================
 </script>
 </body>
 </html>
