@@ -597,34 +597,59 @@
   .c-list a:hover, .c-list a:focus-visible { background: var(--accent-soft); }
   .c-list a[aria-current] { border-left: 3px solid var(--accent); padding-left: 11px; font-weight: 600; }
   .c-list a .ct { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .c-list a small { color: var(--dim); font-size: 11.5px; font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+  .c-list a small { color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .c-list a .cm { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
   .c-list .none { padding: 12px 14px; color: var(--muted); font-size: 13px; }
-  .c-log { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
-  .c-msgs { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 14px 20px; list-style: none; margin: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-  .c-msg { max-width: 88%; min-width: 0; font-size: 13.5px; line-height: 1.55; }
-  .c-msg.humano { align-self: flex-end; }
-  .c-msg.orquestrador { align-self: flex-start; width: 88%; }
-  .c-msg .bub { padding: 8px 12px; border-radius: 8px; overflow-wrap: anywhere; }
-  .c-msg.humano .bub { background: var(--accent-soft); color: var(--text); border: 1px solid var(--accent-soft); border-bottom-right-radius: 2px; white-space: pre-wrap; }
-  .c-msg.orquestrador .bub { background: var(--raised); border: 1px solid var(--line); border-bottom-left-radius: 2px; }
-  .c-msg.pending .bub { opacity: .7; }
-  .c-msg .who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
-  .c-msg.humano .who { justify-content: flex-end; }
-  .c-msg .who b { color: var(--text); font-weight: 600; font-size: 12px; }
-  .c-msg .who time { color: var(--dim); }
-  .c-msg .bub p { margin: 0 0 8px; } .c-msg .bub p:last-child { margin-bottom: 0; }
-  .c-msg .bub ul, .c-msg .bub ol { margin: 0 0 8px; padding-left: 20px; } .c-msg .bub li { margin: 2px 0; }
-  .c-msg .bub code { font-size: 12px; background: var(--surface); border: 1px solid var(--line); padding: 0 4px; border-radius: 2px; overflow-wrap: anywhere; }
-  .c-msg .bub pre { margin: 0 0 8px; padding: 8px 10px; font-size: 12px; background: var(--surface); max-height: 280px; overflow: auto; white-space: pre-wrap; }
-  .c-msg .bub h4 { margin: 4px 0 6px; font-size: 13.5px; }
-  .c-msg .flag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-  .c-msg .flag.err { color: var(--danger); } .c-msg .flag.warn { color: var(--warn); } .c-msg .flag.muted { color: var(--muted); }
-  .c-msg .partial { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line-strong); font-size: 12px; color: var(--muted); }
-  .c-msg .foot { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 4px; font-size: 11.5px; color: var(--dim); }
-  .c-msg .foot .linkbtn { min-height: 32px; font-size: 12px; }
-  .c-msg.live .bub { border-left: 3px solid var(--accent); }
-  .c-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: pulse 1s infinite; }
+  /* D20 (ui-conversa-visual-v2 §3): toda classe do chat tem prefixo c-; nada de seletor global (.live, .muted…) no layout. */
+  .c-log { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .c-msgs { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 16px 20px 24px; list-style: none; margin: 0; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
+  .c-msgs > li { width: 100%; max-width: 68ch; margin-inline: auto; font-size: 14px; }
+  .c-msg { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; font-size: 14px; line-height: 1.6; }
+  .c-msg--hum { align-items: flex-end; }
+  .c-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; max-width: 100%; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .c-msg--hum .c-meta { justify-content: flex-end; }
+  .c-mark { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 1; }
+  .c-name { color: var(--text); font-weight: 600; }
+  .c-meta time, .c-foot { font-variant-numeric: tabular-nums; }
+  .c-meta time { color: var(--dim); font-family: inherit; }
+  .c-meta .mchip { font-size: 10.5px; }
+  .c-body { min-width: 0; max-width: 100%; color: var(--text); font-weight: 400; overflow-wrap: anywhere; }
+  .c-msg--orq .c-body { width: 100%; }
+  .c-bubble { max-width: 85%; padding: 10px 14px; background: var(--accent-soft); border: 1px solid var(--line); border-radius: 12px 12px 4px 12px; white-space: pre-wrap; }
+  .c-msg--pending .c-bubble { opacity: .7; }
+  .c-body p { margin: 0 0 10px; }
+  .c-body > :last-child, .c-body blockquote > :last-child, .c-body li > :last-child { margin-bottom: 0; }
+  .c-body ul, .c-body ol { margin: 0 0 10px; padding-left: 22px; }
+  .c-body ul { list-style-type: disc; } .c-body ol { list-style-type: decimal; }
+  .c-body li ul { list-style-type: circle; margin: 2px 0 0; } .c-body li ol { list-style-type: lower-alpha; margin: 2px 0 0; }
+  .c-body li { margin: 2px 0; padding-left: 2px; }
+  .c-body strong { font-weight: 600; } .c-body em { font-style: italic; }
+  .c-body h4 { margin: 14px 0 6px; font-size: 15px; font-weight: 600; line-height: 1.4; } .c-body > h4:first-child { margin-top: 0; }
+  .c-body code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--raised); border-radius: 3px; padding: 1px 4px; }
+  .c-body pre { margin: 0 0 10px; padding: 8px 10px; font: 12.5px/1.5 "IBM Plex Mono", ui-monospace, monospace; background: var(--raised); border: 1px solid var(--line); border-radius: 4px; white-space: pre; overflow: auto; max-height: 320px; overflow-wrap: normal; }
+  .c-body blockquote { margin: 0 0 10px; padding: 0 0 0 12px; border-left: 3px solid var(--line-strong); color: var(--muted); }
+  .c-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .c-table { max-width: 100%; overflow-x: auto; margin: 0 0 10px; }
+  .c-table table { border-collapse: collapse; font-size: 13px; line-height: 1.45; }
+  .c-table th, .c-table td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; overflow-wrap: normal; }
+  .c-table th { background: var(--raised); font-weight: 600; }
+  .c-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -0.15em; background: var(--accent); animation: c-blink 1s steps(1, end) infinite; }
+  @keyframes c-blink { 50% { opacity: 0; } }
+  .c-phase { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .c-phase-ic { flex: none; width: 14px; text-align: center; color: var(--accent); animation: pulse 1.2s infinite; }
+  .c-foot { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin-top: 2px; font-size: 12px; color: var(--dim); }
+  .c-foot .linkbtn { min-height: 32px; font-size: 12px; }
+  .c-flag { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--muted); }
+  .c-flag--err { color: var(--danger); } .c-flag--warn { color: var(--warn); }
+  .c-partial { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line-strong); font-size: 12.5px; color: var(--muted); }
+  .c-note-empty { color: var(--muted); }
+  .c-msg > .c-prop { align-self: stretch; }
+  .c-day { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); }
+  .c-day::before, .c-day::after { content: ""; flex: 1 1 auto; border-top: 1px solid var(--line); }
+  .c-tobottom { position: absolute; right: 16px; bottom: 16px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .c-tobottom:hover { border-color: var(--accent); color: var(--accent); }
+  .c-tobottom:focus-visible, .c-body a:focus-visible, .c-foot .linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .c-caret, .c-phase-ic, .c-status.work .ic { animation: none; } }
   .c-empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
   .c-empty b { color: var(--text); display: block; font-size: 14px; margin-bottom: 4px; }
   .c-sugs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
@@ -682,14 +707,15 @@
   .c-status .btn { height: 32px; padding: 0 10px; font-size: 12.5px; flex: none; }
   .c-comp { padding: 10px 20px 14px; border-top: 1px solid var(--line); background: var(--surface); }
   .c-comp label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 500; }
-  .c-comp label .num { font-family: "IBM Plex Mono", monospace; color: var(--dim); font-weight: 400; }
+  .c-comp label .num { font-variant-numeric: tabular-nums; color: var(--dim); font-weight: 400; }
   .c-comp label .num.over { color: var(--danger); font-weight: 600; }
-  .c-comp textarea { margin-top: 4px; font-size: 13.5px; min-height: 64px; max-height: 40vh; }
-  .c-comp textarea[aria-disabled="true"] { background: var(--raised); color: var(--muted); cursor: not-allowed; }
+  .c-comp textarea { display: block; margin-top: 4px; font-size: 14px; line-height: 1.5; min-height: 44px; max-height: 40vh; resize: none; overflow-y: hidden; border-radius: 4px; }
   .c-comp .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
   .c-comp .row .hint { font-size: 12px; color: var(--dim); flex: 1 1 200px; }
-  .c-comp .row .btn { height: 40px; flex-grow: 0; }
-  @media (max-width: 900px) { .chat { width: 100%; } }
+  .c-comp .row .hint kbd { font: 11px "IBM Plex Mono", ui-monospace, monospace; padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; background: var(--raised); color: var(--muted); }
+  .c-comp .row .btn { height: 40px; flex: 0 0 auto; width: 96px; justify-content: center; }
+  @media (max-width: 900px) { .chat { width: 100%; } .c-msgs { padding: 12px 12px 20px; } }
+  @media (max-width: 480px) { .c-comp .row .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
   /* D18 × D17: de 600 a 900 px o cabeçalho divide a linha com o selo de ambiente → botão da conversa só com ícone
      (o aria-label/title seguem completos), como já ocorre < 600 px; sem isso o rótulo empurra o selo sobre os contadores. */
   /* Acima de 900 px (até 1100) o rótulo completo também empurrava o nome do projeto sobre o "Ao vivo" (visto a 920 px). */
@@ -711,12 +737,12 @@
     .chat .c-tools { grid-row: auto; grid-column: 1 / -1; justify-content: flex-start; }
     .chat .c-tools .btn { height: 44px; }
     .chat .c-note, .chat .c-warn { padding: 6px 12px; }
-    .c-msgs { padding: 12px; }
-    .c-msg, .c-msg.orquestrador { max-width: 94%; } .c-msg.orquestrador { width: 94%; }
+    .c-bubble { max-width: 88%; }
+    .c-tobottom { min-height: 44px; min-width: 44px; }
+    .c-foot .linkbtn { min-height: 44px; }
     .c-status { padding: 6px 12px; } .c-status .btn { height: 44px; }
     .c-comp { padding: 8px 12px 12px; }
     .c-comp .row .btn, .c-prop .actions .btn { height: 44px; }
-    .c-comp .row .hint { display: none; }
     .c-sugs button { min-height: 44px; }
   }
 </style>
@@ -771,12 +797,13 @@
   </div>
   <p class="c-note">Canal direto e somente leitura. O Orquestrador responde pelo estado registrado; ações só com sua confirmação.</p>
   <div class="c-warn" id="chat-warn" hidden></div>
-  <div class="c-log" id="chat-log" role="log" aria-live="off" aria-label="Mensagens da conversa"><ol class="c-msgs" id="chat-msgs"></ol></div>
+  <div class="c-log" id="chat-log" role="log" aria-live="off" aria-label="Mensagens da conversa"><ol class="c-msgs" id="chat-msgs"></ol>
+    <button class="c-tobottom" type="button" id="chat-bottom" aria-controls="chat-msgs" hidden><span aria-hidden="true">↓</span><span id="chat-bottom-t">Ir para o fim</span></button></div>
   <div class="c-status" id="chat-status" hidden></div>
   <form class="c-comp" id="chat-form" novalidate>
-    <label for="chat-text"><span>Sua pergunta ao Orquestrador</span><span class="num" id="chat-count" aria-hidden="true">0/8000</span></label>
-    <textarea id="chat-text" rows="3" maxlength="8000" aria-describedby="chat-hint" placeholder="Pergunte sobre demandas, gates, agentes…"></textarea>
-    <div class="row"><span class="hint" id="chat-hint">Enter envia · Shift+Enter quebra a linha · Esc fecha</span>
+    <label for="chat-text"><span>Sua pergunta ao Orquestrador</span><span class="num" id="chat-count" hidden>0/8000</span></label>
+    <textarea id="chat-text" rows="1" aria-describedby="chat-hint" placeholder="Pergunte sobre demandas, gates, agentes…"></textarea>
+    <div class="row"><span class="hint" id="chat-hint"><kbd>Enter</kbd> envia · <kbd>Shift+Enter</kbd> nova linha · <kbd>Esc</kbd> fecha</span>
       <button class="btn danger-outline" type="button" id="chat-stop" hidden>Parar</button>
       <button class="btn primary" type="submit" id="chat-send">Enviar</button></div>
   </form>
@@ -3140,12 +3167,12 @@ const chatCheckCmd = r => r === "codex" ? ["codex --version", "codex login statu
 const chatHref = id => hrefWith({ conversa: id, agente: null });
 // Links internos do texto mantêm o painel aberto (a conversa segue ao lado da tela aberta).
 const keepChat = h => { const r = parseHash(h); if (chat.id || route.params.get("conversa")) r.params.set("conversa", chat.id || route.params.get("conversa")); return buildHash(r); };
-const fmtWhen = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+const fmtWhen = ts => chatWhen(ts)?.text || "";   // D20 §3.4: lista "Conversas" e "desde …" no mesmo formato do chat
 const fmtSecs = ms => typeof ms === "number" && isFinite(ms) ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : null;
 // O bloco ```destravar é do servidor (vira `proposal`); no texto que chega em trechos ele é escondido desde a abertura.
 const stripProposal = t => String(t || "").replace(/```(?:destravar|delegar)[\s\S]*?(```|$)/g, "").replace(/\s+$/, "");
 
-// ---- Markdown mínimo por DOM (§9): parágrafo, lista, título, bloco de código, `código`, **negrito**, links seguros e Dn ----
+// ---- Markdown por DOM (§9 + D20 §3.3): parágrafo, listas (aninhadas), título, código, citação, tabela, **negrito**, *itálico*, links seguros e Dn ----
 const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 function safeLink(url, text) {
   const u = String(url || "").trim(), a = mk("a");
@@ -3159,45 +3186,86 @@ function demandLinkEl(code) {
   if (!info) return document.createTextNode(code);
   const a = mk("a"); a.href = keepChat(`#/demandas/${info.code}`); a.textContent = code; a.title = info.eff?.title || ""; return a;
 }
-const INL_SRC = "(`[^`\\n]+`)|(\\*\\*[^*\\n]+\\*\\*)|\\[([^\\]\\n]+)\\]\\(([^)\\s]+)\\)|(https?:\\/\\/[^\\s<>()]*[^\\s<>().,;:!?'\"])|\\b(D\\d{1,4})\\b";
+// D20 §3.3: um único renderizador (mdRender) para a fase ao vivo e a final; marcação incompleta fica literal.
+const INL_SRC = "(`[^`\\n]+`)|(\\*\\*[^*\\n]+\\*\\*)|(\\*[^*\\s](?:[^*\\n]*[^*\\s])?\\*)|\\[([^\\]\\n]+)\\]\\(([^)\\s]+)\\)|(https?:\\/\\/[^\\s<>()]*[^\\s<>().,;:!?'\"])|\\b(D\\d{1,4})\\b";
 function mdInline(parent, s) {
   const re = new RegExp(INL_SRC, "g"); let last = 0, m;
   while ((m = re.exec(s))) {
     if (m.index > last) parent.append(s.slice(last, m.index));
     if (m[1]) { const c = mk("code"); c.textContent = m[1].slice(1, -1); parent.append(c); }
     else if (m[2]) { const b = mk("strong"); mdInline(b, m[2].slice(2, -2)); parent.append(b); }
-    else if (m[3]) parent.append(safeLink(m[4], m[3]) || `${m[3]} (${m[4]})`);
-    else if (m[5]) parent.append(safeLink(m[5], m[5]) || m[5]);
-    else if (m[6]) parent.append(demandLinkEl(m[6]));
+    else if (m[3]) { const e = mk("em"); mdInline(e, m[3].slice(1, -1)); parent.append(e); }
+    else if (m[4]) parent.append(safeLink(m[5], m[4]) || `${m[4]} (${m[5]})`);
+    else if (m[6]) parent.append(safeLink(m[6], m[6]) || m[6]);
+    else if (m[7]) parent.append(demandLinkEl(m[7]));
     last = re.lastIndex;
   }
   if (last < s.length) parent.append(s.slice(last));
 }
-const LI_RE = /^\s*([-*•]|\d+[.)])\s+/;
-function mdRender(text) {
-  const root = document.createDocumentFragment(), lines = String(text || "").replace(/\r/g, "").split("\n");
+const LI_RE = /^(\s*)([-*•]|\d+[.)])\s+(.*)$/, FENCE_RE = /^\s*```/, H_RE = /^#{1,6}\s+(.*)$/, QUOTE_RE = /^\s*>\s?/;
+const TBL_RE = /^\s*\|.*\|\s*$/, TBL_SEP_RE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+const tblCells = l => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+const mdIsTable = (lines, i) => TBL_RE.test(lines[i]) && i + 1 < lines.length && TBL_SEP_RE.test(lines[i + 1]);
+function mdList(lines, i) {
+  const first = LI_RE.exec(lines[i]), indent = first[1].length, ordered = /\d/.test(first[2]), list = mk(ordered ? "ol" : "ul");
+  if (ordered && parseInt(first[2], 10) > 1) list.start = parseInt(first[2], 10);
+  while (i < lines.length) {
+    const m = LI_RE.exec(lines[i]);
+    if (!m) {   // continuação do item (linha recuada) — sem bloco novo
+      if (/^\s{2,}\S/.test(lines[i]) && list.lastElementChild) { list.lastElementChild.append(" "); mdInline(list.lastElementChild, lines[i].trim()); i++; continue; }
+      break;
+    }
+    const ind = m[1].length;
+    if (ind < indent) break;
+    if (ind >= indent + 2 && list.lastElementChild) { const [sub, j] = mdList(lines, i); list.lastElementChild.append(sub); i = j; continue; }
+    if (/\d/.test(m[2]) !== ordered) break;
+    const li = mk("li"); mdInline(li, m[3]); list.append(li); i++;
+  }
+  return [list, i];
+}
+function mdBlocks(lines, root) {
   let i = 0;
   while (i < lines.length) {
     const l = lines[i];
-    if (/^\s*```/.test(l)) { const buf = []; i++; while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]); i++; const pre = mk("pre"); pre.textContent = buf.join("\n"); root.append(pre); continue; }
+    if (FENCE_RE.test(l)) { const buf = []; i++; while (i < lines.length && !FENCE_RE.test(lines[i])) buf.push(lines[i++]); i++; const pre = mk("pre"); pre.textContent = buf.join("\n"); pre.tabIndex = 0; root.append(pre); continue; }
     if (!l.trim()) { i++; continue; }
-    const hm = /^#{1,6}\s+(.*)$/.exec(l);
+    const hm = H_RE.exec(l);
     if (hm) { const h = mk("h4"); mdInline(h, hm[1]); root.append(h); i++; continue; }
-    if (LI_RE.test(l)) {
-      const list = mk(/^\s*\d/.test(l) ? "ol" : "ul");
-      while (i < lines.length && LI_RE.test(lines[i])) {
-        const li = mk("li"); mdInline(li, lines[i].replace(LI_RE, "")); i++;
-        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !LI_RE.test(lines[i])) { li.append(" "); mdInline(li, lines[i].trim()); i++; }
-        list.append(li);
-      }
-      root.append(list); continue;
+    if (QUOTE_RE.test(l)) { const buf = []; while (i < lines.length && QUOTE_RE.test(lines[i])) buf.push(lines[i++].replace(QUOTE_RE, "")); const q = mk("blockquote"); mdBlocks(buf, q); root.append(q); continue; }
+    if (mdIsTable(lines, i)) {
+      const wrap = mk("div", "c-table"), t = mk("table"), th = mk("thead"), tb = mk("tbody"), hr = mk("tr");
+      for (const c of tblCells(lines[i])) { const e = mk("th"); e.scope = "col"; mdInline(e, c); hr.append(e); }
+      th.append(hr); i += 2;
+      while (i < lines.length && TBL_RE.test(lines[i])) { const tr = mk("tr"); for (const c of tblCells(lines[i++])) { const e = mk("td"); mdInline(e, c); tr.append(e); } tb.append(tr); }
+      t.append(th, tb); wrap.append(t); wrap.tabIndex = 0; root.append(wrap); continue;
     }
+    if (LI_RE.test(l)) { const [list, j] = mdList(lines, i); root.append(list); i = j; continue; }
     const p = mk("p"); let first = true;
-    while (i < lines.length && lines[i].trim() && !/^\s*```/.test(lines[i]) && !LI_RE.test(lines[i]) && !/^#{1,6}\s/.test(lines[i])) { if (!first) p.append(mk("br")); mdInline(p, lines[i++]); first = false; }
+    while (i < lines.length && lines[i].trim() && !FENCE_RE.test(lines[i]) && !LI_RE.test(lines[i]) && !H_RE.test(lines[i]) && !QUOTE_RE.test(lines[i]) && !mdIsTable(lines, i)) {
+      if (!first) p.append(mk("br")); mdInline(p, lines[i++]); first = false;
+    }
     root.append(p);
   }
   return root;
 }
+const mdRender = text => mdBlocks(String(text || "").replace(/\r/g, "").split("\n"), document.createDocumentFragment());
+
+// ---- D20 §3.4: horários no fuso do navegador (Intl, sem timeZone), formato absoluto e curto; data completa no title ----
+const CHAT_TZ = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } })();
+const p2 = n => String(n).padStart(2, "0");
+const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const MONTHS_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+function chatWhen(ts) {
+  const d = ts ? new Date(ts) : null;
+  if (!d || isNaN(d)) return null;
+  const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
+  const hm = `${p2(d.getHours())}:${p2(d.getMinutes())}`, dm = `${p2(d.getDate())}/${p2(d.getMonth() + 1)}`;
+  const k = dayKey(d);
+  const text = k === dayKey(now) ? hm : k === dayKey(y) ? `ontem ${hm}` : d.getFullYear() === now.getFullYear() ? `${dm} ${hm}` : `${dm}/${d.getFullYear()} ${hm}`;
+  const day = k === dayKey(now) ? "Hoje" : k === dayKey(y) ? "Ontem" : `${d.getDate()} de ${MONTHS_PT[d.getMonth()]}${d.getFullYear() === now.getFullYear() ? "" : ` de ${d.getFullYear()}`}`;
+  return { text, day, key: k, iso: d.toISOString(), title: `${dm}/${d.getFullYear()} ${hm}:${p2(d.getSeconds())}${CHAT_TZ ? ` (${CHAT_TZ})` : ""}` };
+}
+const chatTimeHtml = (ts, extra) => { const w = chatWhen(ts); return w ? `<time datetime="${esc(w.iso)}" title="${esc(w.title + (extra ? ` · ${extra}` : ""))}">${esc(w.text)}</time>` : ""; };
 
 // ---- Rota → painel ----
 function chatSync() {
@@ -3287,7 +3355,7 @@ async function chatSend(raw) {
     const h = chatHref(chat.id); history.replaceState(null, "", h); route = parseHash(h);
     C("chat-new").setAttribute("href", chatHref("nova"));
   }
-  const r = await chatApi("POST", `/api/conversas/${chat.id}/mensagens`, { text });
+  const r = await chatApi("POST", `/api/conversas/${chat.id}/mensagens`, { text, tz: CHAT_TZ || undefined });   // D20 §3.4: fuso do humano
   if (g !== chat.gen) return;
   chat.sending = false;
   if (!r.ok) return chatSendFailed(opt, text, r);
@@ -3386,17 +3454,21 @@ function chatTurnEnded(fin, errText) {
   const a = chat.active; chat.active = null; chatStopTick(); chatStopStream();
   if (fin) chatMerge([fin]);
   const st = fin?.status || (errText ? "erro" : "ok");
-  if (st === "ok") { chat.status = null; chat.done = { totalMs: fin?.totalMs ?? (a ? Date.now() - a.startedAt : null) }; announce("Resposta do Orquestrador recebida"); }
+  chat.done = null; chat.status = null;
+  if (st === "ok") announce("Resposta do Orquestrador recebida");
   else {
-    chat.done = null;
-    const human = [...chat.msgs].reverse().find(m => m.role === "humano" && (a?.turn == null || m.turn === a.turn));
+    // D20 §3.5: erro/cancelada/tempo esgotado aparecem só no rodapé da mensagem; a barra só quando não há registro.
     const lbl = { erro: "Erro na resposta", cancelada: "Resposta cancelada", tempo_esgotado: "Tempo esgotado", interrompida: "Resposta interrompida" }[st] || "Erro na resposta";
-    const detail = errText || fin?.error || "";
-    chat.status = { kind: st === "cancelada" ? "info" : st === "tempo_esgotado" ? "warn" : "err", icon: st === "cancelada" ? "■" : st === "tempo_esgotado" ? "◷" : "✕",
-      text: `${lbl}${detail ? `: ${detail}` : "."}${st === "cancelada" || st === "tempo_esgotado" ? " O texto parcial ficou marcado." : ""}`, retry: st !== "cancelada" && human ? human.text : null };
-    if (st === "cancelada") announce(chat.status.text); else announceErr(chat.status.text);
+    const detail = errText || fin?.error || "", text = `${lbl}${detail ? `: ${detail}` : "."}`;
+    const recorded = chat.msgs.some(m => m.role === "orquestrador" && (a?.turn == null || m.turn === a.turn));
+    if (!recorded) {
+      const human = [...chat.msgs].reverse().find(m => m.role === "humano" && (a?.turn == null || m.turn === a.turn));
+      chat.status = { kind: st === "tempo_esgotado" ? "warn" : "err", icon: st === "tempo_esgotado" ? "◷" : "✕", text, retry: st !== "cancelada" && human ? human.text : null };
+    }
+    if (st === "cancelada") announce(text); else announceErr(text);
   }
-  chatRender(); chatScroll(false); chatLoadList();
+  const near = chatNearBottom();
+  chatRender(); if (near) chatScroll(true); chatLoadList();
 }
 async function chatCancel() {
   const a = chat.active; if (!a || a.turn == null || a.cancelling) return;
@@ -3408,7 +3480,7 @@ async function chatCancel() {
   if (chat.active && !chat.es && !chat.poll) chatStartPoll();
   C("chat-text").focus({ preventScroll: true });
 }
-function chatStartTick() { if (!chat.tick) chat.tick = setInterval(() => chatRenderStatus(), 1000); }
+function chatStartTick() { if (!chat.tick) chat.tick = setInterval(() => chatRenderPhase(), 1000); }
 function chatStopTick() { if (chat.tick) { clearInterval(chat.tick); chat.tick = null; } }
 function chatSetStatus(kind, text) { chat.status = { kind, icon: kind === "err" ? "✕" : "▲", text }; chatRenderStatus(); }
 
@@ -3502,47 +3574,57 @@ function phaseText(a) {
   }
   return (PHASES[a.phase] || PHASES.pensando)[0];
 }
-const STATUS_FLAG = { erro: ["Erro", "✕", "err"], cancelada: ["Cancelada · texto parcial", "■", "muted"], tempo_esgotado: ["Tempo esgotado · texto parcial", "◷", "warn"], interrompida: ["Interrompida", "■", "muted"] };
+const STATUS_FLAG = { erro: ["Erro", "✕", "err"], cancelada: ["Cancelada · texto parcial", "■", ""], tempo_esgotado: ["Tempo esgotado · texto parcial", "◷", "warn"], interrompida: ["Interrompida", "■", ""] };
+// D20 §3.1: a MESMA estrutura durante e após o streaming — li (coluna) > .c-meta (autor · modelo · horário) > .c-body > [.c-foot].
+// As classes `orquestrador`/`humano`/`bub`/`flag` ficam só como apelidos sem CSS (roteiros do D17); o layout é todo `c-*`.
+let chatMetaSeq = 0;
 function chatMsgEl(m, isLastOrq) {
-  const orq = m.role !== "humano", li = mk("li", `c-msg ${orq ? "orquestrador" : "humano"}${m.pending ? " pending" : ""}`);
-  const who = mk("div", "who");
+  const orq = m.role !== "humano", live = !!m.streaming;
+  const li = mk("li", `c-msg ${orq ? "c-msg--orq orquestrador" : "c-msg--hum humano"}${live ? " c-msg--streaming" : ""}${m.pending ? " c-msg--pending" : ""}`);
+  const meta = mk("div", "c-meta"); meta.id = live ? "chat-live-meta" : `chat-meta-${m.seq ?? `p${++chatMetaSeq}`}`;
+  li.setAttribute("aria-labelledby", meta.id);
+  const timings = orq ? [fmtSecs(m.firstTextMs) && `1º trecho ${fmtSecs(m.firstTextMs)}`, fmtSecs(m.totalMs) && `total ${fmtSecs(m.totalMs)}`].filter(Boolean).join(" · ") : "";
   if (orq) {
     const model = modelId(m.model, m.runner);
-    who.innerHTML = `<b>Orquestrador</b>${m.runner ? `<span>runner ${esc(m.runner)}</span>` : ""}${model ? modelChip(model, m.modelProvider, "conversa", m.runner) : ""}<time datetime="${esc(m.ts || "")}">${esc(hhmm(m.ts))}</time>`;
-    const fl = STATUS_FLAG[m.status]; if (fl) who.insertAdjacentHTML("beforeend", `<span class="flag ${fl[2]}"><span aria-hidden="true">${fl[1]}</span>${fl[0]}</span>`);
-  } else who.innerHTML = `<b>Você</b><time datetime="${esc(m.ts || "")}">${esc(hhmm(m.ts))}</time>${m.pending ? `<span>· enviando…</span>` : ""}`;
-  const bub = mk("div", "bub");
-  if (!orq) bub.textContent = m.text || "";
-  else {
-    const txt = stripProposal(m.text);
-    if (txt) bub.append(mdRender(txt));
-    if (!txt || (m.status && m.status !== "ok")) {
-      const n = mk("span", txt ? "partial" : "muted");
-      n.textContent = m.status === "erro" ? `Sem resposta: ${m.error || "erro no runner"}.` : m.status === "interrompida" ? "O servidor reiniciou durante a resposta; nada foi aproveitado."
-        : m.status === "cancelada" ? (txt ? "Texto parcial: você parou a resposta." : "Você parou a resposta antes do primeiro trecho.")
-        : m.status === "tempo_esgotado" ? (txt ? "Texto parcial: a resposta passou do tempo limite." : "A resposta passou do tempo limite sem texto.") : "Sem texto.";
-      bub.append(n);
-    }
+    meta.innerHTML = `<span class="c-mark" aria-hidden="true">O</span><span class="c-name">Orquestrador</span>${model ? modelChip(model, m.modelProvider, "conversa", m.runner) : ""}${chatTimeHtml(m.ts, isLastOrq ? "" : timings)}`;
+    const chip = meta.querySelector(".mchip"); if (chip && m.runner) chip.title += ` · runner ${m.runner}`;
+  } else meta.innerHTML = `<span class="c-name">Você</span>${chatTimeHtml(m.ts)}${m.pending ? `<span>· enviando…</span>` : ""}`;
+  const body = mk("div", orq ? "c-body bub" : "c-body c-bubble bub");
+  li.append(meta, body);
+  if (live) { li.id = "chat-live"; li.setAttribute("aria-busy", "true"); return li; }   // corpo e fase: chatRenderLive()
+  if (!orq) { body.textContent = m.text || ""; return li; }
+  const txt = stripProposal(m.text);
+  if (txt) body.append(mdRender(txt));
+  if (!txt || (m.status && m.status !== "ok")) {
+    const n = mk(txt ? "p" : "span", txt ? "c-partial" : "c-note-empty");
+    n.textContent = m.status === "erro" ? `Sem resposta: ${m.error || "erro no runner"}.` : m.status === "interrompida" ? "O servidor reiniciou durante a resposta; nada foi aproveitado."
+      : m.status === "cancelada" ? (txt ? "Texto parcial: você parou a resposta." : "Você parou a resposta antes do primeiro trecho.")
+      : m.status === "tempo_esgotado" ? (txt ? "Texto parcial: a resposta passou do tempo limite." : "A resposta passou do tempo limite sem texto.") : "Sem texto.";
+    body.append(n);
   }
-  li.append(who, bub);
-  if (orq) {
-    const foot = mk("div", "foot"), a = fmtSecs(m.firstTextMs), b = fmtSecs(m.totalMs);
-    if (a || b) { const s = mk("span"); s.textContent = [a && `1º trecho em ${a}`, b && `total ${b}`].filter(Boolean).join(" · "); foot.append(s); }
-    if (m.sessionReset) { const s = mk("span"); s.textContent = "sessão reaberta com o histórico recente"; foot.append(s); }
-    if (isLastOrq && ["erro", "tempo_esgotado", "interrompida"].includes(m.status) && !chat.active) {
-      const human = [...chat.msgs].reverse().find(x => x.role === "humano" && x.turn === m.turn);
-      if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = "Tentar de novo"; foot.append(bt); }
-    }
-    if (foot.childNodes.length) li.append(foot);
-    if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(m.proposal.kind === "delegar" ? delegPropEl(m.proposal) : chatPropEl(m.proposal));   // D19: kind ausente = destravar
+  // Rodapé: estado final ≠ ok (ícone + texto), tempos (só na última resposta; nas anteriores vão no title do horário), ações.
+  const foot = mk("div", "c-foot"), fl = STATUS_FLAG[m.status];
+  if (fl) foot.insertAdjacentHTML("beforeend", `<span class="c-flag flag${fl[2] ? ` c-flag--${fl[2]}` : ""}"><span aria-hidden="true">${fl[1]}</span>${fl[0]}</span>`);
+  if (timings && isLastOrq) { const s = mk("span"); s.textContent = timings; foot.append(s); }
+  if (m.sessionReset) { const s = mk("span"); s.textContent = "sessão reaberta com o histórico recente"; foot.append(s); }
+  if (isLastOrq && ["erro", "tempo_esgotado", "interrompida"].includes(m.status) && !chat.active) {
+    const human = [...chat.msgs].reverse().find(x => x.role === "humano" && x.turn === m.turn);
+    if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = "Tentar de novo"; foot.append(bt); }
   }
+  if (foot.childNodes.length) li.append(foot);
+  if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(m.proposal.kind === "delegar" ? delegPropEl(m.proposal) : chatPropEl(m.proposal));   // D19: kind ausente = destravar
   return li;
 }
-function chatLiveEl() {
-  const li = mk("li", "c-msg orquestrador live"); li.id = "chat-live";
-  const who = mk("div", "who"); who.innerHTML = `<b>Orquestrador</b>${chatRunner() ? `<span>runner ${esc(chatRunner())}</span>` : ""}<span class="ph"></span>`;
-  li.append(who, mk("div", "bub"));
-  return li;
+// §3.5: a fase aparece UMA vez, na mensagem ao vivo, logo abaixo do texto (a barra #chat-status não repete a fase).
+const PHASE_ICON = { enviando: "↑", iniciando: "◌", pensando: "◌", consultando: "⌕", respondendo: "✎" };
+function chatPhaseText(a) { return `${phaseText(a)}${a.cancelling ? "" : ` ${Math.max(0, Math.floor((Date.now() - a.startedAt) / 1000))} s`}`; }
+function chatRenderPhase() {
+  const el = C("chat-live"), a = chat.active; if (!el || !a) return;
+  let ph = el.querySelector(":scope > .c-phase");
+  if (!ph) { ph = mk("div", "c-phase"); ph.innerHTML = `<span class="c-phase-ic" aria-hidden="true"></span><span class="c-phase-t"></span>`; el.querySelector(":scope > .c-body").after(ph); }
+  const ic = a.cancelling ? "■" : PHASE_ICON[a.phase] || "◌", t = chatPhaseText(a);
+  if (ph.firstChild.textContent !== ic) ph.firstChild.textContent = ic;
+  if (ph.lastChild.textContent !== t) ph.lastChild.textContent = t;
 }
 let liveRaf = 0;
 function chatRenderLive() {
@@ -3551,17 +3633,34 @@ function chatRenderLive() {
     liveRaf = 0; const el = C("chat-live"), a = chat.active;
     chatRenderStatus(); chatRenderComposer();
     if (!el || !a) return;
-    const near = chatNearBottom();
-    el.querySelector(".ph").textContent = `· ${phaseText(a)}`;
-    const bub = el.querySelector(".bub"), txt = stripProposal(a.text);
-    bub.replaceChildren();
-    if (txt) { bub.append(mdRender(txt)); const last = bub.lastElementChild; const caret = mk("span", "c-caret"); caret.setAttribute("aria-hidden", "true"); (last && !["PRE", "UL", "OL"].includes(last.tagName) ? last : bub).append(caret); }
-    else { const s = mk("span", "muted"); s.textContent = phaseText(a); bub.append(s); }
+    const near = chatNearBottom(), bd = el.querySelector(":scope > .c-body"), txt = stripProposal(a.text);
+    if (bd.dataset.t !== txt) {
+      const grew = txt.length > (bd.dataset.t || "").length;
+      bd.dataset.t = txt; bd.replaceChildren();
+      if (txt) {
+        bd.append(mdRender(txt));
+        // §3.3: cursor no último nó de texto mais profundo (último li, p, célula, pre…), nunca numa linha própria.
+        const caret = mk("span", "c-caret"); caret.setAttribute("aria-hidden", "true");
+        ([...bd.querySelectorAll("p, li, td, th, pre, h4")].at(-1) || bd).append(caret);
+      }
+      if (grew && !near) chat.unseen = true;
+    }
+    chatRenderPhase();
     if (near) chatScroll(true);
+    chatRenderBottom();
   });
 }
-const chatNearBottom = () => { const l = C("chat-msgs"); return l.scrollHeight - l.scrollTop - l.clientHeight < 80; };
-function chatScroll(force) { const l = C("chat-msgs"); if (force || chatNearBottom()) l.scrollTop = l.scrollHeight; }
+const chatNearBottom = () => { const l = C("chat-msgs"); return l.scrollHeight - l.scrollTop - l.clientHeight <= 80; };
+function chatScroll(force) { const l = C("chat-msgs"); if (force || chatNearBottom()) { l.scrollTop = l.scrollHeight; chat.unseen = false; } chatRenderBottom(); }
+// §3.6: rolado para cima → a posição não muda e aparece "Ir para o fim" ("Nova resposta" se chegou texto novo).
+function chatRenderBottom() {
+  const btn = C("chat-bottom"), far = !C("chat").hidden && !chatNearBottom();
+  if (!far) chat.unseen = false;
+  const t = chat.unseen ? "Nova resposta" : "Ir para o fim";
+  if (C("chat-bottom-t").textContent !== t) C("chat-bottom-t").textContent = t;
+  if (btn.hidden === far) { if (!far && btn.contains(document.activeElement)) C("chat-text").focus({ preventScroll: true }); btn.hidden = !far; }
+}
+function chatDayEl(w) { const li = mk("li", "c-day"); li.setAttribute("role", "separator"); li.setAttribute("aria-label", w.day); li.textContent = w.day; return li; }
 function chatRender() {
   chatRenderHead(); chatRenderWarn();
   const list = C("chat-msgs"), fid = list.contains(document.activeElement) ? document.activeElement.id : null, scroll = list.scrollTop, near = chatNearBottom();
@@ -3580,32 +3679,53 @@ function chatRender() {
     li.append(b, p, sg); list.append(li);
   } else if (chat.id && !chat.conv && !chat.msgs.length) { const li = mk("li", "c-empty"); li.textContent = "Carregando a conversa…"; list.append(li); }
   const lastOrq = [...chat.msgs].reverse().find(m => m.role !== "humano");
-  for (const m of chat.msgs) list.append(chatMsgEl(m, m === lastOrq));
-  if (chat.active) list.append(chatLiveEl());
+  const all = chat.active ? [...chat.msgs, { role: "orquestrador", streaming: true, ts: new Date(chat.active.startedAt).toISOString() }] : chat.msgs;
+  let prevDay = null;
+  for (const m of all) {
+    const w = chatWhen(m.ts);   // §3.2: separador de dia entre mensagens de datas locais diferentes
+    if (w && prevDay && w.key !== prevDay) list.append(chatDayEl(w));
+    if (w) prevDay = w.key;
+    list.append(chatMsgEl(m, m === lastOrq));
+  }
   if (near) list.scrollTop = list.scrollHeight; else list.scrollTop = scroll;
   if (fid) C(fid)?.focus({ preventScroll: true });
-  chatRenderLive(); chatRenderStatus(); chatRenderComposer();
+  chatRenderLive(); chatRenderStatus(); chatRenderComposer(); chatRenderBottom();
 }
+// §3.5: a barra só mostra estados da conversa sem mensagem própria (indisponível, ocupado, falha ao enviar/rede).
 function chatRenderStatus() {
-  const el = C("chat-status"), a = chat.active, s = chat.status;
+  const el = C("chat-status"), s = chat.status;
   let html = "", cls = "";
-  if (a) { cls = "work"; html = `<span class="ic" aria-hidden="true">${a.cancelling ? "■" : (PHASES[a.phase] || PHASES.pensando)[1]}</span><span class="txt">${esc(phaseText(a))}</span><span class="el">${Math.floor((Date.now() - a.startedAt) / 1000)} s</span>`; }
-  else if (s) {
+  if (s) {
     cls = s.kind === "err" ? "err" : s.kind === "warn" ? "warn" : "";
     html = `<span class="ic" aria-hidden="true">${esc(s.icon || "▲")}</span><span class="txt">${esc(s.text)}${s.cmds ? s.cmds.map((c, i) => `${i ? " e " : ""}<code>${esc(c)}</code>`).join("") + "." : ""}${s.link ? ` <a href="${esc(s.link.href)}">${esc(s.link.text)}</a>` : ""}</span>${s.retry ? `<button class="btn" type="button" data-chat-retry-text="1">Tentar de novo</button>` : ""}`;
-  } else if (chat.done) { cls = ""; html = `<span class="ic" aria-hidden="true" style="color:var(--ok)">✓</span><span class="txt">Resposta concluída${fmtSecs(chat.done.totalMs) ? ` em ${esc(fmtSecs(chat.done.totalMs))}` : ""}.</span>`; }
+  }
   const key = cls + html;
   if (el.dataset.k !== key) { const had = el.contains(document.activeElement); el.className = `c-status ${cls}`; el.innerHTML = html; el.dataset.k = key; if (had) C("chat-text").focus({ preventScroll: true }); }
   el.hidden = !html;
 }
+// §3.7: durante o turno o campo continua editável (rascunho), Enter não envia e "Enviar" vira "Parar" no mesmo lugar.
+const CHAT_HINT = "<kbd>Enter</kbd> envia · <kbd>Shift+Enter</kbd> nova linha · <kbd>Esc</kbd> fecha";
 function chatRenderComposer() {
-  const busy = !!chat.active || chat.sending, ta = C("chat-text");
-  ta.readOnly = busy; ta.setAttribute("aria-disabled", busy ? "true" : "false");
-  C("chat-send").disabled = busy;
-  const stop = C("chat-stop"); stop.hidden = !chat.active; stop.disabled = !chat.active || chat.active.turn == null || !!chat.active.cancelling;
-  stop.textContent = chat.active?.cancelling ? "Parando…" : "Parar";
+  const busy = !!chat.active || chat.sending, ta = C("chat-text"), send = C("chat-send"), stop = C("chat-stop"), hint = C("chat-hint");
+  ta.readOnly = false; ta.removeAttribute("aria-disabled");
+  send.hidden = !!chat.active; send.disabled = busy;
+  stop.hidden = !chat.active; stop.disabled = !chat.active || chat.active.turn == null || !!chat.active.cancelling;
+  const st = chat.active?.cancelling ? "Parando…" : "Parar"; if (stop.textContent !== st) stop.textContent = st;
+  const h = busy ? "Aguarde a resposta ou pare. Você já pode escrever a próxima pergunta." : CHAT_HINT;
+  if (hint.dataset.k !== h) { hint.innerHTML = h; hint.dataset.k = h; }
 }
-function chatCount() { const n = C("chat-text").value.length, el = C("chat-count"); el.textContent = `${n}/${CHAT_MAX}`; el.classList.toggle("over", n > CHAT_MAX); }
+function chatAutoSize() {
+  const ta = C("chat-text"), max = Math.round(window.innerHeight * 0.4);
+  ta.style.height = "auto";
+  const h = ta.scrollHeight + 2;   // + bordas (box-sizing: border-box)
+  ta.style.height = `${Math.min(h, max)}px`; ta.style.overflowY = h > max ? "auto" : "hidden";
+}
+function chatCount() {
+  const n = C("chat-text").value.length, el = C("chat-count"), show = n >= 7000;
+  el.textContent = `${n}/${CHAT_MAX}`; el.classList.toggle("over", n > CHAT_MAX); el.hidden = !show;
+  C("chat-text").setAttribute("aria-describedby", show ? "chat-hint chat-count" : "chat-hint");
+  chatAutoSize();
+}
 function chatTitle() {
   const it = (chat.info?.items || []).find(x => x.id === chat.id);
   const first = chat.msgs.find(m => m.role === "humano");
@@ -3639,7 +3759,7 @@ function chatRenderList() {
   const items = chat.info?.items || [], busy = chat.info?.busy;
   const ST = { ok: "", erro: " · erro", cancelada: " · cancelada", tempo_esgotado: " · tempo esgotado", interrompida: " · interrompida" };
   el.innerHTML = items.length ? `<ul aria-label="Conversas, da mais recente para a mais antiga">${items.filter(it => CHAT_ID_RE.test(it.id || "")).map(it => `<li><a href="${esc(chatHref(it.id))}" ${it.id === chat.id ? 'aria-current="true"' : ""}>
-      <span class="ct">${esc(it.title || "Conversa sem mensagens")}</span><small>${esc(fmtWhen(it.updatedAt || it.createdAt))}</small>
+      <span class="ct">${esc(it.title || "Conversa sem mensagens")}</span><small>${chatTimeHtml(it.updatedAt || it.createdAt)}</small>
       <span class="cm">${Number(it.messages) || 0} mensagens${esc(ST[it.lastStatus] || "")}${busy?.conversa === it.id ? " · respondendo agora" : ""}</span></a></li>`).join("")}</ul>`
     : `<p class="none">${chat.infoErr ? esc(chatErrText(chat.infoErr)) : "Nenhuma conversa ainda."}</p>`;
 }
@@ -3666,6 +3786,13 @@ C("chat-text").addEventListener("keydown", ev => {
 });
 C("chat-text").addEventListener("input", () => { chatCount(); if (chat.status && chat.status.kind === "err" && !chat.status.retry) { chat.status = null; chatRenderStatus(); } });
 C("chat-stop").addEventListener("click", () => chatCancel());
+C("chat-msgs").addEventListener("scroll", () => chatRenderBottom(), { passive: true });
+C("chat-bottom").addEventListener("click", () => {
+  const l = C("chat-msgs"), reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  chat.unseen = false; l.scrollTo({ top: l.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+  C("chat-bottom").hidden = true; C("chat-text").focus({ preventScroll: true });
+});
+window.addEventListener("resize", () => { if (!C("chat").hidden) chatAutoSize(); });
 C("chat").addEventListener("input", ev => { const pid = ev.target.dataset?.chatNote; if (pid) chat.notes[pid] = ev.target.value; });
 C("chat").addEventListener("click", ev => {
   const sg = ev.target.closest("[data-chat-sug]");

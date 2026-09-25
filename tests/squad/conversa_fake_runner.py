@@ -13,6 +13,11 @@ Palavras-chave na pergunta do humano (texto depois de "Pergunta do humano:"):
   SESSAO_PERDIDA → com --resume, sai com "No conversation found" (sessão perdida → sessionReset)
   ECO            → diz se o prompt trouxe <historico_da_conversa>
   INJECAO        → diz se o contexto trouxe o texto injetado "IGNORE AS REGRAS"
+  FXD20          → texto FX do contrato ui-conversa-visual-v2 §4 (D20) em trechos de 20 caracteres a cada 0,45 s e 1 s
+                   com o texto completo antes do fim
+  MDV6           → Markdown completo do CA-V6 (D20): parágrafo, lista numerada, lista aninhada, código, bloco de 120
+                   colunas, citação, tabela 4×3, link interno/externo, `**negrito` sem fechar e `<img onerror>` literal
+  LONGO          → resposta longa (40 parágrafos curtos) em trechos a cada 0,25 s (~10 s; rolagem do CA-V7, D20)
   PROPOR:<json>  → termina a resposta com o bloco ```destravar <json>```
 """
 import json
@@ -65,8 +70,22 @@ if "PROPOR:" in question:
     block = question.split("PROPOR:", 1)[1].strip()
     text += "Posso destravar.\n\n```destravar\n" + block + "\n```\n"
 step, pause = (16, 0.2) if "LENTO" in question else (12, 0.02)
+if "FXD20" in question:   # D20 §4: FX com trechos ≥ 400 ms (streaming observável pelo navegador)
+    text = ("Recebido. O registro confirma:\n\n- **08:47** – suas respostas à triagem da D19 foram registradas.\n"
+            "- 08:47 – você iniciou a D19.\n\nUse `pending` e veja [o painel](#/painel).")
+    step, pause = 20, 0.45
+if "MDV6" in question:   # D20 CA-V6
+    text = ("Parágrafo inicial com `código` e **negrito**.\n\n1. primeiro\n2. segundo\n\n- externo\n  - aninhado\n- outro\n\n"
+            "```\n" + ("x" * 118) + "\n```\n\n> citação do registro\n\n| a | b | c |\n|---|---|---|\n| 1 | 2 | 3 |\n| 4 | 5 | 6 |\n| 7 | 8 | 9 |\n\n"
+            "Veja [o painel](#/painel) e [a doc](https://example.com/doc). Fim com **negrito sem fechar e <img src=x onerror=alert(1)>")
+    step, pause = 40, 0.05
+if "LONGO" in question:   # D20 CA-V7
+    text = "".join(f"Parágrafo {i:02d} da resposta longa para testar a rolagem do painel.\n\n" for i in range(1, 41))
+    step, pause = 70, 0.25
 for i in range(0, len(text), step):
     delta(text[i:i + step])
     time.sleep(pause)
+if "FXD20" in question:
+    time.sleep(1.0)   # texto completo visível ao vivo antes do `fim` (CA-V2 compara ao vivo × final)
 out({"type": "assistant", "message": {"model": MODEL, "content": [{"type": "text", "text": text}]}})
 out({"type": "result", "subtype": "success", "is_error": False, "result": text})

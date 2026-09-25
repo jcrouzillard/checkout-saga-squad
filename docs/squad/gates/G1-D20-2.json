@@ -1,0 +1,22 @@
+{
+  "gate": "G1", "cycle": 2, "demand": "41bdb8b49835", "code": "D20", "from": "arquiteto+qa", "to": "frontend",
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Commit do teste red antes de qualquer correção", "status": "pass", "source": "git log: 2977776 contrato → 0f5bcf9 G1 RETURN → 87fe99c contrato ajustado → 50b85c7 testes (HEAD); git diff 87fe99c HEAD só toca tests/** (nenhuma mudança em tools/, squad-control/)"},
+    {"name": "(B,3) Teste falha pelo motivo do bug", "status": "pass", "source": "python3 -m unittest tests/squad/test_conversa_tz_d20.py → 7 testes, failures=10 (subtests), todas AssertionError do defeito d: build_context sem parâmetro tz; ts 11:47:11+00:00 ≠ 08:47:11-03:00; cabeçalho sem fuso=; conversa.md sem regra de horário; tz do POST não chega ao runner. Nenhum ERROR de import/ambiente"},
+    {"name": "(B,3) Evento reproducao=FAIL do QA", "status": "pass", "source": "decisions.jsonl cb1abf0ba555 (qa, evidence, demand 41bdb8b49835, reproducao=FAIL, refs tests/ui/d20-conversa-visual.js)"},
+    {"name": "(2) Teste de navegador cobre defeitos a–d", "status": "pass", "source": "tests/ui/d20-conversa-visual.js: CA-V1 (a: li ao vivo display/flex-direction, meta acima, Δlado ≤1px, sem classe live), CA-V2 (b: cor ao vivo = final = texto, peso 400, ul disc, caret dentro do LI, snapshot ao vivo = final), CA-V3 (c: 1 fase só no streaming, #chat-status oculto, sem 'Resposta concluída', total 1x), CA-V4 (d: horários sem segundos, title, 'ontem', POST com tz). Runner FXD20 em conversa_fake_runner.py"},
+    {"name": "(2) Contrato corrigido (build_context, caminho do tz)", "status": "pass", "source": "87fe99c: docs/contracts sem 'context_block'; §3.4 cita Engine.send → build_context(state, data_root, tz=t.tz) e assinatura opcional; CA-V5 atualizado"},
+    {"name": "(1) Execução do roteiro de navegador pelo Auditor", "status": "validate", "source": "não reexecutado (exige servidor + Playwright); resultados red conferidos no detalhe do evento cb1abf0ba555 (Δ111px, --ok/500, circle, fase 2x); reexecutar no G3 para verde"}
+  ],
+  "open_risks": [
+    "Conflito provável com D19 em tools/squad/conversa.py (build_context) e render de mensagens; quem integrar depois faz rebase e reroda CA-V1..V5 + CA da D19.",
+    "CA-V12 (.live global/cabeçalho) depende do merge do PR #171 (D18) — verificar após rebase.",
+    "Escopo visual amplo além de a–d: manter commits de melhoria separados da correção; roteiro cobre V6/V8/V9/V10/V11 só parcialmente (completo no G3)."
+  ],
+  "corrections": [],
+  "human_required": false,
+  "rationale": "As duas correções do ciclo 1 foram atendidas: o contrato usa build_context e descreve o caminho do tz, e o QA commitou a reprodução (unitário + navegador) antes de qualquer correção, com evento reproducao=FAIL. O unitário falha exatamente pelo defeito d e o roteiro de navegador verifica a–c e a parte de UI de d. Único ponto não reexecutado é o roteiro Playwright (validate). Liberado para implementação."
+}
