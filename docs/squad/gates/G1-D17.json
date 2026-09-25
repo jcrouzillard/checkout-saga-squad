@@ -1,0 +1,49 @@
+{
+  "gate": "G1",
+  "demand": "e1d6eae16073",
+  "title": "D17: conversa direta com o Orquestrador (contrato + ADR-020)",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "handoff": "72b09e5fab16",
+  "branch": "feature/D17-conversa-com-o-orquestrador",
+  "commit": "72e2131",
+  "recommendation": "APPROVE",
+  "confidence": 0.84,
+  "risk": "moderado",
+  "human_required": false,
+  "evidences": [
+    {"name": "Aderência às 4 respostas do humano (B,3)", "status": "pass", "source": "ADR-020 Decisão 1-6 e contrato §3, §5, §6, §9: (1) sessão dedicada por --session-id/--resume e codex exec resume, fora do plantão e do run_agent.py, streaming SSE; (2) só Read/Glob/Grep, exceção única = proposta de destravar confirmada pelo humano; (3) botão no cabeçalho abre painel lateral, pergunta e resposta no mesmo painel, parâmetro conversa=<id> sobrevive a F5 (CA-1..3); (4) .squad/conversas/<id>.jsonl, fora de decisions.jsonl e do git, sem campo demand (CA-9)"},
+    {"name": "Somente leitura por construção e testável (B,3)", "status": "validate", "source": "claude --help confirma --tools, --disallowedTools, --strict-mcp-config, --session-id, --include-partial-messages, --add-dir; codex exec resume --help confirma --json, -c, --skip-git-repo-check (sem -s: o -c sandbox_mode do contrato está correto). build_cmd isolado + CA-6/CA-7/CA-8 com hash do log e git status. Defeitos no comando do §3.1: (a) 'Read(~/**)' nega também DATA_ROOT, que fica sob $HOME (/Users/juliencrouzillard/orca/...) — deny vence allow e vale para Glob/Grep: o modelo não leria nada; (b) regras com caminho absoluto no Claude Code exigem '//' (Read(//Users/.../.env)); '/x' é relativo à raiz do projeto; (c) Codex -s read-only lê qualquer arquivo pelo shell (inclusive .env, que existe na cópia principal, e ~/.ssh): a negação de .env/~ não existe para Codex"},
+    {"name": "Destravar reutiliza o mecanismo, com confirmação humana e lista fechada (B,3)", "status": "pass", "source": "server.py:1444-1466 (/api/human) e :1307-1328 (/api/demand/control); contrato §6.1 (tabela fechada), §6.3 (revalidação no confirmar, 409 proposta_obsoleta/ja_decidida, mesma função + via:conversa), CA-11..15. Ações iguais às do painel (squad-control/index.html:1165-1167: RETURN -> APPROVE 'aceitar devolução' + OVERRIDE). alerts.py:159-183 confirma que um human após o gate fecha B2/B3 e zera o contador de ciclos; OVERRIDE fecha B1"},
+    {"name": "Segurança HTTP, segredos e injeção (2)", "status": "pass", "source": "§7: _local_ok (server.py:1022) em todas as rotas novas, ids por regex, 32 KB por Content-Length, 8 000 caracteres; §3.1 ambiente do filho por lista de permissão (sem GH_TOKEN/GITHUB_TOKEN/SQUAD_*); §4 contexto sem detail/evidências, mascarado por transcripts.SECRET_PATTERNS e evidence_rules (ambos existem: transcripts.py:23, evidence_rules.py:179); injeção sem poder (sem escrita + validação + confirmação), CA-16/CA-17"},
+    {"name": "Critérios de aceite verificáveis (2)", "status": "pass", "source": "contrato §11: 23 CAs com comando/observação objetiva; runner simulado (SQUAD_CHAT_RUNNER=fake) para os determinísticos; CA-5/CA-7 com runner real; CA-22 garante não regressão das rotas refatoradas"},
+    {"name": "Viabilidade das metas de latência (1)", "status": "validate", "source": "§8: p50 ≤ 6 s / p95 ≤ 12 s de firstTextMs (claude) com partida do CLI a cada mensagem + prompt de sistema do Claude Code + até 24 KB de contexto: plausível com cache de prompt para perguntas que não leem arquivos; perguntas que disparam Read/Grep antes do texto estouram facilmente. A meta é medida, com escalonamento para processo persistente (alternativa B) sem mudar a API"},
+    {"name": "Impacto em server.py (1)", "status": "pass", "source": "refatorar /api/human e /api/demand/control em record_human_decision/record_control sem mudar resposta nem evento (CA-22). /api/human hoje grava direto no LOG (não usa _append_log) e não valida gate/demanda: a função extraída deve preservar isso na rota; validação fica só na camada da conversa"},
+    {"name": "Independência de fornecedor (1)", "status": "validate", "source": "SQUAD_CHAT_RUNNER claude|codex com comando por runner, prompt em docs/squad/prompts/conversa.md; porém a garantia de 'não ler .env/~' só vale no Claude (ver evidência 2c), e as metas de latência do Codex são separadas"}
+  ],
+  "open_risks": [
+    "OBRIGATÓRIO (implementação): trocar 'Read(~/**)' por negações pontuais (Read(~/.ssh/**), Read(~/.aws/**), Read(~/.config/**), Read(~/.claude/**), Read(~/.codex/**), Read(~/.netrc), Read(~/.gitconfig)) — ou confiar na recusa de leitura fora dos diretórios permitidos no modo -p — e escrever os caminhos absolutos com '//' (Read(//<DATA_ROOT>/.env), Read(//<DATA_ROOT>/.env.*), Read(//<DATA_ROOT>/.git/**)). CA-6 deve verificar a forma '//' e CA-7 deve incluir 'resuma o AGENTS.md' (prova de que a leitura permitida funciona).",
+    "OBRIGATÓRIO: Codex em -s read-only lê .env e arquivos do $HOME pelo shell. Ou o CA-7 'leia o .env' passa a valer só para claude e o risco fica escrito no §10/§12 e no aviso do painel quando o runner for codex, ou a conversa via codex filtra a saída (SECRET_PATTERNS) antes de gravar/exibir. Sem uma das duas, CA-7 falha com codex.",
+    "Destravar APPROVE em gate devolvido: com B1 puro (sem B2/B3) a demanda não está travada — o dono corrige sozinho — e um human APPROVE só zera o contador de ciclos (alerts.py:170, returns conta a partir do último human). Padrão recomendado: APPROVE só quando B2 ou B3 estiver aberto; B1 puro aceita apenas OVERRIDE.",
+    "Os 32 KB precisam ser checados em do_POST antes do self.rfile.read (server.py:1268), por prefixo /api/conversas; hoje a leitura acontece antes do roteamento com teto geral de 22 MB.",
+    "Com um novo escritor em decisions.jsonl (confirmação pelo chat) e ThreadingHTTPServer, usar um lock comum em _append_log/record_* (hoje as rotas abrem o arquivo em 'a' sem lock); não muda o evento.",
+    "--resume do Claude procura a sessão no diretório de projeto do cwd: o cwd .squad/conversas/.sessao tem de ser sempre o mesmo caminho absoluto (DATA_ROOT resolvido), senão todo turno cai em sessionReset.",
+    "firstTextMs mede até o primeiro texto; perguntas que leem arquivos antes de responder ficarão acima da meta. Publicar p50/p95 separando perguntas com e sem ferramenta e mostrar a fase 'consultando <arquivo>' imediatamente (já previsto) para a percepção de instantâneo.",
+    "Brief de handoff do Arquiteto não está em docs/squad/memory/handoffs/ (só o evento 72b09e5fab16) — desvio de protocolo menor, repetido da D16.",
+    "Rotas existentes /api/human e /api/demand/control continuam sem _local_ok: uma página externa pode forjar decisões por CSRF, contornando a confirmação cuidadosa do chat. Fora do escopo pelo contrato §13; recomenda-se demanda própria."
+  ],
+  "human_questions": [
+    {"q": "Histórico fora do git, só na cópia principal", "blocking": false, "default": "Seguir como está (.squad/conversas no DATA_ROOT da cópia principal): atende 'lugar apartado' e evita texto livre num repositório público."},
+    {"q": "Escopo do destravar (B4, override)", "blocking": false, "default": "Lista fechada do §6.1 (B1/B2/B3 e pausa); B4, B5, A1–A5, PR e ambiente de teste ficam fora."},
+    {"q": "APPROVE de gate devolvido conta como destravar", "blocking": false, "default": "Sim só quando B2/B3 estiver aberto; com B1 puro, apenas OVERRIDE (ver open_risks)."},
+    {"q": "Metas de latência", "blocking": false, "default": "As do §8, medidas pelo QA, com escalonamento para processo persistente se não atingidas."},
+    {"q": "Endurecer /api/human e /api/demand/control", "blocking": false, "default": "Fora desta demanda; abrir demanda própria (baixo esforço: reutilizar _local_ok)."}
+  ],
+  "communicate_to_human": [
+    "Nenhuma das 5 perguntas do Arquiteto é bloqueante: todas têm padrão razoável que a implementação segue; você corrige na revisão do PR.",
+    "O chat responde pelo estado registrado, não pela memória do plantão; pode errar e o painel avisa.",
+    "Com o runner codex, o Orquestrador do chat consegue ler qualquer arquivo da máquina (sandbox read-only do Codex não restringe leitura); prefira claude para o chat enquanto isso não for mitigado.",
+    "O texto que você digita vai ao fornecedor de IA; as conversas ficam só nesta máquina e se perdem se .squad/ for apagado."
+  ],
+  "rationale": "ADR-020 e contrato atendem às 4 respostas do humano, são aditivos e trazem 23 CAs verificáveis com runner simulado. As premissas foram conferidas no código e nos CLIs: flags do claude e do codex exec resume existem, _local_ok existe, /api/human e /api/demand/control são as rotas que o painel usa com as mesmas ações, e alerts.py fecha B1/B2/B3 com o evento human. O destravar fica fora do modelo (proposta validada pelo servidor, revalidada no confirmar, mesma função, confirmação humana), o que torna a injeção pelo log inofensiva. As lacunas são corrigíveis sem novo desenho e viram ressalvas obrigatórias: a negação 'Read(~/**)' e os caminhos sem '//' quebrariam ou anulariam o somente leitura no Claude, e o Codex não impede leitura de .env/$HOME. Aprovado com essas ressalvas; risco moderado."
+}
