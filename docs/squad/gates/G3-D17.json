@@ -1,0 +1,122 @@
+{
+  "gate": "G3",
+  "demand": "e1d6eae16073",
+  "title": "D17: conversa direta com o Orquestrador (validação do QA e correções)",
+  "from": "qa",
+  "to": "release",
+  "cycle": 1,
+  "branch": "feature/D17-conversa-com-o-orquestrador",
+  "handoffs": [
+    "397318703ceb",
+    "617af411eb0b",
+    "3fb1f565fd3f",
+    "dbedf6d67cd7"
+  ],
+  "evidence_events": [
+    "365d87bf112f",
+    "d39da1ad5249"
+  ],
+  "commits": [
+    "5d176be",
+    "47976c9",
+    "f02726b",
+    "48aeec7"
+  ],
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "human_required": false,
+  "evidences": [
+    {
+      "name": "Suítes da squad uma a uma (inclui a da D17 com runner simulado)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "Rodadas pelo Auditor no worktree plankton-d17 (TMPDIR no scratchpad g3-d17): test_conversa_d17 44 OK (29 s, SQUAD_CHAT_RUNNER=fake, portas livres, dados temporários; o teste do mesmo segundo já sem expectedFailure), test_alertas_d14 20 OK, test_governanca_d14_qa 19 OK, test_entrega_por_pr 'Todas as verificações passaram', test_ambiente_teste_d15 41 OK, test_bugs_d16 38 OK, test_bugs_d16_qa 18 OK, test_e2e_compose_seguro_d15 11 OK. Total 191 testes. sha256 do decisions.jsonl real e do worktree iguais antes e depois; git status do worktree limpo."
+    },
+    {
+      "name": "Correções QA-D17-1..3 conferidas no diff",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "git show 47976c9: Store.list() ordena por (updatedAt, mtime_ns, createdAt, id) desc — não depende mais da ordem do glob; expectedFailure removido. Prompt conversa.md ganhou a regra 2 ('não é agente da squad; nunca sugerir log.py/gitflow.py/run_agent.py/git/docker compose/echo; indicar o caminho no Squad Control'), regras renumeradas sem perda de conteúdo. git show f02726b: role=log/aria-live=off/aria-label movidos para <div id=chat-log class=c-log> em volta do <ol id=chat-msgs> (sem role) — li deixam de ficar órfãos; CSS flex/min-height 0 preserva a rolagem. Revalidação real do QA-D17-3 em d17-ca7-real.json → revalidacao_QA-D17-3: 2 pedidos de escrita, comandosProibidos=[] e citaSquadControl=true nos dois."
+    },
+    {
+      "name": "Critérios de aceite do contrato (CA-1..CA-23)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "tests/ui/checklist-conversa-d17.md + tests/ui/d17-conversa-result.json (20/20 checagens no navegador, 1440/390, claro/escuro, axe 0 violações após QA-D17-2) + 44 testes automatizados cobrindo CA-2..4, 6, 8..22 com runner simulado; CA-22 compara /api/human e /api/demand/control com o server.py pré-D17 (ab32d13)."
+    },
+    {
+      "name": "Somente leitura com o runner real (CA-7/CA-16)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "tests/ui/d17-ca7-real.json (claude 2.1.280): leitura permitida provada (marcador QA-LEITURA-7f3e9c só existe no arquivo; Read e Grep reais em b5/b6). Negação POR CONSTRUÇÃO provada por sonda com as flags de build_cmd e prompt neutro: Read em .env, .git/config e ~/.ssh → 'File is in a directory that is denied by your permission settings'; G2-D17.json lido — fecha o risco do G2 de a forma '//' só se provar em execução real. Nas perguntas normais a recusa veio antes, pelas regras do prompt (tools=[]). Injeção pelo log apontada como injeção, sem ferramenta, sem proposta, sem arquivo. Canários ausentes; log/gates/git status iguais."
+    },
+    {
+      "name": "Latência medida com runner real (CA-5, humano 1)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "tests/squad/latencia_conversa_d17.json: 14 perguntas, claude-opus-5-5, p50 2 497 ms / p95 5 584 ms (meta p50 ≤ 6 s, p95 ≤ 12 s); sem ferramenta n=11 p50 2 389/p95 3 666; com ferramenta n=3 p50 4 888/p95 5 584; POST 202 ≤ 3 ms. Separação com/sem ferramenta pedida no G1 atendida."
+    },
+    {
+      "name": "Aderência às 4 respostas do humano",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "(1) na hora, sessão dedicada, fora do plantão: --session-id/--resume (CA-4, b4 real), nenhum pending.py/plantão, latência acima. (2) sem efeito colateral, exceto destravar: tools Read/Glob/Grep, CA-8 log byte a byte igual, proposta só grava após confirmação, lista fechada (CA-10..15). (3) opção no Squad Control abre painel, pergunta e resposta no mesmo painel, histórico após F5 (CA-1..3, capturas d17-*.png). (4) registro apartado: .squad/conversas/c-<id>.jsonl, sem campo demand, ignorado pelo git (git check-ignore → .gitignore:7 .squad/)."
+    },
+    {
+      "name": "Ressalvas do G1 e riscos do G2",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "Atendidas: G1-1 ('//' e negações pontuais, sem Read(~/**) — agora provado em execução real), G1-2 (máscara do codex + aviso de isolamento reduzido), G1-3 (APPROVE só com B2/B3), 32 KB antes do read, trava comum, cwd estável, p50/p95 separados; G2: CA-7 completo, desempate da lista, 'agir como agente' (QA-D17-3). Em aberto (não bloqueantes): processo órfão se o servidor cair; codex sem CLI real e 'exec resume' sem -C; CSRF em /api/human e /api/demand/control (pré-existente, fora do escopo §13)."
+    },
+    {
+      "name": "Critério padrão G3: e2e 7 cenários do checkout",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "Não se aplica: a D17 só toca tools/squad, squad-control e docs; nenhum arquivo de services/**, infra/** ou docker-compose.yml no diff develop...HEAD. Mesmo tratamento do G3-D14/D15/D16."
+    },
+    {
+      "name": "Trace ponta a ponta no Jaeger",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "Não se aplica (ferramenta da fábrica, sem serviços do checkout alterados)."
+    },
+    {
+      "name": "Escopo e ownership",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "git diff --name-only develop...HEAD: 29 arquivos, todos de donos corretos — Arquiteto (ADR-020, contrato), Auditor (gates), Orquestrador (tools/squad/conversa.py, server.py, prompts, handoff), Frontend (squad-control/index.html), QA (tests/squad, tests/ui). Nada em services/infra."
+    },
+    {
+      "name": "Rastreabilidade demanda → commits → eventos",
+      "status": "pass",
+      "weight": 1,
+      "blocking": false,
+      "source": "Commits 'D17 (<papel>): …' na branch; eventos defect/handoff 365d87bf112f, d39da1ad5249, 397318703ceb, 617af411eb0b, 3fb1f565fd3f, dbedf6d67cd7 no log com --demand e1d6eae16073."
+    }
+  ],
+  "return_instructions": [],
+  "open_risks": [
+    "BACKLOG (Orquestrador, baixo): processo do runner órfão se o servidor morrer com turno aberto (start_new_session). É somente leitura, termina sozinho (fim do turno ou EPIPE no stdout fechado) e recover() fecha o turno como 'interrompida'. Melhoria: gravar pid/pgid do turno em .squad/conversas e fazer killpg em recover().",
+    "BACKLOG (Orquestrador, baixo): runner codex não exercitado com o CLI real; 'codex exec resume' roda com cwd .sessao sem -C DATA_ROOT (conforme o contrato §3.1) — caminhos relativos a partir do 2º turno podem falhar (erro de leitura, não vazamento: sandbox read-only + máscara + aviso de isolamento reduzido). Antes de usar SQUAD_CHAT_RUNNER=codex, rodar CA-4/CA-5/CA-7 com o CLI real e, se preciso, ADR/errata para -C ou cwd = DATA_ROOT.",
+    "BACKLOG (demanda própria, prioridade alta — pré-existente, fora do escopo pelo contrato §13): /api/human e /api/demand/control sem _local_ok/checagem de Origin — uma página externa aberta no navegador do humano pode forjar decisões por CSRF, contornando a confirmação cuidadosa do chat. As rotas novas /api/conversas já checam origem (CA-17). Recomenda-se reutilizar _local_ok nessas rotas numa demanda curta.",
+    "BACKLOG (Arquiteto, errata documental): contrato §9 diz 'caixa desabilitada durante o turno' e também 'foco permanece na caixa'; a UI desabilita Enviar e mantém a caixa editável (rascunho) — o servidor recusa 2º turno com 409 (CA-18), então não há efeito. Ajustar o texto do contrato para refletir a UI.",
+    "Custo/contexto: CLAUDE.md/AGENTS.md e git status do cwd entram na sessão do chat (herança do Claude Code). Após QA-D17-3 o modelo não sugere mais comandos de agente, mas o comportamento depende do prompt — observar nas primeiras conversas reais."
+  ],
+  "post_merge_steps": [
+    "1. (Humano) Reiniciar o Squad Control da 7070 para carregar conversa.py/server.py e a UI nova.",
+    "2. (Humano) Primeira conversa real: perguntar o estado de uma demanda e conferir a fase 'consultando <arquivo>' e o chip do modelo.",
+    "3. (Orquestrador) Abrir no backlog: CSRF em /api/human e /api/demand/control (prioridade alta), processo órfão em recover(), validação do runner codex real, errata do §9 do contrato."
+  ],
+  "rationale": "Verificado por conta própria no worktree: as 8 suítes de tests/squad passam uma a uma (191 testes, incluindo os 44 da D17 com runner simulado), com o log real intacto. As três correções são pequenas, localizadas e corretas: desempate determinístico da lista, role=log num contêiner próprio e regra explícita no prompt contra sugerir comandos de agente — esta revalidada com o runner real. As evidências reais fecham os pontos que o G2 deixou para o QA: leitura permitida funciona e a negação de .env/.git/~/.ssh é por construção (sonda com prompt neutro recebe 'denied by your permission settings'), não só pela obediência do modelo; injeção pelo log sem efeito; latência bem dentro da meta. As 4 respostas do humano estão atendidas. Os pontos abertos não bloqueiam: o órfão é somente leitura e limitado; o codex não é o runner padrão e falha para o lado seguro; o CSRF é pré-existente e declarado fora do escopo, mas merece demanda própria com prioridade; a divergência do §9 é textual e contraditória no próprio contrato. Aprovado; risco moderado porque o canal pode, com confirmação, gravar decisões no log e as rotas antigas continuam sem checagem de origem."
+}
