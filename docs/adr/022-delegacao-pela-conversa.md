@@ -28,6 +28,11 @@ Fatos verificados no código:
   nenhum evento o fecha. Não há alerta para handoff sem continuidade.
 - Cada demanda trabalha num worktree irmão (`plankton-d<n>`); a cópia principal `plankton/` fica em `develop` e é a
   origem do produtivo (ADR-018).
+- `log.py` (linha 20) e `gitflow.py` (`ROOT`, linhas 26-27) resolvem o log e o repositório **a partir do próprio
+  caminho do script**: rodados de dentro de um worktree, gravam no `decisions.jsonl` do worktree, que o
+  `pending.py`/`alerts.py` (cópia principal) não leem, e a memória vazaria para o PR (defeito `a66b91c8a0d6`).
+  `align_memory` faz `switch` na própria cópia principal.
+- `run_agent.py` gera um `runId` novo a cada execução: A2 `agent-stalled:<runId>` muda de alvo a cada run.
 
 ## Decisão
 1. **A conversa propõe; o servidor valida; o humano confirma; o log registra; o plantão executa.** O modelo do chat
@@ -45,9 +50,18 @@ Fatos verificados no código:
    diretório, QA se mudar código, Auditor no gate do estágio (G3 se a demanda já está em revisão). Conflito com a
    `develop` é resolvido por **merge** da `origin/develop` na feature (sem rebase, sem `--force`); o PR é atualizado
    por push na mesma branch (`gitflow.py review-update`), **nunca** um PR novo nem um `review` novo.
+   **Onde roda**: todo `log.py` e `gitflow.py` da delegação é o da **cópia principal**, chamado pelo caminho absoluto
+   (o log é um só); os comandos git novos do `gitflow.py` recebem o worktree da demanda como diretório de trabalho e
+   **nunca** fazem `switch` na cópia principal. O worktree não commita `docs/squad/memory/**` (`STATE`), e o
+   `review-update` **recusa** o push se o diff da branch contra a `origin/develop` tocar `STATE` (verificar, não
+   realinhar: ver contrato §9.4).
 4. **Resultado e estados no log**: `delegation` → `delegation-start` → (trabalho, handoffs, gate) →
-   `delegation-result` (`ok | falhou | obsoleta | recusada | cancelada`). Uma delegação ativa por demanda; no máximo
-   **2 tentativas** por alvo (a original + uma nova), a 3ª é recusada e volta ao humano. O fechamento de
+   `delegation-result` (`ok | falhou | obsoleta | recusada | cancelada`). Uma delegação ativa por demanda.
+   **Tentativas** com chave estável (independente de `runId`/id de evento que muda a cada ocorrência):
+   `pendencia-agente-parado` → no máximo **1** delegação por `(demanda, agente, passo)` (a run que parou é a
+   original; a delegação é a única nova tentativa; se falhar, volta ao humano), e uma run iniciada por delegação que
+   parar não oferece delegar de novo; `conflito-develop` → no máximo 2 por `(demanda, tipo, PR)`; demais tipos → no
+   máximo 2 por `(demanda, tipo, alvo)` (original + uma nova). O fechamento de
    change-request passa a ser um `decision` com `changeRequest: <id>` e `resolution: aceita|recusada`.
 5. **Detecção de conflito no plantão**: `pending.py` lê `mergeable` na consulta que já faz; transição para
    `CONFLICTING` vira `pr-conflict` no log (e `pr-conflict-cleared` na volta); `alerts.py` abre **B6** "PR em
@@ -58,6 +72,11 @@ Fatos verificados no código:
    (só o servidor grava); o plantão confere que o evento tem par `confirmada` na conversa e revalida a pré-condição
    antes de começar. Merge, cancelar e repriorizar continuam só do humano.
 
+7. **Decisões provisórias** (padrões recomendados pelo Auditor no G1; o humano pode rever no PR): (i) `ajuste-pontual`
+   fica, com piso `moderado` e gate; (ii) latência de até um ciclo do plantão (≈ 3 min) é aceitável, com "aguardando o
+   plantão" na UI; (iii) A6 com limiar de 30 min, ajustável por `SQUAD_HANDOFF_STALLED_S`; (iv) o botão do alerta abre
+   a conversa com o pedido **preenchido e sem enviar**.
+
 ## Consequências
 - (+) Um único caminho para impedimentos pontuais, sem demanda nova e sem fechar PR; tudo rastreável no log.
 - (+) O servidor continua sem poder de escrita no repositório; a conversa continua somente leitura.
@@ -67,6 +86,8 @@ Fatos verificados no código:
   novo, que então vira demanda pelo humano) e por piso de risco `moderado`.
 - (−) Três regras novas (B6, A6, A7) e sete tipos de evento novos; exige atualizar `alerts.py`, `pending.py`,
   `log.py`, `gitflow.py`, prompts e a tela da demanda.
+- (−) A2 some após `STALLED_MAX_S` (1 h, `alerts.py:14`); depois disso o agente parado deixa de ser delegável e
+  volta a ser só do humano.
 - (−) Autenticidade do `delegation` é defendida por convenção (log.py recusa o tipo + par na conversa local), não por
   criptografia: agentes rodam com o mesmo usuário do sistema.
 
@@ -82,3 +103,4 @@ Fatos verificados no código:
 | G. Botão "Delegar correção" grava a delegação direto, sem conversa | seria um segundo caminho de confirmação; o critério de aceite do humano passa pelo chat. A ação abre a conversa com o pedido pré-preenchido |
 | H. Confirmação vale como `test-env-request` | o humano decidiu manter a operação do ambiente com ele (resposta 2; ADR-018) |
 | I. Assinar o evento com HMAC | a chave ficaria legível pelos agentes (mesmo usuário); custo sem ganho real. Revalidação + par na conversa + gate bastam |
+| J. `review-update` realinhar a memória como o `align_memory` | `align_memory` faz `switch` e commit na cópia principal (origem do produtivo); realinhar em silêncio esconderia um agente que gravou no log errado. O realinhamento legítimo já ocorre no `feature-sync`; o `review-update` só verifica e recusa |
