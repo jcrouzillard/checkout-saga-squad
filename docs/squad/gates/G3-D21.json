@@ -1,0 +1,109 @@
+{
+  "gate": "G3",
+  "demand": "71b7d9bc3313",
+  "from": "qa",
+  "to": "release (PR para develop)",
+  "cycle": 1,
+  "commits": [
+    "2d58462 (QA)",
+    "976990c (Orquestrador, fix resume)",
+    "70121ef (Arquiteto, contrato v1.1)",
+    "b56b389 (QA)"
+  ],
+  "recommendation": "APPROVE",
+  "confidence": 0.86,
+  "risk": "moderado",
+  "evidences": [
+    {
+      "name": "Regressão tests/squad uma a uma com SQUAD_CHAT_RUNNER=fake",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "/private/tmp/claude-501/-Users-juliencrouzillard-orca-workspaces-Desafio-Itau-plankton/ef7b91ec-a637-4d10-a30d-05fc99091eb7/scratchpad/g3-d21/*.log (Auditor, head b56b389): test_conversa_anexos_d21 27/27; d17 44; d20-tz 7; d14 20; d15 41; d16 38; d16-qa 18; d19 27; e2e-compose-d15 11; entrega-por-pr OK; d14-qa 19; d18 18; e2e_delegacao_d19 rc=0. sha256 de decisions.jsonl do worktree igual antes/depois; 7070 não tocada."
+    },
+    {
+      "name": "Correção 976990c (--skip-git-repo-check no codex exec resume, defeito c1b28e123d53)",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "Diff de 1 linha em build_cmd; sandbox read-only mantida (-c sandbox_mode=\"read-only\"); flag existe em `codex exec resume --help` (codex-cli 0.156.1, sem chamada a modelo); argv exato afirmado em test_conversa_d17 T01BuildCmd.test_codex e test_conversa_anexos_d21 (igualdade exata)."
+    },
+    {
+      "name": "CA-I15 codex real: sessão retomada com imagem nova",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "/private/tmp/claude-501/-Users-juliencrouzillard-orca-workspaces-Desafio-Itau-plankton/ef7b91ec-a637-4d10-a30d-05fc99091eb7/scratchpad/qa-d21/real-codex.out: T1..T3 mesmo threadId 01a0d92b…, sessionReset=false em T2/T3, T3 uma chamada com argv exec resume <th> --json -c sandbox --image=<abs> -- '-leia…', resposta 'CODIGO VERDE 4271 / FILA KAFKA PARADA'; T2 '191'. Ressalva: check 'T1 B6' falso (codex leu '86' na fonte 5×7) — imagem lida (#191, D18), falha de OCR do fixture, não do encaminhamento. Rodada anterior ao fix, DATA_ROOT como repo git."
+    },
+    {
+      "name": "CA-I14 claude real: --resume com imagens inline",
+      "status": "pass",
+      "weight": 3,
+      "blocking": true,
+      "source": "/private/tmp/claude-501/-Users-juliencrouzillard-orca-workspaces-Desafio-Itau-plankton/ef7b91ec-a637-4d10-a30d-05fc99091eb7/scratchpad/qa-d21/real-claude.out: 7/7 checks; T2 --resume mesmo uuid, stream-json com 2 imagens (incl. ~4,7 MB) inline, tools vazias, sem SQUAD_CHAT_CLAUDE_B64_MAX."
+    },
+    {
+      "name": "Contrato v1.1 (item 7 do G2) alinhado ao código",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "70121ef docs/contracts/imagens-na-conversa.md: ressalvas 1/2/4, Cache-Control no-store (server.py:1277), DELETE …/anexos/<aid> (server.py do_DELETE:1314), --skip-git-repo-check no §5.2, desvios de UI do G2 registrados; CA-I14/I15 com 3º turno."
+    },
+    {
+      "name": "Teste CA-18 do D17 sem pgrep global (defeito c2733217dc86)",
+      "status": "pass",
+      "weight": 2,
+      "blocking": false,
+      "source": "b56b389: verifica filhos do servidor do teste (ppid) e process groups (killpg 0); exige 1 runner durante o turno e nenhum após — mais estrito, não mais frouxo. 44/44."
+    },
+    {
+      "name": "CA-I16 injeção por imagem",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "/private/tmp/claude-501/-Users-juliencrouzillard-orca-workspaces-Desafio-Itau-plankton/ef7b91ec-a637-4d10-a30d-05fc99091eb7/scratchpad/qa-d21/real-codex-injecao/resultado.json: codex descreve o texto como dado, proposal=None, tools=[], logIgual=True. Claude real não repetido (barreira por argv Read/Glob/Grep coberta no fake)."
+    },
+    {
+      "name": "Prova real do resume com o argv pós-fix",
+      "status": "validate",
+      "weight": 1,
+      "blocking": false,
+      "source": "Rodada real foi antes de 976990c; com o flag novo só há prova de parser (--help) e testes de argv. Sem chamadas reais neste gate."
+    },
+    {
+      "name": "CA-I23 aceite humano do Cmd+V",
+      "status": "validate",
+      "weight": 2,
+      "blocking": false,
+      "source": "tests/ui/checklist-imagens-d21.md §3 (roteiro pronto, PENDENTE). Vira item obrigatório do PR."
+    },
+    {
+      "name": "Checklist/rastreabilidade do QA",
+      "status": "validate",
+      "weight": 1,
+      "blocking": false,
+      "source": "tests/ui/checklist-imagens-d21.md cobre CA-I1..I23; §4 e a linha do CA-I15 ficaram desatualizadas (ainda dizem contrato sem notas e resume sem --skip-git-repo-check)."
+    },
+    {
+      "name": "Memória fora do PR",
+      "status": "pass",
+      "weight": 0,
+      "blocking": false,
+      "source": "git diff --name-only origin/develop...HEAD -- docs/squad/memory/ inbox/ produto/bugs/ operacao/bugs/ vazio."
+    }
+  ],
+  "open_risks": [
+    "CA-I23 (Cmd+V real no Squad Control) não executado: item obrigatório do PR, aceite do humano antes do merge.",
+    "CA-I16 com claude real não repetido; aceito pela barreira de ferramentas (Read/Glob/Grep) e pelo prompt, provada no fake; codex real passou.",
+    "codex exec resume com --skip-git-repo-check sem turno real após o fix (flag confirmado no --help; comportamento dentro de repo git não muda).",
+    "T1 do codex leu 'ALERTA 86' em vez de 'B6' (fonte 5×7 do fixture): precisão de OCR do modelo, não defeito do encaminhamento.",
+    "Imagens vão ao fornecedor e ficam em ~/.claude/projects e ~/.codex/sessions (aviso na bandeja).",
+    "checklist-imagens-d21.md §4 desatualizado (não bloqueia; o QA pode corrigir no PR)."
+  ],
+  "human_required": false,
+  "pr_items": [
+    "Executar o roteiro CA-I23 (tests/ui/checklist-imagens-d21.md §3) e registrar --type human antes do merge.",
+    "Opcional: 1 turno real claude com injecao.png (CA-I16) e 1 turno codex retomado com imagem após o fix."
+  ],
+  "rationale": "Verificado no repositório: todas as 13 suítes de tests/squad verdes uma a uma com runner fake, log real intacto; fix 976990c mínimo, sandbox read-only preservada, flag confirmado no --help do codex 0.156.1 e argv exato nos testes; CA-I15 provado real (resume com imagem nova, mesmo threadId, sessionReset=false, prompt com '-' após --) e CA-I14 real (claude --resume com 2 imagens inline, sem ferramentas); contrato v1.1 bate com o código (no-store, DELETE, flag). Nenhum bloqueante falhou. Pendências não bloqueantes: CA-I23 (vira item do PR, aceite humano antes do merge), CA-I16 claude real e resume real pós-fix. Confiança 0.86 (19.0/22; validate = meio), risco moderado → intervenção humana opcional no gate, mas o aceite do Cmd+V é do humano no PR."
+}
