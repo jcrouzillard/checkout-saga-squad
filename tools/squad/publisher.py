@@ -76,6 +76,10 @@ SELF_FILES = ("tools/squad/publisher.py", "tools/squad/publication.py")
 PHASE_TEXT = {"guard": "travas", "sync": "sincronização da develop", "preflight": "verificação prévia",
               "health": "saúde após reinício", "ponto-seguro": "resposta não terminou", "supervisor": "publicador",
               "stop": "parada do servidor", "rollback": "rollback"}
+# R1 do G2: memória viva da squad (espelho de gitflow.STATE) e logs append-only (1 evento JSON com "id" por linha)
+STATE_PATHS = ("docs/squad/memory/", "docs/squad/inbox/", "docs/squad/produto/bugs/", "docs/squad/operacao/bugs/")
+APPEND_LOGS = ("docs/squad/memory/decisions.jsonl",)
+MERGE_GRACE_S = 0.3
 TMP_PREFIXES = ("/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/")
 
 log = logging.getLogger("publisher")
@@ -138,6 +142,12 @@ def git(root, *args, timeout: float = 30) -> tuple[int, str, str]:
         return 127, "", str(e)
     except subprocess.TimeoutExpired:
         return 124, "", f"timeout após {int(timeout)} s: git {' '.join(args)}"
+
+
+def git_raw(root, *args, timeout: float = 30) -> subprocess.CompletedProcess:
+    """Como `git`, mas sem strip e em bytes (status -z, show de blob)."""
+    return subprocess.run([os.environ.get("SQUAD_GIT") or "git", *args], cwd=str(root), capture_output=True,
+                          timeout=timeout)
 
 
 def git_out(root, *args, timeout: float = 30) -> str | None:
@@ -649,10 +659,149 @@ class Supervisor:
                 return why
             rc, out, err = git(self.root, "merge", "--ff-only", "-q", "origin/develop", timeout=60)
             if rc != 0:
-                return f"merge --ff-only falhou: {(err or out)[:300]}"
+                plan = self.memory_block()          # R1 do G2: só a memória viva impede o avanço?
+                if isinstance(plan, str):
+                    return f"merge --ff-only falhou: {(err or out)[:300]} ({plan})"
+                return self.ff_with_memory(*plan)
             log.info("develop avançada por fast-forward para %s", sha7(self.head()))
             return None
         return f"{rel}{': ' + detail if detail else ''}"
+
+    # ------------------------------------------------------------ R1 do G2: avanço com a memória viva suja
+    def memory_block(self):
+        """Quando o `merge --ff-only` falha, confere se o ÚNICO bloqueio são arquivos da memória viva (STATE do
+        gitflow) que o PR integrado também muda. Devolve (logs, iguais) — logs append-only a juntar por id e arquivos
+        cujo conteúdo local já é o do commit novo — ou o motivo (str) para esperar o review-sync, como antes."""
+        rng = set((git_out(self.root, "diff", "--name-only", "-z", "HEAD", "origin/develop", timeout=10) or "")
+                  .split("\0")) - {""}
+        st = git_raw(self.root, "status", "--porcelain", "-z", "--untracked-files=all", timeout=10)
+        if st.returncode != 0:
+            return "git status falhou"
+        out = st.stdout.decode("utf-8", "surrogateescape")
+        dirty, toks, i = {}, out.split("\0"), 0
+        while i < len(toks):
+            t = toks[i]
+            i += 1
+            if len(t) < 4:
+                continue
+            if t[0] in "RC":
+                return f"renomeação local em {t[3:]}"
+            dirty[t[3:]] = t[:2]
+        blocking = sorted(p for p in dirty if p in rng)
+        if not blocking:
+            return "bloqueio fora da memória da squad"
+        logs, same = [], []
+        for p in blocking:
+            xy = dirty[p]
+            if not p.startswith(STATE_PATHS):
+                return f"arquivo local fora da memória da squad: {p}"
+            if xy != "??" and xy[0] != " ":
+                return f"memória com alteração no índice: {p}"
+            if p in APPEND_LOGS:
+                logs.append(p)
+                continue
+            want = git_out(self.root, "rev-parse", "-q", "--verify", f"origin/develop:{p}", timeout=10)
+            have = git_out(self.root, "hash-object", "--", p, timeout=10) if (self.root / p).is_file() else None
+            if want and have and want == have:
+                same.append((p, xy == "??"))
+                continue
+            return f"memória local diverge do commit novo e não é log append-only: {p}"
+        return logs, same
+
+    def ff_with_memory(self, logs: list[str], same: list[tuple[str, bool]]) -> str | None:
+        """Avanço só por fast-forward com a junção append-only do log (§5.1.3, R1 do G2). Nenhum evento é reescrito:
+        1. link duro do log vivo para `.squad/squad-control/merge/` (o inode antigo continua recebendo quem já o abriu);
+        2. troca atômica (tmp + rename) do caminho pelo conteúdo do HEAD — o arquivo nunca some do disco;
+        3. `git merge --ff-only`; se alguém gravou na janela, repete (até 5×) com um novo link;
+        4. SEMPRE (sucesso ou não), depois de uma folga, reanexa com um único `write` em O_APPEND os eventos das cópias
+           que não estão no log atual, deduplicados por `id` (linha sem id: por texto exato). As cópias só são apagadas
+           depois da gravação conferida."""
+        bdir = self.paths.sdir / "merge"
+        bdir.mkdir(parents=True, exist_ok=True)
+        stamp = f"{int(time.time())}-{uuid.uuid4().hex[:6]}"
+        backups: dict[str, list[pathlib.Path]] = {p: [] for p in logs}
+        saved: dict[str, pathlib.Path] = {}
+        ok, err = False, ""
+        try:
+            for attempt in range(5):
+                for p in logs:
+                    live = self.root / p
+                    if not live.exists():
+                        continue
+                    b = bdir / f"{stamp}-{attempt}-{pathlib.Path(p).name}"
+                    os.link(live, b)
+                    backups[p].append(b)
+                    blob = git_raw(self.root, "show", f"HEAD:{p}")
+                    if blob.returncode != 0:          # log sem versão no HEAD: sai do caminho (o link o guarda)
+                        live.unlink()
+                        continue
+                    tmp = live.with_name(f".{live.name}.publisher-{stamp}.tmp")
+                    tmp.write_bytes(blob.stdout)
+                    os.replace(tmp, live)
+                for p, untracked in same:
+                    if (self.root / p).exists() and (untracked or attempt == 0):
+                        if p not in saved:            # cópia (não link): git pode reescrever no mesmo inode
+                            saved[p] = bdir / f"{stamp}-igual-{pathlib.Path(p).name}"
+                            shutil.copy2(self.root / p, saved[p])
+                        if untracked:
+                            (self.root / p).unlink()
+                        else:
+                            git_raw(self.root, "checkout", "-q", "HEAD", "--", p)
+                rc, out, e = git(self.root, "merge", "--ff-only", "-q", "origin/develop", timeout=60)
+                if rc == 0:
+                    ok = True
+                    break
+                err = (e or out)[:300]
+                log.info("fast-forward com a memória: tentativa %d falhou (%s)", attempt + 1, err)
+                time.sleep(0.05)
+        finally:
+            time.sleep(MERGE_GRACE_S)                 # quem abriu o inode antigo antes da troca termina de gravar
+            for p, bs in backups.items():
+                if bs:
+                    self.reattach(self.root / p, bs)
+            for p, b in saved.items():                # sem avanço: devolve o conteúdo local dos arquivos iguais
+                live = self.root / p
+                if not ok and (not live.exists() or live.read_bytes() != b.read_bytes()):
+                    tmp = live.with_name(f".{live.name}.publisher-{stamp}.tmp")
+                    shutil.copy2(b, tmp)
+                    os.replace(tmp, live)
+                b.unlink(missing_ok=True)
+        if not ok:
+            return f"merge --ff-only falhou mesmo com a junção da memória: {err}"
+        log.info("develop avançada por fast-forward para %s com junção append-only de %s", sha7(self.head()),
+                 ", ".join(logs + [p for p, _ in same]))
+        return None
+
+    @staticmethod
+    def reattach(live: pathlib.Path, backups: list[pathlib.Path]):
+        """Acrescenta ao log vivo as linhas das cópias que ele não tem (por `id`; sem id, por texto). Append-only."""
+        def key(line: str):
+            try:
+                d = json.loads(line)
+                return ("id", d["id"]) if isinstance(d, dict) and d.get("id") else ("txt", line)
+            except ValueError:
+                return ("txt", line)
+        cur = live.read_text(encoding="utf-8") if live.exists() else ""
+        have = {key(ln) for ln in cur.splitlines() if ln.strip()}
+        add = []
+        for b in backups:
+            for ln in b.read_text(encoding="utf-8").splitlines():
+                if ln.strip() and key(ln) not in have:
+                    have.add(key(ln))
+                    add.append(ln)
+        if add:
+            prefix = "\n" if cur and not cur.endswith("\n") else ""
+            with live.open("a", encoding="utf-8") as f:
+                f.write(prefix + "\n".join(add) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            log.info("junção da memória: %d evento(s) locais reanexados em %s", len(add), live.name)
+        final = {key(ln) for ln in live.read_text(encoding="utf-8").splitlines() if ln.strip()}
+        if all(key(ln) in final for b in backups for ln in b.read_text(encoding="utf-8").splitlines() if ln.strip()):
+            for b in backups:
+                b.unlink(missing_ok=True)
+        else:
+            log.error("junção da memória incompleta; cópias mantidas em %s", backups[0].parent)
 
     def auto_cycle(self):
         why = self.preconditions()

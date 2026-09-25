@@ -6,6 +6,7 @@ gracioso) e pelo `publisher.py` (caminhos, leitura/gravação do `status.json` e
 A única interface entre o servidor e o supervisor é o disco: o servidor LÊ `status.json` (cache por mtime) e GRAVA
 pedidos em `requests/` (tmp + rename). Nunca sinal nem subprocesso (§4.2).
 """
+import fcntl
 import json
 import os
 import pathlib
@@ -128,7 +129,7 @@ def api_view(sdir, instance: dict | None, busy: dict | None, env=None) -> dict:
         reason = "sem_supervisor"
     elif ((instance or {}).get("environment") or {}).get("name") != "produtivo":
         reason = "nao_produtivo"
-    elif st.get("state") in BUSY_STATES:
+    elif st.get("state") in BUSY_STATES or has_pending(sdir):
         reason = "publicacao_em_andamento"
     out["canPublish"] = reason is None
     out["reason"] = reason
@@ -144,6 +145,11 @@ def write_request(sdir, when: str, confirm: bool, busy: dict | None, trigger: st
     # nome ordenável pelo tempo: o supervisor processa o mais antigo
     write_json_atomic(rdir / f"{time.time_ns()}-{req['id']}.json", req)
     return req
+
+
+def has_pending(sdir) -> bool:
+    rdir = pathlib.Path(sdir) / "requests"
+    return rdir.is_dir() and any(rdir.glob("*.json"))
 
 
 def read_requests(sdir) -> list[tuple[pathlib.Path, dict]]:
@@ -194,7 +200,21 @@ def handle_publish(sdir, instance: dict | None, busy: dict | None, content_type:
     if when == "now" and busy is not None and confirm is not True:
         return 409, {"code": "resposta_em_andamento", "busy": busy,
                      "error": "Há uma resposta da conversa em andamento"}
-    req = write_request(sdir, when, confirm, busy, "botao")
+    # R2 do G2: um pedido ainda em requests/ (o supervisor lê a cada 2 s) já é "publicação em andamento". Conferência
+    # e gravação sob flock: dois POST simultâneos (threads ou processos) nunca gravam dois pedidos.
+    lock_path = pathlib.Path(sdir) / "requests.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            pending = read_requests(sdir)
+            if pending:
+                return 409, {"code": "publicacao_em_andamento", "state": view["state"],
+                             "pendingRequestId": pending[0][1].get("id"),
+                             "error": "Já há um pedido de publicação aguardando o publicador"}
+            req = write_request(sdir, when, confirm, busy, "botao")
+        finally:
+            fcntl.flock(lk, fcntl.LOCK_UN)
     append_event(requested_event(req))
     return 202, {"requestId": req["id"]}
 
