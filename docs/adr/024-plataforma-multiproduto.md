@@ -1,10 +1,11 @@
 # ADR-024: Plataforma da squad separada do produto — cadastro por produto, memória fora do repositório e painel multiproduto
 
-**Status**: Proposto (2026-09-25, Arquiteto — D22 `b26da7851764`, fase 1). Aguarda G1 e decisão humana (§9).
+**Status**: Proposto (2026-09-25, Arquiteto — D22 `b26da7851764`, fase 1). G1 ciclo 1: APPROVE com ressalvas
+(`docs/squad/gates/G1-D22.json`, 0,75); ressalvas aplicadas nesta revisão, sem novo ciclo (§10). Aguarda decisão humana (§9).
 **Numeração**: 023 está com a D21 (`feature/D21-imagem-no-chat`, "imagens na conversa"); este é o próximo livre.
-**Anexo (mapa completo, 67 pontos)**: [`docs/contracts/plataforma-multiproduto-mapa.md`](../contracts/plataforma-multiproduto-mapa.md).
-**Afeta**: ADR-011 (sem mudança de regra), ADR-017, ADR-018, ADR-019, ADR-020, ADR-021, ADR-022 — mecanismos
-mantidos, valores e caminhos passam a vir do cadastro do produto; cada fase que mudar um deles cita este ADR.
+**Anexo (mapa completo, 74 pontos)**: [`docs/contracts/plataforma-multiproduto-mapa.md`](../contracts/plataforma-multiproduto-mapa.md).
+**Afeta**: ADR-011 (sem mudança de regra), ADR-015, ADR-017, ADR-018, ADR-019, ADR-020 e ADR-023 (sem mudança de
+regra: conversas e anexos continuam fora do git, §4.3), ADR-021, ADR-022 — mecanismos mantidos, valores e caminhos passam a vir do cadastro do produto; cada fase que mudar um deles cita este ADR.
 
 ## 1. Contexto
 
@@ -73,17 +74,18 @@ squad-platform/                      (novo repo; dono: Orquestrador; squad-contr
   policies/constitution.md           regras da fábrica (hoje metade do AGENTS.md)
   policies/gates-base.md             estrutura dos gates, pesos, confiança, autocorreção
   products/<id>/product.toml         CADASTRO (revisado por PR)
-  docs/adr/  docs/contracts/         ADRs/contratos da fábrica (números preservados: 008, 009, 011, 012, 014, 016–024)
+  docs/adr/  docs/contracts/         ADRs/contratos da fábrica (números preservados: 008, 009, 011, 012, 014–024)
   tests/                             tests/squad + tests/ui do Squad Control; CI própria
 
 $SQUAD_HOME/ (~/.squad)              fora de qualquer repo de produto
   products/<id>/memory/   (git)      log/decisions.jsonl, gates/, handoffs/, inbox/, bugs/{produto,operacao}/,
-                                     github-sync.json, codes.json, conversas/, MIGRATION.md
-  products/<id>/runtime/  (sem git)  runs/, locks/, pr-state.json, bug-drafts/, bug-pseudonym.key, sessões, logs
+                                     github-sync.json, codes.json, MIGRATION.md
+  products/<id>/runtime/  (sem git)  conversas/<id>.jsonl + conversas/<id>/anexos/ (ADR-020/023), conversas/.sessao,
+                                     runs/, locks/, pr-state.json, bug-drafts/, bug-pseudonym.key, logs
   usage/                             consumo da IA do host (global)
 
 <produto>/ (ex.: checkout-saga-squad)
-  AGENTS.md                          só as regras do produto (ADR-000, topologia, convenções) + link à constituição
+  AGENTS.md                          bloco GERADO com a constituição (§4.5) + regras do produto (ADR-000, topologia, convenções)
   CLAUDE.md                          importa AGENTS.md e a constituição (caminho resolvido pela plataforma)
   squad/roles/<papel>.md             especialização de cada papel para este produto
   squad/gates.md                     critérios de gate do produto
@@ -140,11 +142,11 @@ changelog = "CHANGELOG.md"
 
 [env.prod]
 enabled = true
+kind = "compose"                                         # "compose" (prod.py) | "process" (ver abaixo) | "none"
 compose_project = "checkout-saga"
 env_file = ".env"
 services = ["saga-orchestrator", "order-service", "inventory-service", "payment-service", "shipping-service"]
-ports = { saga = 8080, order = 8081, inventory = 8082, payment = 8083, shipping = 8084, console = 8090,
-          postgres = 5432, kafka = 29092, jaeger = 16686, prometheus = 9090, grafana = 3001 }
+ports = { saga = 8080, order = 8081, inventory = 8082, payment = 8083, shipping = 8084, console = 8090, postgres = 5432, kafka = 29092, jaeger = 16686, prometheus = 9090, grafana = 3001 }
 deploy_rules = [ { path = "services/{module}/**", rebuild = ["{module}"] }, { path = "services/common/**", rebuild = "all" },
                  { path = "checkout-console/nginx.conf", restart = ["checkout-console"] } ]   # etc. (hoje prod.py:77-95)
 [env.test]
@@ -162,10 +164,32 @@ prometheus = "http://localhost:9090"
 [evidence]
 pii_keys = ["shippingAddress", "billingAddress", "zipCode", "cep", "recipient", "customerName"]
 pseudonymize = ["customerId"]
+correlation_keys = { orderId = ["orderId", "order.id", "order_id", "app.order.id"], sagaId = ["sagaId", "saga.id", "saga_id", "app.saga.id"] }
 [[links]]
 label = "Console de Checkout"
 url = "http://localhost:8090"
+[memory]
+link_base = ""                                           # vazio = memória só local (Q4); senão URL do repo de memória
 ```
+
+O produtivo da **plataforma** não é Compose: é o servidor Python na porta 7070 servido da cópia principal. O cadastro
+do `squad-platform` usa `kind = "process"`:
+
+```toml
+[env.prod]                                               # products/squad-platform/product.toml
+enabled = true
+kind = "process"
+command = "python3 squad-control/server.py"              # cwd = repo.path (cópia principal da plataforma)
+ports = { control = 7070 }
+health = "http://localhost:7070/api/instance"
+update = "restart"                                       # após merge: git pull --ff-only + reinício do processo
+[env.test]
+enabled = false                                          # teste da plataforma = tests/squad + tests/ui (servidor efêmero em porta livre)
+```
+
+`prod.py` só age sobre `kind = "compose"`; `kind = "process"` tem um atualizador próprio (mesmas guardas do ADR-018:
+só a cópia principal, só `--ff-only`, sem apagar estado, trava em `run:locks/`, reinício só com health verde antes e
+depois — senão volta ao SHA anterior). O registro de portas (§4.7) inclui as portas `process`.
 
 ## 4. Decisões detalhadas, com alternativas
 
@@ -174,6 +198,7 @@ url = "http://localhost:8090"
 (`tools/squad`, `squad-control`, `tests/squad`, `tests/ui` do Squad Control, `docs/squad` sem a memória, ADRs e
 contratos da fábrica), **preservando a história git e os SHAs de origem** numa tabela `docs/MIGRATION-SHAS.md`.
 A plataforma roda de uma cópia no host (`$SQUAD_PLATFORM`) e recebe o produto por `--product`/`SQUAD_PRODUCT`.
+A extração usa `git filter-repo` (ver §4.13: pré-requisito do host, não dependência da plataforma).
 Durante um release, o produto mantém **calços** `tools/squad/<x>.py` que só fazem `exec` na plataforma (prompts,
 worktrees e hábitos antigos seguem funcionando); depois são removidos.
 
@@ -201,6 +226,11 @@ cadastro só **aponta** para ele.
 **Decisão**: um repositório git **local por produto** em `$SQUAD_HOME/products/<id>/memory/`, com commit automático
 a cada gravação agrupada (mesma cadência de hoje) e remoto privado opcional (`<produto>-squad-memory`). O que não
 precisa de auditoria (runs, travas, rascunhos, sessões, chave de pseudônimo) vai para `runtime/`, fora do git.
+**Conversas e anexos ficam fora do git** (ADR-020 §5 e alternativa G; ADR-023): `run:conversas/<id>.jsonl`,
+`run:conversas/<id>/anexos/<sha256>.<ext>` e `run:conversas/.sessao/`, exatamente como hoje em `.squad/conversas/`,
+só que por produto. Não há mudança no ADR-020 nem no ADR-023: o que a conversa decide e que precisa de auditoria já
+entra no log por evento (`task`, `human-intervention`, delegação) — esse sim vai para o git da memória. A versão
+anterior deste ADR punha `conversas/` em `mem:`; foi corrigida (ressalva 1 do G1-D22).
 Consequências: fim dos commits de memória no produto, de `STATE`/`align_memory`/`discard_state`, do critério G3
 "memória fora do PR" e do estado "sujo" permanente; gates deixam de entrar nos PRs (o corpo do PR passa a linkar o
 parecer). O ADR-019 (evidências mascaradas "no git") continua valendo: no git da memória.
@@ -218,7 +248,7 @@ parecer). O ADR-019 (evidências mascaradas "no git") continua valendo: no git d
    `codes.json` fixa o legado pelo **id** (ids são a chave canônica; o código é rótulo). A tabela registra os
    códigos citados nos contratos quando diferem (`aliases`), para que "D7" em `ui-cancelar-demanda.md` continue
    resolvendo para `e31bdfb73679`.
-2. Na F3, `git filter-repo --path docs/squad/memory --path docs/squad/gates --path docs/squad/inbox --path
+2. Na F3, `git filter-repo` (ou o caminho alternativo de §4.13) com `--path docs/squad/memory --path docs/squad/gates --path docs/squad/inbox --path
    docs/squad/produto --path docs/squad/operacao` gera o repositório de memória **com a história git do log**; as
    linhas do log não são reescritas (append-only), só o caminho muda. `MIGRATION.md` registra origem (repo, SHA),
    contagem de linhas e o sha256 de cada arquivo.
@@ -240,8 +270,16 @@ vão para `policies/constitution.md`. Cada papel = `roles/<papel>.md` (plataform
 qa, auditor) é fixo na plataforma; o produto pode não usar algum (ex.: sem `observabilidade`), mas não inventa papel
 sem ADR da plataforma. Para os subagentes nativos do Claude Code, o produto mantém `.claude/agents/*.md` **gerados**
 pela plataforma (cabeçalho "gerado — não editar"), com verificação de sincronia no plantão.
+**Como a constituição chega a Codex/Copilot/Devin**: esses runners leem só o `AGENTS.md` do diretório e **não seguem
+link nem import**. Por isso o `AGENTS.md` do produto passa a ter um **bloco gerado** com o texto integral de
+`plat:policies/constitution.md`, entre marcadores `<!-- squad:constituicao v<versão da plataforma> — gerado, não
+editar -->` … `<!-- /squad:constituicao -->`, seguido da parte do produto (editada à mão pelo dono). O gerador
+(`squad sync-policies --product <id>`) é o mesmo que gera `.claude/agents/*.md`; o plantão e o G3 verificam que o
+bloco bate com a versão da plataforma em uso (bloco divergente = alerta, e o PR de atualização é do Orquestrador).
+O `CLAUDE.md` continua só importando `AGENTS.md`. `run_agent` já compõe o prompt inteiro e não depende do bloco.
 Alternativa rejeitada: um `AGENTS.md` só, na plataforma, com seções por produto — o produto deixaria de ser
-compreensível por quem abre só o repositório dele, e Codex/Copilot/Devin leem o `AGENTS.md` **do cwd**.
+compreensível por quem abre só o repositório dele, e Codex/Copilot/Devin leem o `AGENTS.md` **do cwd**. Rejeitado
+também "link para a constituição": não chega a esses runners.
 
 ### 4.6 GitHub
 Issues e Project **por produto** (`[github]` do cadastro). O `checkout-saga` mantém `jcrouzillard/checkout-saga-squad`
@@ -272,6 +310,16 @@ produto); o orçamento do `/api/live` (ADR-017: 300 ms, 64 KB) vale por produto.
   como já é feito para evidências de bug).
 - A conversa (ADR-020) recebe `--add-dir` **só** da memória e do repo do produto dela; nunca de outro produto nem de
   `$SQUAD_HOME` inteiro.
+- **Negação explícita dos outros produtos (runner claude)**: `--add-dir` não impede leitura fora dele; hoje
+  `claude_deny_paths` nega só `.env`, `.git` e segredos do home. Passa a negar também, para **cada outro produto
+  cadastrado**, `Read(//$SQUAD_HOME/products/<outro>/**)` e `Read(//<repo_path do outro>/**)` (e os worktrees dele);
+  como no Claude Code negação vence permissão, a lista é "todos menos o meu", gerada do cadastro a cada sessão.
+- **Runner codex: limitação declarada.** O sandbox read-only do Codex não restringe leitura (`CODEX_WARNING`,
+  `readIsolation: "reduzida"`). Com dois ou mais produtos cadastrados, a conversa com codex mostra o aviso **com o nome
+  dos outros produtos legíveis** e exige opção explícita do humano por produto (`chat_runner_codex_ack` no runtime);
+  sem ela, o painel usa o runner claude. O mesmo vale para `run_agent` com `SQUAD_RUNNER=codex`.
+- **Teste da F6 nos dois runners**: claude — ler um arquivo-sentinela de outro produto é negado; codex — a sentinela
+  é legível (limitação), e o teste verifica que o aviso e a exigência de opção explícita aparecem.
 - Chave de pseudônimo de evidências por produto (pseudônimos não se correlacionam entre produtos).
 - O cadastro (que define guardas do produtivo) só muda por PR na plataforma, revisado pelo humano.
 - Limite conhecido: `gh`, `docker` e as credenciais dos runners são do host — os produtos **não** estão isolados
@@ -287,6 +335,39 @@ produto); o orçamento do `/api/live` (ADR-017: 300 ms, 64 KB) vale por produto.
 - **Demandas em voo** continuam nos seus worktrees; calços em `tools/squad/` (F4) mantêm caminhos antigos válidos.
 - **Flag de retorno**: `SQUAD_MEMORY_MODE=repo|external` em F3 (padrão `repo` até o corte); voltar é mudar a flag e
   reimportar, pelo id, os eventos gravados depois do corte (mesma técnica de `import_memory`).
+
+### 4.11 Demandas em voo durante F2–F4 (D12, D21 e as que surgirem)
+Hoje há branches longas abertas: `feature/D12-evidencias-na-demanda` (ADR-015, PR #104 aberto desde 23/09) e
+`feature/D21-imagem-no-chat` (ADR-023). Regras:
+1. **Antes de cada fase** (F2a, F2b, F3, F4) o Orquestrador lista as branches em voo no log (`progress`) e o humano
+   escolhe, para cada uma: integrar antes da fase (preferido), ou continuar e absorver a fase depois.
+2. **Quem absorve é a branch em voo**, nunca a fase: depois do merge da fase na `develop`, `gitflow.py feature-sync`
+   traz a `develop` para a branch; conflitos são resolvidos pelo dono do arquivo na branch em voo e passam por novo G2.
+3. **F3 e F4 não começam com PR aberto que toque `tools/squad/**`, `squad-control/**` ou `docs/squad/**`** — ou ele é
+   integrado, ou é fechado e reaberto depois do corte a partir da nova base (o conteúdo não se perde: o commit fica
+   referenciado no log). D12 e D21 caem nessa regra.
+4. Pareceres, handoffs e eventos de uma demanda em voo no momento do corte da F3 são migrados como os demais (pelo id);
+   o parecer que a branch tiver commitado em `docs/squad/gates/` é descartado do PR (fonte = `mem:gates/`).
+5. ADR-015 (D12) entra na lista de ADRs da fábrica (§3, mapa E2); se for aceito depois da F4, nasce na plataforma.
+
+### 4.12 Links para a memória nas issues e PRs
+`github_sync.py` grava nas issues links `blob/<branch>/docs/squad/…` (log, handoffs, evidências de bug; mapa F5) e,
+depois da F3, o PR citaria o parecer por link. O alvo depende da **Q4**:
+- Q4 = remoto privado: `cad:memory.link_base` aponta para o repo de memória; links funcionam para quem tem acesso a ele
+  (o revisor humano); issue pública passa a ter link que terceiros não abrem — aceitável, a memória é da squad.
+- Q4 = só local: issue e PR citam **o id do evento e o caminho `mem:`** em texto, e o corpo do PR inclui o resumo do
+  parecer (recomendação, confiança, risco, ressalvas) — o revisor não depende de link.
+- Links antigos (173 issues): continuam válidos enquanto os arquivos existirem em `develop` do produto. Se **Q7** =
+  apagar, o espelho reescreve uma vez esses links para `blob/<SHA do corte>/…` (permanente) antes da remoção.
+
+### 4.13 `git filter-repo` e dependências fora da stdlib
+A plataforma continua **só stdlib em tempo de execução**. `git filter-repo` é usado apenas uma vez, nas operações de
+extração da F3 (memória) e F4 (repositório), como `gh` e `docker`: **ferramenta do host**, não importada. Hoje não
+está instalada (`git filter-repo` → comando inexistente). Decisão: pré-requisito declarado da F3/F4
+(`brew install git-filter-repo`), verificado por `squad doctor` antes do corte; se o humano preferir não instalar, o
+caminho alternativo é só git: `git fast-export --all -- <caminhos>` → reescrita de caminho por script stdlib →
+`git fast-import` num repo novo, com a mesma verificação (contagem, sha256, ids, `git log` do log). O critério de
+aceite é o mesmo nos dois caminhos.
 
 ## 5. Consequências
 - A fábrica deixa de sujar o produto: some a classe de defeitos de memória em PR/merge (a66b91c8a0d6 e afins) e o
@@ -305,14 +386,17 @@ configuração antes de mover (barato e reversível) → memória (maior acoplam
 
 | Fase | Entrega | Critério de aceite (verificável) | Rollback |
 |---|---|---|---|
-| **F1** (esta) | ADR-024 + mapa de 67 pontos | G1 aprovado; cada ponto com classe, destino e fase; perguntas §9 respondidas pelo humano | — |
-| **F2 — cadastro sem mover arquivos** | `squad/product.py` (resolvedor), `products/checkout-saga/product.toml` **ainda dentro deste repo** (`docs/squad/products/`), todos os pontos F2 do mapa lendo do cadastro; `code` gravado no `task` + `codes.json` do legado; `gitflow`/`github_sync`/`triage` honrando o log resolvido; prompts com placeholders | (a) teste de equivalência: cada valor antes fixo (repo, branches, projetos, portas, serviços, regras de deploy, PII, owners, build) é igual ao do cadastro; (b) `grep` sem `checkout-saga\|checkout-teste\|jcrouzillard\|plankton` em `tools/squad/*.py` e `squad-control/index.html` fora de comentários; (c) `tests/squad` inteiro verde; (d) códigos D1–D22 do painel iguais aos de hoje, e `aliases` resolvem os códigos citados nos contratos; (e) plantão, `feature-start`, publicação no teste e `prod.py update --dry-run` funcionando num ciclo real | reverter o PR (nenhum arquivo foi movido; o cadastro é só lido) |
-| **F3 — memória fora do repo** | `MemoryStore` (log, gates, handoffs, inbox, bugs, sync, conversas, runs, locks) com modo `repo`/`external`; `squad memory migrate --product checkout-saga` (filter-repo + verificação + evento `migration`); `gitflow` sem `STATE` no modo externo; `README` "movido para" no produto | (a) `migrate --verify`: mesma contagem de linhas, sha256 e conjunto de ids; (b) `git log` do `decisions.jsonl` no repo de memória mostra os commits desde 2026-09-23; (c) após o corte, um ciclo completo de demanda (start → G1 → G2 → G3 → PR) não gera nenhum commit em `docs/squad/**` no produto e o PR não contém gates; (d) painel e alertas idênticos antes/depois (snapshot de `/api/state` normalizado); (e) janela de corte ≤ 15 min, registrada no log | `SQUAD_MEMORY_MODE=repo` + reimportar por id os eventos pós-corte para o log do produto; memória externa preservada |
+| **F1** (esta) | ADR-024 + mapa de 74 pontos | G1 aprovado; cada ponto com classe, destino e fase; perguntas §9 respondidas pelo humano | — |
+| **F2a — resolvedor e códigos congelados** (bloqueada pela Q2) | `squad/product.py` (resolvedor, produto padrão implícito), `products/checkout-saga/product.toml` mínimo **ainda dentro deste repo** (`docs/squad/products/`); `code` gravado no `task` + `codes.json`/`aliases` do legado; `gitflow`/`github_sync`/`triage` honrando `SQUAD_LOG`/log resolvido; slug das transcrições calculado do `repo_path`/worktree (mapa A1, B1, B13, B14) | (a) códigos D1–D22 do painel iguais aos de hoje e `aliases` resolvem os códigos citados nos contratos; (b) teste: com `SQUAD_LOG` apontando para um log temporário, os três scripts não leem nem gravam o log real; (c) transcrições das runs aparecem no painel a partir de um worktree e de `SQUAD_ROOT_DATA` diferente; (d) `tests/squad` verde | reverter o PR (nada movido; `code` é campo a mais, ignorado pelo código antigo) |
+| **F2b — valores para o cadastro** | cadastro completo (inclui `[env.prod] kind`, `correlation_keys`, `memory.link_base`) e todos os pontos F2b do mapa lendo dele; prompts com placeholders; `tests/squad` com cadastro de teste (A10) | (a) teste de equivalência: cada valor antes fixo (repo, branches, projetos, portas, serviços, regras de deploy, PII, correlação, owners, build, rótulos do teste) é igual ao do cadastro; (b) `grep` sem `checkout-saga\|checkout-teste\|jcrouzillard\|plankton` em `tools/squad/*.py`, `squad-control/index.html` e `tests/squad` fora de comentários e do cadastro de teste; (c) `tests/squad` inteiro verde; (d) plantão, `feature-start`, publicação no teste e `prod.py update --dry-run` funcionando num ciclo real | reverter o PR (nenhum arquivo foi movido; o cadastro é só lido) |
+| **F3 — memória fora do repo** | `MemoryStore` (log, gates, handoffs, inbox, bugs, sync, conversas, runs, locks) com modo `repo`/`external`; `squad memory migrate --product checkout-saga` (filter-repo ou fast-export, §4.13 + verificação + evento `migration`); conversas/anexos para `run:`; links do espelho por `link_base` (§4.12); `gitflow` sem `STATE` no modo externo; `README` "movido para" no produto | (a) `migrate --verify`: mesma contagem de linhas, sha256 e conjunto de ids; (b) `git log` do `decisions.jsonl` no repo de memória mostra os commits desde 2026-09-23; (c) após o corte, um ciclo completo de demanda (start → G1 → G2 → G3 → PR) não gera nenhum commit em `docs/squad/**` no produto e o PR não contém gates; (d) painel e alertas idênticos antes/depois (snapshot de `/api/state` normalizado); (e) janela de corte ≤ 15 min, registrada no log | `SQUAD_MEMORY_MODE=repo` + reimportar por id os eventos pós-corte para o log do produto; memória externa preservada |
 | **F4 — repositório da plataforma** | `squad-platform` extraído com história; constituição e papéis-base na plataforma, `AGENTS.md`/`squad/roles`/`squad/gates.md` no produto; `.claude/agents/*.md` gerados; CLI `squad`; calços `tools/squad/*.py` no produto; CI da plataforma rodando `tests/squad`; Squad Control servido da plataforma (versão = tags da plataforma) | (a) servidor, plantão e `run_agent` rodando a partir de `$SQUAD_PLATFORM` com o checkout como produto, sem nenhum arquivo da fábrica no produto além dos calços e dos gerados; (b) `git log --follow` de `server.py` na plataforma mostra a história D3–D21; (c) CI verde nos dois repositórios; (d) prompt composto de cada papel = base + especialização (teste de igualdade com os prompts de hoje, salvo o texto movido); (e) uma demanda `produto` e uma `operacao` entregues depois do corte, cada uma no seu repo | voltar os calços para as cópias originais (o produto ainda tem as ferramentas no histórico git); a plataforma extraída é descartável |
 | **F5 — painel multiproduto** | `/api/products`, `/api/p/<id>/…`, seletor, rotas `#/p/<id>/…`, sino agregado, conversa por produto, `squad-platform` cadastrado como produto (demandas `operacao` vão para ele) | (a) com 2 produtos cadastrados, cada tela mostra só o produto escolhido; sino agrega com etiqueta; (b) rotas e hashes antigos continuam funcionando (produto padrão); (c) orçamento do `/api/live` do ADR-017 mantido por produto; (d) testes de UI 390/1440, claro/escuro, como nas D13–D20 | desligar o seletor (`SQUAD_MULTI=0`): o painel volta ao produto padrão, API antiga intacta |
-| **F6 — segundo produto de prova** | produto sintético mínimo (`hello-squad`: 1 serviço, Compose, 1 teste) cadastrado; 1 demanda de ponta a ponta nele | (a) demanda completa (G1–G3, PR, publicação no teste, produtivo) sem tocar arquivos, memória, portas, containers nem issues do checkout (verificado por `prod-fingerprint` do checkout antes/depois e por diff da memória do checkout vazio); (b) colisão de portas proposital é recusada no carregamento; (c) conversa de um produto não lê arquivos do outro (teste de negação) | descadastrar o produto; apagar sua memória e seus containers (só dele) |
+| **F6 — segundo produto de prova** | produto sintético mínimo (`hello-squad`: 1 serviço, Compose, 1 teste) cadastrado; 1 demanda de ponta a ponta nele | (a) demanda completa (G1–G3, PR, publicação no teste, produtivo) sem tocar arquivos, memória, portas, containers nem issues do checkout (verificado por `prod-fingerprint` do checkout antes/depois e por diff da memória do checkout vazio); (b) colisão de portas proposital é recusada no carregamento; (c) conversa de um produto não lê arquivos do outro: teste de negação com runner claude e verificação do aviso/opção explícita com runner codex (§4.9) | descadastrar o produto; apagar sua memória e seus containers (só dele) |
 
-Dependências: F3 exige F2 (resolvedor e `code` congelado); F4 exige F3 (sem memória no repo, a extração não carrega
+Dependências: F2a exige a resposta da Q2; F2b exige F2a; F3 exige F2a (resolvedor e `code` congelado), a resposta
+da Q4 antes do seu G1 e `git filter-repo` ou o caminho alternativo (§4.13); F2b pode correr em paralelo à F3, mas F4
+exige F2b e F3; antes de F2a, F2b, F3 e F4 vale a regra das demandas em voo (§4.11); F4 exige F3 (sem memória no repo, a extração não carrega
 estado vivo); F5 pode começar em paralelo a F4 na parte de API, mas só entrega com F4; F6 exige F5.
 
 ## 7. Riscos
@@ -326,6 +410,9 @@ estado vivo); F5 pode começar em paralelo a F4 na parte de API, mas só entrega
 | Subagentes nativos do Claude Code dessincronizados dos papéis gerados | média | médio | geração + verificação no plantão; o runner genérico usa sempre a composição |
 | Credenciais do host compartilhadas entre produtos (`gh`, docker, runners) | — | alto se houver produto de terceiros | isolamento declarado como contra erro; produto de terceiros exige host/usuário próprio (fora do escopo) |
 | Duas fontes de verdade durante F2 (cadastro e constantes) | média | médio | F2 remove as constantes; teste de equivalência + grep no aceite |
+| Branches em voo (D12, D21) conflitando com F2–F4 | alta | médio | regra do §4.11: integrar antes ou absorver depois; F3/F4 não começam com PR aberto em `tools/squad`/`squad-control`/`docs/squad` |
+| Leitura de outro produto pela conversa com codex | média com 2+ produtos | alto | limitação declarada, aviso nominal e opção explícita por produto; claude com negação gerada (§4.9) |
+| Links de issues/PRs para a memória sem alvo | alta se Q4 = local | baixo | id do evento + resumo do parecer no PR; reescrita para SHA fixo se Q7 = apagar (§4.12) |
 | Squad trabalhando no próprio chão (D22 muda as ferramentas que executam a D22) | alta | médio | fases pequenas, produto padrão implícito, flag de retorno em cada fase |
 
 ## 8. Fora do escopo
@@ -333,16 +420,36 @@ Hospedar a plataforma fora do host local; multiusuário/autenticação no painel
 banco de dados para a memória; publicar a plataforma como pacote.
 
 ## 9. Perguntas que só o humano decide
+**Bloqueios**: a **Q2 bloqueia a F2** (F2a grava `code` e `code_prefix`; sem a resposta não há especificação).
+A **Q4 precisa de resposta antes do G1 da F3** (define `link_base`, os links de parecer em PRs e issues, §4.12).
+Recomendado responder a Q3 junto com a Q2. As demais não bloqueiam (Q1: F4; Q5: F3; Q6: F4/F5; Q7: pós-F3; Q8: F6).
+
 1. **Repositório novo** `jcrouzillard/squad-platform` (público ou privado?) — ou prefere outro nome/dono?
-2. **Numeração das demandas**: o checkout continua em `D23, D24…` e a plataforma usa prefixo próprio (proposta:
+2. **[bloqueia a F2] Numeração das demandas**: o checkout continua em `D23, D24…` e a plataforma usa prefixo próprio (proposta:
    `P1, P2…`), ou a numeração continua **global** entre produtos? E a D22 (esta), que é da fábrica, fica como D22?
 3. **Histórico legado**: aceita manter D1–D21 inteiros na memória do `checkout-saga` (visível também no
    `squad-platform`), sem dividir por tipo, como proposto em §4.4.6?
-4. **Remoto da memória**: a memória de cada produto deve ter remoto privado no GitHub (backup e auditoria fora do
-   host) ou fica só local? Se remoto: um repo privado por produto?
+4. **[responder antes do G1 da F3] Remoto da memória**: a memória de cada produto deve ter remoto privado no GitHub (backup e auditoria fora do
+   host) ou fica só local? Se remoto: um repo privado por produto? (Decide para onde apontam os links de parecer e de
+   evidência em PRs e issues, §4.12; conversas e anexos ficam fora do git em qualquer caso.)
 5. **Janela de corte da F3**: autoriza pausar o plantão por até 15 min num momento escolhido por você?
 6. **Calços e apelidos**: por quanto tempo manter os calços `tools/squad/*.py` e as rotas antigas da API (proposta:
    um release depois da F4/F5)?
 7. **Arquivos antigos no produto**: depois da F3, apagar `docs/squad/memory/**`, `gates/`, `inbox/` e bugs do repo do
-   produto (ficam no histórico git) ou manter congelados para sempre?
+   produto (ficam no histórico git) ou manter congelados para sempre? (Se apagar, os links das 173 issues são
+   reescritos antes para um SHA fixo, §4.12.)
 8. **F6**: aceita um produto sintético (`hello-squad`) só como prova, ou já existe um segundo produto real em vista?
+
+## 10. Ressalvas do G1-D22 (ciclo 1) e onde foram tratadas
+| # | Ressalva | Tratamento |
+|---|---|---|
+| 1 | Conflito com ADR-020 (conversas no git) e anexos da D21 | §4.3: conversas e anexos em `run:` (fora do git); ADR-020/023 sem mudança; mapa B7, B16 |
+| 2 | ADR-015/D12 ausente; branches em voo | §3, mapa E2; §4.11 |
+| 3 | Links `blob/…/docs/squad/…` do `github_sync.py` | mapa F5; §4.12; Q4 e Q7 |
+| 4 | `git filter-repo` fora da stdlib | §4.13 (pré-requisito do host + alternativa só git) |
+| 5 | Produtivo da plataforma não é Compose | §3: `[env.prod] kind = "process"` (7070) |
+| 6 | Isolamento da conversa entre produtos | §4.9: negação gerada (claude), limitação declarada (codex), teste F6 nos dois |
+| 7 | Constituição para Codex/Copilot/Devin | §4.5: bloco gerado no `AGENTS.md`; mapa D2 |
+| 8 | Valores menores | mapa A10, C16, C17, C18, G7 |
+| 9 | F2 grande | §6: F2a e F2b; mapa com fase F2a/F2b |
+| 10 | Brief de handoff | `docs/squad/memory/handoffs/12-arquiteto-d22-adr024-para-auditor.md` |
