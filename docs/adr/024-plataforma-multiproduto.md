@@ -6,6 +6,7 @@
 **Anexo (mapa completo, 74 pontos)**: [`docs/contracts/plataforma-multiproduto-mapa.md`](../contracts/plataforma-multiproduto-mapa.md).
 **Afeta**: ADR-011 (sem mudança de regra), ADR-015, ADR-017, ADR-018, ADR-019, ADR-020 e ADR-023 (sem mudança de
 regra: conversas e anexos continuam fora do git, §4.3), ADR-021, ADR-022 — mecanismos mantidos, valores e caminhos passam a vir do cadastro do produto; cada fase que mudar um deles cita este ADR.
+**Revisão D25 (`233278d0cfa9`)**: §4.1, §4.3, §4.4.2, §4.12 (parte da Q4), §4.13 (parte da F3), as linhas F3/F4 do §6 e o item "banco de dados para a memória" do §8 são **substituídos** pelo [ADR-026](026-sentido-da-separacao-e-memoria-no-neon.md) (proposto): o produto sai do repositório, a memória vai para o Postgres (Neon) com cache local e a entrega usa uma exportação congelada. Os riscos novos estão no ADR-026 §7. As Q1 e Q4 do §9 passam a ser as Q-A1 e Q-B2 do ADR-026.
 
 ## 1. Contexto
 
@@ -193,7 +194,7 @@ depois — senão volta ao SHA anterior). O registro de portas (§4.7) inclui as
 
 ## 4. Decisões detalhadas, com alternativas
 
-### 4.1 Repositório da plataforma e distribuição
+### 4.1 Repositório da plataforma e distribuição — *substituída pelo ADR-026 §3 (sentido B)*
 **Decisão**: repositório novo `jcrouzillard/squad-platform`, extraído com `git filter-repo` dos caminhos da fábrica
 (`tools/squad`, `squad-control`, `tests/squad`, `tests/ui` do Squad Control, `docs/squad` sem a memória, ADRs e
 contratos da fábrica), **preservando a história git e os SHAs de origem** numa tabela `docs/MIGRATION-SHAS.md`.
@@ -222,7 +223,7 @@ cadastro só **aponta** para ele.
 | JSON (evolução do `project.json`) | sem comentários; aceitável como formato de troca — `/api/products` devolve o cadastro em JSON |
 | Banco de dados | sem revisão por PR nem histórico; desproporcional para poucos produtos |
 
-### 4.3 Onde fica a memória
+### 4.3 Onde fica a memória — *substituída pelo ADR-026 §4 (Neon com cache local)*
 **Decisão**: um repositório git **local por produto** em `$SQUAD_HOME/products/<id>/memory/`, com commit automático
 a cada gravação agrupada (mesma cadência de hoje) e remoto privado opcional (`<produto>-squad-memory`). O que não
 precisa de auditoria (runs, travas, rascunhos, sessões, chave de pseudônimo) vai para `runtime/`, fora do git.
@@ -378,7 +379,7 @@ aceite é o mesmo nos dois caminhos.
 - Os ADRs 017–022 não mudam de regra; mudam de lugar (F4) e passam a receber valores do cadastro.
 - O Frontend passa a trabalhar em dois repositórios (produto e plataforma), com PRs separados.
 
-## 6. Plano de fases
+## 6. Plano de fases — *linhas F3 e F4 substituídas pelo ADR-026 §6 (F3a, F3b, F3c, F4 no sentido B)*
 
 Cada fase é uma demanda (`operacao`), com branch, gates G1–G3 e PR com merge humano (ADR-011). A ordem é:
 configuração antes de mover (barato e reversível) → memória (maior acoplamento) → repositório (depende das duas)
@@ -399,7 +400,7 @@ da Q4 antes do seu G1 e `git filter-repo` ou o caminho alternativo (§4.13); F2b
 exige F2b e F3; antes de F2a, F2b, F3 e F4 vale a regra das demandas em voo (§4.11); F4 exige F3 (sem memória no repo, a extração não carrega
 estado vivo); F5 pode começar em paralelo a F4 na parte de API, mas só entrega com F4; F6 exige F5.
 
-## 7. Riscos
+## 7. Riscos — *riscos novos (rede, Neon, segredo, sincronização, sentido B) no ADR-026 §7*
 
 | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|

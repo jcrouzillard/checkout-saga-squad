@@ -1,0 +1,40 @@
+{
+  "gate": "G3",
+  "cycle": 1,
+  "demand": "233278d0cfa9",
+  "code": "D25",
+  "phase": "revisão do ADR-024 (ADR-026) — entrega só documental",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "commit": "2e70b39",
+  "base": "012f385",
+  "recommendation": "APPROVE",
+  "confidence": 0.95,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "(B,3) Ressalva de segredo do G1: R1–R4 e S7 ampliado", "status": "pass",
+     "source": "ADR-026 §9.1: R1 /api/project com {{VAR}} só por lista de permissão e recusa de nomes URL/TOKEN/KEY/SECRET/PASSWORD (vale para o cadastro TOML); R2 run_agent.py/testenv/publicador/plantão/github_sync com lista de permissão e servidor sem gravar a URL em os.environ; R3 CLI não lê a URL, só setup com getpass em tty; R4 arquivo $SQUAD_HOME/secrets/memory.env modo 600 fora do .env do Compose (ou aceitação explícita na Q-B4). S7 ampliado cobre project.json, cadastro, filhos de run_agent/testenv/publicador, setup sem tty e sync sem servidor"},
+    {"name": "(B,3) Correção declarada pelo Arquiteto sobre conversa.py confirmada no código", "status": "pass",
+     "source": "tools/squad/conversa.py:96-97 ENV_ALLOW/ENV_PREFIX e :222-225 child_env() por lista de permissão (sem SQUAD_*, GH_TOKEN), usado em :1507 (Popen env=child_env()). Só run_agent.py:150 ({k:v for os.environ} menos 3 chaves) e :227 ({**os.environ, SQUAD_RUN}) repassam o ambiente inteiro. A ressalva do G1 que citava conversa.py estava errada nesse ponto; o R2 a corrige"},
+    {"name": "(B,3) Código × D23 com code-confirmed", "status": "pass",
+     "source": "ADR-026 §9.2: rede fora do codes.lock (LOCK_TIMEOUT_S 5 s × connect_timeout 10 s), provisório D?<id> no backend neon, reserva só pelo sincronizador (corrige §4.2.9), evento novo code-confirmed com regra de leitura e conflito de sentido, log.py sempre provisório, critério de duas máquinas e zero conexões com a trava segura; mapa B14 atualizado"},
+    {"name": "(B,2) F3c antes da F4", "status": "pass",
+     "source": "ADR-026 §9.3: só mecanismo e exportação em $SQUAD_HOME/…/exports sem commit, release-start desligado (export.enabled=false) até a F4, tag entrega-desafio-<data> como evidência versionada; §6 F3c e F4 critério (g) (primeiro release do checkout-saga com exportação commitada e verificada offline); mapa H9"},
+    {"name": "(2) Correções de detalhe: arrival_seq, legado inteiro, diagrama", "status": "pass",
+     "source": "§4.2.6 arrival_seq por id no cache (inclusive os próprios via RETURNING/pull); §4.2.8 e S9 legado = log inteiro na migração; §9.4 e §6 F3c/mapa H9 com o diagrama da squad"},
+    {"name": "(2) Impacto em F5 dos pontos 2 e 3", "status": "pass",
+     "source": "§9.5: esquema/papel/variável por produto, lista de recusa R1, códigos por produto com referência <produto>/<código>; export por produto ligado só com repositório próprio"},
+    {"name": "(1) Números: 189 issues e nota dos 24 PRs", "status": "pass",
+     "source": "§1 correção '14 PRs' → 24 verificados e 189 issues/itens do Project; §3.1 tabela com 189"},
+    {"name": "(1) Mapa B16, B14, H4, H9", "status": "pass",
+     "source": "plataforma-multiproduto-mapa.md: B16 só em run: (linha própria com B7/B8/B10/B11); B14 com §9.2; H4 arquivo de segredo e R1/R2; H9 diagrama e §9.3"},
+    {"name": "(B,2) Nenhuma string de conexão", "status": "pass",
+     "source": "grep -E 'postgres(ql)?://|neon\\.tech|npg_|sslmode' no ADR-026 e no mapa: vazio. Commit 2e70b39 só altera os 2 arquivos documentais"}
+  ],
+  "open_risks": [
+    "Implementação ainda pendente: R2 exige mudar run_agent.py:150/227 na F3b (hoje repassa o ambiente inteiro); critério do G1 da F3b",
+    "Q-B4 e Q-C1 continuam decisões do humano (R4 arquivo separado × .env; destino da exportação)"
+  ],
+  "human_required": false,
+  "rationale": "Todas as ressalvas do G1-D25 entraram no §9 do ADR-026 e no mapa, com critério verificável por fase. A correção do Arquiteto sobre conversa.py procede: ela já usa lista de permissão; só run_agent.py repassa tudo. Sem código alterado nem segredo nos arquivos."
+}
