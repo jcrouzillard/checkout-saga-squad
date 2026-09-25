@@ -2961,8 +2961,8 @@ function instView() {
   if (b.dirty) notes.push("alterações locais não commitadas");
   const stale = f.state === "desatualizado", unk = f.state === "indeterminado" || !f.state;
   const bad = stale ? "Desatualizado: o código mudou desde a subida. Reinicie (make squad)." : unk ? "Não foi possível verificar a versão." : "";
-  const aria = `Ambiente: ${label}. Versão ${display}${stale ? ". Desatualizado, reinicie" : ""}${notes.length ? ". " + notes.join(", ").replace(/^./, c => c.toUpperCase()) : ""}`;
-  return { env, label, short: `${INST_ENV[env][1]} · ${b.commit || "commit ?"}`, display, notes, bad, warn: stale, aria, prefix: env === "teste" ? "[TESTE] " : env === "desconhecido" ? "[?] " : "" };
+  const aria = `Ambiente: ${label}. Versão ${display}${stale ? ". Desatualizado, reinicie" : unk ? ". Não foi possível verificar a versão" : ""}${notes.length ? ". " + notes.join(", ").replace(/^./, c => c.toUpperCase()) : ""}`;
+  return { env, label, short: `${INST_ENV[env][1]} · ${b.commit || "commit ?"}`, display, notes, bad, warn: stale || unk, aria, prefix: env === "teste" ? "[TESTE] " : env === "desconhecido" ? "[?] " : "" };
 }
 function instFields() {
   const d = INST.data, v = instView(), T = x => x ? new Date(x).toLocaleString("pt-BR") : "—", S = x => (x === null || x === undefined || x === "") ? "—" : String(x);
