@@ -1,0 +1,60 @@
+{
+  "gate": "G1",
+  "cycle": 1,
+  "demand": "cf7a120591b0",
+  "code": "D24",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "artifacts": ["docs/adr/025-publicacao-do-squad-control.md", "docs/contracts/publicacao-do-squad-control.md"],
+  "commit": "04ca631",
+  "recommendation": "APPROVE",
+  "confidence": 0.81,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Aceite do humano (≤ 1 min; servidor quebrado → rollback e aviso)", "status": "pass",
+     "source": "contrato CA-1/CA-2 mensuráveis (mergedAt × ts do squad-updated ≤ 45 s; quebrado-no-import barrado no pré-voo, erro de execução → phase=health + rolledBack). Orçamento típico: poll 15 s (média 7,5) + fetch + pré-voo ~3-15 s + troca ~3 s + estabilidade 10 s ≈ 25-45 s; recarga da aba (§7.4) fecha o 'sem tocar no terminal'. Pior caso somado (15+15+20+10) passa de 60 s — aceitável como cauda, CA-1 fixa o caso típico"},
+    {"name": "(B,3) Travas do ADR-018 adaptadas a processo", "status": "validate",
+     "source": "§5.2 cobre cópia principal+develop, ff-only, código limpo, lock, porta; guarda estrutural da 7070 (CA-15). DEFEITO DE ORDEM: §5.1.3 executa `git merge --ff-only` ANTES das travas do §5.2 e sem conferir branch nem operação em curso — com a cópia principal em release/* (release-start usa a cópia principal) avançaria a branch errada; durante o `pull --rebase --autostash` do sync_develop (gitflow.py:104, HEAD destacado) avançaria o HEAD destacado no meio do rebase"},
+    {"name": "(B,2) Saúde em 4 pontos, candidato com dados sintéticos, rollback por plankton-squad-prev, manutenção", "status": "pass",
+     "source": "§5.3 candidato em porta ≥ 17070 com SQUAD_ROOT_DATA sintético (server.py:43-44 deriva LOG de DATA_ROOT), SQUAD_ENV=teste, SQUAD_TESTENV_SPAWN=0 (server.py:612); motivo correto (Store.recover, conversa.py:1070). Rollback sem checkout na cópia principal; revertido persistente (CA-18); página de manutenção com 503 (CA-22). prod.py usa last_deployed do log (prod.py:206), não ORIG_HEAD — avanço prévio da develop pelo publicador não esconde mudanças do produtivo"},
+    {"name": "(B,2) Segurança do botão", "status": "pass",
+     "source": "§4.2: _local_ok (server.py:1204) → 403; Content-Type JSON; 409 sem_supervisor/nao_produtivo/em_andamento/resposta_em_andamento sem confirm; interface só por arquivo (sem sinal/subprocesso); evento squad-publish-requested agent humano; agentes proibidos de usar a rota (espelha test-env-request)"},
+    {"name": "(2) Ponto seguro via busy, SIGTERM → interrompida pela publicação, recarga automática", "status": "pass",
+     "source": "Engine.busy() existe (conversa.py:1348) e sai em GET /api/conversas (server.py:1242), inclusive no servidor atual; 20 s no automático com contagem, now/safe(600 s) no botão; §6 Engine.shutdown com texto parcial preservado, CA-9; §7.4 recarga sem rascunho, faixa com rascunho (CA-13); §7.5 Reenviar (CA-14)"},
+    {"name": "(2) Compatibilidade com testes e contratos existentes (/api/live, /api/instance, log.py)", "status": "validate",
+     "source": "CA-20 afirma 'sem quebrar os testes da D18', mas: tests/squad/test_alertas_d14.py:394 fixa set(live)-{testEnv} e test_instancia_d18.py:239/275 fixa LIVE_KEYS — o campo `publication` (sempre presente, null sem supervisor) quebra os dois; test_instancia_d18.py:295 fixa set(/api/instance) == {environment, build, freshness} — `pid` no nível de cima quebra. log.py --type não aceita squad-publish-requested/squad-updated/squad-update-failed/squad-server-crashed (gravação via testenv.append contorna, mas a CLI e o painel precisam conhecer os tipos)"},
+    {"name": "(1) Sobreposição com a D23", "status": "validate",
+     "source": "§11 cobre server.py/gitflow.py/run_agent.py e códigos (eventos sem demand). Omite que a D23 também muda squad-control/index.html, testenv.py e log.py (git diff develop no plankton-d23). 'Quem integrar por último faz o rebase' contradiz a regra de conflito por merge (gates.md G3·D19, AGENTS.md)"},
+    {"name": "(1) Primeira adoção do servidor atual (pid 7606, cwd = cópia principal, não supervisionado)", "status": "validate",
+     "source": "§2 start adota via /api/instance.environment.root + lsof; ensure nunca adota (bom). Mas a pergunta 3 sugere 'confirmação no botão' — o servidor 7606 não tem o botão; a confirmação só pode ser no terminal do `make squad`. R3 (runner órfão sem SIGTERM gracioso) aceito"},
+    {"name": "(1) Pedido de mudança ao DevOps (Makefile)", "status": "pass", "source": "log b07ba6ca1c52 (change-request --to devops); §9 com alvos e .PHONY"},
+    {"name": "(1) Handoff e decisão registrados", "status": "pass", "source": "handoff a6f81716402c, decisão 58e53a667638, brief 15-arquiteto-d24-adr025-para-auditor.md; decisão do Orquestrador fd0c2871d359 coerente com as respostas do humano (inbox/done/cf7a120591b0.json)"}
+  ],
+  "required_before_implementation": [
+    "R1 (Arquiteto, contrato §5.1): antes de QUALQUER escrita git, conferir `git symbolic-ref -q HEAD == refs/heads/develop`, ausência de .git/rebase-merge, .git/rebase-apply, MERGE_HEAD, CHERRY_PICK_HEAD e .git/index.lock; qualquer um presente = 'tenta no próximo ciclo', sem evento (só o limite de 5 min por SHA gera phase=sync). As travas 1-3 do §5.2 valem também para a sincronização, não só para a publicação.",
+    "R2 (Arquiteto, §4.3/§4.4/CA-20): declarar que `publication` no /api/live e as mudanças do /api/instance exigem atualizar test_alertas_d14.py:394 (acrescentar 'publication' ao conjunto tolerado) e test_instancia_d18.py:239 (LIVE_KEYS); pôr `pid` dentro de `build` (ou `environment`), não no nível de cima, para não quebrar test_instancia_d18.py:295.",
+    "R3 (Arquiteto, §8): os 4 tipos novos entram nas choices do log.py --type (arquivo também mexido pela D23 — coordenar) e o painel os trata como tipos conhecidos.",
+    "R4 (Arquiteto, §11): incluir na sobreposição squad-control/index.html, testenv.py e log.py; trocar 'faz o rebase' por 'merge da origin/develop na branch (sem rebase nem --force)'."
+  ],
+  "open_risks": [
+    "Publicador passa a escrever na develop da cópia principal fora do gitflow.py (só ff de commits já integrados pelo humano). Aceitável porque é equivalente ao pull do review-sync, mas precisa constar no AGENTS.md (Orquestrador) como exceção sancionada, junto com 'agentes não usam POST /api/squad-control/publish'.",
+    "Corrida com o sync_develop do plantão: `pull --rebase --autostash` guarda o decisions.jsonl no stash; um append do publicador (ou do servidor) nessa janela gera conflito no stash pop. Risco pré-existente, o publicador só acrescenta escritores; mitigação sugerida: publicador não grava evento enquanto houver rebase/autostash em curso (R1).",
+    "Commits locais de memória não enviados + merge novo = divergência → publicação espera o review-sync (≥ 180 s) e o CA-1 estoura nesse caso raro. Aceito; aparece como phase=sync após 5 min.",
+    "Candidato do pré-voo deve rodar também com SQUAD_TESTENV_PROBE=0 (server.py:569) para não consultar o docker à toa; e o worktree plankton-squad-prev aparece em `git worktree list` (testenv.py:117) — conferir que listagens de instâncias/worktrees o ignoram ou o rotulam.",
+    "Janela de 3-5 s fora do ar e resposta cortada após 20 s — aceitos pelo desenho e visíveis ao humano.",
+    "A própria D24 não se publica: depois do merge dela o humano roda `make squad` uma vez (adoção do pid 7606); CA-1 só é verificável num PR de teste seguinte."
+  ],
+  "human_questions": {
+    "blocking": [],
+    "defaults": {
+      "1_limite_20s": "sim, 20 s (SQUAD_PUBLISH_SAFE_WAIT_S ajustável); cumpre 'avisa na tela antes de reiniciar' do pedido",
+      "2_recarga_automatica_sem_rascunho": "sim",
+      "3_encerrar_servidor_atual_na_1a_adocao": "sim, mas só via `make squad` iniciado pelo humano, com confirmação no TERMINAL (o servidor atual não tem o botão); ensure/plantão nunca adotam",
+      "4_sem_volta_apos_reboot": "sim (fora de escopo, demanda futura)",
+      "5_publicador_avancar_develop_antes_do_delivered": "sim, só ff-only e com as checagens do R1; registrar a exceção no AGENTS.md"
+    },
+    "note": "Nenhuma bloqueia: o humano delegou a forma ao Orquestrador (clarification 758fa29b938d) e todas têm padrão reversível e visível no PR."
+  },
+  "human_required": false,
+  "rationale": "ADR e contrato atendem ao pedido (automático ≤ 1 min, travas, pré-voo com candidato sintético, rollback por worktree sem tocar a cópia principal, ponto seguro, eventos, aviso, botão com confirmação) e a descoberta sobre o review-sync está correta (ciclo 180 s + LLM; gitflow.py:268-290). Pesos: 3+1,5+2+2+2+1+0,5+0,5+1+1 = 14,5/18 = 0,81. Aprovado com 4 correções de contrato obrigatórias antes da implementação (R1-R4): a principal é a ordem do §5.1, que hoje faria merge --ff-only antes de conferir branch/rebase em curso; e o /api/live/instance que quebraria test_alertas_d14 e test_instancia_d18 apesar do CA-20 dizer o contrário."
+}

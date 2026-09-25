@@ -1416,6 +1416,30 @@ class Engine:
         self._kill(t)
         return {"status": "cancelando"}
 
+    def shutdown(self, reason: str = "reinicio_publicacao", wait_s: float = 4.5) -> dict | None:
+        """D24 (ADR-025 §7, contrato §6): parada do servidor. O turno ativo termina como `interrompida` com
+        `code = reason`, preservando o texto já transmitido; o runner (grupo de processo) é morto."""
+        t = self.active
+        if t is None or t.done:
+            return None
+        t.stop_reason = "reinicio"
+        t.stop_code = reason
+        self._kill(t)
+        deadline = time.monotonic() + wait_s
+        with t.cond:
+            while not t.done and time.monotonic() < deadline:
+                t.cond.wait(0.2)
+            if not t.done:    # runner não saiu a tempo: grava o registro final aqui (o _finish tardio é ignorado)
+                t.finish(self.store.append(t.cid, self._interrupted_msg(t, t.sent, None)))
+        return {"conversa": t.cid, "turn": t.turn}
+
+    @staticmethod
+    def _interrupted_msg(t: Turn, text: str, runner: str | None) -> dict:
+        return {"t": "msg", "turn": t.turn, "role": "orquestrador", "ts": now_iso(), "text": (text or "").strip(),
+                "status": "interrompida", "runner": runner, "code": getattr(t, "stop_code", None) or "reinicio_publicacao",
+                "error": "interrompida pela publicação do Squad Control"
+                if getattr(t, "stop_code", None) in (None, "reinicio_publicacao") else "servidor encerrado"}
+
     # ---------------- execução
     def _kill(self, t: Turn):
         p = t.proc
@@ -1476,7 +1500,8 @@ class Engine:
         except Exception as e:  # nunca deixa o turno pendurado
             msg = {"t": "msg", "turn": t.turn, "role": "orquestrador", "ts": now_iso(), "text": t.sent.strip(),
                    "status": "erro", "runner": runner, "code": "erro_interno", "error": f"erro interno: {type(e).__name__}"}
-            t.finish(self.store.append(cid, msg))
+            if not t.done:   # D24: o shutdown pode já ter gravado o registro final
+                t.finish(self.store.append(cid, msg))
         finally:
             with self.lock:
                 if self.active is t:
@@ -1650,6 +1675,13 @@ class Engine:
             raw = mask(raw, self.store.data_root)
         text, block, action_kind = split_action(raw)
         found = action_kind is not None
+        if t.stop_reason == "reinicio":   # D24: servidor parando (publicação); texto parcial preservado
+            with t.cond:
+                if not t.done:
+                    msg = self._interrupted_msg(t, text or t.sent, runner)
+                    msg.update(sessionId=sid, totalMs=round((time.monotonic() - t.t0) * 1000), tools=res["tools"])
+                    t.finish(self.store.append(cid, msg))
+            return
         if t.stop_reason:
             status = t.stop_reason
         elif res["code"] == 0 and not res["isError"]:
