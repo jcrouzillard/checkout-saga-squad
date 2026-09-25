@@ -1,0 +1,393 @@
+{
+ "results": {
+  "painel_acoes": [
+   [
+    "pr-conflict:8f7b84c95cc0",
+    [
+     "Delegar correção na D2 (abre a conversa com o pedido preenchido, sem enviar)",
+     "na D2 (abre a conversa com o pedido preenchido, sem enviar)",
+     "Ver D2"
+    ]
+   ],
+   [
+    "pr-waiting:9d11bb943e5c",
+    [
+     "Revisar PR #171 (abre em nova aba)",
+     "(abre em nova aba)",
+     "Ver D1"
+    ]
+   ],
+   [
+    "pr-waiting:14bd5807b433",
+    [
+     "Revisar PR #172 (abre em nova aba)",
+     "(abre em nova aba)",
+     "Ver D2"
+    ]
+   ]
+  ],
+  "pedido": {
+   "hash": "#/painel?conversa=nova",
+   "open": true,
+   "value": "Delegar a correção do conflito do PR #172 da D2 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR.",
+   "msgs": 0,
+   "focus": "chat-text"
+  },
+  "cartao": {
+   "role": "group",
+   "txt": "PROPOSTA DE DELEGAÇÃO · PRECISA DA SUA CONFIRMAÇÃO Demanda D2 · D2: frete grátis qa-d19-e2e-46878b23 Tipo Conflito do PR com a develop Alvo PR #172 em conflito com a develop Agente responsável Orquestrador Risco Moderado Tentativa 1/2 Efeito A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu. Tarefa (editável, até 2 000 caracteres) 167/2000 Nada é registrado até você confirmar. Depois, o plantão começa em até ~3 min. Confirmar delegação Descartar",
+   "bloco": false,
+   "count": "167/2000",
+   "hasTextarea": true
+  },
+  "contador": "199/2000",
+  "confirmado": {
+   "txt": "eito A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu. Delegação confirmada às 12:40:12 (evento f16373db315c). Estado: ◷ Pedida · aguardando o plantão O plantão começa em até ~3 min. Acompanhe na seção Delegações da demanda. Ver delegações da D2",
+   "live": "Delegação registrada pelo servidor. Aguardando o plantão (até ~3 min)."
+  },
+  "painel_depois": [
+   [
+    "pr-conflict:8f7b84c95cc0",
+    [
+     "●Delegado · Pedida · aguardando o plantão",
+     "●",
+     "Ver delegação da D2",
+     "da D2"
+    ]
+   ],
+   [
+    "pr-waiting:9d11bb943e5c",
+    [
+     "Revisar PR #171 (abre em nova aba)",
+     "(abre em nova aba)",
+     "Ver D1"
+    ]
+   ],
+   [
+    "pr-waiting:14bd5807b433",
+    [
+     "Revisar PR #172 (abre em nova aba)",
+     "(abre em nova aba)",
+     "Ver D2"
+    ]
+   ]
+  ],
+  "xss": {
+   "flag": null,
+   "imgs": 0,
+   "bolds": 0,
+   "ta": "<img src=x onerror=window.__xss=1> <b>negrito</b>"
+  },
+  "d1_1440-claro": {
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 28 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação",
+   "marks": 6,
+   "links": [
+    "Parecer G3 · APPROVE",
+    "PR #171 (abre em nova aba)",
+    "commit c1ad023 (abre em nova aba)",
+    "Eventos na Auditoria"
+   ],
+   "badge": null
+  },
+  "d2_1440-claro": {
+   "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 12 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+   "bg": "rgb(247, 247, 245)"
+  },
+  "d1_1440-escuro": {
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 34 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação",
+   "marks": 6,
+   "links": [
+    "Parecer G3 · APPROVE",
+    "PR #171 (abre em nova aba)",
+    "commit c1ad023 (abre em nova aba)",
+    "Eventos na Auditoria"
+   ],
+   "badge": null
+  },
+  "d2_1440-escuro": {
+   "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 19 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+   "bg": "rgb(17, 19, 22)"
+  },
+  "d1_390-claro": {
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 40 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação",
+   "marks": 6,
+   "links": [
+    "Parecer G3 · APPROVE",
+    "PR #171 (abre em nova aba)",
+    "commit c1ad023 (abre em nova aba)",
+    "Eventos na Auditoria"
+   ],
+   "badge": null
+  },
+  "d2_390-claro": {
+   "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 25 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+   "bg": "rgb(247, 247, 245)"
+  },
+  "d1_390-escuro": {
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 48 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação",
+   "marks": 6,
+   "links": [
+    "Parecer G3 · APPROVE",
+    "PR #171 (abre em nova aba)",
+    "commit c1ad023 (abre em nova aba)",
+    "Eventos na Auditoria"
+   ],
+   "badge": null
+  },
+  "d2_390-escuro": {
+   "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+   "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 33 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+   "bg": "rgb(17, 19, 22)"
+  },
+  "pageErrors": []
+ },
+ "checks": [
+  {
+   "name": "B6 no Painel com \"Delegar correção\"",
+   "ok": true,
+   "info": [
+    "pr-conflict:8f7b84c95cc0",
+    [
+     "Delegar correção na D2 (abre a conversa com o pedido preenchido, sem enviar)",
+     "na D2 (abre a conversa com o pedido preenchido, sem enviar)",
+     "Ver D2"
+    ]
+   ]
+  },
+  {
+   "name": "B6 da D1 (resolvido) não aparece",
+   "ok": true,
+   "info": [
+    "pr-conflict:8f7b84c95cc0",
+    "pr-waiting:9d11bb943e5c",
+    "pr-waiting:14bd5807b433"
+   ]
+  },
+  {
+   "name": "teclado alcança \"Delegar correção\" com Tab",
+   "ok": true
+  },
+  {
+   "name": "pedido preenche o campo e NÃO envia",
+   "ok": true,
+   "info": {
+    "hash": "#/painel?conversa=nova",
+    "open": true,
+    "value": "Delegar a correção do conflito do PR #172 da D2 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR.",
+    "msgs": 0,
+    "focus": "chat-text"
+   }
+  },
+  {
+   "name": "foco no campo da conversa",
+   "ok": true,
+   "info": "chat-text"
+  },
+  {
+   "name": "cartão role=group com tarefa editável e contador n/2000",
+   "ok": true,
+   "info": {
+    "role": "group",
+    "txt": "PROPOSTA DE DELEGAÇÃO · PRECISA DA SUA CONFIRMAÇÃO Demanda D2 · D2: frete grátis qa-d19-e2e-46878b23 Tipo Conflito do PR com a develop Alvo PR #172 em conflito com a develop Agente responsável Orquestrador Risco Moderado Tentativa 1/2 Efeito A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu. Tarefa (editável, até 2 000 caracteres) 167/2000 Nada é registrado até você confirmar. Depois, o plantão começa em até ~3 min. Confirmar delegação Descartar",
+    "bloco": false,
+    "count": "167/2000",
+    "hasTextarea": true
+   }
+  },
+  {
+   "name": "cartão mostra agente, risco (texto), tentativa 1/2 e efeito \"o merge continua seu\"",
+   "ok": true,
+   "info": "PROPOSTA DE DELEGAÇÃO · PRECISA DA SUA CONFIRMAÇÃO Demanda D2 · D2: frete grátis qa-d19-e2e-46878b23 Tipo Conflito do PR com a develop Alvo PR #172 em conflito com a develop Agente responsável Orquestrador Risco Moderado Tentativa 1/2 Efeito A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu. Tarefa (editável, até 2 000 caracteres) 167/2000 Nada é registrado até você confirmar. Depois, o plantão começa em até ~3 min. Confirmar delegação Descartar"
+  },
+  {
+   "name": "bloco ```delegar fora do texto exibido",
+   "ok": true
+  },
+  {
+   "name": "teclado alcança \"Confirmar delegação\" a partir da tarefa",
+   "ok": true
+  },
+  {
+   "name": "cartão confirmado mostra estado (aguardando o plantão)",
+   "ok": true,
+   "info": {
+    "txt": "eito A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado. O merge continua seu. Delegação confirmada às 12:40:12 (evento f16373db315c). Estado: ◷ Pedida · aguardando o plantão O plantão começa em até ~3 min. Acompanhe na seção Delegações da demanda. Ver delegações da D2",
+    "live": "Delegação registrada pelo servidor. Aguardando o plantão (até ~3 min)."
+   }
+  },
+  {
+   "name": "B6 com delegação ativa mostra \"Delegado\" sem botão",
+   "ok": true,
+   "info": [
+    "pr-conflict:8f7b84c95cc0",
+    [
+     "●Delegado · Pedida · aguardando o plantão",
+     "●",
+     "Ver delegação da D2",
+     "da D2"
+    ]
+   ]
+  },
+  {
+   "name": "tarefa do modelo exibida como texto (sem <img>/<b> interpretados)",
+   "ok": true,
+   "info": {
+    "flag": null,
+    "imgs": 0,
+    "bolds": 0,
+    "ta": "<img src=x onerror=window.__xss=1> <b>negrito</b>"
+   }
+  },
+  {
+   "name": "[1440-claro] D1: seção Delegações com quem pediu, tipo, agente, tarefa, risco, estado e resultado",
+   "ok": true,
+   "info": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 28 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação"
+  },
+  {
+   "name": "[1440-claro] D1: eventos com delegation marcados na linha do tempo",
+   "ok": true,
+   "info": 6
+  },
+  {
+   "name": "[1440-claro] D1 concluída sem badge \"em andamento\"",
+   "ok": true,
+   "info": null
+  },
+  {
+   "name": "[1440-claro] sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "name": "[1440-claro] D2: badge \"Delegação em andamento\" e estado pedida/aguardando",
+   "ok": true,
+   "info": {
+    "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+    "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 12 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+    "bg": "rgb(247, 247, 245)"
+   }
+  },
+  {
+   "name": "[1440-claro] tema aplicado",
+   "ok": true,
+   "info": "rgb(247, 247, 245)"
+  },
+  {
+   "name": "[1440-escuro] D1: seção Delegações com quem pediu, tipo, agente, tarefa, risco, estado e resultado",
+   "ok": true,
+   "info": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 34 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação"
+  },
+  {
+   "name": "[1440-escuro] D1: eventos com delegation marcados na linha do tempo",
+   "ok": true,
+   "info": 6
+  },
+  {
+   "name": "[1440-escuro] D1 concluída sem badge \"em andamento\"",
+   "ok": true,
+   "info": null
+  },
+  {
+   "name": "[1440-escuro] sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "name": "[1440-escuro] D2: badge \"Delegação em andamento\" e estado pedida/aguardando",
+   "ok": true,
+   "info": {
+    "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+    "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 19 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+    "bg": "rgb(17, 19, 22)"
+   }
+  },
+  {
+   "name": "[1440-escuro] tema aplicado",
+   "ok": true,
+   "info": "rgb(17, 19, 22)"
+  },
+  {
+   "name": "[390-claro] D1: seção Delegações com quem pediu, tipo, agente, tarefa, risco, estado e resultado",
+   "ok": true,
+   "info": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 40 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação"
+  },
+  {
+   "name": "[390-claro] D1: eventos com delegation marcados na linha do tempo",
+   "ok": true,
+   "info": 6
+  },
+  {
+   "name": "[390-claro] D1 concluída sem badge \"em andamento\"",
+   "ok": true,
+   "info": null
+  },
+  {
+   "name": "[390-claro] sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "name": "[390-claro] D2: badge \"Delegação em andamento\" e estado pedida/aguardando",
+   "ok": true,
+   "info": {
+    "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+    "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 25 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+    "bg": "rgb(247, 247, 245)"
+   }
+  },
+  {
+   "name": "[390-claro] tema aplicado",
+   "ok": true,
+   "info": "rgb(247, 247, 245)"
+  },
+  {
+   "name": "[390-claro] cartão: alvos de toque ≥ 40 px e sem rolagem horizontal",
+   "ok": true,
+   "info": []
+  },
+  {
+   "name": "[390-escuro] D1: seção Delegações com quem pediu, tipo, agente, tarefa, risco, estado e resultado",
+   "ok": true,
+   "info": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ✓ Concluída Quando 25/09, 12:39 · há 48 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #171 em conflito com a develop Tarefa Delegar a correção do conflito do PR #171 da D1 com a develop: integrar a develop na branch da demanda por merge, preservando as duas mudanças, e atualizar o mesmo PR. Rodar os testes do order-service. qa-d19-e2e-46878b23 Resultado Merge da develop integrado; QA e G3 aprovados; PR #171 atualizado. · 25/09, 12:39 Parecer G3 · APPROVE PR #171 (abre em nova aba) commit c1ad023 (abre em nova aba) Eventos na Auditoria 6 eventos desta delegação"
+  },
+  {
+   "name": "[390-escuro] D1: eventos com delegation marcados na linha do tempo",
+   "ok": true,
+   "info": 6
+  },
+  {
+   "name": "[390-escuro] D1 concluída sem badge \"em andamento\"",
+   "ok": true,
+   "info": null
+  },
+  {
+   "name": "[390-escuro] sem rolagem horizontal",
+   "ok": true
+  },
+  {
+   "name": "[390-escuro] D2: badge \"Delegação em andamento\" e estado pedida/aguardando",
+   "ok": true,
+   "info": {
+    "badge": "● Delegação em andamento · Pedida · aguardando o plantão",
+    "sec": "Delegações Tarefas pontuais que você pediu pela conversa. A squad trabalha na branch da demanda, o Auditor avalia e o mesmo PR é atualizado; o merge continua seu. Conflito do PR com a develop ◷ Pedida · aguardando o plantão Quando 25/09, 12:40 · há 33 s Quem pediu Você, pela conversa Agente Orquestrador Risco Moderado Tentativa 1/2 Alvo PR #172 em conflito com a develop Tarefa Delegar a correção d",
+    "bg": "rgb(17, 19, 22)"
+   }
+  },
+  {
+   "name": "[390-escuro] tema aplicado",
+   "ok": true,
+   "info": "rgb(17, 19, 22)"
+  },
+  {
+   "name": "[390-escuro] cartão: alvos de toque ≥ 40 px e sem rolagem horizontal",
+   "ok": true,
+   "info": []
+  },
+  {
+   "name": "sem erros de página",
+   "ok": true,
+   "info": []
+  }
+ ],
+ "errors": []
+}
