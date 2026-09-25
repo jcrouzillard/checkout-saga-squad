@@ -523,6 +523,107 @@
   .warnl { list-style: none; margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); font-size: 13px; }
   .bugsec .te-box { margin-top: 12px; }
   .srcbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+  /* ================= D17 (ADR-020, contrato conversa-com-o-orquestrador §9): conversa direta com o Orquestrador ================= */
+  .chat-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; min-height: 32px; padding: 0 10px; cursor: pointer; white-space: nowrap; align-self: center; }
+  .chat-btn:hover, .chat-btn[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .chat-btn svg { flex: none; }
+  .chat { position: fixed; top: var(--hdr-h); right: 0; bottom: 0; width: min(640px, 100%); background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow); z-index: 10; display: flex; flex-direction: column; min-width: 0; }
+  .chat[hidden], .chat [hidden] { display: none !important; }
+  .chat .c-head { padding: 12px 20px 10px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; position: relative; }
+  .chat .c-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .chat .c-head h2:focus { outline: none; }
+  .chat .c-sub { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat .c-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; grid-row: 1 / span 2; grid-column: 2; }
+  .chat .c-tools .btn { height: 36px; padding: 0 12px; font-size: 13px; }
+  .chat .c-note { margin: 0; padding: 8px 20px; font-size: 12.5px; color: var(--muted); background: var(--raised); border-bottom: 1px solid var(--line); }
+  .chat .c-warn { margin: 0; padding: 8px 20px; font-size: 12.5px; color: var(--text); background: var(--warn-soft); border-bottom: 1px solid var(--line); border-left: 3px solid var(--warn); display: flex; gap: 8px; align-items: flex-start; }
+  .chat .c-warn svg { color: var(--warn); margin-top: 3px; }
+  .chat .c-warn.err { background: var(--danger-soft); border-left-color: var(--danger); } .chat .c-warn.err svg { color: var(--danger); }
+  .chat .c-warn code { font-size: 11.5px; overflow-wrap: anywhere; }
+  .c-list { position: absolute; top: 100%; right: 12px; left: 12px; max-height: min(420px, 60vh); overflow: auto; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); z-index: 3; border-radius: 4px; }
+  .c-list ul { list-style: none; margin: 0; padding: 4px 0; }
+  .c-list a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 14px; min-height: 44px; color: var(--text); text-decoration: none; font-size: 13px; }
+  .c-list a:hover, .c-list a:focus-visible { background: var(--accent-soft); }
+  .c-list a[aria-current] { border-left: 3px solid var(--accent); padding-left: 11px; font-weight: 600; }
+  .c-list a .ct { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .c-list a small { color: var(--dim); font-size: 11.5px; font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+  .c-list a .cm { grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
+  .c-list .none { padding: 12px 14px; color: var(--muted); font-size: 13px; }
+  .c-msgs { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 14px 20px; list-style: none; margin: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .c-msg { max-width: 88%; min-width: 0; font-size: 13.5px; line-height: 1.55; }
+  .c-msg.humano { align-self: flex-end; }
+  .c-msg.orquestrador { align-self: flex-start; width: 88%; }
+  .c-msg .bub { padding: 8px 12px; border-radius: 8px; overflow-wrap: anywhere; }
+  .c-msg.humano .bub { background: var(--accent-soft); color: var(--text); border: 1px solid var(--accent-soft); border-bottom-right-radius: 2px; white-space: pre-wrap; }
+  .c-msg.orquestrador .bub { background: var(--raised); border: 1px solid var(--line); border-bottom-left-radius: 2px; }
+  .c-msg.pending .bub { opacity: .7; }
+  .c-msg .who { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
+  .c-msg.humano .who { justify-content: flex-end; }
+  .c-msg .who b { color: var(--text); font-weight: 600; font-size: 12px; }
+  .c-msg .who time { color: var(--dim); }
+  .c-msg .bub p { margin: 0 0 8px; } .c-msg .bub p:last-child { margin-bottom: 0; }
+  .c-msg .bub ul, .c-msg .bub ol { margin: 0 0 8px; padding-left: 20px; } .c-msg .bub li { margin: 2px 0; }
+  .c-msg .bub code { font-size: 12px; background: var(--surface); border: 1px solid var(--line); padding: 0 4px; border-radius: 2px; overflow-wrap: anywhere; }
+  .c-msg .bub pre { margin: 0 0 8px; padding: 8px 10px; font-size: 12px; background: var(--surface); max-height: 280px; overflow: auto; white-space: pre-wrap; }
+  .c-msg .bub h4 { margin: 4px 0 6px; font-size: 13.5px; }
+  .c-msg .flag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .c-msg .flag.err { color: var(--danger); } .c-msg .flag.warn { color: var(--warn); } .c-msg .flag.muted { color: var(--muted); }
+  .c-msg .partial { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line-strong); font-size: 12px; color: var(--muted); }
+  .c-msg .foot { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 4px; font-size: 11.5px; color: var(--dim); }
+  .c-msg .foot .linkbtn { min-height: 32px; font-size: 12px; }
+  .c-msg.live .bub { border-left: 3px solid var(--accent); }
+  .c-caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: pulse 1s infinite; }
+  .c-empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
+  .c-empty b { color: var(--text); display: block; font-size: 14px; margin-bottom: 4px; }
+  .c-sugs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+  .c-sugs button { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; color: var(--text); font: inherit; font-size: 13px; padding: 6px 12px; min-height: 36px; cursor: pointer; text-align: left; }
+  .c-sugs button:hover { border-color: var(--accent); color: var(--accent); }
+  .c-prop { margin-top: 8px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; background: var(--surface); padding: 10px 12px; font-size: 13px; }
+  .c-prop.danger { border-left-color: var(--danger); }
+  .c-prop.invalid { border-left-color: var(--warn); background: var(--warn-soft); }
+  .c-prop.done { border-left-color: var(--ok); }
+  .c-prop h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .c-prop dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 10px; margin: 0 0 8px; }
+  .c-prop dt { color: var(--muted); } .c-prop dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .c-prop label { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .c-prop textarea { margin-top: 4px; }
+  .c-prop .actions { margin-top: 8px; }
+  .c-prop .actions .btn { height: 40px; padding: 0 14px; flex-grow: 0; }
+  .c-prop .res { margin: 6px 0 0; font-size: 13px; }
+  .c-status { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .c-status[hidden] { display: none; }
+  .c-status .ic { flex: none; width: 16px; text-align: center; }
+  .c-status.work { color: var(--accent); } .c-status.work .ic { animation: pulse 1.2s infinite; }
+  .c-status.err { color: var(--danger); background: var(--danger-soft); } .c-status.warn { color: var(--warn); background: var(--warn-soft); }
+  .c-status .txt { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
+  .c-status .el { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--dim); white-space: nowrap; }
+  .c-status .btn { height: 32px; padding: 0 10px; font-size: 12.5px; flex: none; }
+  .c-comp { padding: 10px 20px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+  .c-comp label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .c-comp label .num { font-family: "IBM Plex Mono", monospace; color: var(--dim); font-weight: 400; }
+  .c-comp label .num.over { color: var(--danger); font-weight: 600; }
+  .c-comp textarea { margin-top: 4px; font-size: 13.5px; min-height: 64px; max-height: 40vh; }
+  .c-comp textarea[aria-disabled="true"] { background: var(--raised); color: var(--muted); cursor: not-allowed; }
+  .c-comp .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .c-comp .row .hint { font-size: 12px; color: var(--dim); flex: 1 1 200px; }
+  .c-comp .row .btn { height: 40px; flex-grow: 0; }
+  @media (max-width: 900px) { .chat { width: 100%; } }
+  @media (max-width: 600px) {
+    .chat-btn { min-height: 44px; min-width: 44px; justify-content: center; padding: 0 8px; }
+    .chat-btn .cbt { display: none; }
+    .chat { top: 0; z-index: 12; }
+    .chat .c-head { padding: 8px 12px; }
+    .chat .c-tools { grid-row: auto; grid-column: 1 / -1; justify-content: flex-start; }
+    .chat .c-tools .btn { height: 44px; }
+    .chat .c-note, .chat .c-warn { padding: 6px 12px; }
+    .c-msgs { padding: 12px; }
+    .c-msg, .c-msg.orquestrador { max-width: 94%; } .c-msg.orquestrador { width: 94%; }
+    .c-status { padding: 6px 12px; } .c-status .btn { height: 44px; }
+    .c-comp { padding: 8px 12px 12px; }
+    .c-comp .row .btn, .c-prop .actions .btn { height: 44px; }
+    .c-comp .row .hint { display: none; }
+    .c-sugs button { min-height: 44px; }
+  }
 </style>
 </head>
 <body>
@@ -536,6 +637,7 @@
       <nav class="ctrs" id="ctrs" aria-label="Bloqueios e avisos"></nav>
     </div>
     <div class="hdr-actions">
+    <button class="chat-btn" id="chat-btn" type="button" aria-expanded="false" aria-controls="chat" aria-label="Conversar com o Orquestrador" title="Conversar com o Orquestrador"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.2A8 8 0 1 1 21 12z"></path><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"></path></svg><span class="cbt">Conversar com o Orquestrador</span></button>
     <button class="theme-btn" id="theme-btn" type="button"><span aria-hidden="true">◐</span> <span class="tw" id="theme-lbl">Tema: Sistema</span></button>
     <button class="bell" id="bell" aria-label="Notificações" aria-expanded="false" aria-controls="notif-panel" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"></path></svg><span class="badge" id="bell-badge" hidden></span></button>
     <div class="notif-panel" id="notif-panel" hidden></div>
@@ -561,6 +663,29 @@
   <footer class="autoria autoria-m">Desafio Técnico | Checkout Saga com Squad Agêntica · Julien Crouzillard · Software Engineer</footer>
 </div></div>
 <aside class="drawer" id="drawer" hidden></aside>
+<!-- D17 (ADR-020, contrato §9): painel lateral não modal da conversa com o Orquestrador. Criado uma vez; o polling não o recria. -->
+<aside class="chat" id="chat" role="dialog" aria-modal="false" aria-labelledby="chat-h" hidden>
+  <div class="c-head">
+    <div style="min-width:0"><h2 id="chat-h" tabindex="-1">Conversa com o Orquestrador</h2><div class="c-sub" id="chat-sub"></div></div>
+    <div class="c-tools">
+      <button class="btn" type="button" id="chat-list-btn" aria-expanded="false" aria-controls="chat-list">Conversas</button>
+      <a class="btn" id="chat-new" href="#">Nova conversa</a>
+      <button class="btn" type="button" id="chat-close">Fechar</button>
+    </div>
+    <div class="c-list" id="chat-list" hidden></div>
+  </div>
+  <p class="c-note">Canal direto e somente leitura. O Orquestrador responde pelo estado registrado; ações só com sua confirmação.</p>
+  <div class="c-warn" id="chat-warn" hidden></div>
+  <ol class="c-msgs" id="chat-msgs" role="log" aria-live="off" aria-label="Mensagens da conversa"></ol>
+  <div class="c-status" id="chat-status" hidden></div>
+  <form class="c-comp" id="chat-form" novalidate>
+    <label for="chat-text"><span>Sua pergunta ao Orquestrador</span><span class="num" id="chat-count" aria-hidden="true">0/8000</span></label>
+    <textarea id="chat-text" rows="3" maxlength="8000" aria-describedby="chat-hint" placeholder="Pergunte sobre demandas, gates, agentes…"></textarea>
+    <div class="row"><span class="hint" id="chat-hint">Enter envia · Shift+Enter quebra a linha · Esc fecha</span>
+      <button class="btn danger-outline" type="button" id="chat-stop" hidden>Parar</button>
+      <button class="btn primary" type="submit" id="chat-send">Enviar</button></div>
+  </form>
+</aside>
 <div id="sr-live" class="sr-only" role="status" aria-live="polite"></div>
 <div id="sr-alert" class="sr-only" aria-live="assertive"></div>
 
@@ -606,7 +731,7 @@ const statusLabel = { pass: "Passou", fail: "Falhou", validate: "Validar" };
 // D9 (ADR-012, contrato ui-modelo-por-agente §6): selo "<ID> · <Fornecedor>" ou "não registrado".
 // Alias (opus/sonnet) e nome do runner (claude/codex) não são ID de modelo: servidores antigos os mandavam em runs[].model.
 const MODEL_NOT_ID = new Set(["opus", "sonnet", "haiku", "fable", "claude", "codex", "inherit", "<synthetic>"]);
-const MODEL_SOURCE = { logged: "registrado no log pelo agente", run: "herdado da execução (run)", transcript: "reconstruído da transcrição (heurística agente + título + 120 s)", none: "não registrado", "n/a": "não se aplica" };
+const MODEL_SOURCE = { conversa: "registrado na conversa (ID efetivo informado pelo runner)", logged: "registrado no log pelo agente", run: "herdado da execução (run)", transcript: "reconstruído da transcrição (heurística agente + título + 120 s)", none: "não registrado", "n/a": "não se aplica" };
 const modelId = (m, runner) => { const v = typeof m === "string" ? m.trim() : ""; return v && !MODEL_NOT_ID.has(v.toLowerCase()) && v !== runner ? v : null; };
 // Fornecedor: o do servidor vence (null = não identificável → "fornecedor desconhecido"); só quando o campo não vem
 // (IDs extras de models[] ou servidor antigo) deriva pelo prefixo (§3).
@@ -2325,11 +2450,14 @@ function canonical(h) {
   if (r.view === "produto" && !r.parts.length) return "#/produto/grafana" + (r.params.toString() ? "?" + r.params : "");
   return null;
 }
-const keyOf = r => `${r.view}/${r.parts.join("/")}?${[...r.params].filter(([k]) => k !== "agente").map(([k, v]) => `${k}=${v}`).join("&")}`;
+const keyOf = r => `${r.view}/${r.parts.join("/")}?${[...r.params].filter(([k]) => k !== "agente" && k !== "conversa").map(([k, v]) => `${k}=${v}`).join("&")}`;
 let pendingFocus = false;
 function applyRoute() {
   const c = canonical(location.hash);
   if (c && c !== location.hash) { history.replaceState(null, "", c); }
+  // D17 (contrato §9): painel de conversa e gaveta do integrante são mutuamente exclusivos — vale o que acabou de abrir.
+  { const r0 = parseHash(location.hash);
+    if (r0.params.get("conversa") && r0.params.get("agente")) { r0.params.delete(route.params.get("conversa") ? "conversa" : "agente"); history.replaceState(null, "", buildHash(r0)); } }
   const r = parseHash(location.hash);
   const k = keyOf(r), changed = k !== routeKey;
   // O aviso de rota inexistente vale só para o redirecionamento que o criou; qualquer navegação seguinte o limpa.
@@ -2339,6 +2467,7 @@ function applyRoute() {
   if (changed) { routeKey = k; flash = ""; flashErr = false; ctlConfirm.clear(); for (const x in teAsk) delete teAsk[x]; for (const x in teMsg) delete teMsg[x]; pendingFocus = true; syncMenu(); render(); }
   else if (fresh) render();
   else renderDrawer(true);
+  chatSync();
 }
 function syncMenu() {
   const on = route.view;
@@ -2641,7 +2770,7 @@ async function poll() {
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
 // Indicador ao vivo (§6.1) + dados defasados (§8.3). O "há N s" não é anunciado; só a mudança de faixa vai ao leitor de tela.
-const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append]";
+const STALE_SEL = "[data-te],[data-te-ask],[data-human],[data-clarify],[data-start],[data-ctl],[data-ctlpr],[data-precancel-confirm],[data-bl-save],[data-register],[data-bug-draft],[data-bug-submit],[data-bug-append],[data-chat-confirm]";
 function applyStale() {
   const stale = isStale();
   document.querySelectorAll(STALE_SEL).forEach(el => {
@@ -2873,7 +3002,580 @@ document.addEventListener("change", async ev => {
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   if (notifOpen) { notifOpen = false; lastSeen = newestTs(); notifStore.set("lastSeen", lastSeen); renderBell(); $("#bell").focus(); return; }
+  if (chatEsc()) { e.preventDefault(); return; }
   if (drawerAgent) location.hash = hrefWith({ agente: null });
+});
+// ================= D17 (ADR-020, contrato conversa-com-o-orquestrador §7 e §9): conversa direta com o Orquestrador =================
+// Painel lateral não modal, aberto por ?conversa=<id>|nova em qualquer rota. Criado uma vez no HTML; o polling de /api/live não o
+// recria (preserva rolagem, rascunho e foco). Texto do modelo nunca vira HTML: Markdown mínimo montado por DOM (textContent).
+// O servidor valida e grava; a UI só pergunta, mostra e pede a confirmação humana da proposta de destravar (§6.3).
+const CHAT_ID_RE = /^c-[0-9a-f]{12}$/, CHAT_PID_RE = /^p-[0-9a-f]{6}$/, CHAT_MAX = 8000, CHAT_NOTE_MAX = 2000;
+const chat = { id: null, conv: null, msgs: [], lastSeq: 0, info: null, infoErr: null, active: null, es: null, poll: null, tick: null,
+  sending: false, status: null, gen: 0, decisions: {}, propMsg: {}, notes: {}, loadErr: null, done: null };
+const C = id => document.getElementById(id);
+const CHAT_ERR = {
+  mensagem_vazia: "Escreva uma pergunta antes de enviar.", mensagem_grande: "A mensagem passa de 8 000 caracteres.",
+  turno_em_andamento: "Outra conversa está respondendo agora. Aguarde ela terminar ou pare a resposta por lá.",
+  conversa_cheia: "Esta conversa chegou ao limite (2 000 mensagens ou 4 MB). Abra uma nova conversa.",
+  orquestrador_indisponivel: "Orquestrador indisponível: o runner não foi encontrado ou está sem login.",
+  conversa_nao_encontrada: "Conversa não encontrada.", origem_invalida: "Pedido recusado pelo servidor (origem inválida).",
+  corpo_grande: "Pedido grande demais para o servidor.", turno_encerrado: "A resposta já tinha terminado.",
+  proposta_obsoleta: "O estado mudou desde a proposta: nada foi registrado. Pergunte de novo ao Orquestrador se ainda fizer sentido.",
+  ja_decidida: "Esta proposta já foi decidida.", proposta_invalida: "Proposta inválida: não pode ser confirmada por aqui.",
+  nota_grande: "A nota passa de 2 000 caracteres.", rede: "Sem conexão com o servidor.",
+  proposta_nao_encontrada: "Proposta não encontrada nesta conversa.", erro_runner: "O runner terminou com erro.",
+};
+const chatErrText = r => { const c = r?.j?.code;
+  if (r?.status === 404 && !c) return "O servidor ainda não oferece a conversa com o Orquestrador (rota /api/conversas ausente). Reinicie o Squad Control na versão com a D17.";
+  const m = typeof r?.j?.error === "string" && r.j.error.trim() ? r.j.error.trim() : CHAT_ERR[c];
+  return m || `Erro no servidor (${r?.status || "sem conexão"}).`; };
+const announceErr = t => { const el = C("sr-alert"); if (!el || !t) return; el.textContent = ""; setTimeout(() => { el.textContent = t; }, 50); };
+async function chatApi(method, url, body) {
+  let res;
+  try { res = await fetch(url, { method, cache: "no-store", headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { return { ok: false, status: 0, j: { code: "rede" } }; }
+  const j = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, j: j && typeof j === "object" ? j : {} };
+}
+const chatRunner = () => chat.conv?.runner || chat.info?.runner || null;
+const chatCheckCmd = r => r === "codex" ? ["codex --version", "codex login status"] : ["claude --version", 'claude -p "oi"'];
+const chatHref = id => hrefWith({ conversa: id, agente: null });
+// Links internos do texto mantêm o painel aberto (a conversa segue ao lado da tela aberta).
+const keepChat = h => { const r = parseHash(h); if (chat.id || route.params.get("conversa")) r.params.set("conversa", chat.id || route.params.get("conversa")); return buildHash(r); };
+const fmtWhen = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+const fmtSecs = ms => typeof ms === "number" && isFinite(ms) ? `${(ms / 1000).toFixed(1).replace(".", ",")} s` : null;
+// O bloco ```destravar é do servidor (vira `proposal`); no texto que chega em trechos ele é escondido desde a abertura.
+const stripProposal = t => String(t || "").replace(/```destravar[\s\S]*?(```|$)/g, "").replace(/\s+$/, "");
+
+// ---- Markdown mínimo por DOM (§9): parágrafo, lista, título, bloco de código, `código`, **negrito**, links seguros e Dn ----
+const mk = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+function safeLink(url, text) {
+  const u = String(url || "").trim(), a = mk("a");
+  if (/^#\/[^\s]*$/.test(u)) { a.href = keepChat(u); a.textContent = text; return a; }
+  if (/^https?:\/\/[^\s]+$/i.test(u)) { a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; a.className = "ext"; a.textContent = text;
+    const sr = mk("span", "sr-only"); sr.textContent = " (abre em nova aba)"; a.append(sr); return a; }
+  return null;
+}
+function demandLinkEl(code) {
+  const info = state ? findDemand(code) : null;
+  if (!info) return document.createTextNode(code);
+  const a = mk("a"); a.href = keepChat(`#/demandas/${info.code}`); a.textContent = code; a.title = info.eff?.title || ""; return a;
+}
+const INL_SRC = "(`[^`\\n]+`)|(\\*\\*[^*\\n]+\\*\\*)|\\[([^\\]\\n]+)\\]\\(([^)\\s]+)\\)|(https?:\\/\\/[^\\s<>()]*[^\\s<>().,;:!?'\"])|\\b(D\\d{1,4})\\b";
+function mdInline(parent, s) {
+  const re = new RegExp(INL_SRC, "g"); let last = 0, m;
+  while ((m = re.exec(s))) {
+    if (m.index > last) parent.append(s.slice(last, m.index));
+    if (m[1]) { const c = mk("code"); c.textContent = m[1].slice(1, -1); parent.append(c); }
+    else if (m[2]) { const b = mk("strong"); mdInline(b, m[2].slice(2, -2)); parent.append(b); }
+    else if (m[3]) parent.append(safeLink(m[4], m[3]) || `${m[3]} (${m[4]})`);
+    else if (m[5]) parent.append(safeLink(m[5], m[5]) || m[5]);
+    else if (m[6]) parent.append(demandLinkEl(m[6]));
+    last = re.lastIndex;
+  }
+  if (last < s.length) parent.append(s.slice(last));
+}
+const LI_RE = /^\s*([-*•]|\d+[.)])\s+/;
+function mdRender(text) {
+  const root = document.createDocumentFragment(), lines = String(text || "").replace(/\r/g, "").split("\n");
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\s*```/.test(l)) { const buf = []; i++; while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]); i++; const pre = mk("pre"); pre.textContent = buf.join("\n"); root.append(pre); continue; }
+    if (!l.trim()) { i++; continue; }
+    const hm = /^#{1,6}\s+(.*)$/.exec(l);
+    if (hm) { const h = mk("h4"); mdInline(h, hm[1]); root.append(h); i++; continue; }
+    if (LI_RE.test(l)) {
+      const list = mk(/^\s*\d/.test(l) ? "ol" : "ul");
+      while (i < lines.length && LI_RE.test(lines[i])) {
+        const li = mk("li"); mdInline(li, lines[i].replace(LI_RE, "")); i++;
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !LI_RE.test(lines[i])) { li.append(" "); mdInline(li, lines[i].trim()); i++; }
+        list.append(li);
+      }
+      root.append(list); continue;
+    }
+    const p = mk("p"); let first = true;
+    while (i < lines.length && lines[i].trim() && !/^\s*```/.test(lines[i]) && !LI_RE.test(lines[i]) && !/^#{1,6}\s/.test(lines[i])) { if (!first) p.append(mk("br")); mdInline(p, lines[i++]); first = false; }
+    root.append(p);
+  }
+  return root;
+}
+
+// ---- Rota → painel ----
+function chatSync() {
+  const p = route.params.get("conversa"), panel = C("chat");
+  const valid = p === "nova" || CHAT_ID_RE.test(p || "");
+  if (!valid) { if (!panel.hidden) chatClose(); return; }
+  const wasHidden = panel.hidden;
+  panel.hidden = false; C("chat-btn").setAttribute("aria-expanded", "true");
+  C("chat-new").setAttribute("href", chatHref("nova"));
+  if (wasHidden || (p === "nova" ? chat.id !== null : p !== chat.id)) chatReset(p === "nova" ? null : p);
+  if (wasHidden) { chatLoadList(); setTimeout(() => C("chat-text").focus({ preventScroll: true }), 0); }
+  else chatRenderList();
+}
+function chatClose() {
+  const panel = C("chat"), had = panel.contains(document.activeElement);
+  chatStopStream(); chatStopTick(); chat.gen++;
+  panel.hidden = true; C("chat-btn").setAttribute("aria-expanded", "false"); chatListOpen(false);
+  if (had) C("chat-btn").focus({ preventScroll: true });
+}
+function chatReset(id) {
+  chatStopStream(); chatStopTick(); chat.gen++;
+  Object.assign(chat, { id, conv: null, msgs: [], lastSeq: 0, active: null, sending: false, status: null, loadErr: null, decisions: {}, propMsg: {}, notes: {}, done: null });
+  chatRender();
+  if (id) chatLoad(id);
+}
+function chatEsc() {
+  if (C("chat").hidden) return false;
+  if (!C("chat-list").hidden) { chatListOpen(false); C("chat-list-btn").focus(); return true; }
+  location.hash = hrefWith({ conversa: null });
+  return true;
+}
+async function chatLoadList() {
+  const r = await chatApi("GET", "/api/conversas");
+  if (r.ok) { chat.info = r.j; chat.infoErr = null; } else { chat.infoErr = r; }
+  chatRenderWarn(); chatRenderList(); chatRenderHead();
+  return r;
+}
+async function chatLoad(id) {
+  const g = chat.gen, r = await chatApi("GET", `/api/conversas/${id}`);
+  if (g !== chat.gen) return;
+  if (!r.ok) { chat.loadErr = r; chatRender(); announceErr(chatErrText(r)); return; }
+  chat.conv = r.j; chatMerge(r.j.messages);
+  chatRender(); chatScroll(true);
+  if (r.j.active && r.j.active.turn != null) chatAttach(r.j.active);
+}
+async function chatCatchUp() {
+  if (!chat.id) return null;
+  const g = chat.gen, r = await chatApi("GET", `/api/conversas/${chat.id}?after=${chat.lastSeq}`);
+  if (g !== chat.gen || !r.ok) return null;
+  chatMerge(r.j.messages);
+  return r.j;
+}
+function chatMerge(recs) {
+  for (const m of Array.isArray(recs) ? recs : []) {
+    if (!m || typeof m !== "object") continue;
+    if (typeof m.seq === "number" && m.seq > chat.lastSeq) chat.lastSeq = m.seq;
+    if (m.t === "proposal") { if (m.id) chat.decisions[m.id] = m; continue; }
+    if (m.t && m.t !== "msg") continue;
+    if (typeof m.seq === "number" && chat.msgs.some(x => x.seq === m.seq)) continue;
+    // a mensagem otimista do humano é trocada pelo registro do servidor
+    if (m.role === "humano") { const k = chat.msgs.findIndex(x => x.pending && x.text === m.text); if (k >= 0) chat.msgs.splice(k, 1); }
+    chat.msgs.push(m);
+  }
+  chat.msgs.sort((a, b) => (a.seq ?? 1e15) - (b.seq ?? 1e15));
+}
+
+// ---- Turno: envio, streaming (SSE), fallback por polling, cancelamento ----
+async function chatSend(raw) {
+  const text = String(raw ?? "").trim();
+  if (chat.active || chat.sending) return;
+  if (!text) { chatSetStatus("err", CHAT_ERR.mensagem_vazia); announceErr(CHAT_ERR.mensagem_vazia); C("chat-text").focus(); return; }
+  if (text.length > CHAT_MAX) { chatSetStatus("err", CHAT_ERR.mensagem_grande); announceErr(CHAT_ERR.mensagem_grande); return; }
+  const g = chat.gen, opt = { t: "msg", role: "humano", text, ts: new Date().toISOString(), pending: true };
+  chat.sending = true; chat.status = null; chat.done = null;
+  chat.msgs.push(opt);
+  chat.active = { turn: null, phase: "enviando", text: "", base: "", tool: null, startedAt: Date.now() };
+  if (C("chat-text").value.trim() === text) C("chat-text").value = "";
+  chatCount(); chatRender(); chatScroll(true); chatStartTick();
+  // §8: indicador "pensando" em ≤ 300 ms, sem esperar o servidor.
+  setTimeout(() => { if (g === chat.gen && chat.active?.phase === "enviando") { chat.active.phase = "pensando"; chatRenderLive(); } }, 250);
+  if (!chat.id) {
+    const r = await chatApi("POST", "/api/conversas", {});
+    if (g !== chat.gen) return;
+    if (!r.ok || !CHAT_ID_RE.test(r.j.id || "")) return chatSendFailed(opt, text, r.ok ? { ok: false, status: r.status, j: { error: "Resposta inesperada do servidor ao criar a conversa." } } : r);
+    chat.id = r.j.id; chat.conv = { id: r.j.id, createdAt: r.j.createdAt, runner: r.j.runner, messages: [] };
+    const h = chatHref(chat.id); history.replaceState(null, "", h); route = parseHash(h);
+    C("chat-new").setAttribute("href", chatHref("nova"));
+  }
+  const r = await chatApi("POST", `/api/conversas/${chat.id}/mensagens`, { text });
+  if (g !== chat.gen) return;
+  chat.sending = false;
+  if (!r.ok) return chatSendFailed(opt, text, r);
+  if (r.j.message && typeof r.j.message === "object") { Object.assign(opt, r.j.message); delete opt.pending; if (opt.seq > chat.lastSeq) chat.lastSeq = opt.seq; }
+  else delete opt.pending;
+  chat.active.turn = r.j.turn ?? opt.turn ?? null;
+  if (chat.active.phase === "enviando") chat.active.phase = "pensando";
+  chatRender(); chatScroll(true);
+  const url = typeof r.j.stream === "string" && /^\/api\/conversas\/c-[0-9a-f]{12}\/turnos\/\d+\/stream$/.test(r.j.stream) ? r.j.stream : `/api/conversas/${chat.id}/turnos/${chat.active.turn}/stream`;
+  chatOpenStream(url);
+  chatLoadList();
+}
+async function chatSendFailed(opt, text, r) {
+  const code = r.j?.code, g = chat.gen;
+  chat.sending = false; chat.active = null; chatStopTick();
+  const k = chat.msgs.indexOf(opt); if (k >= 0) chat.msgs.splice(k, 1);
+  if (code === "orquestrador_indisponivel" && chat.id) {
+    // §3.1: a mensagem do humano fica gravada e a resposta vira status "erro" — traz os registros do servidor.
+    await chatCatchUp(); if (g !== chat.gen) return;
+  }
+  if (!chat.msgs.some(m => m.role === "humano" && m.text === text && !m.pending) && !C("chat-text").value.trim()) { C("chat-text").value = text; chatCount(); }
+  const msg = chatErrText(r);
+  if (code === "turno_em_andamento") {
+    const other = [r.j.conversa, r.j.busy?.conversa, r.j.active?.conversa, r.j.id].find(x => CHAT_ID_RE.test(x || "")) || null;
+    chat.status = { kind: "warn", icon: "◷", text: other && other !== chat.id ? "Ocupado: outra conversa está respondendo agora. Só uma resposta por vez no servidor." : "Ocupado: esta conversa ainda está respondendo.",
+      link: other && other !== chat.id ? { href: chatHref(other), text: "Abrir a conversa que está respondendo" } : null };
+    if (other === chat.id) chatLoad(chat.id);
+  } else if (code === "orquestrador_indisponivel") {
+    const [a, b] = chatCheckCmd(chatRunner());
+    chat.status = { kind: "err", icon: "✕", text: `${msg} Verifique no terminal: `, cmds: [a, b], retry: text };
+    chatLoadList();
+  } else if (code === "conversa_cheia") chat.status = { kind: "warn", icon: "▲", text: msg, link: { href: chatHref("nova"), text: "Abrir nova conversa" } };
+  else chat.status = { kind: "err", icon: "✕", text: msg, retry: ["mensagem_vazia", "mensagem_grande", "conversa_nao_encontrada", "origem_invalida"].includes(code) ? null : text };
+  chatRender(); announceErr(chat.status.text + (chat.status.cmds ? chat.status.cmds.join(" e ") : ""));
+}
+function chatAttach(a) {
+  chat.active = { turn: a.turn, phase: a.phase || "pensando", text: a.text || "", base: a.text || "", tool: a.tool || null, startedAt: chat.active?.startedAt || Date.now() };
+  chatStartTick(); chatRender(); chatScroll(true);
+  chatOpenStream(`/api/conversas/${chat.id}/turnos/${a.turn}/stream`);
+}
+function chatStopStream() {
+  if (chat.es) { try { chat.es.close(); } catch (e) {} chat.es = null; }
+  if (chat.poll) { clearTimeout(chat.poll); chat.poll = null; }
+}
+function chatOpenStream(url) {
+  chatStopStream();
+  if (!chat.active) return;
+  if (typeof EventSource !== "function") return chatStartPoll();
+  const g = chat.gen, es = new EventSource(url); let buf = "", closed = false;
+  chat.es = es;
+  const on = (name, fn) => es.addEventListener(name, ev => { if (g !== chat.gen || chat.es !== es || !chat.active) return; let d = {}; try { d = JSON.parse(ev.data || "{}") || {}; } catch (e) {} fn(d); });
+  on("fase", d => { chat.active.phase = d.phase || chat.active.phase; chat.active.tool = d.phase === "consultando" ? (d.tool ?? chat.active.tool) : null; chatRenderLive(); });
+  on("texto", d => {
+    // Reconexão/anexo: o servidor pode reenviar o texto acumulado; junta sem duplicar o que já veio do GET.
+    const dl = typeof d.delta === "string" ? d.delta : "";
+    if (d.replace) { buf = dl; chat.active.base = ""; } else buf += dl;
+    const base = chat.active.base || "";
+    chat.active.text = base.startsWith(buf) ? base : buf.startsWith(base) ? buf : base + buf;
+    if (chat.active.phase !== "consultando") chat.active.phase = "respondendo";
+    chatRenderLive();
+  });
+  on("fim", d => { closed = true; chatStopStream(); chatTurnEnded(d.message && typeof d.message === "object" ? d.message : null); });
+  on("erro", async d => {
+    closed = true; chatStopStream();
+    const txt = chatErrText({ status: 500, j: d });
+    if (d.message && typeof d.message === "object") chatMerge([d.message]);
+    await chatCatchUp(); if (g !== chat.gen) return;
+    chatTurnEnded(d.message && typeof d.message === "object" ? d.message : null, txt);
+  });
+  es.onerror = () => { if (closed || g !== chat.gen || chat.es !== es) return; chatStartPoll(); };
+}
+// §7.1: se o SSE falhar, GET …?after= a cada 1 s até o turno fechar.
+function chatStartPoll() {
+  chatStopStream();
+  const g = chat.gen;
+  const tick = async () => {
+    chat.poll = null;
+    if (g !== chat.gen || !chat.active) return;
+    const turn = chat.active.turn, j = await chatCatchUp();
+    if (g !== chat.gen || !chat.active) return;
+    if (j) {
+      if (j.active && (turn == null || j.active.turn === turn)) {
+        chat.active.turn = j.active.turn; chat.active.phase = j.active.phase || chat.active.phase; chat.active.tool = j.active.tool ?? null;
+        if (typeof j.active.text === "string") chat.active.text = j.active.text;
+        chatRenderLive();
+      } else {
+        const fin = [...chat.msgs].reverse().find(m => m.role === "orquestrador" && (turn == null || m.turn === turn)) || null;
+        return chatTurnEnded(fin, fin ? null : "A resposta terminou sem registro final.");
+      }
+    }
+    chat.poll = setTimeout(tick, 1000);
+  };
+  chat.poll = setTimeout(tick, 400);
+}
+function chatTurnEnded(fin, errText) {
+  const a = chat.active; chat.active = null; chatStopTick(); chatStopStream();
+  if (fin) chatMerge([fin]);
+  const st = fin?.status || (errText ? "erro" : "ok");
+  if (st === "ok") { chat.status = null; chat.done = { totalMs: fin?.totalMs ?? (a ? Date.now() - a.startedAt : null) }; announce("Resposta do Orquestrador recebida"); }
+  else {
+    chat.done = null;
+    const human = [...chat.msgs].reverse().find(m => m.role === "humano" && (a?.turn == null || m.turn === a.turn));
+    const lbl = { erro: "Erro na resposta", cancelada: "Resposta cancelada", tempo_esgotado: "Tempo esgotado", interrompida: "Resposta interrompida" }[st] || "Erro na resposta";
+    const detail = errText || fin?.error || "";
+    chat.status = { kind: st === "cancelada" ? "info" : st === "tempo_esgotado" ? "warn" : "err", icon: st === "cancelada" ? "■" : st === "tempo_esgotado" ? "◷" : "✕",
+      text: `${lbl}${detail ? `: ${detail}` : "."}${st === "cancelada" || st === "tempo_esgotado" ? " O texto parcial ficou marcado." : ""}`, retry: st !== "cancelada" && human ? human.text : null };
+    if (st === "cancelada") announce(chat.status.text); else announceErr(chat.status.text);
+  }
+  chatRender(); chatScroll(false); chatLoadList();
+}
+async function chatCancel() {
+  const a = chat.active; if (!a || a.turn == null || a.cancelling) return;
+  a.cancelling = true; chatRenderLive();
+  const g = chat.gen, r = await chatApi("POST", `/api/conversas/${chat.id}/turnos/${a.turn}/cancelar`, {});
+  if (g !== chat.gen) return;
+  if (!r.ok && r.j.code !== "turno_encerrado") { if (chat.active) chat.active.cancelling = false; chatSetStatus("err", `Não foi possível parar: ${chatErrText(r)}`); announceErr(chat.status.text); }
+  // o registro final (status "cancelada") chega pelo SSE; se ele caiu, o polling fecha o turno.
+  if (chat.active && !chat.es && !chat.poll) chatStartPoll();
+  C("chat-text").focus({ preventScroll: true });
+}
+function chatStartTick() { if (!chat.tick) chat.tick = setInterval(() => chatRenderStatus(), 1000); }
+function chatStopTick() { if (chat.tick) { clearInterval(chat.tick); chat.tick = null; } }
+function chatSetStatus(kind, text) { chat.status = { kind, icon: kind === "err" ? "✕" : "▲", text }; chatRenderStatus(); }
+
+// ---- Proposta de destravar (§6.3): o cartão só pede a confirmação; quem valida e grava é o servidor ----
+const PROP_REASON = { nao_destravavel: "esse estado não pode ser destravado pelo chat", acao_nao_permitida: "essa ação não é permitida para esse estado",
+  alvo_inexistente: "a demanda ou o alerta citado não existe", ja_decidido: "já existe decisão humana para esse gate", formato_invalido: "a proposta veio num formato inválido" };
+function propTarget(p) {
+  const info = state && p.demand ? findDemand(p.demand) : null;
+  const g = info && p.gate ? [...state.log].reverse().find(e => e.type === "gate" && e.gate === p.gate && e.demand === info.d.id) || null : null;
+  return { info, g, code: info?.code || (/^D\d+$/i.test(p.demand || "") ? p.demand.toUpperCase() : null) };
+}
+function propAction(p, g) {
+  const to = AGENTS[g?.to]?.label || "a próxima etapa";
+  if (p.action === "resume") return ["Retomar a demanda", "o Orquestrador volta a despachar o próximo passo da demanda."];
+  if (p.action === "OVERRIDE") return ["Seguir mesmo assim (assumo o risco)", "você assumiu o risco; o Orquestrador libera a demanda e registra a decisão."];
+  if (p.action === "APPROVE") return g?.recommendation === "RETURN" ? ["Aceitar a devolução · corrigir e reauditar", "o Orquestrador executa a correção pedida pelo Auditor e pede a reauditoria."]
+    : [`Enviar para ${to}`, `${to} assumirá a próxima etapa.`];
+  return [String(p.action || "—"), ""];
+}
+function chatPropEl(p) {
+  const box = mk("div", "c-prop"), dec = chat.decisions[p.id], pm = chat.propMsg[p.id], { info, g, code } = propTarget(p);
+  box.setAttribute("role", "group"); box.setAttribute("aria-labelledby", `cp-h-${p.id}`);
+  const h = mk("h4"); h.id = `cp-h-${p.id}`; h.tabIndex = -1;
+  const gateHref = code ? keepChat(p.gate ? `#/demandas/${code}/gates` : `#/demandas/${code}`) : null;
+  if (!p.valid) {
+    box.classList.add("invalid"); h.innerHTML = `${ICON.aviso}<span>Sugestão não acionável</span>`; box.append(h);
+    const t = mk("p", "res"); t.textContent = `O Orquestrador sugeriu algo que não pode ser feito por aqui: ${PROP_REASON[p.reason] || p.reason || "motivo não informado"}.`; box.append(t);
+    if (gateHref) { const a = mk("a"); a.href = gateHref; a.textContent = `Ver ${p.gate || "a demanda"} da ${code}`; box.append(a); }
+    return box;
+  }
+  const [label, effect] = propAction(p, g), danger = p.action === "OVERRIDE";
+  if (danger) box.classList.add("danger");
+  h.innerHTML = `${danger ? ICON.bloqueio : ICON.info}<span>Proposta de destravar · precisa da sua confirmação</span>`; box.append(h);
+  const dl = mk("dl"), row = (k, v) => { const dt = mk("dt"), dd = mk("dd"); dt.textContent = k; if (v instanceof Node) dd.append(v); else dd.textContent = v; dl.append(dt, dd); };
+  const dem = document.createDocumentFragment();
+  if (code && info) { const a = mk("a"); a.href = keepChat(`#/demandas/${code}`); a.textContent = code; dem.append(a, ` · ${info.eff?.title || ""}`); } else dem.append(code || p.demand || "—");
+  row("Demanda", dem);
+  if (p.gate) row("Gate", p.gate);
+  if (p.gate) row("Parecer atual do Auditor", g ? `${g.recommendation === "APPROVE" ? "Aprovou" : g.recommendation === "RETURN" ? "Devolveu" : g.recommendation || "—"} · ${pct(g.confidence)} de confiança · risco ${g.risk || "—"}` : "não encontrado no registro");
+  row("Ação", label);
+  if (effect) row("Efeito", effect.charAt(0).toUpperCase() + effect.slice(1));
+  box.append(dl);
+  if (dec) {
+    box.classList.add("done");
+    const t = mk("p", "res"), when = dec.ts ? ` às ${hhmm(dec.ts)}` : "";
+    t.textContent = dec.decision === "confirmada" ? `Confirmada${when}: o servidor registrou a decisão${dec.event ? ` (evento ${String(dec.event).slice(0, 12)})` : ""}.`
+      : dec.decision === "obsoleta" ? `Obsoleta${when}: o estado mudou antes da confirmação; nada foi registrado.` : `Descartada${when}: nada foi registrado.`;
+    if (dec.decision !== "confirmada") t.classList.add("muted"); else t.classList.add("ok-msg");
+    box.append(t);
+    if (gateHref) { const a = mk("a"); a.href = gateHref; a.textContent = p.gate ? `Ver ${p.gate} da ${code}` : `Abrir ${code}`; box.append(a); }
+    return box;
+  }
+  const nid = `cp-note-${p.id}`, lab = mk("label"); lab.htmlFor = nid; lab.textContent = "Nota para o registro (editável, até 2 000 caracteres)";
+  const ta = mk("textarea"); ta.id = nid; ta.rows = 2; ta.maxLength = CHAT_NOTE_MAX; ta.value = chat.notes[p.id] ?? p.note ?? ""; ta.dataset.chatNote = p.id;
+  box.append(lab, ta);
+  const acts = mk("div", "actions");
+  const ok = mk("button", `btn ${danger ? "danger" : "primary"}`); ok.type = "button"; ok.dataset.chatConfirm = p.id; ok.textContent = danger ? "Seguir mesmo assim (assumo o risco)" : `Confirmar: ${label}`;
+  const no = mk("button", "btn"); no.type = "button"; no.dataset.chatDiscard = p.id; no.textContent = "Descartar";
+  acts.append(ok, no); box.append(acts);
+  if (pm) { const t = mk("p", `res ${pm.ok ? "ok-msg" : "fail"}`); t.setAttribute("role", "status"); t.textContent = pm.text; box.append(t); }
+  return box;
+}
+async function chatDecide(pid, kind, btn) {
+  if (!CHAT_PID_RE.test(pid) || !chat.id) return;
+  const note = String(chat.notes[pid] ?? C(`cp-note-${pid}`)?.value ?? "").trim();
+  if (kind === "confirmar" && note.length > CHAT_NOTE_MAX) { chat.propMsg[pid] = { ok: false, text: CHAT_ERR.nota_grande }; chatRender(); announceErr(CHAT_ERR.nota_grande); return; }
+  btn.disabled = true;
+  const g = chat.gen, r = await chatApi("POST", `/api/conversas/${chat.id}/propostas/${pid}/${kind}`, kind === "confirmar" ? { note } : {});
+  if (g !== chat.gen) return;
+  if (r.ok) {
+    chat.propMsg[pid] = { ok: true, text: kind === "confirmar" ? "Decisão registrada pelo servidor." : "Proposta descartada; nada foi registrado." };
+    chat.decisions[pid] = kind === "confirmar" ? { id: pid, decision: "confirmada", event: r.j.event?.id || null, ts: r.j.event?.ts || new Date().toISOString() } : { id: pid, decision: "descartada", ts: new Date().toISOString() };
+  } else {
+    chat.propMsg[pid] = { ok: false, text: chatErrText(r) };
+    if (r.j.code === "proposta_obsoleta") chat.decisions[pid] = { id: pid, decision: "obsoleta", ts: new Date().toISOString() };
+  }
+  await chatCatchUp(); if (g !== chat.gen) return;
+  chatRender();
+  const text = chat.propMsg[pid].text; if (r.ok) announce(text); else announceErr(text);
+  C(`cp-h-${pid}`)?.focus({ preventScroll: true });
+  if (r.ok && kind === "confirmar") refresh();
+}
+
+// ---- Desenho (incremental: lista inteira só quando muda; trechos só no balão ao vivo) ----
+const PHASES = { enviando: ["Enviando…", "↑"], iniciando: ["Iniciando a sessão…", "◌"], pensando: ["Pensando…", "◌"], consultando: ["Consultando", "⌕"], respondendo: ["Respondendo…", "✎"] };
+function phaseText(a) {
+  if (a.cancelling) return "Parando…";
+  if (a.phase === "consultando") {
+    const t = a.tool, name = typeof t === "object" && t ? t.name : null, path = typeof t === "object" && t ? t.path || t.pattern || "" : String(t || "");
+    return name === "Read" ? `Lendo ${path || "arquivo"}` : name === "Grep" || name === "Glob" ? `Procurando ${path || "nos arquivos"}` : `Consultando ${path || name || "arquivos"}`;
+  }
+  return (PHASES[a.phase] || PHASES.pensando)[0];
+}
+const STATUS_FLAG = { erro: ["Erro", "✕", "err"], cancelada: ["Cancelada · texto parcial", "■", "muted"], tempo_esgotado: ["Tempo esgotado · texto parcial", "◷", "warn"], interrompida: ["Interrompida", "■", "muted"] };
+function chatMsgEl(m, isLastOrq) {
+  const orq = m.role !== "humano", li = mk("li", `c-msg ${orq ? "orquestrador" : "humano"}${m.pending ? " pending" : ""}`);
+  const who = mk("div", "who");
+  if (orq) {
+    const model = modelId(m.model, m.runner);
+    who.innerHTML = `<b>Orquestrador</b>${m.runner ? `<span>runner ${esc(m.runner)}</span>` : ""}${model ? modelChip(model, m.modelProvider, "conversa", m.runner) : ""}<time datetime="${esc(m.ts || "")}">${esc(hhmm(m.ts))}</time>`;
+    const fl = STATUS_FLAG[m.status]; if (fl) who.insertAdjacentHTML("beforeend", `<span class="flag ${fl[2]}"><span aria-hidden="true">${fl[1]}</span>${fl[0]}</span>`);
+  } else who.innerHTML = `<b>Você</b><time datetime="${esc(m.ts || "")}">${esc(hhmm(m.ts))}</time>${m.pending ? `<span>· enviando…</span>` : ""}`;
+  const bub = mk("div", "bub");
+  if (!orq) bub.textContent = m.text || "";
+  else {
+    const txt = stripProposal(m.text);
+    if (txt) bub.append(mdRender(txt));
+    if (!txt || (m.status && m.status !== "ok")) {
+      const n = mk("span", txt ? "partial" : "muted");
+      n.textContent = m.status === "erro" ? `Sem resposta: ${m.error || "erro no runner"}.` : m.status === "interrompida" ? "O servidor reiniciou durante a resposta; nada foi aproveitado."
+        : m.status === "cancelada" ? (txt ? "Texto parcial: você parou a resposta." : "Você parou a resposta antes do primeiro trecho.")
+        : m.status === "tempo_esgotado" ? (txt ? "Texto parcial: a resposta passou do tempo limite." : "A resposta passou do tempo limite sem texto.") : "Sem texto.";
+      bub.append(n);
+    }
+  }
+  li.append(who, bub);
+  if (orq) {
+    const foot = mk("div", "foot"), a = fmtSecs(m.firstTextMs), b = fmtSecs(m.totalMs);
+    if (a || b) { const s = mk("span"); s.textContent = [a && `1º trecho em ${a}`, b && `total ${b}`].filter(Boolean).join(" · "); foot.append(s); }
+    if (m.sessionReset) { const s = mk("span"); s.textContent = "sessão reaberta com o histórico recente"; foot.append(s); }
+    if (isLastOrq && ["erro", "tempo_esgotado", "interrompida"].includes(m.status) && !chat.active) {
+      const human = [...chat.msgs].reverse().find(x => x.role === "humano" && x.turn === m.turn);
+      if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = "Tentar de novo"; foot.append(bt); }
+    }
+    if (foot.childNodes.length) li.append(foot);
+    if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(chatPropEl(m.proposal));
+  }
+  return li;
+}
+function chatLiveEl() {
+  const li = mk("li", "c-msg orquestrador live"); li.id = "chat-live";
+  const who = mk("div", "who"); who.innerHTML = `<b>Orquestrador</b>${chatRunner() ? `<span>runner ${esc(chatRunner())}</span>` : ""}<span class="ph"></span>`;
+  li.append(who, mk("div", "bub"));
+  return li;
+}
+let liveRaf = 0;
+function chatRenderLive() {
+  if (liveRaf) return;
+  liveRaf = requestAnimationFrame(() => {
+    liveRaf = 0; const el = C("chat-live"), a = chat.active;
+    chatRenderStatus(); chatRenderComposer();
+    if (!el || !a) return;
+    const near = chatNearBottom();
+    el.querySelector(".ph").textContent = `· ${phaseText(a)}`;
+    const bub = el.querySelector(".bub"), txt = stripProposal(a.text);
+    bub.replaceChildren();
+    if (txt) { bub.append(mdRender(txt)); const last = bub.lastElementChild; const caret = mk("span", "c-caret"); caret.setAttribute("aria-hidden", "true"); (last && !["PRE", "UL", "OL"].includes(last.tagName) ? last : bub).append(caret); }
+    else { const s = mk("span", "muted"); s.textContent = phaseText(a); bub.append(s); }
+    if (near) chatScroll(true);
+  });
+}
+const chatNearBottom = () => { const l = C("chat-msgs"); return l.scrollHeight - l.scrollTop - l.clientHeight < 80; };
+function chatScroll(force) { const l = C("chat-msgs"); if (force || chatNearBottom()) l.scrollTop = l.scrollHeight; }
+function chatRender() {
+  chatRenderHead(); chatRenderWarn();
+  const list = C("chat-msgs"), fid = list.contains(document.activeElement) ? document.activeElement.id : null, scroll = list.scrollTop, near = chatNearBottom();
+  list.replaceChildren();
+  if (chat.loadErr) {
+    const li = mk("li", "c-empty"), b = mk("b"); b.textContent = chat.loadErr.j?.code === "conversa_nao_encontrada" || chat.loadErr.status === 404 && chat.loadErr.j?.code ? "Conversa não encontrada" : "Não foi possível abrir a conversa";
+    const p = mk("span"); p.textContent = `${chatErrText(chat.loadErr)} `; const a = mk("a"); a.href = chatHref("nova"); a.textContent = "Começar uma nova conversa";
+    li.append(b, p, a); list.append(li);
+  } else if (!chat.msgs.length && !chat.active && !(chat.id && !chat.conv)) {
+    const li = mk("li", "c-empty"), b = mk("b"); b.textContent = "Pergunte ao Orquestrador";
+    const p = mk("span"); p.textContent = "Ele responde pelo log, pelos gates, alertas e arquivos do repositório — sem executar nada. Sugestões:";
+    const sg = mk("div", "c-sugs");
+    for (const q of ["O que está travado agora e por quê?", "O que depende de mim neste momento?", "Resuma o estado das demandas em andamento.", "Qual o último parecer do Auditor e o que ele pediu?"]) {
+      const bt = mk("button"); bt.type = "button"; bt.dataset.chatSug = q; bt.textContent = q; sg.append(bt);
+    }
+    li.append(b, p, sg); list.append(li);
+  } else if (chat.id && !chat.conv && !chat.msgs.length) { const li = mk("li", "c-empty"); li.textContent = "Carregando a conversa…"; list.append(li); }
+  const lastOrq = [...chat.msgs].reverse().find(m => m.role !== "humano");
+  for (const m of chat.msgs) list.append(chatMsgEl(m, m === lastOrq));
+  if (chat.active) list.append(chatLiveEl());
+  if (near) list.scrollTop = list.scrollHeight; else list.scrollTop = scroll;
+  if (fid) C(fid)?.focus({ preventScroll: true });
+  chatRenderLive(); chatRenderStatus(); chatRenderComposer();
+}
+function chatRenderStatus() {
+  const el = C("chat-status"), a = chat.active, s = chat.status;
+  let html = "", cls = "";
+  if (a) { cls = "work"; html = `<span class="ic" aria-hidden="true">${a.cancelling ? "■" : (PHASES[a.phase] || PHASES.pensando)[1]}</span><span class="txt">${esc(phaseText(a))}</span><span class="el">${Math.floor((Date.now() - a.startedAt) / 1000)} s</span>`; }
+  else if (s) {
+    cls = s.kind === "err" ? "err" : s.kind === "warn" ? "warn" : "";
+    html = `<span class="ic" aria-hidden="true">${esc(s.icon || "▲")}</span><span class="txt">${esc(s.text)}${s.cmds ? s.cmds.map((c, i) => `${i ? " e " : ""}<code>${esc(c)}</code>`).join("") + "." : ""}${s.link ? ` <a href="${esc(s.link.href)}">${esc(s.link.text)}</a>` : ""}</span>${s.retry ? `<button class="btn" type="button" data-chat-retry-text="1">Tentar de novo</button>` : ""}`;
+  } else if (chat.done) { cls = ""; html = `<span class="ic" aria-hidden="true" style="color:var(--ok)">✓</span><span class="txt">Resposta concluída${fmtSecs(chat.done.totalMs) ? ` em ${esc(fmtSecs(chat.done.totalMs))}` : ""}.</span>`; }
+  const key = cls + html;
+  if (el.dataset.k !== key) { const had = el.contains(document.activeElement); el.className = `c-status ${cls}`; el.innerHTML = html; el.dataset.k = key; if (had) C("chat-text").focus({ preventScroll: true }); }
+  el.hidden = !html;
+}
+function chatRenderComposer() {
+  const busy = !!chat.active || chat.sending, ta = C("chat-text");
+  ta.readOnly = busy; ta.setAttribute("aria-disabled", busy ? "true" : "false");
+  C("chat-send").disabled = busy;
+  const stop = C("chat-stop"); stop.hidden = !chat.active; stop.disabled = !chat.active || chat.active.turn == null || !!chat.active.cancelling;
+  stop.textContent = chat.active?.cancelling ? "Parando…" : "Parar";
+}
+function chatCount() { const n = C("chat-text").value.length, el = C("chat-count"); el.textContent = `${n}/${CHAT_MAX}`; el.classList.toggle("over", n > CHAT_MAX); }
+function chatTitle() {
+  const it = (chat.info?.items || []).find(x => x.id === chat.id);
+  const first = chat.msgs.find(m => m.role === "humano");
+  const t = it?.title || chat.conv?.title || (first ? String(first.text).slice(0, 80) : "");
+  return chat.id ? `${t || "Conversa sem mensagens"}${chat.conv?.createdAt ? ` · desde ${fmtWhen(chat.conv.createdAt)}` : ""}` : "Nova conversa";
+}
+function chatRenderHead() {
+  C("chat-sub").textContent = chatTitle(); C("chat-sub").title = chatTitle();
+  const n = chat.info?.items?.length; C("chat-list-btn").textContent = n ? `Conversas (${n})` : "Conversas";
+}
+function chatRenderWarn() {
+  const el = C("chat-warn"), parts = [], r = chatRunner(), inf = chat.info;
+  let err = false;
+  if (chat.infoErr) { parts.push(esc(chatErrText(chat.infoErr))); err = true; }
+  else if (inf && inf.available === false) {
+    const [a, b] = chatCheckCmd(r); err = true;
+    parts.push(`<b>Orquestrador indisponível</b>: o runner <code>${esc(r || "claude")}</code> não foi encontrado ou está sem login. Suas mensagens ficam guardadas. Verifique no terminal: <code>${esc(a)}</code> e <code>${esc(b)}</code>.`);
+  }
+  // G1-D17 ressalva 3: o servidor sinaliza isolamento menor (readIsolation/isolationWarning) quando o runner é codex.
+  const iso = chat.conv?.runner ? chat.conv : inf;
+  const srvWarn = [iso?.isolationWarning, iso?.warning].find(x => typeof x === "string" && x.trim());
+  if (srvWarn) parts.push(`<b>Runner ${esc(r || "codex")}: isolamento menor.</b> ${esc(srvWarn)}`);
+  else if (r === "codex" || /^(reduzid[oa]|menor|parcial|low)$/i.test(String(iso?.readIsolation || iso?.isolation || ""))) parts.push(`<b>Runner codex: isolamento menor.</b> O modo somente leitura do Codex não impede a leitura de arquivos desta máquina (inclusive <code>.env</code> e a pasta pessoal). Evite pedir conteúdo sensível; prefira o runner claude para o chat.`);
+  const html = parts.map(p => `<span>${p}</span>`).join("<br>");
+  if (el.dataset.k !== html) { el.innerHTML = html ? `${err ? ICON.bloqueio : ICON.aviso}<div>${html}</div>` : ""; el.dataset.k = html; }
+  el.classList.toggle("err", err); el.hidden = !html;
+}
+function chatListOpen(open) { C("chat-list").hidden = !open; C("chat-list-btn").setAttribute("aria-expanded", open ? "true" : "false"); if (open) chatRenderList(); }
+function chatRenderList() {
+  const el = C("chat-list"); if (el.hidden) return;
+  const items = chat.info?.items || [], busy = chat.info?.busy;
+  const ST = { ok: "", erro: " · erro", cancelada: " · cancelada", tempo_esgotado: " · tempo esgotado", interrompida: " · interrompida" };
+  el.innerHTML = items.length ? `<ul aria-label="Conversas, da mais recente para a mais antiga">${items.filter(it => CHAT_ID_RE.test(it.id || "")).map(it => `<li><a href="${esc(chatHref(it.id))}" ${it.id === chat.id ? 'aria-current="true"' : ""}>
+      <span class="ct">${esc(it.title || "Conversa sem mensagens")}</span><small>${esc(fmtWhen(it.updatedAt || it.createdAt))}</small>
+      <span class="cm">${Number(it.messages) || 0} mensagens${esc(ST[it.lastStatus] || "")}${busy?.conversa === it.id ? " · respondendo agora" : ""}</span></a></li>`).join("")}</ul>`
+    : `<p class="none">${chat.infoErr ? esc(chatErrText(chat.infoErr)) : "Nenhuma conversa ainda."}</p>`;
+}
+
+// ---- Eventos ----
+C("chat-btn").addEventListener("click", async () => {
+  if (!C("chat").hidden) { location.hash = hrefWith({ conversa: null }); return; }
+  const r = await chatLoadList();
+  const first = r.ok ? (r.j.items || []).find(x => CHAT_ID_RE.test(x.id || "")) : null;   // §9: sem id → a mais recente (ou nova)
+  location.hash = chatHref(first ? first.id : "nova");
+});
+C("chat-close").addEventListener("click", () => { location.hash = hrefWith({ conversa: null }); });
+C("chat-list-btn").addEventListener("click", async () => {
+  const open = C("chat-list").hidden; chatListOpen(open);
+  if (open) { await chatLoadList(); C("chat-list").querySelector("a")?.focus(); }
+});
+C("chat-list").addEventListener("click", ev => { if (ev.target.closest("a")) chatListOpen(false); });
+document.addEventListener("click", ev => { if (!C("chat-list").hidden && !ev.target.closest("#chat-list, #chat-list-btn")) chatListOpen(false); });
+C("chat-new").addEventListener("click", ev => { ev.preventDefault(); chatListOpen(false); const h = chatHref("nova");
+  if (route.params.get("conversa") === "nova") { if (!chat.active && !chat.sending) chatReset(null); } else location.hash = h; C("chat-text").focus(); });
+C("chat-form").addEventListener("submit", ev => { ev.preventDefault(); chatSend(C("chat-text").value); C("chat-text").focus({ preventScroll: true }); });
+C("chat-text").addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing && !ev.altKey && !ev.ctrlKey && !ev.metaKey) { ev.preventDefault(); if (!chat.active && !chat.sending) chatSend(C("chat-text").value); }
+});
+C("chat-text").addEventListener("input", () => { chatCount(); if (chat.status && chat.status.kind === "err" && !chat.status.retry) { chat.status = null; chatRenderStatus(); } });
+C("chat-stop").addEventListener("click", () => chatCancel());
+C("chat").addEventListener("input", ev => { const pid = ev.target.dataset?.chatNote; if (pid) chat.notes[pid] = ev.target.value; });
+C("chat").addEventListener("click", ev => {
+  const sg = ev.target.closest("[data-chat-sug]");
+  if (sg) { C("chat-text").value = sg.dataset.chatSug; chatCount(); C("chat-text").focus(); return; }
+  const rt = ev.target.closest("[data-chat-retry]");
+  if (rt) { const human = [...chat.msgs].reverse().find(x => x.role === "humano" && String(x.turn) === rt.dataset.chatRetry); if (human) chatSend(human.text); C("chat-text").focus(); return; }
+  if (ev.target.closest("[data-chat-retry-text]")) { const t = chat.status?.retry; chat.status = null; if (t) { if (C("chat-text").value.trim() === t) C("chat-text").value = ""; chatSend(t); } C("chat-text").focus(); return; }
+  const cf = ev.target.closest("[data-chat-confirm]"); if (cf) { chatDecide(cf.dataset.chatConfirm, "confirmar", cf); return; }
+  const ds = ev.target.closest("[data-chat-discard]"); if (ds) { chatDecide(ds.dataset.chatDiscard, "descartar", ds); return; }
 });
 window.addEventListener("hashchange", applyRoute);
 fetch("/api/project").then(r => r.json()).then(p => {
