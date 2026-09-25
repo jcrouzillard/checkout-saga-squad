@@ -60,11 +60,19 @@ function measure() {
 (async () => {
   await relay(PORT);
   const b = await puppeteer.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'], executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
-  const page = async (w, { theme = 'light', tz = 'America/Sao_Paulo', hash = '#/painel' } = {}) => {
+  // clock (ms desde a época): relógio FIXO do navegador (defeito af1bc2450bca — o CA-V4 dependia da hora real: depois
+  // de 00:00 em Tóquio a mensagem "de hoje" virava "ontem"). Só `new Date()`/`Date.now()` sem argumento são deslocados;
+  // o tempo continua andando a partir do instante fixado (timers/animações intactos).
+  const page = async (w, { theme = 'light', tz = 'America/Sao_Paulo', hash = '#/painel', clock = null } = {}) => {
     const p = await b.newPage();
     await p.setViewport({ width: w, height: w > 500 ? 900 : 844, deviceScaleFactor: 1 });
     await p.emulateTimezone(tz);
     p.on('pageerror', e => out.errors.push(String(e).slice(0, 300)));
+    if (clock != null) await p.evaluateOnNewDocument(fixed => {
+      const RD = Date, off = fixed - RD.now();
+      class FD extends RD { constructor(...a) { if (a.length === 0) super(RD.now() + off); else super(...a); } static now() { return RD.now() + off; } }
+      window.Date = FD;
+    }, clock);
     await p.evaluateOnNewDocument(t => {
       try { localStorage.setItem('sc-theme', t); } catch (e) { /* */ }
       window.__live = []; window.__posts = [];
@@ -162,7 +170,9 @@ function measure() {
 
   // ======================= CA-V4: horários no fuso do navegador, sem segundos, "ontem"
   const ymd = (d, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-  const now = new Date(), today = ymd(now, 'America/Sao_Paulo'), yday = ymd(new Date(now.getTime() - 86400000), 'America/Sao_Paulo');
+  // Relógio fixo (af1bc2450bca): 2026-09-24 12:00Z = 09:00 em São Paulo e 21:00 em Tóquio — "hoje" nos dois fusos.
+  const CLOCK = Date.UTC(2026, 8, 24, 12, 0, 0);
+  const now = new Date(CLOCK), today = ymd(now, 'America/Sao_Paulo'), yday = ymd(new Date(now.getTime() - 86400000), 'America/Sao_Paulo');
   const [yy, mm, dd] = today.split('-');
   const CID = 'c-d20d20d20d20';
   const recs = [
@@ -176,7 +186,7 @@ function measure() {
   if (fs.existsSync('/conv')) {
     fs.writeFileSync(`/conv/${CID}.jsonl`, recs.map(r => JSON.stringify(r)).join('\n') + '\n');
     const times = async tz => {
-      const q = await page(1440, { tz, hash: `#/painel?conversa=${CID}` }); await sleep(1500);
+      const q = await page(1440, { tz, hash: `#/painel?conversa=${CID}`, clock: CLOCK }); await sleep(1500);
       const r = await q.evaluate(() => {
         const pick = li => li.querySelector(':scope > .c-meta') || li.querySelector(':scope > .who');
         const msgs = [...document.querySelectorAll('#chat-msgs > li.c-msg')].map(li => { const m = pick(li), t = m && m.querySelector('time');

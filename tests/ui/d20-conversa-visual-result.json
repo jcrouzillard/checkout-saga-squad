@@ -143,26 +143,26 @@
         {
           "meta": "Vocêontem 08:47",
           "time": "ontem 08:47",
-          "title": "24/09/2026 08:47:59 (America/Sao_Paulo)",
-          "dt": "2026-09-24T11:47:59.000Z"
+          "title": "23/09/2026 08:47:59 (America/Sao_Paulo)",
+          "dt": "2026-09-23T11:47:59.000Z"
         },
         {
           "meta": "OOrquestradorclaude-fake-1-20260901 · Anthropicontem 08:48",
           "time": "ontem 08:48",
-          "title": "24/09/2026 08:48:10 (America/Sao_Paulo) · 1º trecho 0,9 s · total 2,1 s",
-          "dt": "2026-09-24T11:48:10.000Z"
+          "title": "23/09/2026 08:48:10 (America/Sao_Paulo) · 1º trecho 0,9 s · total 2,1 s",
+          "dt": "2026-09-23T11:48:10.000Z"
         },
         {
           "meta": "Você08:47",
           "time": "08:47",
-          "title": "25/09/2026 08:47:59 (America/Sao_Paulo)",
-          "dt": "2026-09-25T11:47:59.000Z"
+          "title": "24/09/2026 08:47:59 (America/Sao_Paulo)",
+          "dt": "2026-09-24T11:47:59.000Z"
         },
         {
           "meta": "OOrquestradorclaude-fake-1-20260901 · Anthropic08:48",
           "time": "08:48",
-          "title": "25/09/2026 08:48:30 (America/Sao_Paulo)",
-          "dt": "2026-09-25T11:48:30.000Z"
+          "title": "24/09/2026 08:48:30 (America/Sao_Paulo)",
+          "dt": "2026-09-24T11:48:30.000Z"
         }
       ],
       "toquio": [
@@ -270,7 +270,7 @@
         "contOx": "auto"
       },
       "interno": [
-        "#/painel?conversa=c-4ab5057ab144"
+        "#/painel?conversa=c-7a4f9e3949ee"
       ],
       "externo": {
         "rel": "noopener noreferrer",
@@ -296,14 +296,14 @@
         0
       ],
       "rolado": {
-        "top0": 3049,
+        "top0": 3090,
         "tops": [
-          3049,
-          3049,
-          3049,
-          3049,
-          3049,
-          3049
+          3090,
+          3090,
+          3090,
+          3090,
+          3090,
+          3090
         ],
         "cresceu": true,
         "botao": {

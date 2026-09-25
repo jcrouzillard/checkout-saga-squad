@@ -1,0 +1,443 @@
+{
+ "results": {
+  "CA-I1-colar-no-campo": {
+   "ok": true,
+   "pv": true,
+   "t1": {
+    "cards": [
+     {
+      "cls": "c-att ready",
+      "alt": "Imagem 1: print.png",
+      "x": "Remover imagem 1: print.png"
+     }
+    ],
+    "msg": "",
+    "note": "Imagens vão ao fornecedor de IA. Evite prints com senhas ou dados pessoais.",
+    "send": false,
+    "hint": "Enter envia · Shift+Enter nova linha · Esc fecha",
+    "text": ""
+   },
+   "up": 1
+  },
+  "CA-I5-minimo-400ms": {
+   "ok": true,
+   "ms": 411,
+   "labels": [
+    "Enviando imagem 1: 0%",
+    "Processando imagem 1"
+   ]
+  },
+  "CA-I1-colar-na-lista": {
+   "ok": true,
+   "pv2": true
+  },
+  "CA-I2-colar-texto": {
+   "ok": true,
+   "pt": false,
+   "pti": false
+  },
+  "CA-I6-remover": {
+   "ok": true,
+   "t2": {
+    "cards": [
+     {
+      "cls": "c-att ready",
+      "alt": "Imagem 1: print.png",
+      "x": "Remover imagem 1: print.png"
+     }
+    ],
+    "msg": "",
+    "note": "Imagens vão ao fornecedor de IA. Evite prints com senhas ou dados pessoais.",
+    "send": false,
+    "hint": "Enter envia · Shift+Enter nova linha · Esc fecha",
+    "text": ""
+   },
+   "foco": "Remover imagem 1: print.png"
+  },
+  "CA-I7-envio-1": {
+   "ok": true,
+   "hist1": {
+    "imgs": [
+     {
+      "alt": "Imagem 1 de 1 enviada por você: print.png",
+      "w": 240,
+      "h": 150,
+      "ok": true
+     }
+    ],
+    "bubble": "O que é isto? IMGECO",
+    "orq": "OOrquestradorclaude-fake-1-20260901 · Anthropic12:26Resposta simulada da D17. histórico: não. imagens recebidas: 1.1º trecho 0,1 s · total 0,2 s",
+    "posts": [
+     "{\"text\":\"O que é isto? IMGECO\",\"attachments\":[\"6c686ace3a861e4c7a844cb404b6b9d2735e8cadee34e900b2fd5f092008a7e3\"],\"tz\":\"America/Sao_Paulo\"}"
+    ]
+   },
+   "t3": {
+    "cards": [],
+    "msg": "",
+    "note": false,
+    "send": false,
+    "hint": "Enter envia · Shift+Enter nova linha · Esc fecha",
+    "text": ""
+   },
+   "stdin": [
+    {
+     "media_type": "image/png",
+     "sha256": "6c686ace3a861e4c7a844cb404b6b9d2735e8cadee34e900b2fd5f092008a7e3"
+    }
+   ]
+  },
+  "CA-I3-arrastar": {
+   "ok": true,
+   "de": {
+    "prevented": true,
+    "overlay": true,
+    "overlayText": "Solte para anexar — PNG, JPEG ou WEBP, até 5 MB"
+   },
+   "deText": {
+    "prevented": false,
+    "overlay": false,
+    "overlayText": "Solte para anexar — PNG, JPEG ou WEBP, até 5 MB"
+   },
+   "outside": {
+    "drop": true,
+    "over": true
+   }
+  },
+  "CA-I4-botao": {
+   "ok": true,
+   "btnInfo": {
+    "label": "Anexar imagem",
+    "title": "Anexar imagem (PNG, JPEG ou WEBP, até 5 MB)",
+    "accept": "image/png,image/jpeg,image/webp",
+    "multiple": true,
+    "w": 44,
+    "h": 44
+   }
+  },
+  "CA-I7-envio-3": {
+   "ok": true,
+   "hist3": [
+    {
+     "alt": "Imagem 1 de 3 enviada por você: print.png",
+     "w": 120
+    },
+    {
+     "alt": "Imagem 2 de 3 enviada por você: tela.webp",
+     "w": 120
+    },
+    {
+     "alt": "Imagem 3 de 3 enviada por você: foto.jpg",
+     "w": 120
+    }
+   ]
+  },
+  "CA-I7-quatro": {
+   "ok": true,
+   "t4": {
+    "cards": [
+     {
+      "cls": "c-att ready",
+      "alt": "Imagem 1: a.png",
+      "x": "Remover imagem 1: a.png"
+     },
+     {
+      "cls": "c-att ready",
+      "alt": "Imagem 2: b.png",
+      "x": "Remover imagem 2: b.png"
+     },
+     {
+      "cls": "c-att ready",
+      "alt": "Imagem 3: c.webp",
+      "x": "Remover imagem 3: c.webp"
+     }
+    ],
+    "msg": "⚠No máximo 3 imagens por mensagem — 1 não foi anexada.",
+    "note": "Imagens vão ao fornecedor de IA. Evite prints com senhas ou dados pessoais.",
+    "send": false,
+    "hint": "Enter envia · Shift+Enter nova linha · Esc fecha",
+    "text": ""
+   },
+   "al4": [
+    "No máximo 3 imagens por mensagem — 1 não foi anexada."
+   ]
+  },
+  "CA-I7-so-imagem": {
+   "ok": true,
+   "onlyImg": {
+    "imgs": 1,
+    "bubble": false,
+    "post": "{\"text\":\"\",\"attachments\":[\"6c686ace3a861e4c7a844cb404b6b9d2735e8cadee34e900b2fd5f092008a7e3\"],\"tz\":\"America/Sao_Paulo\"}"
+   }
+  },
+  "CA-I8-recusa-navegador": {
+   "ok": true,
+   "msg": "⚠doc.pdf: formato não aceito. Envie PNG, JPEG ou WEBP.⚠anim.gif: formato não aceito. Envie PNG, JPEG ou WEBP.⚠falso.png: formato não aceito. Envie PNG, JPEG ou WEBP.⚠grande.png: imagem acima de 5 MB (6,3 MB).⚠gigante.png: imagem acima de 8000 px de largura ou altura.⚠foto.heic: HEIC não é aceito. Exporte como JPEG ou PNG.",
+   "alerta": "doc.pdf: formato não aceito. Envie PNG, JPEG ou WEBP. anim.gif: formato não aceito. Envie PNG, JPEG ou WEBP. falso.png: formato não aceito. Envie PNG, JPEG ou WEBP. grande.png: imagem acima de 5 MB (6,3 MB). gigante.png: imagem acima de 8000 px de largura ou altura. foto.heic: HEIC não é aceito. Exporte como JPEG ou PNG."
+  },
+  "CA-I8-recusa-servidor": {
+   "ok": true,
+   "t6": {
+    "cards": [
+     {
+      "cls": "c-att err",
+      "alt": "Imagem 1: truncado.png",
+      "x": "Remover imagem 1: truncado.png"
+     }
+    ],
+    "msg": "⚠truncado.png: a imagem está corrompida ou incompleta.",
+    "note": "Imagens vão ao fornecedor de IA. Evite prints com senhas ou dados pessoais.",
+    "send": true,
+    "hint": "Remova ou reenvie as imagens com erro.",
+    "text": ""
+   }
+  },
+  "CA-I5-progresso": {
+   "ok": true,
+   "valores": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "n": 99
+  },
+  "CA-I5-reduced-motion": {
+   "ok": true,
+   "rm": {
+    "ring": "none",
+    "anim": "none",
+    "rmVis": "block",
+    "txt": "Processando…"
+   },
+   "textos": [
+    "Enviando 0%",
+    "Processando…"
+   ]
+  },
+  "CA-I12-historico-f5": {
+   "ok": true,
+   "h5": [
+    [
+     {
+      "alt": "Imagem 1 de 1 enviada por você: print.png",
+      "ok": true
+     }
+    ],
+    [
+     {
+      "alt": "Imagem 1 de 3 enviada por você: print.png",
+      "ok": true
+     },
+     {
+      "alt": "Imagem 2 de 3 enviada por você: tela.webp",
+      "ok": true
+     },
+     {
+      "alt": "Imagem 3 de 3 enviada por você: foto.jpg",
+      "ok": true
+     }
+    ],
+    [
+     {
+      "alt": "Imagem 1 de 1 enviada por você: a.png",
+      "ok": true
+     }
+    ]
+   ]
+  },
+  "CA-I12-visualizador": {
+   "ok": true,
+   "v1": {
+    "open": true,
+    "focus": "chat-viewer-close",
+    "h": "print.png",
+    "sub": "1440×900 px · 1 de 3",
+    "href": "/api/conversas/c-ebfda7d8d6ea/anexos/6c686ace3a861e4c7a844cb404b6b9d2735e8cadee34e900b2fd5f092008a7e3",
+    "target": "_blank",
+    "rel": "noopener noreferrer"
+   },
+   "v2": "tela.webp",
+   "v3": {
+    "open": false,
+    "panel": true,
+    "focus": "3:0"
+   }
+  },
+  "CA-I21-teclado": {
+   "ok": true,
+   "ordemTab": [
+    "#chat-text",
+    "#chat-attach",
+    "#chat-send",
+    "body"
+   ],
+   "ordemShiftTab": [
+    "#chat-send",
+    "#chat-attach",
+    "#chat-text",
+    "Remover imagem 1: tecl.png",
+    "A",
+    "c-img"
+   ],
+   "anexarPorEnter": true,
+   "anuncioImagemAnexada": 1,
+   "removerPorEnter": [
+    2,
+    1
+   ],
+   "focoAposRemover": "Remover imagem 1: tecl.png",
+   "enviado": {
+    "imgs": 1,
+    "txt": "teclado IMGECO"
+   }
+  },
+  "CA-I12-indisponivel": {
+   "ok": true,
+   "na": {
+    "na": "⚠Imagem indisponível",
+    "label": "Imagem 1 de 1 indisponível: tecl.png"
+   }
+  },
+  "CA-I-retry-rede": {
+   "ok": true,
+   "e1": "⚠rede.png: falha ao enviar. Tente de novo.",
+   "rt": {
+    "t": "Tentar de novo",
+    "l": "Tentar de novo a imagem 1: rede.png"
+   },
+   "e2": [
+    {
+     "cls": "c-att ready",
+     "alt": "Imagem 1: rede.png",
+     "x": "Remover imagem 1: rede.png"
+    }
+   ]
+  },
+  "CA-I21-1440-escuro": {
+   "ok": true,
+   "m": {
+    "hscroll": false,
+    "trayW": true,
+    "attach": [
+     44,
+     44
+    ],
+    "x": [
+     [
+      32,
+      32
+     ],
+     [
+      32,
+      32
+     ],
+     [
+      32,
+      32
+     ]
+    ],
+    "send": [
+     96,
+     40
+    ]
+   }
+  },
+  "CA-I21-390-claro": {
+   "ok": true,
+   "m": {
+    "hscroll": false,
+    "trayW": true,
+    "attach": [
+     44,
+     44
+    ],
+    "x": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "send": [
+     96,
+     44
+    ]
+   }
+  },
+  "CA-I21-390-escuro": {
+   "ok": true,
+   "m": {
+    "hscroll": false,
+    "trayW": true,
+    "attach": [
+     44,
+     44
+    ],
+    "x": [
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ],
+     [
+      44,
+      44
+     ]
+    ],
+    "send": [
+     96,
+     44
+    ]
+   }
+  }
+ },
+ "errors": [],
+ "console": [
+  "Failed to load resource: the server responded with a status of 404 (File not found)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 422 (Unprocessable Content)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: net::ERR_FAILED",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)",
+  "Failed to load resource: the server responded with a status of 409 (Conflict)"
+ ],
+ "uploads": 24,
+ "removes": 16,
+ "fails": []
+}
