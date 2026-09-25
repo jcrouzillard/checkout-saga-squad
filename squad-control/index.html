@@ -523,6 +523,57 @@
   .warnl { list-style: none; margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); font-size: 13px; }
   .bugsec .te-box { margin-top: 12px; }
   .srcbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+  /* D18 (ADR-021): selo de ambiente e versão do próprio Squad Control. ≥ 900 px: rodapé fixo da coluna do menu;
+     < 900 px: selo compacto no cabeçalho; < 600 px: selo compacto fixo no canto inferior esquerdo (sempre visível). */
+  .inst { --i-fg: var(--muted); --i-bg: var(--raised); font: inherit; color: var(--text); cursor: pointer; text-align: left; border: 1px solid var(--line); border-left: 3px solid var(--i-fg); background: var(--i-bg); border-radius: 2px; }
+  .inst[data-env="teste"] { --i-fg: var(--warn); --i-bg: var(--warn-soft); }
+  .inst[data-env="produtivo"] { --i-fg: var(--ok); --i-bg: var(--ok-soft); }
+  .inst:hover { border-color: var(--line-strong); border-left-color: var(--i-fg); }
+  .inst:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .inst-env { color: var(--i-fg); font-weight: 600; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; }
+  .inst-dot { margin-right: 6px; font-size: 9px; vertical-align: 1px; }
+  .inst-wrap { display: none; }
+  .inst-side { display: grid; gap: 3px; width: 100%; padding: 9px 10px 9px 11px; }
+  .inst-ver { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; line-height: 1.4; }
+  .inst-seg { white-space: nowrap; }
+  .inst-note { font-size: 12px; color: var(--muted); line-height: 1.35; }
+  .inst-note::before { content: "• "; }
+  .inst-bad { font-size: 12px; color: var(--danger); line-height: 1.35; font-weight: 500; }
+  .inst-c { display: none; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; white-space: nowrap; }
+  .inst-c .inst-env { font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  .brand .inst-c span { display: inline; padding-left: 0; border-left: 0; font-size: inherit; color: inherit; }   /* anula ".brand span" (nome do projeto) */
+  .brand .inst-c .inst-env { color: var(--i-fg); font-size: 11.5px; } .brand .inst-c .inst-bad { color: var(--danger); }
+  .inst-c .inst-bad { font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  .inst-panel { position: fixed; z-index: 40; width: min(390px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 14px 16px; font-size: 13px; }
+  .inst-panel h2 { font-size: 14px; margin: 0 0 4px; font-weight: 600; } .inst-panel h2:focus { outline: none; } .inst-panel h2:focus-visible { outline: 2px solid var(--accent); }
+  .inst-panel .inst-bad { margin: 6px 0 0; font-size: 12.5px; }
+  .inst-panel dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 12px; margin: 12px 0; }
+  .inst-panel dt { color: var(--muted); font-size: 12px; }
+  .inst-panel dd { margin: 0; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; }
+  .inst-panel dd.txt { font-family: inherit; font-size: 12.5px; }
+  .inst-panel .inst-acts { display: flex; gap: 8px; justify-content: flex-end; }
+  .inst-panel .inst-acts button { font: inherit; font-size: 12.5px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 2px; cursor: pointer; }
+  .inst-panel .inst-acts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (min-width: 900.02px) {
+    .layout > .side { display: flex; flex-direction: column; }
+    .inst-wrap { display: block; margin-top: auto; position: sticky; bottom: 0; z-index: 2; padding: 12px 16px; background: var(--panel2, var(--surface)); border-top: 1px solid var(--line); }
+    .inst-wrap + .autoria { margin-top: 0; }
+  }
+  @media (max-width: 900px) {
+    /* o selo compacto divide a linha com a marca: o nome do produto sai do cabeçalho (segue no título da aba), como já ocorre < 600 px */
+    .inst-c { display: inline-flex; }
+    .brand { flex-shrink: 0; } .brand b { white-space: nowrap; } #hdr .brand #project-name { display: none; }
+  }
+  @media (min-width: 600px) and (max-width: 900px) {
+    /* D18: com o selo, o cabeçalho usa os rótulos curtos (como < 600 px); os aria-label seguem completos */
+    .live .lw, .ctr .cw, .theme-btn .tw { display: none; }
+  }
+  @media (min-width: 600px) and (max-width: 780px) { .brand .inst-c .inst-cm { display: none; } #hdr .brand { gap: 10px; } }   /* commit segue no aria-label e no detalhe */
+  @media (max-width: 599.98px) {
+    .inst-c { position: fixed; z-index: 9; left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); min-height: 40px; max-width: calc(100vw - 24px); box-shadow: var(--shadow); }
+    .frame { padding-bottom: 64px; }
+    .toasts { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  }
   /* ================= D17 (ADR-020, contrato conversa-com-o-orquestrador §9): conversa direta com o Orquestrador ================= */
   .chat-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); font: inherit; font-size: 13px; font-weight: 500; min-height: 32px; padding: 0 10px; cursor: pointer; white-space: nowrap; align-self: center; }
   .chat-btn:hover, .chat-btn[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
@@ -665,6 +716,19 @@
   .c-comp .row .btn { height: 40px; flex: 0 0 auto; width: 96px; justify-content: center; }
   @media (max-width: 900px) { .chat { width: 100%; } .c-msgs { padding: 12px 12px 20px; } }
   @media (max-width: 480px) { .c-comp .row .hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+  /* D18 × D17: de 600 a 900 px o cabeçalho divide a linha com o selo de ambiente → botão da conversa só com ícone
+     (o aria-label/title seguem completos), como já ocorre < 600 px; sem isso o rótulo empurra o selo sobre os contadores. */
+  /* Acima de 900 px (até 1100) o rótulo completo também empurrava o nome do projeto sobre o "Ao vivo" (visto a 920 px). */
+  @media (min-width: 600px) and (max-width: 1100px) {
+    .chat-btn { min-width: 36px; justify-content: center; padding: 0 8px; }
+    .chat-btn .cbt { display: none; }
+  }
+  /* 600–700 px: o botão da conversa soma ~44 px à linha do selo → a idade do "Ao vivo" sai (segue no status lido)
+     e as folgas do cabeçalho encolhem (a 610 px o selo ainda encostava no "Ao vivo") */
+  @media (min-width: 600px) and (max-width: 700px) { #hdr .live .age { display: none; } header#hdr { padding: 0 16px; } #hdr .gbar { column-gap: 8px; } }
+  /* ≤ 600 px o painel da conversa ocupa a tela e ficaria por cima do selo (focável, mas invisível): o selo sai
+     enquanto a conversa está aberta — o cabeçalho do painel já dá o contexto e o selo volta ao fechar. */
+  @media (max-width: 600px) { body:has(#chat:not([hidden])) #inst-c { display: none; } }
   @media (max-width: 600px) {
     .chat-btn { min-height: 44px; min-width: 44px; justify-content: center; padding: 0 8px; }
     .chat-btn .cbt { display: none; }
@@ -4013,6 +4077,146 @@ fetch("/api/project").then(r => r.json()).then(p => {
 
 syncHeaderH();
 poll().finally(() => { applyRoute(); });
+// ---- D18 (ADR-021, contrato ui-ambiente-e-versao): ambiente e versão do PRÓPRIO Squad Control, sempre visíveis.
+// Fonte: state.instance (/api/state já buscado) e GET /api/instance a cada 60 s e ao voltar à aba (nunca no ciclo de 1,5 s).
+// 404 em /api/instance com /api/state sem "instance" = servidor antigo → "desconhecido, reinicie".
+const INST = { data: null, status: "loading", open: false, trigger: null, seenState: null, busy: false, lastPrefix: "" };
+const INST_ENV = { produtivo: ["Produtivo", "PRODUTIVO"], teste: ["Teste", "TESTE"], desconhecido: ["Ambiente desconhecido", "DESCONHECIDO"] };
+const instOk = d => !!(d && typeof d === "object" && d.environment && typeof d.environment === "object");
+function instView() {
+  const d = INST.data, st = INST.status;
+  if (st === "loading" && !d) return { env: "carregando", label: "Verificando ambiente…", short: "…", display: "", notes: [], bad: "", aria: "Ambiente: verificando…", prefix: "" };
+  if (!d) {
+    const bad = st === "old" ? "Servidor sem suporte à versão — reinicie (make squad)." : "Não foi possível verificar a versão.";
+    return { env: "desconhecido", label: INST_ENV.desconhecido[0], short: INST_ENV.desconhecido[1], display: st === "old" ? "versão indisponível" : "versão ?", notes: [], bad, warn: true,
+      aria: `Ambiente: ${INST_ENV.desconhecido[0]}. ${st === "old" ? "Servidor sem suporte à versão, reinicie" : "Não foi possível verificar a versão"}`, prefix: "[?] " };
+  }
+  const e = d.environment || {}, b = d.build || {}, f = d.freshness || {};
+  const env = INST_ENV[e.name] ? e.name : "desconhecido";
+  const label = env === "desconhecido" ? INST_ENV.desconhecido[0] : (e.label || INST_ENV[env][0]);
+  const display = b.display || [b.release || "sem tag", b.pom || "pom ?", b.commit || "commit ?"].join(" · ") + (b.dirty ? " +alterações" : "");
+  const notes = [];
+  if (env === "teste" && e.dataIsMain) notes.push("dados do produtivo");
+  if (b.dirty) notes.push("alterações locais não commitadas");
+  const stale = f.state === "desatualizado", unk = f.state === "indeterminado" || !f.state;
+  const bad = stale ? "Desatualizado: o código mudou desde a subida. Reinicie (make squad)." : unk ? "Não foi possível verificar a versão." : "";
+  const aria = `Ambiente: ${label}. Versão ${display}${stale ? ". Desatualizado, reinicie" : unk ? ". Não foi possível verificar a versão" : ""}${notes.length ? ". " + notes.join(", ").replace(/^./, c => c.toUpperCase()) : ""}`;
+  return { env, label, short: `${INST_ENV[env][1]} · ${b.commit || "commit ?"}`, display, notes, bad, warn: stale || unk, aria, prefix: env === "teste" ? "[TESTE] " : env === "desconhecido" ? "[?] " : "" };
+}
+function instFields() {
+  const d = INST.data, v = instView(), T = x => x ? new Date(x).toLocaleString("pt-BR") : "—", S = x => (x === null || x === undefined || x === "") ? "—" : String(x);
+  if (!d) return [["Ambiente", v.label, 1], ["Situação", v.bad || "Verificando…", 1]];
+  const e = d.environment || {}, b = d.build || {}, f = d.freshness || {};
+  const fr = { atual: "atual", desatualizado: `desatualizado — reinicie${f.changedPaths ? ` (${f.changedPaths === 1 ? "1 arquivo mudou" : `${f.changedPaths} arquivos mudaram`})` : ""}`, indeterminado: "não foi possível verificar" }[f.state] || S(f.state);
+  return [
+    ["Ambiente", `${v.label}${e.source ? ` (${e.source})` : ""}`, 1], ["Motivo", S(e.reason), 1],
+    ["Versão", v.display], ["Tag de release", b.release || "sem tag"], ["Versão do pom", b.pom || "pom ?"],
+    ["Commit", S(b.commitFull || b.commit)], ["Branch", b.branch || "destacado (sem branch)"],
+    ["Alterações locais", b.dirty === true ? "sim (tools/squad ou squad-control)" : b.dirty === false ? "não" : "—", 1],
+    ["Worktree", S(e.worktree)], ["Porta", S(e.port)], ["Raiz do código", S(e.root)],
+    ["Origem dos dados", `${S(e.dataRoot)}${e.dataIsMain ? " — cópia principal (grava no log real)" : ""}`], ...(e.log ? [["Log", S(e.log)]] : []),
+    ["Subiu em", T(b.startedAt), 1], ["HEAD atual", S(f.headNow)], ["Atualidade", fr, 1], ["Verificado em", T(f.checkedAt), 1],
+  ];
+}
+function instEnsureDom() {
+  if ($("#inst-side")) return;
+  const aut = document.querySelector(".side > .autoria");
+  const wrap = document.createElement("div"); wrap.className = "inst-wrap";
+  wrap.innerHTML = `<button type="button" class="inst inst-side" id="inst-side" aria-expanded="false" aria-controls="inst-panel"></button>`;
+  if (aut) aut.before(wrap); else document.querySelector(".side")?.appendChild(wrap);
+  const c = document.createElement("button"); c.type = "button"; c.className = "inst inst-c"; c.id = "inst-c";
+  c.setAttribute("aria-expanded", "false"); c.setAttribute("aria-controls", "inst-panel");
+  document.querySelector("#hdr .brand")?.appendChild(c);
+  const p = document.createElement("div"); p.className = "inst-panel"; p.id = "inst-panel"; p.hidden = true;
+  p.setAttribute("role", "dialog"); p.setAttribute("aria-labelledby", "inst-panel-h");
+  document.body.appendChild(p);
+}
+function instRender() {
+  instEnsureDom();
+  const v = instView(), side = $("#inst-side"), c = $("#inst-c");
+  const ver = v.display.split(" · ").map(x => `<span class="inst-seg">${esc(x)}</span>`).join(" · ");   // quebra só em "·"
+  const sideHtml = `<span class="inst-env"><span class="inst-dot" aria-hidden="true">●</span>${esc(v.label)}</span>${v.display ? `<span class="inst-ver">${ver}</span>` : ""}${v.notes.map(n => `<span class="inst-note">${esc(n)}</span>`).join("")}${v.bad ? `<span class="inst-bad">${v.warn ? "⚠ " : ""}${esc(v.bad)}</span>` : ""}`;
+  const cHtml = `<span class="inst-env"><span class="inst-dot" aria-hidden="true">●</span>${esc(v.short.split(" · ")[0])}</span>${v.short.includes(" · ") ? `<span class="inst-cm">${esc(v.short.split(" · ").slice(1).join(" · "))}</span>` : ""}${v.warn ? `<span class="inst-bad" aria-hidden="true">⚠</span>` : ""}`;
+  for (const [el, html] of [[side, sideHtml], [c, cHtml]]) {
+    if (!el) continue;
+    el.dataset.env = v.env;
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.setAttribute("aria-label", v.aria); el.title = v.display ? `${v.label} · ${v.display}${v.bad ? " — " + v.bad : ""}` : v.label;
+    el.setAttribute("aria-expanded", String(INST.open && INST.trigger === el));
+  }
+  if (INST.open) instPanelFill();
+  instTitle();
+}
+function instPanelFill() {
+  const p = $("#inst-panel"), v = instView();
+  const html = `<h2 id="inst-panel-h" tabindex="-1">Ambiente e versão do Squad Control</h2>${v.bad ? `<p class="inst-bad">${v.warn ? "⚠ " : ""}${esc(v.bad)}</p>` : ""}${v.notes.length ? `<p class="inst-note" style="margin:6px 0 0">${esc(v.notes.join(" · "))}</p>` : ""}
+    <dl>${instFields().map(([k, val, txt]) => `<dt>${esc(k)}</dt><dd${txt ? ` class="txt"` : ""}>${esc(val)}</dd>`).join("")}</dl>
+    <div class="inst-acts"><button type="button" data-inst-copy>Copiar</button><button type="button" data-inst-close>Fechar</button></div>`;
+  if (p.dataset.html !== html) { const f = document.activeElement, inP = p.contains(f), sel = f?.matches?.("[data-inst-copy]") ? "[data-inst-copy]" : f?.matches?.("[data-inst-close]") ? "[data-inst-close]" : null; p.innerHTML = html; p.dataset.html = html; if (inP) (sel ? p.querySelector(sel) : $("#inst-panel-h"))?.focus({ preventScroll: true }); }
+}
+function instPlace() {
+  const p = $("#inst-panel"), t = INST.trigger; if (!INST.open || !p || !t) return;
+  const r = t.getBoundingClientRect(), W = innerWidth, H = innerHeight, w = Math.min(390, W - 32);
+  p.style.left = `${Math.max(16, Math.min(r.left, W - w - 16))}px`;
+  if (r.top > H / 2) { p.style.top = "auto"; p.style.bottom = `${Math.max(16, H - r.top + 8)}px`; p.style.maxHeight = `${Math.max(160, r.top - 24)}px`; }
+  else { p.style.bottom = "auto"; p.style.top = `${Math.max(16, r.bottom + 8)}px`; p.style.maxHeight = `${Math.max(160, H - r.bottom - 24)}px`; }
+}
+function instOpen(trigger) {
+  INST.open = true; INST.trigger = trigger;
+  const p = $("#inst-panel"); p.hidden = false; instRender(); instPlace();
+  $("#inst-panel-h")?.focus({ preventScroll: true });
+}
+function instClose(refocus) {
+  if (!INST.open) return;
+  const t = INST.trigger; INST.open = false; INST.trigger = null;
+  const p = $("#inst-panel"); if (p) p.hidden = true;
+  instRender();
+  if (refocus && t && t.isConnected && t.getClientRects().length) t.focus({ preventScroll: true });
+}
+function instTitle() {
+  const want = instView().prefix, t = document.title;
+  let base = t;
+  for (const px of ["[TESTE] ", "[?] "]) if (base.startsWith(px)) base = base.slice(px.length);
+  if (want + base !== t) document.title = want + base;
+}
+async function instFetch() {
+  if (INST.busy) return; INST.busy = true;
+  try {
+    const r = await fetch("/api/instance", { cache: "no-store" });
+    if (r.status === 404) { if (!instOk(state?.instance)) { INST.data = null; INST.status = "old"; } }
+    else if (!r.ok) throw new Error(r.status);
+    else { const j = await r.json(); if (!instOk(j)) throw new Error("formato"); INST.data = j; INST.status = "ok"; }
+  } catch (e) { if (!INST.data) INST.status = "error"; }   // sem rede: mantém o último dado bom
+  INST.busy = false; instRender();
+}
+function instFromState() {
+  if (!state || state === INST.seenState) return;
+  const first = INST.seenState === null; INST.seenState = state;
+  if (instOk(state.instance)) { INST.data = state.instance; INST.status = "ok"; instRender(); }
+  else if (first || INST.status === "ok") instFetch();   // servidor sem "instance" no /api/state: confirma pelo /api/instance
+}
+document.addEventListener("click", ev => {
+  const tg = ev.target.closest?.("#inst-side, #inst-c");
+  if (tg) { if (INST.open && INST.trigger === tg) instClose(false); else instOpen(tg); return; }
+  if (ev.target.closest?.("[data-inst-close]")) { instClose(true); return; }
+  if (ev.target.closest?.("[data-inst-copy]")) {
+    const txt = "Squad Control — ambiente e versão\n" + instFields().map(([k, v]) => `${k}: ${v}`).join("\n");
+    const done = ok => announce(ok ? "Detalhes copiados." : "Não foi possível copiar; selecione o texto do painel.");
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(() => done(true), () => done(false));
+    else { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) {} ta.remove(); done(ok); $("[data-inst-copy]")?.focus(); }
+    return;
+  }
+  if (INST.open && !ev.target.closest?.("#inst-panel")) instClose(false);
+});
+window.addEventListener("keydown", e => { if (e.key === "Escape" && INST.open) { e.stopPropagation(); instClose(true); } }, true);
+window.addEventListener("resize", instPlace);
+window.addEventListener("scroll", instPlace, { passive: true });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) instFetch(); });
+setInterval(instFromState, 1000);   // só compara referência do state já buscado; nenhuma rede
+setInterval(() => { if (!document.hidden) instFetch(); }, 60000);
+setTimeout(() => { if (INST.status === "loading") instFetch(); }, 5000);   // /api/state ainda não chegou
+{ const tt = document.querySelector("title"); if (tt && window.MutationObserver) new MutationObserver(instTitle).observe(tt, { childList: true, characterData: true, subtree: true }); }
+instRender();
 </script>
 </body>
 </html>

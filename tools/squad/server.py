@@ -34,6 +34,7 @@ from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das 
 import testenv as te  # noqa: E402  (D15, ADR-018: ambiente de teste compartilhado)
 import bugs  # noqa: E402  (D16, ADR-019: demandas de bug — rascunho, links do produtivo, BugStore)
 import evidence_rules as er  # noqa: E402  (D16: regras únicas de evidência, máscara e limites)
+import instance as inst  # noqa: E402  (D18, ADR-021: ambiente e versão do próprio Squad Control)
 import conversa as cv  # noqa: E402  (D17, ADR-020: conversa direta com o Orquestrador)
 
 
@@ -45,6 +46,7 @@ GATES_DIR = DATA_ROOT / "docs/squad/gates"
 HANDOFFS_DIR = DATA_ROOT / "docs/squad/memory/handoffs"
 RUNS_DIR = DATA_ROOT / ".squad/runs"
 UI_DIR = ROOT / "squad-control"
+INSTANCE = None   # D18: inst.Instance criada em main() (ou na 1ª consulta, com a porta do servidor)
 
 AGENT_ALIASES = {
     "arquiteto": "arquiteto", "backend": "backend", "devops": "devops",
@@ -1515,6 +1517,16 @@ class Handler(SimpleHTTPRequestHandler):
             return self._bug_evidence(data)
         return self._json({"error": "not found"}, 404)
 
+    def _instance(self):
+        """D18 (ADR-021): calculado na subida (main); git só aqui, com cache de 30 s — nunca no /api/live."""
+        global INSTANCE
+        try:
+            if INSTANCE is None:
+                INSTANCE = inst.Instance(ROOT, self.server.server_address[1], DATA_ROOT, LOG)
+            return INSTANCE.snapshot()
+        except Exception:  # nunca derruba /api/state
+            return None
+
     def do_GET(self):
         if self.path == "/api/conversas" or self.path.startswith(("/api/conversas/", "/api/conversas?")):
             return self._chat_get()
@@ -1555,8 +1567,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "alerts": extra["alerts"], "alertsHistory": extra["alertsHistory"], "agents": extra["agents"],
                 "serverMs": extra["serverMs"],
                 "testEnv": extra["testEnv"],   # D15 — acréscimo (formato de GET /api/test-env)
+                "instance": self._instance(),  # D18 — acréscimo (formato de GET /api/instance)
                 "delegations": extra["delegations"],   # D19 — acréscimo: delegação ativa por demanda
             })
+        if self.path.startswith("/api/instance"):
+            return self._json(self._instance())
         if self.path.startswith("/api/test-env"):
             return self._json(test_env_view())
         if self.path.startswith("/api/usage"):
@@ -1807,6 +1822,9 @@ def main():
         print(json.dumps(out, ensure_ascii=False))
         sys.exit(code)
     port = args.port
+    global INSTANCE
+    INSTANCE = inst.Instance(ROOT, port, DATA_ROOT, LOG)   # D18: ambiente e versão fixados na subida
+    print(f"Ambiente: {INSTANCE.env['label']} ({INSTANCE.env['reason']}) · versão {INSTANCE.build['display']}")
     print(f"Squad Control em http://localhost:{port}  (transcrições: {transcripts_root()})")
     # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
     threading.Thread(target=lambda: compute(full=False), daemon=True).start()

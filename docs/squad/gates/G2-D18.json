@@ -1,0 +1,42 @@
+{
+  "gate": "G2",
+  "demand": "b72a6bd8caf3",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "cycle": 1,
+  "handoff": "f61cd842c1ff+25425042af36",
+  "commit": "22616bd",
+  "recommendation": "APPROVE",
+  "confidence": 0.89,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Escopo e ownership", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git diff --stat origin/develop...HEAD: c20a602 só tools/squad/{instance,server,testenv}.py + handoff 09 (Orquestrador); 22616bd só squad-control/index.html (+191, só acréscimo de CSS/JS, DOM injetado por JS); nada em services/**, contratos de evento ou compose; worktree limpo"},
+    {"name": "Ressalvas R1–R4 e R6 do G1", "status": "pass", "weight": 3, "blocking": true,
+     "source": "R1: testenv.find_main_root(root, timeout) devolve None em returncode≠0/timeout/sem develop; instance.environment roda a regra 3 (rev-parse --is-inside-work-tree) antes e usa timeout 2 s; teste test_r1_sem_develop → 'teste'. R2: por janela de 30 s só rev-parse HEAD + status; diff --name-only só com HEAD novo (memorizado). R3: dirty/display recalculados em _refresh. R4: dataIsMain = DATA_ROOT==principal ou LOG sob a principal; produtivo exige log sob ROOT. R6: maior vX.Y.Z por tupla numérica, pré-release só sem final (test_r6_so_prerelease)"},
+    {"name": "Testes unitários do scratchpad", "status": "pass", "weight": 3, "blocking": true,
+     "source": "python3 scratchpad/d18/test_instance.py -v → Ran 12 tests OK (CA1–CA13, CA20, R1, R6; repos git temporários, PATH sem git, git que dorme)"},
+    {"name": "/api/live sem git (CA13) e API só acréscimo (CA14)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "servidor em processo (porta efêmera, SQUAD_ROOT_DATA = cópia em scratchpad/g2-d18/data, SQUAD_TESTENV_PROBE=0) com Popen instrumentado: 5× /api/live → 0 subprocessos, Cache-Control no-store; 5× /api/instance e /api/state no cache → 0 git; após 30 s → só [rev-parse HEAD, status --porcelain]. /api/state mantém agents, alerts, alertsHistory, gates, github, handoffs, log, now, runs, serverMs, summary, testEnv, thresholds, usage, version + 'instance'; /api/instance no-store"},
+    {"name": "D15 preservado (testenv.main_root)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "main_root() = find_main_root() or ROOT: mesmo resultado da D15 (SQUAD_MAIN_ROOT sobrepõe; git falho/sem develop → ROOT, antes via stdout vazio). tests/squad/test_ambiente_teste_d15.py → Ran 41 OK; test_e2e_compose_seguro_d15.py → 11 OK"},
+    {"name": "Suítes tests/squad uma a uma", "status": "validate", "weight": 2, "blocking": false,
+     "source": "d15 41 OK, d16 38 OK, d16 QA 18 OK, e2e compose 11 OK, entrega por PR OK, governança 19 OK. test_alertas_d14.py → FAILED 1/20 (Compatibilidade.test_api_state_e_live_por_http: live.version ≠ state.version), determinístico no worktree; passa com SQUAD_TESTENV_PROBE=0 (20 OK) e passa na cópia de HEAD fora de repositório git. Causa: a 1ª /api/state do teste cria INSTANCE de forma preguiçosa (~45 ms de git), tempo em que a thread do TE_PROBE (docker ps) grava health e muda data_version entre as duas chamadas — corrida do teste, não defeito do produto (em produção INSTANCE nasce em main()). O handoff declarou '20 OK': evidência imprecisa"},
+    {"name": "UI 1440/1280/800/700/390, estados e acessibilidade", "status": "validate", "weight": 2, "blocking": false,
+     "source": "capturas scratchpad/d18-front/shots (teste/prod/unk/old × claro/escuro): rodapé sticky da .side acima da autoria a 1440 no topo e rolado ao fim; compacto no cabeçalho a 700/800; fixo no canto inferior esquerdo a 390 (R5) sem cobrir o sino; painel role=dialog com os campos da §4, Copiar/Fechar, Esc/clique fora; texto além de cor; [TESTE]/[?] via MutationObserver; 404 + state sem instance → 'Servidor sem suporte à versão — reinicie'. Carga: setInterval de 1 s só compara referência do state (sem rede), GET /api/instance a cada 60 s e no visibilitychange. Playwright/axe (CA15–CA19) ainda não executados por terceiro — cabe ao QA"},
+    {"name": "Desvios declarados", "status": "validate", "weight": 2, "blocking": false,
+     "source": "(1) environment.log: acréscimo que explica R4, aceitável — Arquiteto registra no contrato §4. (2) commit = commitFull[:7] em vez de --short=7: idêntico salvo abreviação ambígua (git alongaria); display do CA9 atendido; aceito. (3) 600–900 px sem o nome do produto e com rótulos curtos (como < 600 px): nome segue no título e aria-labels completos; aceitável, humano confirma. (4) commit omitido no compacto 600–780 px: contrato §5 pede rótulo + commit; o commit fica no aria-label/detalhe e o ⚠ permanece — desvio pequeno, humano confirma. (5) toasts +64 px e .frame padding-bottom 64 px a < 600 px: necessário para o selo fixo não cobrir os toasts; aceito. Extra: aria-label não cita 'indeterminado' (só 'desatualizado') — menor"},
+    {"name": "Robustez do servidor", "status": "pass", "weight": 1, "blocking": false,
+     "source": "_instance() captura qualquer exceção → instance null (UI trata como erro); git() engole OSError/Timeout/ValueError; snapshot com lock; subida sem SQUAD_ENV ≤ 2 s por comando (declarado ~12 s no pior caso com SQUAD_ENV e git lento)"}
+  ],
+  "open_risks": [
+    "QA-1 — test_alertas_d14.py falha 1/20 no worktree por corrida (TE_PROBE × INSTANCE preguiçosa). QA (dono de tests/**) deve estabilizar: SQUAD_TESTENV_PROBE=0 no setUp dessa classe (como nas suítes D15) ou pré-criar server.INSTANCE antes da 1ª chamada; não mudar o produto.",
+    "QA-2 — portar scratchpad/d18/test_instance.py para tests/squad/test_instancia_d18.py e acrescentar o teste de contrato CA13/CA14 por HTTP (contador de subprocess no /api/live e chaves do /api/state).",
+    "QA-3 — Playwright CA15–CA19 (1440 rolado ao fim, 1280×720, 390 sem rolagem horizontal e sino visível, Enter/Esc e foco devolvido, axe claro/escuro, rota /api/instance interceptada com 404) — inclusive 600–780 px (commit oculto) e 390 px (selo fixo não cobre toasts nem o último botão da página).",
+    "Arquiteto — registrar no contrato §4 o campo environment.log e, se o humano aceitar, os desvios de 600–900 px; §3 passar a citar diff --name-only (R2) e rev-parse + status por janela (R3).",
+    "Conflito provável com a D17 em server.py (import, _instance, rota, main) — pequeno; resolver no merge.",
+    "Menor — incluir 'Não foi possível verificar a versão' no aria-label quando freshness=indeterminado."
+  ],
+  "human_required": false,
+  "rationale": "As duas entregas cumprem o contrato e aplicam as ressalvas do G1 com evidência verificada: regra de ambiente sem fallback silencioso (R1), git limitado a rev-parse + status por 30 s e diff só em HEAD novo (R2/R3), SQUAD_LOG em dataIsMain (R4), tag final numérica (R6). Medi 0 subprocessos no /api/live, API só com acréscimo e D15 intacto (41 OK). O único teste vermelho (d14, 1/20) é uma corrida do próprio teste exposta pela criação preguiçosa da instância — passa com SQUAD_TESTENV_PROBE=0 — e fica para o QA estabilizar; o handoff do Orquestrador reportou essa suíte como verde, o que registro. Os desvios de UI são pequenos, justificados e ficam para o humano confirmar na revisão do PR. Confiança 0.89 = 17/19 (suítes com 1 falha não bloqueante, UI só por capturas do próprio Frontend, desvios a confirmar); risco baixo: recurso somente leitura e local."
+}

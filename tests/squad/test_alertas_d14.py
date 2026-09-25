@@ -30,6 +30,10 @@ GATES = TMP / "docs/squad/gates"
 RUNS = TMP / ".squad/runs"
 TRANS = TMP / "transcripts"
 os.environ.update(SQUAD_ROOT_DATA=str(TMP), SQUAD_LOG=str(LOG), SQUAD_TRANSCRIPTS=str(TRANS))
+# D18 (QA-1 do G2): sem a sonda do ambiente de teste (docker/gh em segundo plano), `version` do /api/state e do
+# /api/live podia divergir quando a sonda terminava entre as duas chamadas — janela alargada pela criação preguiçosa
+# de `server.INSTANCE` (git) no 1º /api/state. A sonda não é assunto desta suíte (é da D15, que também a desliga).
+os.environ.update(SQUAD_TESTENV_PROBE="0", SQUAD_TESTENV_SPAWN="0")
 os.environ.pop("SQUAD_STALLED_S", None)
 sys.path.insert(0, str(REPO / "tools/squad"))
 server = importlib.import_module("server")
