@@ -720,7 +720,10 @@
   "4310b7518c7d",
   "8489968f6eb1",
   "111a73aad4d4",
-  "010e4dd9e4d0"
+  "010e4dd9e4d0",
+  "9fd05e46ee33",
+  "79b946044e28",
+  "684804c16f2e"
  ],
  "issues": {
   "_diario": {
@@ -2900,6 +2903,28 @@
    "handed": true,
    "closed": true,
    "kind": "task"
+  },
+  "9fd05e46ee33": {
+   "number": 227,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/227",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg80ojE",
+   "agent": "arquiteto",
+   "status": "Gate (Auditor)",
+   "phase": "F1",
+   "handed": true,
+   "closed": false,
+   "kind": "task"
+  },
+  "79b946044e28": {
+   "number": 228,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/228",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg80orw",
+   "agent": "devops",
+   "status": "Backlog",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "ticket"
   }
  },
  "project": {
