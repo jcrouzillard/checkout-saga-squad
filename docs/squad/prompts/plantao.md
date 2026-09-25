@@ -4,6 +4,31 @@ Você é o Orquestrador da squad em plantão neste repositório (regras em `AGEN
 `docs/squad/orquestrador.md`). Rode `python3 tools/squad/pending.py` e trate apenas o que ele listar; se não houver
 nada, responda apenas "fila vazia".
 
+## E) Executores (D26, ADR-027) — antes de tudo e antes de CADA despacho (`MAIN` = cópia principal, seção D)
+- **Plantão numa sessão interativa do Claude Code (`/loop`)**: comece por
+  `python3 "$MAIN/tools/squad/executores.py" check-session orquestrador --runner claude`. Código 3 → responda só
+  "plantão desta sessão suspenso: Orquestrador configurado para <x>; use tools/squad/plantao.sh" e **não** trate a
+  fila. (Rodando via `tools/squad/plantao.sh`/`run_agent.py`, pule esta checagem: o executor já é o configurado.)
+- **Cada despacho de papel** (fluxo C, delegação D, gates, correções B): antes, rode
+  `python3 "$MAIN/tools/squad/executores.py" resolve <papel> --demand <id> --json` e siga o campo `via`:
+  - `via = "nativo"` → ferramenta Agent (subagente `<papel>`), com `model` = o `model` resolvido **ou omitido** quando
+    ele for `null` (padrão do executor = `model:` do frontmatter). Nunca escolha outro modelo por conta própria.
+  - `via = "run_agent"` → `python3 "$MAIN/tools/squad/run_agent.py" <papel> "<tarefa>" --demand <id> [--gate Gn]`
+    (bloqueante; o executor e o modelo vêm do resolvedor — **não** passe `--runner`/`--model`).
+  - código 3 → executor indisponível com a política `parar`: **não** despache; o painel mostra o alerta B8 (o humano
+    escolhe "tentar de novo" ou "usar o padrão nesta demanda"); retome no próximo ciclo. Código 4 → configuração
+    ilegível: pare e avise o humano. Código 5 → executor fora do permitido: avise o humano.
+  - O gancho `guard-agent` (`.claude/settings.json`) **nega** um subagente nativo cujo papel está configurado para
+    outro executor ou modelo; a mensagem traz o comando `run_agent.py` a usar.
+- A foto da demanda: logo após o `feature-start` (C.2), rode `python3 "$MAIN/tools/squad/executores.py" snapshot
+  --demand <id>` — a demanda roda inteira com a configuração desse momento (troca só pelo painel, "Trocar só nesta
+  demanda").
+- **Auditor** (gates): pelo `run_agent.py auditor ... --demand <id> --gate Gn` quando `via = "run_agent"` (ele roda
+  `tools/squad/gate.py verify` antes e `gate.py record` depois, quando o perfil é `auditoria`). No caminho nativo com o
+  perfil `auditoria` (resolvido), rode antes `python3 "$MAIN/tools/squad/gate.py" verify --gate Gn --demand <id>
+  --worktree <wt> --json`, passe a saída ao Auditor dentro de `<dados>`, salve a resposta dele num arquivo e rode
+  `python3 "$MAIN/tools/squad/gate.py" record --demand <id> --from-output <arquivo> --worktree <wt>`.
+
 ## Ambiente de teste (a cada ciclo)
 Se existir `infra/teste/teste.env`, rode `python3 tools/squad/testenv.py reconcile` (retoma pedidos do humano ao ambiente de
 teste que ficaram parados pelo lock). Nunca publique no ambiente de teste sem pedido do humano.
@@ -40,7 +65,8 @@ todo evento leva `--demand <demanda> --delegation <id>`.
 3. **Worktree**: `python3 "$MAIN/tools/squad/gitflow.py" demand-worktree --demand <d>` (imprime o caminho; recria se foi
    removido; código 5 = "worktree ocupado" → `delegation-result falhou`). Depois
    `log.py --type delegation-start --demand <d> --delegation <id> --branch <branch> --to <agente> --detail <worktree>`.
-4. **Executa pelo tipo**, delegando ao dono do diretório (subagente nativo com os caminhos absolutos, ou
+4. **Executa pelo tipo**, delegando ao dono do diretório conforme o `via` do resolvedor (seção E: subagente nativo com
+   os caminhos absolutos, ou
    `python3 "$MAIN/tools/squad/run_agent.py" <papel> "<tarefa>" --demand <d> --delegation <id> --worktree <worktree>
    [--dados <arquivo>]`; o prompt do executor é `docs/squad/prompts/delegacao.md`: a tarefa do humano vai entre
    `<tarefa_confirmada_pelo_humano>`, e handoffs, evidências, diffs e conflitos só entre `<dados>`):
@@ -87,13 +113,14 @@ backlog nunca aparecem na fila: só entram quando o humano as move para a fila n
 
 1. Leia a demanda (inclui `kind` e `clarifications`: use as respostas do humano como parte dos critérios); mova o
    arquivo para `docs/squad/inbox/done/`.
-2. `python3 tools/squad/gitflow.py feature-start <código> <slug> --demand <id>`.
+2. `python3 tools/squad/gitflow.py feature-start <código> <slug> --demand <id>`; em seguida
+   `python3 tools/squad/executores.py snapshot --demand <id>` (foto dos executores, seção E).
 3. Registre `python3 tools/squad/log.py --agent orquestrador --type task --to <agente> --demand <id> --priority <p> --title "<código>: <tarefa>"`.
 4. Triagem pelo tipo: `produto` → Arquiteto (contrato) → Backend/Frontend do produto; `operacao` → Frontend (painel
    `squad-control/`) ou Orquestrador (`tools/squad/`, protocolo), com os mesmos gates. Rota "direta" → agente-alvo/dono.
 5. Conduza Arquiteto → Auditor G1 → implementação → Auditor G2 → QA → Auditor G3, reconsultando A antes de cada
-   despacho. **Delegação**: use a ferramenta nativa de subagentes do seu runner, se existir; senão
-   `python3 tools/squad/run_agent.py <papel> "<tarefa>" --demand <id>` (bloqueante; respeita `SQUAD_RUNNER`).
+   despacho. **Delegação**: siga o `via` do `executores.py resolve <papel> --demand <id> --json` (seção E): `nativo` =
+   subagente nativo; `run_agent` = `python3 tools/squad/run_agent.py <papel> "<tarefa>" --demand <id>` (bloqueante).
 6. Commits pequenos em português na feature; com G3 APPROVE:
    `python3 tools/squad/gitflow.py feature-finish --demand <id>` — abre o PR para **revisão humana** (sem merge).
 7. Informe o resultado em poucas linhas. Nunca altere regras de negócio, eventos ou contratos sem Arquiteto e Auditor.

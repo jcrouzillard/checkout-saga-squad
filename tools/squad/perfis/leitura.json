@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": ["Read", "Glob", "Grep"],
+    "deny": ["Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Agent",
+             "Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(~/.config/**)", "Read(~/.claude/**)", "Read(~/.codex/**)",
+             "Read(~/.gnupg/**)", "Read(~/.docker/**)", "Read(~/.kube/**)", "Read(~/.azure/**)", "Read(~/Library/Keychains/**)",
+             "Read(~/.netrc)", "Read(~/.gitconfig)", "Read(~/.git-credentials)", "Read(~/.npmrc)",
+             "Read(~/.pypirc)", "Read(~/.pgpass)"]
+  }
+}

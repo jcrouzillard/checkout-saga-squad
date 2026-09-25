@@ -39,6 +39,7 @@ import instance as inst  # noqa: E402  (D18, ADR-021: ambiente e versão do pró
 import conversa as cv  # noqa: E402  (D17, ADR-020: conversa direta com o Orquestrador)
 import publication as pub  # noqa: E402  (D24, ADR-025: publicação do Squad Control pelo supervisor)
 import product  # noqa: E402  (D23, F2a: resolvedor de produto, códigos congelados, transcrições)
+import executores as exe  # noqa: E402  (D26, ADR-027: executor e modelo por agente)
 
 
 # D23 (F2a §2): caminhos pelo resolvedor; os nomes do módulo continuam como apelidos do resolvido.
@@ -455,9 +456,13 @@ def collect_external_runs(now: float | None = None) -> list[dict]:
     progress = [e for e in read_log() if e.get("type") == "progress" and e.get("run")]
     out = []
     for meta_path in sorted(runs_dir.glob("*.json")):
+        if meta_path.name.startswith("verify-"):   # D26 §7.4: saída do gate.py verify, não é run
+            continue
         try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(meta, dict) or not meta.get("id"):
             continue
         log_path = meta_path.with_suffix(".log")
         status = meta.get("status", "trabalhando")
@@ -514,6 +519,9 @@ def collect_external_runs(now: float | None = None) -> list[dict]:
                     "sessionId": meta.get("sessionId"), "demand": meta.get("demand"),
                     "delegation": meta.get("delegation"),   # D19: run iniciada por delegação (run_agent --delegation)
                     "runner": runner, "status": status,
+                    # D26 §9.2: configurado × efetivo gravados pelo run_agent (ausentes em runs antigas)
+                    **{k: meta.get(k) for k in ("runnerConfigured", "modelConfigured", "configSource", "profile",
+                                                "fallback", "fallbackOf") if k in meta},
                     "started": meta.get("started"),
                     "updated": datetime.fromtimestamp(mtime, timezone.utc).isoformat(timespec="seconds"),
                     "toolCount": len([x for x in activity if x["kind"] == "tool"]), "current": current,
@@ -708,7 +716,8 @@ def compute(full: bool) -> dict:
         rows = read_log()
         test_env = test_env_view()
         gate_alerts = (list(rules.open.values()) + al.env_alerts(rows, test_env, rules.codes)
-                       + al.handoff_alerts(rows, rules, runs, now))          # D19: A6 (relógio, como o A2)
+                       + al.handoff_alerts(rows, rules, runs, now)           # D19: A6 (relógio, como o A2)
+                       + al.executor_alerts(rows, runs, rules, now))         # D26: B8, B9, A8
         agents, stalled = al.build_agents(runs, rules, rows, gate_alerts, now, orchestrator_view(runs, rules, now))
         alerts = al.with_age(al.sort_alerts(gate_alerts + stalled), now)
         delegations = annotate_delegations(alerts, rows, rules, now)
@@ -773,6 +782,34 @@ def live_payload() -> tuple[bytes, str]:
 
 
 MATCH_WINDOW_S = 120
+
+
+# ---------------------------------------------------------------- D26 (ADR-027): executores
+def exec_ctx() -> "exe.Ctx":
+    return exe.context(LOG)
+
+
+def exec_writer(entry: dict) -> dict:
+    """Eventos `executor-*` gravados pelo servidor: mesma trava/linha do log (preserva `before: null`)."""
+    _write_log_line(entry)
+    return entry
+
+
+def demand_executor_views(rows: list[dict], runs: list[dict], codes: dict) -> list[dict]:
+    """/api/state `demands[]`: por demanda com foto ou runs, configurado × efetivo por papel (contrato §9.3, §10)."""
+    ids = []
+    for e in rows:
+        if e.get("type") == "executor-snapshot" and e.get("demand") and e["demand"] not in ids:
+            ids.append(e["demand"])
+    for r in runs:
+        if r.get("demand") and r.get("agent") in al.ROLES and r["demand"] not in ids:
+            ids.append(r["demand"])
+    out = []
+    for d in ids:
+        items = al.demand_executors(rows, runs, d)
+        if items:
+            out.append({"id": d, "code": codes.get(d), "executors": items})
+    return out
 
 
 def _ts(value) -> float | None:
@@ -1682,7 +1719,17 @@ class Handler(SimpleHTTPRequestHandler):
                 "instance": self._instance(),  # D18 — acréscimo (formato de GET /api/instance)
                 "delegations": extra["delegations"],   # D19 — acréscimo: delegação ativa por demanda
                 "codes": codes,   # D23 — acréscimo: id → código (congelado > gravado > posicional)
+                "demands": demand_executor_views(read_log(), runs, codes),   # D26 — executores por demanda
             })
+        if urllib.parse.urlsplit(self.path).path == "/api/executores":   # D26 (contrato §10)
+            if not self._local_ok():
+                return self._forbidden()
+            try:
+                with LOCK:
+                    runs = [public_run(r) for r in collect_runs()]
+                return self._json(exe.view(exec_ctx(), read_log(), runs, writer=exec_writer))
+            except exe.ExecError as e:
+                return self._json(e.payload(), e.http)
         if self.path.startswith("/api/instance"):
             return self._json(self._instance())
         if self.path.startswith("/api/test-env"):
@@ -1710,6 +1757,34 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _append_log(self, entry: dict) -> dict:
         return append_log(entry)
+
+    def _executores_post(self, path: str, raw: bytes):
+        """D26 (contrato §10): só o humano, pelo painel local, grava a configuração (recusas `{error, code}`)."""
+        if not self._local_ok():
+            return self._forbidden()
+        try:
+            data = json.loads(raw or b"{}")
+        except json.JSONDecodeError:
+            return self._json({"error": "JSON inválido", "code": "formato_invalido"}, 400)
+        if not isinstance(data, dict):
+            return self._json({"error": "JSON inválido", "code": "formato_invalido"}, 400)
+        ctx = exec_ctx()
+        try:
+            if path == "/api/executores/checar":
+                return self._json({"status": exe.check(ctx, fresh=True)})
+            if path == "/api/executores/aplicar-a-todos":
+                return self._json(exe.apply_all(ctx, data, via="painel", writer=exec_writer))
+            if path == "/api/demand/executores":
+                return self._json(exe.set_demand(ctx, data.get("demand"), data.get("role"), data.get("runner"),
+                                                 data.get("model"), bool(data.get("acknowledge")), via="painel",
+                                                 writer=exec_writer))
+            body = {k: data[k] for k in ("baseVersion", "squad", "agents", "policy", "acknowledge", "codexAck")
+                    if k in data}
+            return self._json(exe.save(ctx, body, via="painel", writer=exec_writer))
+        except exe.ExecError as e:
+            return self._json(e.payload(), e.http)
+        except product.ProductError as e:
+            return self._json({"error": str(e), "code": "configuracao_ilegivel"}, 500)
 
     def do_POST(self):
         self._t0 = time.monotonic()   # D17: firstTextMs conta a partir do recebimento do POST
@@ -1753,6 +1828,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         raw = self.rfile.read(length)
+        epath = urllib.parse.urlsplit(self.path).path
+        if epath in ("/api/executores", "/api/executores/aplicar-a-todos", "/api/executores/checar",
+                     "/api/demand/executores"):
+            return self._executores_post(epath, raw)
         if self.path.startswith("/api/bug/"):
             return self._bug_post(urllib.parse.urlsplit(self.path).path, raw)
         if self.path.startswith("/api/test-env/request"):

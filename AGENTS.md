@@ -31,7 +31,7 @@ Cada diretório tem **um único dono**. Um agente só escreve no que é seu; par
 
 | Agente            | Arquivo de definição                    | Dono de                                                        |
 |-------------------|-----------------------------------------|----------------------------------------------------------------|
-| Orquestrador      | `docs/squad/orquestrador.md`            | `AGENTS.md`, `CLAUDE.md`, `docs/squad/**`, `tools/squad/**`, plano e sequência |
+| Orquestrador      | `docs/squad/orquestrador.md`            | `AGENTS.md`, `CLAUDE.md`, `.claude/**` (definições de papel e `settings.json`), `docs/squad/**`, `tools/squad/**`, plano e sequência |
 | Arquiteto         | `.claude/agents/arquiteto.md`           | `docs/architecture/**`, `docs/adr/**`, `docs/contracts/**`      |
 | Backend           | `.claude/agents/backend.md`             | `services/**` (código de produção), `pom.xml`                   |
 | DevOps            | `.claude/agents/devops.md`              | `Dockerfile`, `docker-compose.yml`, `infra/**` (exceto observability), `.github/**`, `Makefile` |
@@ -99,8 +99,11 @@ Ao terminar sua tarefa, todo agente:
 ## Execução independente de fornecedor
 - Definições de papel: `.claude/agents/<papel>.md` — o **corpo** é o prompt do papel para qualquer fornecedor; o
   cabeçalho (frontmatter) só é usado pelo Claude Code. O Orquestrador está em `docs/squad/orquestrador.md`.
-- Delegação: use a ferramenta nativa de subagentes do seu runner, se existir; caso contrário,
-  `python3 tools/squad/run_agent.py <papel> "<tarefa>" [--demand <id>]` (runner em `SQUAD_RUNNER=claude|codex`).
+- Executor e modelo por papel (ADR-027): escolhidos pelo humano no painel (Squad Control → Executores), por máquina,
+  com foto por demanda. Antes de delegar: `python3 tools/squad/executores.py resolve <papel> --demand <id> --json` e
+  siga `via`: `nativo` = subagente nativo do Claude Code; `run_agent` =
+  `python3 tools/squad/run_agent.py <papel> "<tarefa>" [--demand <id>]`. `SQUAD_RUNNER`/`SQUAD_MODEL` não configuram
+  mais (só semeiam a primeira configuração); nenhum agente muda a própria configuração.
 - Progresso: registre marcos com `python3 tools/squad/log.py --agent <papel> --type progress --title "..."` para
   que o Squad Control mostre o trabalho ao vivo, qualquer que seja o fornecedor.
 - Plantão do Orquestrador: `tools/squad/plantao.sh` (prompt em `docs/squad/prompts/plantao.md`).
