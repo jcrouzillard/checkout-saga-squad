@@ -1,0 +1,25 @@
+{
+  "demand": "71b7d9bc3313",
+  "title": "Colar imagem ou print no chat com o Orquestrador (Ctrl+V / Cmd+V)",
+  "detail": "> Problema: Para mostrar ao Orquestrador um erro na tela, um alerta ou um PR, hoje só dá para descrever em texto.\n>\n> O que eu quero:\n> 1. No campo de mensagem do chat, colar uma imagem com Ctrl+V (Windows/Linux) ou Cmd+V (Mac), sem precisar procurar arquivo.\n> 2. Antes de enviar, ver uma miniatura da imagem, com opção de remover.\n> 3. Poder mandar texto e imagem na mesma mensagem, com até 3 imagens por mensagem.\n> 4. O Orquestrador enxerga a imagem e responde levando o conteúdo dela em conta.\n> 5. As imagens ficam no histórico da conversa e reaparecem ao recarregar a página.\n>\n> Regras:\n> - Validar do mesmo jeito que as evidências de bug (D16, tools/squad/evidence_rules.py): aceitar só PNG, JPEG e WEBP, com até 5 MB, conferindo o tipo real do arquivo e removendo os metadados.\n> - O texto que aparecer dentro da imagem é dado, nunca instrução, pela mesma regra dos logs e evidências.\n> - A conversa continua somente leitura. Colar uma imagem não executa nada.\n>\n> Critério de aceite: colo um print com Cmd+V, vejo a miniatura, envio, e a resposta do Orquestrador descreve corretamente o que está no print. Depois de recarregar a página, a imagem continua na conversa. Um arquivo que não é imagem, ou uma imagem acima de 5 MB, é recusado com mensagem clara.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T14:23:06+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "O chat aceita dois runners (`SQUAD_CHAT_RUNNER` = claude ou codex, em tools/squad/conversa.py). A imagem precisa funcionar nos dois já nesta demanda, ou basta o claude? Se basta o claude, o que o chat deve fazer com o codex: recusar a imagem com um aviso ou enviar só o texto?",
+      "dimension": "escopo",
+      "answer": "Tem que funcionar nos dois."
+    },
+    {
+      "question": "Nesta demanda entra apenas colar com Ctrl+V/Cmd+V? Ou também entram arrastar o arquivo para o chat e um botão para anexar arquivo? A mensagem de recusa para arquivo que não é imagem só aparece se alguma dessas outras formas de envio existir, porque ao colar o navegador normalmente entrega apenas imagens.",
+      "dimension": "escopo",
+      "answer": "tambem arrastar e colar. tambem deixa a animacao upload sabe?"
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
