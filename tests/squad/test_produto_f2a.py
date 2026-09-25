@@ -15,6 +15,7 @@ no PATH (nenhuma chamada real a modelo ou ao GitHub). CA-9 confere o log/github-
 
 Uso: SQUAD_CHAT_RUNNER=fake python3 tests/squad/test_produto_f2a.py -v
 """
+import base64
 import concurrent.futures as cf
 import fcntl
 import hashlib
@@ -31,12 +32,24 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import uuid
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 SQ = REPO / "tools/squad"
 PY = sys.executable
-MARK = "F2A-QA"   # todo título sintético carrega esta marca (CA-9 procura por ela no log real)
+RUN = uuid.uuid4().hex[:8]
+MARK = f"F2A-QA-{RUN}"   # marca por execução nos títulos sintéticos (CA-9 compara o campo `title` dos eventos)
+
+
+def synth_id() -> str:
+    """id sintético de 12 hex gerado por execução (nunca constante: texto de defeito no log real não casa)."""
+    return uuid.uuid4().hex[:12]
+
+
+ID_B, ID_D, ID_AUS = synth_id(), synth_id(), synth_id()          # CA-7 (gitflow), CA-8 (triagem), QA-D23-1 (ausente)
+ID_A1, ID_A2, ID_A3 = synth_id(), synth_id(), synth_id()         # CA-11
+SYNTH_IDS = {ID_B, ID_D, ID_AUS, ID_A1, ID_A2, ID_A3}
 
 # ids da tabela do contrato §4.3 (D1…D24, nesta ordem)
 FROZEN = ["13e55010e3f5", "48b6ace91207", "62f458c8038b", "1cc732c62a2d", "d91b7a8b31d9", "c6f83b5bb5c7",
@@ -360,7 +373,7 @@ class T02Codigos(unittest.TestCase):
 
     def test_ca6_log_sintetico_comeca_em_d1(self):
         rows = [{"id": "aaaaaaaaaaaa", "agent": "humano", "type": "task"},
-                {"id": "bbbbbbbbbbbb", "agent": "orquestrador", "type": "task"},
+                {"id": ID_B, "agent": "orquestrador", "type": "task"},
                 {"id": "cccccccccccc", "agent": "humano", "type": "task"}]
         self.assertEqual(product.demand_codes(rows), {"aaaaaaaaaaaa": "D1", "cccccccccccc": "D2"})
 
@@ -491,11 +504,62 @@ class T04Trava(unittest.TestCase):
         self.assertRegex(body["code"], r"^D[1-9][0-9]*$")
 
 
+    def test_qa_d23_2_bug_com_503_nao_deixa_pasta_nem_indice(self):
+        """QA-D23-2 (ac4df23): bug cujo `task` cai em 503 trava_de_codigos → pasta e linha do index.jsonl desfeitas;
+        o rascunho continua e o reenvio (trava livre) grava 201."""
+        data = make_data("data-trava-bug", COPY)
+        log = data / "docs/squad/memory/decisions.jsonl"
+        srv, base = start_server(server_env(data, SQUAD_TRANSCRIPTS=str(TMP / "tr-trava-bug")))
+        consent = {"production": True, "public": True}
+
+        def draft(txt):
+            st, d = post(base, "/api/bug/draft", {"kind": "produto", "files": [
+                {"name": "erro.log", "contentBase64": base64.b64encode(txt).decode()}]})
+            self.assertEqual(st, 201, d)
+            return d["draft"]
+
+        def bug(dr, title):
+            return post(base, "/api/demand", {"title": title, "kind": "produto", "detail": "sintoma", "nature": "bug",
+                                              "bug": {"draft": dr, "consent": consent}}, timeout=30)
+
+        bugs_dir = data / "docs/squad/produto/bugs"
+        idx = bugs_dir / "index.jsonl"
+        holder = None
+        try:
+            st, b1 = bug(draft(b"falha 1\n"), f"{MARK}-BUG1")   # índice já existe: exercita o truncate (não o unlink)
+            self.assertEqual(st, 201, b1)
+            dirs0, idx0, log0 = sorted(p.name for p in bugs_dir.iterdir()), idx.read_bytes(), log.read_bytes()
+            dr2 = draft(b"falha 2\n")
+            (data / ".squad/locks").mkdir(parents=True, exist_ok=True)
+            holder = subprocess.Popen([PY, "-c", "import fcntl, os, sys, time; fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT); "
+                                       "fcntl.flock(fd, fcntl.LOCK_EX); print('ok', flush=True); time.sleep(60)",
+                                       str(data / ".squad/locks/codes.lock")], stdout=subprocess.PIPE, text=True)
+            self.assertEqual(holder.stdout.readline().strip(), "ok")
+            st, e = bug(dr2, f"{MARK}-BUG2")
+            self.assertEqual((st, e.get("code")), (503, "trava_de_codigos"), e)
+            self.assertEqual(sorted(p.name for p in bugs_dir.iterdir()), dirs0, "nenhuma pasta órfã")
+            self.assertEqual(idx.read_bytes(), idx0, "nenhuma linha órfã no index.jsonl")
+            self.assertEqual(log.read_bytes(), log0, "nenhum task gravado")
+            self.assertTrue((data / ".squad/bug-drafts" / dr2).exists(), "rascunho preservado para o reenvio")
+            holder.kill()
+            holder.wait()
+            holder = None
+            st, b2 = bug(dr2, f"{MARK}-BUG2")
+            self.assertEqual(st, 201, b2)
+            self.assertEqual(len(idx.read_text().splitlines()), len(idx0.decode().splitlines()) + 1)
+            self.assertTrue((bugs_dir / b2["id"] / "bug.json").is_file())
+        finally:
+            if holder:
+                holder.kill()
+                holder.wait()
+            stop(srv)
+
+
 # ====================================================================== CA-7 / CA-8
 class T05Ferramentas(unittest.TestCase):
     def test_ca7_gitflow_honra_squad_log(self):
         g = TMP / "g.jsonl"
-        g.write_text(json.dumps({"id": "bbbbbbbbbbbb", "ts": "2026-09-25T00:00:00+00:00", "agent": "humano",
+        g.write_text(json.dumps({"id": ID_B, "ts": "2026-09-25T00:00:00+00:00", "agent": "humano",
                                  "type": "task", "title": f"Demanda: {MARK} gitflow"}) + "\n")
         envg = {**ENV0, "SQUAD_LOG": str(g), "PATH": SAFE_PATH}
         GR = TMP / "gr"   # repositório TEMPORÁRIO (nada de git no worktree real)
@@ -508,7 +572,7 @@ class T05Ferramentas(unittest.TestCase):
             self.assertEqual(git(*c, cwd=GR).returncode, 0)
         (GR / "docs/squad/memory/decisions.jsonl").write_text("{}\n")   # memória suja: snapshot NÃO pode commitar
         code = ("import sys; sys.path.insert(0, 'tools/squad'); import gitflow; print(gitflow.LOG); "
-                f"print(gitflow.demand_code('bbbbbbbbbbbb')); gitflow.log('{MARK} gitflow'); "
+                f"print(gitflow.demand_code('{ID_B}')); gitflow.log('{MARK} gitflow'); "
                 "gitflow.import_memory('develop'); gitflow.snapshot_state()")
         r = subprocess.run([PY, "-c", code], cwd=GR, env=envg, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr[-500:])
@@ -519,10 +583,18 @@ class T05Ferramentas(unittest.TestCase):
         self.assertIn(f"SQUAD_LOG={g}", r.stdout)
         self.assertEqual((GR / "docs/squad/memory/decisions.jsonl").read_text(), "{}\n")
         br = git("branch", "--list", cwd=GR).stdout
-        r = subprocess.run([PY, "tools/squad/gitflow.py", "feature-start", "D99", "x", "--demand", "bbbbbbbbbbbb"],
+        r = subprocess.run([PY, "tools/squad/gitflow.py", "feature-start", "D99", "x", "--demand", ID_B],
                            cwd=GR, env=envg, capture_output=True, text=True)
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn("D99", r.stdout + r.stderr)
+        self.assertEqual(git("branch", "--list", cwd=GR).stdout, br)
+        self.assertEqual(git("rev-list", "--count", "HEAD", cwd=GR).stdout.strip(), "1")
+        # QA-D23-1 (ac4df23): demanda AUSENTE do log também sai 2 (contrato §5.1), sem criar branch
+        r = subprocess.run([PY, "tools/squad/gitflow.py", "feature-start", "D1", "x", "--demand", ID_AUS],
+                           cwd=GR, env=envg, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn(ID_AUS, r.stderr)
+        self.assertIn("não encontrada", r.stderr)
         self.assertEqual(git("branch", "--list", cwd=GR).stdout, br)
         self.assertEqual(git("rev-list", "--count", "HEAD", cwd=GR).stdout.strip(), "1")
 
@@ -543,11 +615,11 @@ class T05Ferramentas(unittest.TestCase):
     def test_ca8_triage_grava_validation_no_temporario(self):
         data = make_data("data-triage")
         tl = TMP / "t.jsonl"
-        tl.write_text(json.dumps({"id": "dddddddddddd", "ts": "2026-09-25T00:00:00+00:00", "agent": "humano",
+        tl.write_text(json.dumps({"id": ID_D, "ts": "2026-09-25T00:00:00+00:00", "agent": "humano",
                                   "type": "task", "title": f"Demanda: {MARK} triagem", "kind": "operacao"}) + "\n")
         env = {**ENV0, "SQUAD_LOG": str(tl), "SQUAD_ROOT_DATA": str(data), "PATH": SAFE_PATH,
                "SQUAD_TRANSCRIPTS": str(TMP / "tr-tri"), "HOME": str(TMP / "home-tri")}
-        r = subprocess.run([PY, str(SQ / "triage.py"), "dddddddddddd", "--runner", "claude"], env=env,
+        r = subprocess.run([PY, str(SQ / "triage.py"), ID_D, "--runner", "claude"], env=env,
                            capture_output=True, text=True, cwd=REPO)
         rows = product.read_rows(tl)
         self.assertTrue(any(e.get("type") == "validation" for e in rows), (r.stdout + r.stderr)[-500:])
@@ -599,9 +671,9 @@ class T06Transcricoes(unittest.TestCase):
         log = data / "docs/squad/memory/decisions.jsonl"
         ts_m, ts_w = "2026-09-25T10:00:00+00:00", "2026-09-25T10:05:00+00:00"
         log.write_text("".join(json.dumps(e) + "\n" for e in [
-            {"id": "aaaa11110001", "ts": ts_m, "agent": "backend", "type": "progress", "title": f"{MARK}-CA11-MAIN"},
-            {"id": "aaaa11110002", "ts": ts_w, "agent": "qa", "type": "progress", "title": f"{MARK}-CA11-WT"},
-            {"id": "aaaa11110003", "ts": ts_w, "agent": "qa", "type": "progress", "title": f"{MARK}-CA11-NADA"}]))
+            {"id": ID_A1, "ts": ts_m, "agent": "backend", "type": "progress", "title": f"{MARK}-CA11-MAIN"},
+            {"id": ID_A2, "ts": ts_w, "agent": "qa", "type": "progress", "title": f"{MARK}-CA11-WT"},
+            {"id": ID_A3, "ts": ts_w, "agent": "qa", "type": "progress", "title": f"{MARK}-CA11-NADA"}]))
 
         def tr(where, name, ts, agent, title, model):
             d = home / ".claude/projects" / product._slug(where)
@@ -635,11 +707,11 @@ class T06Transcricoes(unittest.TestCase):
         finally:
             stop(srv)
         by = {e["id"]: e for e in st["log"]}
-        self.assertEqual((by["aaaa11110001"]["modelSource"], by["aaaa11110001"]["model"]),
+        self.assertEqual((by[ID_A1]["modelSource"], by[ID_A1]["model"]),
                          ("transcript", "claude-opus-5-5"), "transcrição da cópia principal varrida (enrich_log)")
-        self.assertEqual((by["aaaa11110002"]["modelSource"], by["aaaa11110002"]["model"]),
+        self.assertEqual((by[ID_A2]["modelSource"], by[ID_A2]["model"]),
                          ("transcript", "claude-sonnet-4-6"), "transcrição do worktree registrado varrida")
-        self.assertEqual(by["aaaa11110003"]["modelSource"], "none")
+        self.assertEqual(by[ID_A3]["modelSource"], "none")
         run = next((x for x in st["runs"] if x["id"] == meta["id"]), None)
         self.assertIsNotNone(run, "run do run_agent em data_root/.squad/runs aparece em /api/state")
         self.assertEqual(run["model"], "claude-opus-5-5")
@@ -680,9 +752,16 @@ class T99NadaNoReal(unittest.TestCase):
         self.assertEqual(sha(WT_SYNC), BEFORE["wt_sync"], "github-sync.json do worktree intacto")
         now = REAL_LOG.read_bytes()
         self.assertTrue(now.startswith(BEFORE["real_bytes"]), "log real: só append de terceiros")
-        for txt in (now.decode("utf-8", "ignore"), WT_LOG.read_text(errors="ignore")):
-            for s in (MARK, "aaaa11110001", "bbbbbbbbbbbb", "dddddddddddd"):
-                self.assertNotIn(s, txt)
+        # Só EVENTOS contam (nada de substring em texto livre: um defeito pode citar ids/marcas no título/detalhe):
+        # id sintético desta execução, `demand`/`code` de task apontando para ele, ou título criado por este teste.
+        for log in (REAL_LOG, WT_LOG):
+            for r in product.read_rows(log):
+                self.assertNotIn(r.get("id"), SYNTH_IDS, (log, r.get("id")))
+                if r.get("type") == "task":
+                    for k in ("demand", "code"):
+                        self.assertNotIn(r.get(k), SYNTH_IDS, (log, k, r.get("id")))
+                title = str(r.get("title") or "")
+                self.assertFalse(title.startswith((MARK, f"Demanda: {MARK}")), (log, r.get("id"), title))
         runs = REPO / ".squad/runs"
         self.assertEqual(sorted(p.name for p in runs.glob("*")) if runs.exists() else [], BEFORE["wt_runs"])
 
