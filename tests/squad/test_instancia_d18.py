@@ -236,7 +236,8 @@ class ContratoHTTP(unittest.TestCase):
     STATE_KEYS_ANTES = {"now", "log", "gates", "runs", "handoffs", "github", "usage", "version", "thresholds",
                         "summary", "alerts", "alertsHistory", "agents", "serverMs", "testEnv",
                         "delegations"}   # D19 (ADR-022) acrescentou `delegations` antes da D18
-    LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv"}
+    LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv",
+                 "publication"}   # D24 (ADR-025, contrato publicacao-do-squad-control §4.5): sempre presente, null sem supervisor
     LIVE_HEADERS = {"content-type", "cache-control", "etag", "x-squad-version", "content-length"}
 
     @classmethod
@@ -274,6 +275,7 @@ class ContratoHTTP(unittest.TestCase):
         self.assertEqual(self.popens, [], "o /api/live não pode executar subprocessos")
         self.assertEqual(set(live), self.LIVE_KEYS)
         self.assertNotIn("instance", live)
+        self.assertIsNone(live["publication"], "D24 §4.3: sem supervisor o campo sai null")
         self.assertEqual({k.lower() for k in r.headers.keys()} - {"server", "date"}, self.LIVE_HEADERS)
         self.assertEqual(r.headers["Cache-Control"], "no-store")
         self.assertEqual(r.headers["X-Squad-Version"], live["version"])
@@ -297,6 +299,9 @@ class ContratoHTTP(unittest.TestCase):
                         <= set(inst["environment"]))
         self.assertTrue({"release", "pom", "commit", "commitFull", "branch", "dirty", "startedAt", "display"}
                         <= set(inst["build"]))
+        # D24 (ADR-025 §4.4): `mode` e `pid` entram DENTRO de `build`; o nível de cima não muda
+        self.assertEqual(inst["build"]["mode"], "principal")
+        self.assertEqual(inst["build"]["pid"], os.getpid())
         self.assertTrue({"state", "headNow", "changedPaths", "checkedAt"} <= set(inst["freshness"]))
         self.assertEqual(inst["environment"]["port"], self.httpd.server_address[1])
         _, live = self.get("/api/live")
