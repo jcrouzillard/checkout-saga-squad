@@ -43,18 +43,22 @@ O código hoje condiciona a solução assim:
    modo antigo continua em `make squad-primeiro-plano`, e `python3 tools/squad/server.py --port N` continua valendo
    para testes e worktrees (pedido de mudança ao DevOps).
 2. **Gatilhos**: (a) **automático**. A cada 15 s o supervisor lê `git ls-remote origin refs/heads/develop` e só faz
-   `fetch` quando o SHA muda. Ele avança a cópia principal com `git merge --ff-only origin/develop` e sem autostash,
+   `fetch` quando o SHA muda. **Antes de qualquer escrita git** exige HEAD em `refs/heads/develop` e nenhuma operação
+   em curso (rebase, merge, cherry-pick, `index.lock`); se houver, tenta no próximo ciclo, sem evento. Ele avança a cópia principal com `git merge --ff-only origin/develop` e sem autostash,
    para nunca mexer no log vivo. Publica quando o código em `tools/squad/` e `squad-control/` do HEAD difere do que
    está no ar. O `review-sync` do plantão continua registrando `delivered`, e o pull dele vira no-op. (b) **botão**.
    `POST /api/squad-control/publish` grava um pedido em arquivo, que o supervisor lê a cada 2 s. (c) **subida do
-   supervisor**.
+   supervisor**. A primeira adoção do servidor atual (em primeiro plano, sem supervisor) só acontece por `make squad`
+   iniciado pelo humano, com confirmação no terminal; o `ensure` do plantão nunca adota.
 3. **Travas (as do ADR-018, adaptadas a processo)**: só a cópia principal em `develop`; só fast-forward (HEAD à frente
    da `origin/develop` apenas com commits que tocam só `docs/squad/**`; divergência espera o `review-sync`); nenhuma
    mudança rastreada em `tools/squad/` ou `squad-control/`; lock; porta 7070 só com a cópia principal; nenhum dado é
-   apagado.
+   apagado. Avançar a `develop` da cópia principal fora do `gitflow.py` é uma **exceção sancionada** (só fast-forward
+   de commits já integrados pelo humano, equivalente ao pull do `review-sync`) e, junto com "agentes não usam
+   `POST /api/squad-control/publish`", entra no `AGENTS.md` pelo Orquestrador.
 4. **Saúde em quatro pontos**: *antes* (o servidor atual responde, o que é só registrado, pois pode ser justamente o
    quebrado); *pré-voo* (`py_compile` e a subida de um **candidato** em porta livre, com dados sintéticos
-   descartáveis, `SQUAD_ENV=teste` e sem efeitos colaterais, antes de derrubar o atual); *depois* (na 7070,
+   descartáveis, `SQUAD_ENV=teste`, `SQUAD_TESTENV_SPAWN=0`, `SQUAD_TESTENV_PROBE=0` e sem efeitos colaterais, antes de derrubar o atual); *depois* (na 7070,
    `/api/instance` com `commitFull` = alvo e `environment.name = produtivo`, mais `/api/state`, `/api/live` e `/`, em até
    20 s); *estabilidade* (o processo continua vivo 10 s depois). O candidato não usa os dados reais porque a subida
    roda `Store.recover()`, que fecharia como `interrompida` o turno em andamento do servidor atual.
@@ -62,7 +66,8 @@ O código hoje condiciona a solução assim:
    partir do worktree destacado `<pai>/plankton-squad-prev`, com `SQUAD_ENV=produtivo`, `SQUAD_ROOT_DATA=<cópia
    principal>` e `SQUAD_PUBLISH_REVERTED=<sha falho>`. O selo mostra "revertido". O supervisor não tenta de novo o
    mesmo SHA sozinho, só quando chega um SHA novo ou quando o humano aperta o botão. Se o anterior também falhar, o
-   próprio supervisor serve na 7070 uma **página de manutenção** estática com o erro e o caminho dos logs.
+   próprio supervisor serve na 7070 uma **página de manutenção** estática com o erro e o caminho dos logs. O worktree `plankton-squad-prev`
+   é ignorado ou rotulado nas listagens de worktrees/instâncias e nunca é oferecido como ambiente de teste.
 6. **Ponto seguro**: `busy` lido de `GET /api/conversas`, rota já existente. O automático espera até **20 s**
    (`SQUAD_PUBLISH_SAFE_WAIT_S`) e, durante a espera, o painel mostra um aviso com contagem regressiva. No fim do
    prazo o supervisor reinicia. O botão com resposta em andamento abre uma confirmação com duas saídas: "Publicar
@@ -73,11 +78,21 @@ O código hoje condiciona a solução assim:
    **recarrega sozinha** quando o `commitFull` do servidor muda, desde que não haja rascunho. Com rascunho, mostra uma
    faixa "Recarregar".
 8. **Eventos (só acréscimo)**: `squad-publish-requested` (agent `humano`), `squad-updated`, `squad-update-failed`,
-   `squad-server-crashed`. **Estado ao vivo** no arquivo `.squad/squad-control/status.json`, exposto em
-   `GET /api/squad-control/publication` e num objeto pequeno `publication` (≤ 1 KB) no `/api/live`.
+   `squad-server-crashed`, acrescentados às choices de `--type` do `log.py` (coordenado com a D23, que também altera
+   esse arquivo). **Estado ao vivo** no arquivo `.squad/squad-control/status.json`, exposto em
+   `GET /api/squad-control/publication` e num objeto pequeno `publication` (≤ 1 KB) no `/api/live`. O `/api/instance`
+   só ganha chaves dentro de `build`/`freshness` (`build.pid`, `build.mode`). Os testes `test_alertas_d14.py:394` e
+   `test_instancia_d18.py` (`LIVE_KEYS`) são atualizados para aceitar `publication` (contrato §4.5).
 9. **O supervisor se atualiza**: quando `publisher.py` muda num merge publicado com sucesso, o supervisor valida o
    código novo num subprocesso (`publisher.py selftest`) e faz `os.execv` de si mesmo. O servidor filho não reinicia.
    Se o `selftest` falha, o supervisor antigo continua e grava `squad-update-failed` com `phase = "supervisor"`.
+
+10. **Coordenação com a D23**: sobreposição em `server.py`, `squad-control/index.html`, `testenv.py` e `log.py`,
+    com mudanças mínimas e isoladas; quem integrar por último faz merge da `origin/develop` na branch, sem rebase
+    nem `--force` (contrato §11).
+11. **Padrões às perguntas do G1**: 20 s de ponto seguro; recarga automática sem rascunho; 1ª adoção só por
+    `make squad` com confirmação no terminal; sem volta após reboot; avanço da `develop` antes do `delivered` só por
+    fast-forward com as checagens (contrato §14).
 
 ## Consequências
 - (+) A função nova aparece em ≤ 1 min sem terminal: ~15 s de detecção, ~5 s de pré-voo, até 20 s de ponto seguro e
@@ -94,6 +109,10 @@ O código hoje condiciona a solução assim:
   temporário e fica visível no selo.
 - (−) O supervisor não sobrevive a um reboot da máquina: após reiniciar, é preciso rodar `make squad`, como hoje.
   O plantão, a cada ciclo, só sobe o supervisor se a 7070 estiver livre (`publisher.py ensure`).
+- (−) A D24 não se publica sozinha: depois do merge dela, o humano roda `make squad` uma vez (adoção com confirmação
+  no terminal). O CA-1 só é verificável num PR de teste seguinte.
+- (−) Commits locais de memória não enviados + merge novo geram divergência; a publicação espera o `review-sync`
+  (≥ 180 s). Raro e visível como `phase = "sync"`.
 
 ## Alternativas consideradas
 - **launchd/systemd**: sobrevive ao reboot, mas só funciona em uma plataforma, exige um plist fora do repositório e

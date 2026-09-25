@@ -14,9 +14,12 @@
 | Orquestrador | `tools/squad/conversa.py` | `Engine.shutdown(reason)` |
 | Orquestrador | `tools/squad/instance.py` | `freshness.state = "revertido"` e `build.mode` |
 | Orquestrador | `tools/squad/plantao.sh` | `publisher.py ensure` a cada ciclo |
+| Orquestrador | `tools/squad/log.py` | os 4 tipos novos em `TYPES` (choices do `--type`), coordenado com a D23 (§8, §11) |
+| Orquestrador | `AGENTS.md` | exceção sancionada: o publicador avança a `develop` da cópia principal; agentes não usam `POST /api/squad-control/publish` (§4.2, §5.1) |
 | Frontend | `squad-control/index.html` | botão, confirmação, avisos, recarga automática, turno interrompido |
 | DevOps (**pedido de mudança**) | `Makefile` | alvos `squad`, `squad-primeiro-plano`, `squad-parar`, `squad-status`, `squad-logs` (§9) |
 | QA | `tests/squad/test_publisher.py`, `tests/squad/test_publication_api.py`, `tests/ui/checklist-publicacao-d24.md` | §10 |
+| QA | `tests/squad/test_alertas_d14.py:394`, `tests/squad/test_instancia_d18.py:239` (`LIVE_KEYS`) | acrescentar `publication` ao conjunto de chaves do `/api/live` (§4.3, CA-20) |
 
 ## 1. Configuração (espelho do `[env.prod]` do ADR-024)
 `publisher.py` lê um dicionário `CONFIG` com exatamente estas chaves. Na F2b ele virá do `product.toml` do
@@ -43,11 +46,11 @@ Diretório de estado: `<cópia principal>/.squad/squad-control/`, que já está 
 
 | Comando | Efeito | Saída / código |
 |---|---|---|
-| `start [--port 7070]` | daemoniza (`start_new_session`, stdin `/dev/null`), toma o lock e sobe o servidor. Se já houver supervisor, só mostra o estado. Se a porta estiver ocupada por um Squad Control **da cópia principal** (conferido por `/api/instance`: `environment.root` == cópia principal), **adota**: espera o ponto seguro (≤ 20 s), encerra o processo (pid por `lsof -nP -iTCP:<porta> -sTCP:LISTEN -t`; `SIGTERM`, depois `SIGKILL` em 8 s) e sobe o supervisionado. Porta ocupada por outra coisa → recusa. | imprime URL, pid e caminhos de log. 0 ok, 2 recusado |
+| `start [--port 7070]` | daemoniza (`start_new_session`, stdin `/dev/null`), toma o lock e sobe o servidor. Se já houver supervisor, só mostra o estado. Se a porta estiver ocupada por um Squad Control **da cópia principal** (conferido por `/api/instance`: `environment.root` == cópia principal), **adota** só depois de confirmação no terminal (`Encerrar o Squad Control atual (pid N) e subir o supervisionado? [s/N]`; sem TTY ou resposta ≠ `s` → recusa, código 2; `--yes` só para testes): espera o ponto seguro (≤ 20 s), encerra o processo (pid por `lsof -nP -iTCP:<porta> -sTCP:LISTEN -t`; `SIGTERM`, depois `SIGKILL` em 8 s) e sobe o supervisionado. Porta ocupada por outra coisa → recusa. | imprime URL, pid e caminhos de log. 0 ok, 2 recusado |
 | `stop` | `SIGTERM` no supervisor, que para o servidor graciosamente (§6) e sai | 0 |
 | `status [--json]` | conteúdo de `status.json`, com o pid vivo conferido | 0 no ar; 1 fora |
 | `publish [--when now\|safe]` | grava um pedido como o botão (§4.2), mas com `trigger = "cli"` | 0 aceito; 3 sem supervisor |
-| `ensure` | se não há supervisor **e** a porta está livre **e** a cópia é a principal, faz `start`. Nunca adota. | 0 |
+| `ensure` | se não há supervisor **e** a porta está livre **e** a cópia é a principal, faz `start`. **Nunca adota** e nunca pergunta: a 1ª adoção (servidor atual em primeiro plano, sem supervisor) é só por `make squad` iniciado pelo humano. | 0 |
 | `selftest` | importa os módulos, valida `CONFIG` e sai. Usado antes do `execv` (§5.6). | 0 ok |
 | `run` | loop em primeiro plano, sem daemonizar (usado por `start` e pelos testes) | — |
 
@@ -133,7 +136,18 @@ O orçamento do ADR-017 (300 ms, 64 KB) continua valendo. Quando não há superv
   Sem a variável, vale `principal`.
 - `freshness.state` ganha `revertido` quando `SQUAD_PUBLISH_REVERTED=<sha>` está definido. Nesse caso
   `freshness.failedCommit` recebe o `<sha7>`. Os demais estados não mudam.
-- `pid` (inteiro): ajuda a adoção e o diagnóstico.
+- `build.pid` (inteiro, **dentro de `build`**): ajuda a adoção e o diagnóstico. Nada novo no nível de cima do
+  `/api/instance` nem do `instance` do `/api/state`: o conjunto continua `{environment, build, freshness}`
+  (`test_instancia_d18.py:295` segue valendo sem mudança). `build` e `freshness` só ganham chaves, e os testes da D18
+  conferem essas chaves por inclusão (`<=`).
+
+### 4.5 Testes existentes que mudam (declarado; QA atualiza na implementação)
+| Teste | Hoje | Mudança |
+|---|---|---|
+| `tests/squad/test_alertas_d14.py:394` | `set(live) - {"testEnv"}` == 7 chaves | tolerar também `publication`: `set(live) - {"testEnv", "publication"}` |
+| `tests/squad/test_instancia_d18.py:239` (`LIVE_KEYS`, usado na linha 275) | 8 chaves | acrescentar `"publication"` (o campo sai sempre, `null` sem supervisor) |
+| `tests/squad/test_instancia_d18.py:295` | `set(inst) == {environment, build, freshness}` | **não muda** (o `pid` fica em `build`) |
+Nenhum outro teste de `tests/squad` pode quebrar; se quebrar, é defeito da implementação, não do teste.
 
 ## 5. Fluxo do supervisor
 
@@ -155,16 +169,31 @@ stateDiagram-v2
 ```
 
 ### 5.1 Gatilho automático (a cada `poll_s` = 15 s, se `auto`)
-1. `git ls-remote origin refs/heads/develop`, com timeout de 10 s. Se o SHA for igual ao último visto, pula.
+0. **Pré-condições de escrita git (checadas a cada ciclo, antes de qualquer `fetch`, `merge` ou `worktree`)**:
+   - `git symbolic-ref -q HEAD` == `refs/heads/develop` (HEAD destacado, `release/*`, `hotfix/*` ou qualquer outro
+     branch → não escreve);
+   - nenhuma operação em curso: ausentes `.git/rebase-merge`, `.git/rebase-apply`, `.git/MERGE_HEAD`,
+     `.git/CHERRY_PICK_HEAD` e `.git/index.lock` (caminhos resolvidos por `git rev-parse --git-path`);
+   - as travas 1 a 3 do §5.2 (cópia principal, código limpo, sem divergência) valem **também aqui**, não só na
+     publicação.
+   Qualquer uma falhando → **tenta no próximo ciclo, sem evento e sem gravar no log** (o publicador também não grava
+   evento enquanto houver rebase/autostash em curso, para não conflitar com o `stash pop` do `sync_develop`). Só o
+   limite de 5 min falhando com o mesmo SHA remoto gera um `squad-update-failed` com `phase = "sync"`, uma vez por SHA,
+   e ainda assim só quando as operações em curso já terminaram.
+1. `git ls-remote origin refs/heads/develop`, com timeout de 10 s. Se o SHA for igual ao último visto, pula para o
+   passo 4.
 2. Se mudou: `git fetch -q origin develop`.
-3. **Sincronização só por avanço simples**:
+3. **Sincronização só por avanço simples** (as pré-condições do passo 0 são conferidas de novo logo antes):
    - HEAD ancestral de `origin/develop`: `git merge --ff-only origin/develop` (**sem** `--autostash`). Se falhar (arquivo
-     sujo tocado pelo merge, `index.lock`), não mexe em nada e tenta de novo no próximo ciclo. Depois de 5 min falhando
-     com o mesmo SHA, grava `squad-update-failed` com `phase = "sync"`, uma vez por SHA.
+     sujo tocado pelo merge, `index.lock`), não mexe em nada e tenta de novo no próximo ciclo, com o mesmo limite de
+     5 min do passo 0.
    - `origin/develop` ancestral de HEAD: aceito só se `git diff --name-only origin/develop HEAD` ⊆ `docs/squad/**`
      (memória local ainda não enviada).
    - Divergência: não faz nada. Espera o `review-sync` do plantão (`sync_develop` rebaseia a memória). Aplica-se o
      mesmo limite de 5 min.
+   - Este avanço acontece antes do `delivered` do `review-sync` e é uma **exceção sancionada** ao "só o
+     `gitflow.py` escreve na `develop`": só fast-forward de commits já integrados pelo humano, equivalente ao pull do
+     `review-sync`. O Orquestrador registra a exceção no `AGENTS.md` ao integrar a D24.
 4. **Precisa publicar?** `git diff --name-only <server.commit> HEAD -- tools/squad squad-control` não vazio **e**
    HEAD ≠ `failedCommit`. Se precisar, entra em `verificando` com `trigger = "auto"`.
 
@@ -174,7 +203,9 @@ O gatilho também dispara quando o HEAD da cópia principal muda por outro camin
 ### 5.2 Travas (`verificando`, em ordem; qualquer recusa → `squad-update-failed` com `phase = "guard"`, sem tocar em nada)
 1. `root` == `testenv.main_root()` e branch `develop`.
 2. `git status --porcelain --untracked-files=no -- tools/squad squad-control` vazio.
-3. HEAD relacionado à `origin/develop` como no §5.1.3 (sem divergência).
+3. HEAD relacionado à `origin/develop` como no §5.1.3 (sem divergência) e as pré-condições do §5.1.0 (HEAD em
+   `refs/heads/develop`, sem rebase/merge/cherry-pick/`index.lock` em curso). Operação em curso ou `index.lock` não é
+   recusa: tenta no próximo ciclo, sem evento.
 4. Lock de publicação `.squad/locks/squad-publish.lock` (`flock` não bloqueante). Se ocupado, tenta no próximo ciclo,
    sem evento.
 5. Porta: a 7070 pertence ao servidor filho (pid em `status.json`) ou está livre.
@@ -186,7 +217,7 @@ O gatilho também dispara quando o HEAD da cópia principal muda por outro camin
 3. **Candidato**: sobe `command` na primeira porta livre ≥ 17070, com `cwd = root` e as variáveis
    `SQUAD_ENV=teste`, `SQUAD_ROOT_DATA=.squad/squad-control/preflight/<id>` (esqueleto com
    `docs/squad/memory/decisions.jsonl` vazio e as pastas de `inbox`, `gates` e `handoffs`),
-   `SQUAD_TESTENV_SPAWN=0` e `SQUAD_SUPERVISED` ausente. Espera `200` em `/api/instance`, `/api/state`,
+   `SQUAD_TESTENV_SPAWN=0`, `SQUAD_TESTENV_PROBE=0` (não consulta o docker) e `SQUAD_SUPERVISED` ausente. Espera `200` em `/api/instance`, `/api/state`,
    `/api/live` e `/` em até 15 s. Depois disso: `SIGTERM`, apaga a pasta `preflight/<id>`. Se falhar →
    `phase = "preflight"` e o servidor atual **não é tocado**.
 
@@ -216,7 +247,9 @@ O gatilho também dispara quando o HEAD da cópia principal muda por outro camin
    `SQUAD_SUPERVISED=1`. Repete a saúde *depois*, agora comparando com o commit anterior. Se passar: `revertido` e
    `squad-update-failed` com `rolledBack = true`. Se falhar: `fora-do-ar` e `rolledBack = false`.
 7. O worktree `plankton-squad-prev` pertence ao publicador. Ele nunca recebe commits e nunca é removido
-   automaticamente.
+   automaticamente. As listagens de worktrees/instâncias (`testenv.py`, `git worktree list` em `testenv.py:117`, painel)
+   o **ignoram** como candidato a ambiente de teste ou o **rotulam** "publicador (rollback)"; nunca o oferecem para
+   `te_spawn`, remoção ou limpeza.
 
 ### 5.6 O supervisor se atualiza
 Depois de um `squad-updated` em que `tools/squad/publisher.py` ou `publication.py` mudaram, o supervisor roda
@@ -311,6 +344,11 @@ e tem o botão "Reenviar", que reenvia a mesma pergunta num turno novo. O texto 
 | `squad-update-failed` | `orquestrador` | `commit`, `from`, `trigger`, `requestId?`, `phase: guard\|sync\|preflight\|ponto-seguro\|stop\|health\|rollback\|supervisor`, `rolledBack: bool`, `runningCommit`, `detail` (≤ 1500, mascarado), `healthBefore` | com rollback: "Squad Control: falhou a publicação de <sha7>, mantida a versão anterior <sha7>". Sem rollback: "Squad Control: publicação de <sha7> não feita (<fase>)" |
 | `squad-server-crashed` | `orquestrador` | `commit`, `mode`, `exitCode`, `restarts`, `detail` | "Squad Control caiu e foi reiniciado (<n>)" |
 
+- Os 4 tipos entram em `TYPES` do `tools/squad/log.py` (choices do `--type`) e o painel os trata como tipos
+  conhecidos (rótulo e ícone na linha do tempo, não "desconhecido"). O `log.py` também é alterado pela D23: a mudança
+  aqui é só acrescentar 4 nomes ao conjunto, sem mexer em validação nem em outras linhas; quem integrar por último
+  resolve o conflito por merge (§11).
+
 - Sem `demand`: são eventos de operação. Quando o merge veio de um PR com `review` no log, o supervisor preenche
   `demand` e `pr`, procurando o `review` cujo `merge_commit`/`url` corresponda. Isso é opcional e não bloqueia.
 - O sino (ADR-017) cria um alerta para `squad-update-failed` com `rolledBack = false` e `phase` ∈ {`health`,
@@ -342,12 +380,19 @@ sandbox. Nenhum teste chama `publisher.py` com a porta de `CONFIG`. O CA-15 prov
 (CA-1, CA-2).
 
 ## 11. Coordenação com a D23 (F2a, em paralelo)
-A D23 mexe em `server.py`, `gitflow.py` e `run_agent.py`. Para minimizar a sobreposição:
+A D23 mexe em `server.py`, `gitflow.py`, `run_agent.py`, `squad-control/index.html`, `testenv.py` e `log.py`. Para
+minimizar a sobreposição:
 - **Nada** em `gitflow.py` nem em `run_agent.py`: o gatilho é o próprio supervisor, sem gancho no `after_review`.
 - No `server.py`, só três pontos, cada um com ≤ 15 linhas que delegam a `publication.py`: o despacho das duas rotas
   no `do_GET`/`do_POST`, a inclusão de `publication` no `/api/live` e o `signal.signal` no `main()`.
+- No `squad-control/index.html`, o código novo fica em funções e blocos próprios (selo/botão, faixas, recarga,
+  "Reenviar"), sem reescrever trechos existentes.
+- No `testenv.py`, só o filtro/rótulo do `plankton-squad-prev` na listagem de worktrees (§5.5.7); o `append` é usado
+  como está.
+- No `log.py`, só os 4 nomes novos em `TYPES` (§8).
 - Os eventos novos não têm `demand` e não entram no cálculo de códigos D da D23.
-- Quem integrar por último faz o rebase. Não há conflito semântico.
+- Quem integrar por último faz **merge da `origin/develop` na sua branch (sem rebase nem `--force`)** e resolve os
+  conflitos textuais. Não há conflito semântico.
 
 ## 12. Critérios de aceite (numerados e verificáveis)
 
@@ -372,7 +417,9 @@ A D23 mexe em `server.py`, `gitflow.py` e `run_agent.py`. Para minimizar a sobre
 | CA-17 | Queda: matar o filho com `SIGKILL` → o supervisor o sobe de novo em ≤ 5 s e grava `squad-server-crashed`. 5 quedas em 5 min → rollback. | servidor falso `sai-apos-3s` |
 | CA-18 | Revertido persistente: depois de `revertido`, o mesmo SHA não é tentado de novo automaticamente (0 tentativas em 3 ciclos). Um SHA novo ou o botão tenta outra vez. `start` com `failedCommit == HEAD` sobe o anterior. | teste |
 | CA-19 | O supervisor se atualiza: um merge que muda `publisher.py` resulta em `execv` com o **mesmo pid do servidor** (não reinicia de novo). `selftest` falhando mantém o supervisor antigo e gera `phase = "supervisor"`. | teste |
-| CA-20 | `/api/live` continua dentro do orçamento do ADR-017 (p95 ≤ 300 ms, ≤ 64 KB) com o campo `publication`. `/api/instance` ganha `build.mode`, `freshness.state = "revertido"` e `pid` sem quebrar os testes da D18. | `tests/squad` inteiro verde, mais a medição |
+| CA-20 | `/api/live` continua dentro do orçamento do ADR-017 (p95 ≤ 300 ms, ≤ 64 KB) com o campo `publication`. `/api/instance` ganha `build.mode`, `build.pid` e `freshness.state = "revertido"`, mantendo o nível de cima `{environment, build, freshness}`. As únicas atualizações de teste permitidas são as do §4.5 (`test_alertas_d14.py:394` e `LIVE_KEYS` em `test_instancia_d18.py:239`). | `tests/squad` inteiro verde após o §4.5, mais a medição |
+| CA-23 | Travas de escrita git: com HEAD destacado, em `release/*`, ou com `.git/rebase-merge`, `rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD` ou `index.lock` presentes, o supervisor não executa nenhum `fetch`, `merge` ou `worktree` e não grava evento; ao desaparecer a condição, publica no ciclo seguinte. | teste com executor git gravando os comandos |
+| CA-24 | Primeira adoção: `ensure` com a 7070 ocupada por um servidor não supervisionado não o encerra (pid intacto). `start` sem TTY ou com resposta ≠ `s` recusa com código 2. | teste com servidor falso |
 | CA-21 | `make squad` inicia o supervisor e devolve o terminal com a URL. `make squad-primeiro-plano` preserva o comportamento antigo. `python3 tools/squad/server.py --port N` continua funcionando sem supervisor (publicação `supervised = false`). | manual e teste |
 | CA-22 | Página de manutenção: com o novo e o anterior quebrados, a 7070 serve a página do §7.4 e `/api/*` responde 503. "Tentar de novo", depois de consertar, publica. | servidor falso |
 
@@ -389,12 +436,25 @@ A D23 mexe em `server.py`, `gitflow.py` e `run_agent.py`. Para minimizar a sobre
   rollback cobrem esse caso.
 - **R6**: `lsof` pode faltar em Linux mínimo. Nesse caso a adoção recusa com a instrução "pare o `make squad` antigo
   (Ctrl+C) e rode `make squad`". O caminho normal não depende de `lsof`.
-- **R7**: o supervisor não volta sozinho após reboot. É preciso rodar `make squad`, como hoje, e o `ensure` do
-  plantão cobre o caso em que o plantão está ativo.
+- **R7**: o supervisor não volta sozinho após reboot (decidido: sem volta automática, demanda futura). É preciso
+  rodar `make squad`, como hoje, e o `ensure` do plantão cobre o caso em que o plantão está ativo e a 7070 livre.
 - **R8**: `ls-remote` a cada 15 s são ~240 consultas por hora ao GitHub pelo protocolo git (não é a API REST, então
   não conta no limite do `gh`). Sem rede, o gatilho (a) fica parado, e o (b) e o HEAD local continuam funcionando.
+- **R9**: a D24 não se publica sozinha. Depois do merge dela, o humano roda `make squad` uma vez (adoção do servidor
+  atual, com confirmação no terminal). O CA-1 só é verificável num PR de teste seguinte.
+- **R10**: commits locais de memória não enviados + merge novo = divergência; a publicação espera o `review-sync`
+  (≥ 180 s) e o CA-1 estoura nesse caso raro. Aceito; aparece como `phase = "sync"` após 5 min.
 
-## 14. Fora de escopo
+## 14. Padrões às perguntas do G1 (reversíveis, visíveis no PR)
+1. Prazo do ponto seguro no automático: **20 s** (`SQUAD_PUBLISH_SAFE_WAIT_S`), com aviso e contagem na tela.
+2. Recarga automática da aba quando não há rascunho: **sim** (§7.4).
+3. Encerrar o servidor atual na 1ª adoção: **sim, só via `make squad` iniciado pelo humano, com confirmação no
+   terminal** (o servidor atual não tem o botão); `ensure`/plantão nunca adotam (§2, CA-24).
+4. Volta automática após reboot: **não** (fora de escopo, demanda futura).
+5. Publicador avançar a `develop` antes do `delivered`: **sim, só por fast-forward e com as checagens do §5.1.0**;
+   exceção registrada no `AGENTS.md` pelo Orquestrador.
+
+## 15. Fora de escopo
 - Reinício automático após reboot (launchd/systemd), que pode vir numa demanda futura.
 - Publicação sem nenhuma indisponibilidade (proxy blue/green).
 - Supervisão dos demais processos da squad (`github_sync --watch`, plantão).
