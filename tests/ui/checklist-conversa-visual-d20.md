@@ -22,7 +22,7 @@ axe-core wcag2aa); `SQUAD_CHAT_RUNNER=fake` em tudo, exceto **1** pergunta ao `c
 | CA-V9 largura e espaçamento | PASS | 1440: corpo ≤ 68ch, balão humano ≤ 85 %; 390: sem rolagem horizontal, balão ≤ 88 %, "Ir para o fim"/Enviar/Parar/"Tentar de novo" ≥ 44 px; separador de dia presente |
 | CA-V10 tema Grafite | PASS | axe wcag2aa sem violações em `#chat` durante e após o streaming nos 4 casos; nenhum texto de mensagem com a cor `--ok`. Capturas: `d20-{1440,390}-{claro,escuro}-{streaming,final}.png` (8) |
 | CA-V11 acessibilidade | PASS | `aria-live` só "Resposta do Orquestrador recebida" (nenhum trecho); teclado: Shift+Tab do campo chega em "Ir para o fim" (contorno de foco 2 px), Enter rola e devolve o foco ao campo; Tab até "Parar" + Enter cancela (d17); Esc fecha e o foco volta a `#chat-btn`; `prefers-reduced-motion: reduce` → cursor e ícone de fase com `animation: none` |
-| CA-V12 sem regressão | PASS com ressalva | `d17-conversa.js` 20/20 (CA-1, 2, 3, 21, 23, reconexão, estados, destravar, axe, 390); `tests/squad/*` todas verdes uma a uma; indicador `.live` do cabeçalho intacto (flex, cor de estado). **Ressalva:** a reverificação "após o rebase sobre a D18 (PR #171)" não é possível ainda — a D18 não está na `develop` nem nesta branch |
+| CA-V12 sem regressão | PASS | `d17-conversa.js` 20/20 (CA-1, 2, 3, 21, 23, reconexão, estados, destravar, axe, 390); `tests/squad/*` todas verdes uma a uma; indicador `.live` do cabeçalho intacto (flex, cor de estado). Ressalva do rebase sobre a D18 **resolvida** na verificação pós-integração abaixo (commit `f100e2a`) |
 
 ## Suítes de `tests/squad/` (uma a uma, `SQUAD_CHAT_RUNNER=fake`)
 test_conversa_tz_d20 7 OK · test_conversa_d17 44 OK · test_alertas_d14 20 OK · test_ambiente_teste_d15 41 OK ·
@@ -41,3 +41,28 @@ test_entrega_por_pr.py "Todas as verificações passaram".
 ## Defeitos
 Nenhum defeito de produção encontrado. Observação (não bloqueia): link interno do Markdown ganha `?conversa=<id>`
 para manter o painel aberto — compatível com "internos `#/…`" do contrato.
+
+## Verificação pós-integração (develop com D18 e D19 mesclada — `f100e2a`)
+Servidor do worktree com dados temporários, `SQUAD_CHAT_RUNNER=fake`, roteiros rodados de uma **cópia** de `tests/ui`
+(sem sobrescrever capturas), `zenika/alpine-chrome:with-puppeteer`, `TZ=America/Sao_Paulo`.
+
+| Suíte | Resultado |
+|---|---|
+| `tests/ui/d20-conversa-visual.js` | 17/17 PASS (CA-V1..V4, V6..V11, **CA-V12-indicador-live**: `display:flex`, cor = `--ok`), axe sem violações |
+| `tests/ui/d18-ambiente-versao.js` | tudo ok (CA15..CA19, estados, larguras 800/700, título `[TESTE]`); axe sem violações |
+| `tests/ui/d17-conversa.js` | 20/20 PASS |
+| `tests/ui/d19-delegacao.js` | 39/39 ok |
+| `tests/squad/e2e_delegacao_d19.py` | 21/21 `[ok]`, "UI PRONTA" |
+| `tests/ui/d20-cabecalho-selo.js` (novo) | 24/24 PASS — ver abaixo |
+
+**CA-V12 (agora verificável com a D18):** PASS — o indicador "ao vivo" segue `flex` com cor de estado e convive com
+o selo e o botão da conversa.
+
+Convivência no cabeçalho (claro e escuro; selo + botão da conversa + "ao vivo" + sino): nenhuma sobreposição, nada
+fora da tela, sem rolagem horizontal em 1440, 1100, 900, 700, 610 e 390 px. O selo fica na lateral em 1440/1100
+(D18 CA15), no cabeçalho em 900/700/610 (`●TESTE f100e2a`) e fixo no rodapé em 390 (D18 CA16). Painel do chat v2
+aberto: em 1440/1100 ocupa a direita (640 px) e não cobre o selo lateral; em 900..610 ocupa a largura sob o cabeçalho
+e o selo segue visível e clicável; em 390 o painel é tela cheia e o selo fica oculto enquanto a conversa está aberta
+(esperado para diálogo em tela cheia). Capturas de apoio ficaram no scratchpad (não versionadas).
+
+Defeitos causados pelo merge: **nenhum**.
