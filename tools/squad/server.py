@@ -34,6 +34,7 @@ from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das 
 import testenv as te  # noqa: E402  (D15, ADR-018: ambiente de teste compartilhado)
 import bugs  # noqa: E402  (D16, ADR-019: demandas de bug — rascunho, links do produtivo, BugStore)
 import evidence_rules as er  # noqa: E402  (D16: regras únicas de evidência, máscara e limites)
+import conversa as cv  # noqa: E402  (D17, ADR-020: conversa direta com o Orquestrador)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -1002,6 +1003,81 @@ def collect_usage() -> dict:
     return {"providers": providers}
 
 
+# ---------------------------------------------------------------- escrita no log (D17: trava comum)
+# Todas as gravações do servidor em decisions.jsonl passam por aqui: as rotas existentes e a confirmação pela conversa
+# (ThreadingHTTPServer = uma thread por conexão). O evento gravado não muda.
+LOG_WRITE_LOCK = threading.RLock()
+HUMAN_TITLES = {"APPROVE": "Humano aceitou a recomendação do Auditor", "RETURN": "Humano devolveu a etapa",
+                "OVERRIDE": "Humano decidiu seguir apesar da devolução (assume o risco)"}
+CONTROL_TITLES = {"pause": "Pausar", "resume": "Retomar", "reprioritize": "Repriorizar", "cancel": "Cancelar"}
+
+
+def _write_log_line(entry: dict):
+    with LOG_WRITE_LOCK:
+        with LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def append_log(entry: dict) -> dict:
+    entry = {"id": uuid.uuid4().hex[:12], "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **entry}
+    entry = {k: v for k, v in entry.items() if v not in (None, "")}
+    _write_log_line(entry)
+    return entry
+
+
+def record_human_decision(action: str, gate, demand, note="", title=None, via: str | None = None) -> dict:
+    """Corpo de POST /api/human (mesmo evento); D17: a confirmação pela conversa acrescenta só `via`."""
+    entry = {
+        "id": uuid.uuid4().hex[:12],
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "agent": "humano",
+        "type": "human",
+        "title": title or HUMAN_TITLES[action],
+        "detail": note,
+        "gate": gate,
+        "demand": demand,
+        "recommendation": action,
+        "via": via,
+    }
+    entry = {k: v for k, v in entry.items() if v not in (None, "")}
+    _write_log_line(entry)
+    return entry
+
+
+def record_control(demand, action: str, note="", priority=None, via: str | None = None) -> dict:
+    """Evento de POST /api/demand/control (validação fica na rota); D17: a conversa acrescenta só `via`."""
+    return append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": demand,
+                       "action": action, "priority": priority,
+                       "title": f"{CONTROL_TITLES[action]} demanda", "detail": note, "via": via})
+
+
+# ---------------------------------------------------------------- D17: conversa com o Orquestrador
+_CHAT: "cv.Engine | None" = None
+_CHAT_LOCK = threading.Lock()
+
+
+def chat_state() -> dict:
+    """Estado atual para o contexto do chat e para validar/revalidar propostas de destravar (§4, §6)."""
+    live = compute(full=False)
+    with LOCK:
+        rows = read_log()
+        rules = rules_cached()
+    return {"rows": rows, "rules": rules, "alerts": live["alerts"], "agents": live["agents"],
+            "testEnv": live["testEnv"], "now": live["now"]}
+
+
+def chat() -> "cv.Engine":
+    global _CHAT
+    with _CHAT_LOCK:
+        if _CHAT is None:
+            store = cv.Store(DATA_ROOT)
+            store.recover()          # turnos pendentes de uma execução anterior viram `interrompida`
+            _CHAT = cv.Engine(store, chat_state, LOG_WRITE_LOCK)
+        return _CHAT
+
+
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(UI_DIR), **kw)
@@ -1037,6 +1113,134 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _forbidden(self):
         return self._json({"error": "origem não permitida: use o Squad Control em http://localhost", "code": "origem_invalida"}, 403)
+
+    # ------------------------------------------------------------ D17 (ADR-020): conversa com o Orquestrador
+    def _chat_err(self, e: "cv.ChatError"):
+        return self._json(e.payload(), e.status)
+
+    @staticmethod
+    def _chat_parts(path: str) -> list[str]:
+        return [p for p in urllib.parse.urlsplit(path).path.split("/")[3:] if p != ""]   # /api/conversas/...
+
+    def _chat_get(self):
+        if not self._local_ok():
+            return self._forbidden()
+        parts = self._chat_parts(self.path)
+        eng = chat()
+        try:
+            if not parts:
+                runner = cv.default_runner()
+                return self._json({"runner": runner, "available": cv.available(runner), **cv.isolation(runner),
+                                   "busy": eng.busy(), "items": eng.store.list()})
+            cid = parts[0]
+            if not eng.store.exists(cid):
+                raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
+            if len(parts) == 1:
+                q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                try:
+                    after = int((q.get("after") or ["0"])[0])
+                except ValueError:
+                    after = 0
+                return self._json(eng.view(cid, after))
+            if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "stream" and parts[2].isdigit():
+                return self._chat_stream(eng, cid, int(parts[2]))
+        except cv.ChatError as e:
+            return self._chat_err(e)
+        return self._json({"error": "rota não encontrada", "code": "nao_encontrado"}, 404)
+
+    def _chat_stream(self, eng: "cv.Engine", cid: str, n: int):
+        """SSE (§7.1): fase/texto/fim/erro; `: ping` a cada 15 s; reconexão reenvia o texto acumulado num `texto`."""
+        t = eng.turn(cid, n)
+        final = None
+        if t is None:   # turno já encerrado em outra execução do servidor: devolve o registro final gravado
+            recs = eng.store.records(cid)
+            final = next((r for r in recs if r.get("t") == "msg" and r.get("role") == "orquestrador"
+                          and r.get("turn") == n), None)
+            if final is None:
+                return self._json({"error": "turno não encontrado", "code": "turno_nao_encontrado"}, 404)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.close_connection = True
+
+        def send(event: str | None, data: dict | None = None, eid: int | None = None, comment: str | None = None):
+            if comment is not None:
+                chunk = f": {comment}\n\n"
+            else:
+                chunk = (f"id: {eid}\n" if eid is not None else "") + f"event: {event}\n" + \
+                        f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+            self.wfile.write(chunk.encode("utf-8"))
+            self.wfile.flush()
+        try:
+            if final is not None:
+                if final.get("status") == "erro":
+                    send("erro", {"code": final.get("code") or "erro_runner", "error": final.get("error") or "falha",
+                                  "message": final})
+                else:
+                    send("fim", {"message": final})
+                return
+            with t.cond:
+                idx = len(t.events)
+                phase, tool, text, done = t.phase, t.tool, t.sent, t.done
+            if done:
+                send(*t.final_event, eid=idx)
+                return
+            send("fase", {"phase": phase, **({"tool": tool} if tool else {})}, eid=idx)
+            if text:
+                send("texto", {"delta": text, "replace": True}, eid=idx)
+            last_ping = time.monotonic()
+            while True:
+                with t.cond:
+                    if len(t.events) == idx:
+                        t.cond.wait(timeout=1.0)
+                    new = t.events[idx:]
+                    idx = len(t.events)
+                for eid, event, data in new:
+                    send(event, data, eid=eid)
+                    if event in ("fim", "erro"):
+                        return
+                    last_ping = time.monotonic()
+                if time.monotonic() - last_ping >= cv.PING_S:
+                    send(None, comment="ping")
+                    last_ping = time.monotonic()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
+
+    def _chat_post(self, raw: bytes):
+        parts = self._chat_parts(self.path)
+        try:
+            data = json.loads(raw or b"{}")
+        except json.JSONDecodeError:
+            return self._json({"error": "JSON inválido", "code": "json_invalido"}, 400)
+        if not isinstance(data, dict):
+            return self._json({"error": "JSON inválido", "code": "json_invalido"}, 400)
+        eng = chat()
+        try:
+            if not parts:
+                runner = cv.default_runner()
+                if not cv.available(runner):
+                    raise cv.ChatError(503, "orquestrador_indisponivel",
+                                       f"Orquestrador indisponível: runner {runner} ausente (verifique `{runner} --version`)")
+                meta = eng.store.create(runner, cv.requested_model())
+                return self._json({"id": meta["id"], "createdAt": meta["createdAt"], "runner": runner,
+                                   **cv.isolation(runner)}, 201)
+            cid = parts[0]
+            if not eng.store.exists(cid):
+                raise cv.ChatError(404, "conversa_nao_encontrada", "conversa não encontrada")
+            if len(parts) == 2 and parts[1] == "mensagens":
+                return self._json(eng.send(cid, data.get("text"), t0=self._t0), 202)
+            if len(parts) == 4 and parts[1] == "turnos" and parts[3] == "cancelar" and parts[2].isdigit():
+                return self._json(eng.cancel(cid, int(parts[2])), 202)
+            if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "confirmar":
+                return self._json(eng.confirm(cid, parts[2], data, record_human_decision, record_control), 201)
+            if len(parts) == 4 and parts[1] == "propostas" and parts[3] == "descartar":
+                return self._json(eng.discard(cid, parts[2]), 200)
+        except cv.ChatError as e:
+            return self._chat_err(e)
+        return self._json({"error": "rota não encontrada", "code": "nao_encontrado"}, 404)
 
     def _bug_err(self, e: "er.EvidenceError"):
         return self._json(e.payload(), e.status)
@@ -1182,6 +1386,8 @@ class Handler(SimpleHTTPRequestHandler):
         return self._json({"error": "not found"}, 404)
 
     def do_GET(self):
+        if self.path == "/api/conversas" or self.path.startswith(("/api/conversas/", "/api/conversas?")):
+            return self._chat_get()
         if self.path.startswith("/api/bug/"):
             return self._bug_get(urllib.parse.urlsplit(self.path).path)
         if self.path.startswith("/api/live"):
@@ -1242,18 +1448,26 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def _append_log(self, entry: dict) -> dict:
-        entry = {"id": uuid.uuid4().hex[:12], "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **entry}
-        entry = {k: v for k, v in entry.items() if v not in (None, "")}
-        with LOG.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        return entry
+        return append_log(entry)
 
     def do_POST(self):
+        self._t0 = time.monotonic()   # D17: firstTextMs conta a partir do recebimento do POST
         # D16 (ressalva 4 do G1): o teto de 22 MB vale antes de ler qualquer byte do corpo (teto geral do servidor).
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
+        if self.path == "/api/conversas" or self.path.startswith(("/api/conversas/", "/api/conversas?")):
+            # D17: origem local e corpo ≤ 32 KB checados ANTES de ler o corpo.
+            if not self._local_ok():
+                self.close_connection = True
+                return self._forbidden()
+            if length < 0 or length > cv.MAX_BODY:
+                self.close_connection = True
+                return self._json({"error": "corpo da requisição acima de 32 KB" if length > 0 else "Content-Length inválido",
+                                   "code": "corpo_grande" if length > 0 else "content_length_invalido"},
+                                  413 if length > 0 else 400)
+            return self._chat_post(self.rfile.read(length))
         if length < 0 or length > er.MAX_BODY:
             self.close_connection = True
             body = json.dumps({"error": "corpo da requisição acima de 22 MB" if length > 0 else "Content-Length inválido",
@@ -1310,7 +1524,6 @@ class Handler(SimpleHTTPRequestHandler):
             action = data.get("action")
             if action not in ("pause", "resume", "reprioritize", "cancel"):
                 return self._json({"error": "ação inválida"}, 400)
-            titles = {"pause": "Pausar", "resume": "Retomar", "reprioritize": "Repriorizar", "cancel": "Cancelar"}
             rows = read_jsonl(LOG)
             if not any(e.get("id") == data.get("id") and e.get("type") == "task" for e in rows):
                 return self._json({"error": "demanda não encontrada"}, 404)
@@ -1318,9 +1531,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"error": "demanda já cancelada"}, 409)
             if action == "cancel" and is_done(rows, data.get("id")):
                 return self._json({"error": "demanda já concluída"}, 409)
-            entry = self._append_log({"agent": "humano", "type": "control", "to": "orquestrador", "demand": data.get("id"),
-                                      "action": action, "priority": data.get("priority"),
-                                      "title": f"{titles[action]} demanda", "detail": data.get("note", "")})
+            entry = record_control(data.get("id"), action, data.get("note", ""), priority=data.get("priority"))
             if action == "cancel":
                 s = te.derive(read_jsonl(LOG))   # D15: cancelada libera o teste / sai da fila (reconcile)
                 if s["demand"] == data.get("id") or any(q["demand"] == data.get("id") for q in s["queue"]):
@@ -1447,22 +1658,8 @@ class Handler(SimpleHTTPRequestHandler):
         action = data.get("action")
         if action not in ("APPROVE", "RETURN", "OVERRIDE"):
             return self._json({"error": "action deve ser APPROVE, RETURN ou OVERRIDE"}, 400)
-        titles = {"APPROVE": "Humano aceitou a recomendação do Auditor", "RETURN": "Humano devolveu a etapa",
-                  "OVERRIDE": "Humano decidiu seguir apesar da devolução (assume o risco)"}
-        entry = {
-            "id": uuid.uuid4().hex[:12],
-            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "agent": "humano",
-            "type": "human",
-            "title": data.get("title") or titles[action],
-            "detail": data.get("note", ""),
-            "gate": data.get("gate"),
-            "demand": data.get("demand"),
-            "recommendation": action,
-        }
-        entry = {k: v for k, v in entry.items() if v not in (None, "")}
-        with LOG.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        entry = record_human_decision(action, data.get("gate"), data.get("demand"), data.get("note", ""),
+                                      title=data.get("title"))
         return self._json(entry, 201)
 
 
@@ -1473,6 +1670,7 @@ def main():
     print(f"Squad Control em http://localhost:{port}  (transcrições: {transcripts_root()})")
     # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
     threading.Thread(target=lambda: compute(full=False), daemon=True).start()
+    chat()   # D17: fecha como `interrompida` turnos que ficaram abertos numa execução anterior
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 
