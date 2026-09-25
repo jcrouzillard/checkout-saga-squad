@@ -285,6 +285,14 @@ class Q05CA13Real(unittest.TestCase):
         # o working tree do worktree pode ter arquivos novos do QA não commitados: o clone usa o HEAD commitado +
         # o gitflow.py atual (o que está sob teste)
         shutil.copy2(REPO / "tools/squad/gitflow.py", cls.clone / "tools/squad/gitflow.py")
+        if (REPO / "tools/squad/product.py").exists():
+            shutil.copy2(REPO / "tools/squad/product.py", cls.clone / "tools/squad/product.py")
+        # D23 (F2a §5.1): `feature-start <código> --demand <id>` exige o `task` do humano no log e o código resolvido
+        # igual ao informado. Semeia o `task` da demanda do bug com o código gravado D99 (código gravado vale, §4.4).
+        with (cls.clone / "docs/squad/memory/decisions.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"id": "aaaaaaaaaaa1", "ts": "2026-09-24T00:00:00+00:00", "agent": "humano",
+                                "type": "task", "title": "Demanda: bug de teste", "kind": "produto",
+                                "code": "D99", "code_prefix": "D"}, ensure_ascii=False) + "\n")
         run("git", "config", "user.email", "qa@squad.local", cwd=cls.clone)
         run("git", "config", "user.name", "qa", cwd=cls.clone)
         run("git", "add", "-A", cwd=cls.clone)

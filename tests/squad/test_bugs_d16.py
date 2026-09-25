@@ -253,13 +253,18 @@ class T01Compat(unittest.TestCase):
         st, e, _ = call("POST", "/api/demand", {"title": "Comum", "kind": "produto", "detail": " x "})
         self.assertEqual(st, 201)
         line = LOG.read_text()[len(before):].strip()
+        # D23 (F2a §4.2): todo `task` do humano sai com `code`/`code_prefix` gravados por product.append_task, no fim
+        self.assertRegex(e.get("code", ""), r"^D[1-9][0-9]*$")
         expected = {"id": e["id"], "ts": e["ts"], "agent": "humano", "type": "task", "to": "orquestrador",
-                    "title": "Demanda: Comum", "detail": "x", "priority": "normal", "kind": "produto"}
+                    "title": "Demanda: Comum", "detail": "x", "priority": "normal", "kind": "produto",
+                    "code": e["code"], "code_prefix": "D"}
         self.assertEqual(line, json.dumps(expected, ensure_ascii=False))
         st, e2, _ = call("POST", "/api/demand", {"title": "Comum 2", "kind": "operacao", "nature": "demanda", "when": "backlog"})
         self.assertEqual(st, 201)
         self.assertNotIn("nature", e2)
-        self.assertEqual(list(e2), ["id", "ts", "agent", "type", "to", "title", "priority", "kind", "backlog"])
+        self.assertEqual(list(e2), ["id", "ts", "agent", "type", "to", "title", "priority", "kind", "backlog",
+                                    "code", "code_prefix"])   # D23: código nasce na gravação
+        self.assertEqual(int(e2["code"][1:]), int(e["code"][1:]) + 1)
 
     def test_validacoes_existentes_e_novas(self):
         n = len(log_rows())

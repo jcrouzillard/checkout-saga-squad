@@ -235,7 +235,8 @@ class ContratoHTTP(unittest.TestCase):
     """CA13/CA14 por HTTP, com o servidor do worktree numa porta efêmera e dados temporários."""
     STATE_KEYS_ANTES = {"now", "log", "gates", "runs", "handoffs", "github", "usage", "version", "thresholds",
                         "summary", "alerts", "alertsHistory", "agents", "serverMs", "testEnv",
-                        "delegations"}   # D19 (ADR-022) acrescentou `delegations` antes da D18
+                        "delegations",   # D19 (ADR-022) acrescentou `delegations` antes da D18
+                        "codes"}         # D23 (F2a §4.6) acrescentou `codes` (id → código); /api/live não muda
     LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv"}
     LIVE_HEADERS = {"content-type", "cache-control", "etag", "x-squad-version", "content-length"}
 
