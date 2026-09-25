@@ -1,0 +1,48 @@
+{
+  "gate": "G2",
+  "demand": "841f9a27e64a",
+  "title": "D16: demandas de bug (servidor + UI)",
+  "from": "orquestrador+frontend",
+  "to": "qa",
+  "handoffs": ["d85b82eb0622", "f81557071737"],
+  "branch": "feature/D16-demandas-de-bug",
+  "commits": ["d1f7da0", "d17c053"],
+  "recommendation": "RETURN",
+  "confidence": 0.79,
+  "risk": "moderado",
+  "human_required": false,
+  "cycle": 1,
+  "evidences": [
+    {"name": "Suítes da squad (B,3)", "status": "pass", "source": "python3 tests/squad/<cada>.py: test_bugs_d16 27 OK; test_alertas_d14 20 OK; test_governanca_d14_qa 19 OK; test_ambiente_teste_d15 41 OK; test_e2e_compose_seguro_d15 11 OK; test_entrega_por_pr 'Todas as verificações passaram' (pytest ausente; rodado com unittest)"},
+    {"name": "Máscara >= mínimo do contrato §8.2 (B,3)", "status": "fail", "source": "log sintético contra evidence_rules.mask_text: e-mail, CPF formatado e cru, cartão Luhn (3 formatos), JWT, Authorization Bearer, password=/senha:/token=/api_key=, credencial em URL, IP público v4/v6 (privados mantidos), shippingAddress JSON e JSON escapado, address=Address[...] e customerId -> HMAC: OK e idempotente. FALHAS: 'accessToken=abc123', 'bearer_token=xyz', '\"accessToken\":\"tok_abc\"', '\"refreshToken\"/\"idToken\"/\"apiToken\"' ficam em claro — o \\b antes de (password|...|token|api[_-]?key) em SECRET_PATTERNS['chave_valor'] impede chaves compostas, que o padrão mínimo do contrato ((...|token|...)\\s*[=:]\\s*\\S+, sem \\b) pega; 'Address[street=Av Paulista, number=1000, ...]' / 'ShippingAddress[street=..., number=...]' sem chave antes (toString do record em mensagem de exceção) só mascara o CEP; '529982247-25' não é CPF (contrato: \\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}); 'Cookie: JSESSIONID=...' em claro (fora do mínimo, recomendado)"},
+    {"name": "Ressalvas 2-9 do G1 no código (2)", "status": "pass", "source": "R2 HMAC-SHA256 com chave de 32 bytes em .squad/bug-pseudonym.key (perm 600; .gitignore:7 '.squad/'); R3 gitflow.porcelain() com -uall em snapshot_state/clean_tree, STATE inclui produto|operacao/bugs, align_memory faz add por caminho com check=False, .gitattributes index.jsonl merge=union; R4 do_POST devolve 413 por Content-Length > 22 MB sem ler o corpo (conferido ao vivo: 30 MB anunciados sem corpo -> 413 corpo_grande); R5 _local_ok (Host, Origin, Sec-Fetch-Site) em todas as rotas /api/bug/* e na criação com nature=bug; draft = secrets.token_hex(16); R6 WARN_HEURISTIC em trace/painel/alerta; R7 viewPanel=<id> e panel-<id> aceitos e canonizados, $__range/$__rate_interval/$__interval substituídos (dashboards só usam $__range); R8 WARN_MEMORY no aviso e no cabeçalho do snapshot; R9 evidence_rules.py só stdlib, sem dependência do ADR-015, inclui find_secrets; gates.md com o item red->green em G1 e G3 (git worktree temporário)"},
+    {"name": "Segurança do servidor e do cliente (B,2)", "status": "pass", "source": "ao vivo em :7171: Origin evil.com/null, Host evil.com e Sec-Fetch-Site cross-site -> 403 (draft, criação e GET); download com Content-Type do allowlist, X-Content-Type-Options nosniff, CSP default-src 'none', Cache-Control no-store; traversal ..%2f -> 404 (safe_child: FILE_RE, sem symlink, relative_to); PNG com tEXt -> metadata 1 e servido sem o texto; .jpg com bytes PNG -> 415; .svg -> 415. UI: logs só por textContent (pre.buglog preenchido em updateBugButtons), <img> com src esc() e safeApiUrl só /api/bug/..., demais campos via esc() (escapa &<>\"); extLink só para URL canônica do servidor com ^https?://"},
+    {"name": "Anti-SSRF (2)", "status": "pass", "source": "parse_link: só http(s) em localhost/127.0.0.1, porta 16686 (trace 16/32 hex) ou GRAFANA_PORT (painel/alerta); 169.254.169.254 e 'localhost@evil.com' -> host_nao_permitido; :26686/:13001 -> ambiente_de_teste; :9090 -> link_nao_suportado. http_get_json usa só a URL-base fixa (SQUAD_PROD_*), sem proxy, sem redirect, 5 s, 10 MB"},
+    {"name": "Compatibilidade (B,2)", "status": "pass", "source": "ao vivo: POST /api/demand sem nature -> 201 com as mesmas chaves de antes (agent, detail, id, kind, priority, title, to, ts, type); 'bug' sem nature -> 400; kind continua produto|operacao; test_demanda_comum_byte_a_byte e test_log_real_copiado_continua_legivel passam; UI: selo/seção Bug só com nature=bug"},
+    {"name": "Fluxo real rascunho -> bug (B,3)", "status": "pass", "source": "servidor do worktree em 127.0.0.1:7171 com SQUAD_ROOT_DATA/SQUAD_LOG no scratchpad e SQUAD_PROD_* apontando para porta morta: rascunho de log sintético com nome '../../erro Pagamento.log' -> 01-erro-pagamento.log, prévia mascarada (secret 4, pii 4, endereco 1, pseudonimo 1); só 'production' -> 422; segredo no título -> 422; Origin externa -> 403; criação -> 201 (verifiedBy declaracao-humana, dir docs/squad/produto/bugs/<id>); reuso do mesmo rascunho -> 404. Diferença no diretório temporário: só bug.json, evidencias/01-erro-pagamento.log, index.jsonl e o log (2 linhas) + .squad/bug-pseudonym.key (fora do git); rascunho removido. Servidor derrubado"},
+    {"name": "UI: formulário, prévia, confirmação, selo/filtro, Produto, página do bug (2)", "status": "validate", "source": "revisão estática de d17c053: #/demandas/bug com tipo, título, severidade, link+arquivos, prévia com expiração, avisos e contagens, fieldset com 2 confirmações (botão só habilita com ambas; mensagem pública/privada pela visibilidade), filtro 'bugs' em #/demandas (bugsVisible), selo BUG nas listas, seção Bug e 'Acrescentar evidência' na página da demanda, botões 'Abrir bug a partir deste trace/painel' em Produto (#/demandas/bug?kind=produto&fonte=...). Não rodei tests/ui/*.js: node indisponível nesta máquina"},
+    {"name": "Observação sem-F1 da suíte D14 (1)", "status": "pass", "source": "decisions.jsonl real: a única ocorrência de 'undefined' fora de 'sem '/'0 ' é texto literal do handoff 0c6324e3bd07 (Frontend D15: \"nunca 'undefined'\"), exibido em #/auditoria/eventos; o regex de tests/ui/d14-governanca.js:228 não exclui esse contexto. Não é defeito da UI (o próprio f81557071737 passa a conter o literal)"},
+    {"name": "Escopo e ownership (1)", "status": "validate", "source": "git diff fd3402c..HEAD --stat: 12 arquivos, todos da D16; tools/squad, docs/squad = Orquestrador; squad-control = Frontend. Desvio: tests/squad/test_bugs_d16.py (tests/** é do QA) escrito pelo Orquestrador em d1f7da0; .gitattributes sem dono na tabela"}
+  ],
+  "return_instructions": [
+    "Orquestrador (tools/squad/evidence_rules.py): em SECRET_PATTERNS['chave_valor'] aceitar chaves compostas — prefixo \\w* / [\\w.-]* antes de (password|passwd|senha|secret|token|api[_-]?key|...) em vez de \\b, cobrindo accessToken, refreshToken, idToken, apiToken, bearer_token, auth_token, X-Auth-Token em forma k=v, k: v e JSON \"k\":\"v\" (inclusive escapado), sem mascarar chaves inofensivas já cobertas por testes (ex.: traceId, orderId).",
+    "Mascarar o toString de record sem chave antes: (?:Shipping)?Address\\[[^\\]]*\\] -> [MASCARADO:endereco] (o record do domínio é com.checkout.shipping.domain.Address(street, number, complement, city, state, zipCode, ...)).",
+    "CPF: aceitar a forma do contrato com separadores opcionais (\\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}), mantendo a validação de dígitos para a forma só com dígitos.",
+    "Recomendado (não bloqueante): Cookie/Set-Cookie -> [MASCARADO:segredo]; $__range_s/_ms e $__interval_ms em resolve_vars.",
+    "Acrescentar esses casos a test_ca6_* em tests/squad/test_bugs_d16.py (ou pedir ao QA) e reenviar o G2; a UI (d17c053) não precisa mudar."
+  ],
+  "open_risks": [
+    "A máscara é por padrão: formatos novos de log podem escapar; a prévia lida pelo humano continua sendo a última defesa antes do git público e permanente.",
+    "tests/ui/*.js (D14/D16) não rodados pelo Auditor (sem node); a evidência de UI vem do handoff f81557071737 e da revisão estática.",
+    "Criação usa data.kind e não o kind do rascunho: um rascunho gerado como operacao pode virar bug de produto (inofensivo, mas QA deve registrar o comportamento).",
+    "O regex 'sem-F1' da suíte D14 continuará acusando o literal 'undefined' dos handoffs; ajustar o teste (QA) para ler só o que a UI gera."
+  ],
+  "qa_priorities": [
+    "CA-6 com um corpus de logs reais do produtivo (docker compose logs dos 5 serviços, JSON do Spring Boot com mensagem contendo payload escapado e stacktrace) e chaves compostas de token.",
+    "Fluxo UI ponta a ponta no navegador: prévia, 2 confirmações, 201, selo/filtro BUG, página do bug, Acrescentar evidência, links de Produto (Jaeger/Grafana) com o produtivo no ar.",
+    "CA-13 real: gitflow feature-finish/align_memory com a pasta docs/squad/produto/bugs ainda não rastreada no git.",
+    "CA-4/5/9 contra o Jaeger/Grafana reais (trace com erro gerado por simulate, painel com $__range, porta de teste recusada).",
+    "Ajustar o falso positivo 'sem-F1' da tests/ui/d14-governanca.js e assumir a suíte test_bugs_d16.py (ownership do QA)."
+  ],
+  "rationale": "Entrega ampla e bem feita: 6 suítes verdes (129+ testes), fluxo real rascunho -> bug ponta a ponta com isolamento do diretório de dados, anti-CSRF/DNS-rebinding, 413 antes do corpo, download seguro, anti-SSRF, compatibilidade byte a byte e ressalvas 2-9 do G1 atendidas. Devolvo por um único ponto bloqueante de aderência ao contrato: a máscara de segredos ficou mais estreita que o mínimo do §8.2 (chaves compostas como accessToken/bearer_token não são mascaradas) e o toString do record Address sem chave vaza rua e número — num repositório público e de histórico permanente. Correção pequena e localizada em evidence_rules.py + testes; a UI está aprovada como está."
+}

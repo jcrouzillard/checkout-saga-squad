@@ -1,0 +1,43 @@
+{
+  "gate": "G2",
+  "demand": "841f9a27e64a",
+  "title": "D16: demandas de bug (servidor + UI) — reauditoria, 3º ciclo (autorizado pelo humano)",
+  "from": "orquestrador",
+  "to": "qa",
+  "handoffs": ["48e354ec216e"],
+  "branch": "feature/D16-demandas-de-bug",
+  "commits": ["335f3de"],
+  "previous": "docs/squad/gates/G2-D16-2.json",
+  "human_authorization": {"accepted_return": "ea846dde4249", "orchestrator_decision": "b9d8710c50ff"},
+  "recommendation": "APPROVE",
+  "confidence": 0.85,
+  "risk": "moderado",
+  "human_required": false,
+  "human_notice": true,
+  "cycle": 3,
+  "evidences": [
+    {"name": "Suítes da squad (B,3)", "status": "pass", "source": "python3 tests/squad/<cada>.py no worktree: test_bugs_d16 38 OK (32 -> 38); test_alertas_d14 20 OK; test_governanca_d14_qa 19 OK; test_ambiente_teste_d15 41 OK; test_e2e_compose_seguro_d15 11 OK; test_entrega_por_pr 'Todas as verificações passaram'"},
+    {"name": "Bloqueante do 2º ciclo: aspas simples/crase (B,3)", "status": "pass", "source": "corpus do Auditor contra evidence_rules.mask_text (idempotente na 2ª passada) e find_secrets: password='hunter2', api_key='AB12', token: 'abc', secret=`s3cr`, senha = 'a b c', password='it\\'s x', Authorization: 'Bearer abc' -> valor mascarado com aspas preservadas e find_secrets != []. Mínimo do contrato §8.2 (docs/contracts/demandas-de-bug.md:226) atendido"},
+    {"name": "422 segredo_no_texto no título/descrição (B,3)", "status": "pass", "source": "servidor isolado do harness de test_bugs_d16 (SQUAD_ROOT_DATA em diretório temporário, nenhum POST ao servidor/log real): títulos 'erro secret=`s3cr` no job', \"falha 'password'='hunter2'\", 'falha \"accessToken\": \"a b\"', \"passwd = 'x'\" -> 422 segredo_no_texto; descrição \"client_secret='ab cd' e X-Auth-Token: 'zz'\" -> 422; 'tokenCount=12 estourou' -> 201 (sem falso bloqueio)"},
+    {"name": "Valores com espaço e aspas escapadas (B,2)", "status": "pass", "source": "'\"password\":\"my pass word\"', 'accessToken = \"x y\"', '{\"password\":\"a\\\\\"b c\"}', 'password: \"a b\", other=1' -> valor inteiro mascarado até a aspa de fechamento do mesmo nível; campos vizinhos preservados"},
+    {"name": "JSON escapado 1, 2 e 3 vezes + validade (B,3)", "status": "pass", "source": "password/customerName/shippingAddress/customerId/authorization em JSON escapado 2 vezes mascarados (antes vazavam); token em escape de 3 níveis mascarado; json.dumps de objeto com JSON-string dentro (1, 2 e 3 níveis) continua JSON válido após a máscara e decodifica em cada nível com os rótulos [MASCARADO:*] e cust-<hmac>"},
+    {"name": "Address com colchetes, truncado e em stack trace (B,2)", "status": "pass", "source": "'Address[street=Rua [bloco 2], number=3] ok' -> 'Address[MASCARADO:endereco] ok' (nada vaza); 'addr=Address[street=Rua A, number=3' (truncado) -> mascarado até o fim da linha; record dentro de IllegalStateException com zipCode, seguido de '\\tat com.checkout...' -> só o record mascarado, frames preservados"},
+    {"name": "Falsos positivos e CPF por contexto (1)", "status": "pass", "source": "tokenizer=, tokenCount=, totalTokens:, passwordPolicy=, secretsManager:, maxTokens=, PWD=/home/app, orderId=12345678909 preservados; mantidos accessToken, bearer_token, X-Auth-Token, client_secret, secretKey, spring.datasource.password. CPF: cpf=52998224725 e 'documento: 52998224725' mascarados; '529.982.247-25' mascarado; '52998224725 sozinho' sem contexto preservado (decisão registrada no código; formatado ou com contexto é pego)"},
+    {"name": "Limite remanescente: máscara por padrão (B,1)", "status": "validate", "source": "chaves fora da lista ficam em claro e não bloqueiam título: pin=1234, otp=998877, cvv=123, passphrase=abc, pwd=abc, auth=xyz. Também valor vazio ('password=\"\"') e valor que começa com o literal '[MASCARADO' (token='[MASCARADO] x', só adversarial). Fora do mínimo do contrato; a prévia revisada pelo humano (confirmação dupla) segue como última defesa antes do git público"},
+    {"name": "Desempenho (não regressão)", "status": "validate", "source": "mask_text em uma linha de 100 KB sem separadores: 8,3 s (igual em 24de5d5, anterior a este ciclo); 200 KB: ~33 s. Causa: PII_PATTERNS 'email' [A-Za-z0-9._%+-]+@... sem âncora à esquerda é quadrático sem '@'. MAX_LOG = 1 MB -> uma linha de 1 MB (base64/minificado) pode prender a requisição de prévia por minutos. Local e sem vazamento; correção sugerida: (?<![A-Za-z0-9._%+-]) antes do e-mail ou limitar o comprimento da parte local {1,64}"},
+    {"name": "Escopo do commit (1)", "status": "pass", "source": "git show --stat 335f3de: tools/squad/evidence_rules.py, tests/squad/test_bugs_d16.py; servidor e UI inalterados"}
+  ],
+  "open_risks": [
+    "Máscara é por padrão (lista de chaves + padrões de valor): chaves desconhecidas (pin, otp, cvv, passphrase, pwd, auth) passam. Deve ser COMUNICADO ao humano: a prévia mascarada que ele confirma é a última barreira antes de um repositório público e permanente; cvv em particular é dado de cartão.",
+    "Regex de e-mail quadrática (pré-existente): uma linha longa sem separadores em log de até 1 MB degrada a prévia por minutos. Não bloqueia o G2; corrigir antes do G3 ou registrar como débito.",
+    "tests/ui/*.js (D16) não rodados pelo Auditor (sem node no host)."
+  ],
+  "qa_priorities": [
+    "Fluxo UI ponta a ponta com Puppeteer em Docker contra o servidor do worktree com SQUAD_ROOT_DATA temporário (sem containers da aplicação): prévia mascarada, 2 confirmações, 201, 422 segredo_no_texto e 409 tipo_divergente exibidos com clareza (pedir nova prévia), selo/filtro BUG, página do bug, Acrescentar evidência.",
+    "CA-6 com corpus real de logs do Spring Boot (JSON com payload outbox/Kafka escapado 1-2 vezes, stack traces com Address[...], toString/SQL com aspas simples); conferir que o texto gravado em bugs/ é igual à prévia confirmada.",
+    "Desempenho da prévia com um .log de ~1 MB contendo uma linha longa (base64) — medir o tempo e registrar como defeito se passar de alguns segundos.",
+    "Chaves fora da lista (pin, otp, cvv, passphrase): confirmar que a UI deixa claro ao humano que a máscara é por padrão e que a prévia deve ser lida.",
+    "CA-13 real (gitflow/align_memory com bugs/ não rastreado) e assumir ownership de tests/squad/test_bugs_d16.py."
+  ],
+  "rationale": "O bloqueante do 2º ciclo (segredo entre aspas simples) foi corrigido e verificado por mim com corpus próprio e pelo servidor isolado (422 no título e na descrição). As quatro ressalvas também foram resolvidas: valores com espaço e aspas escapadas, JSON escapado 1-3 vezes com JSON válido após a máscara, Address com colchetes/truncado/em stack trace e os falsos positivos (tokenizer, tokenCount, passwordPolicy, PWD, orderId de 11 dígitos). Máscara idempotente e 38 testes verdes. Risco segue moderado porque a máscara é por padrão num destino público e permanente (chaves desconhecidas passam) e há uma degradação de desempenho pré-existente; nenhum dos dois viola o mínimo do contrato, então aprovo para QA com aviso ao humano (não obrigatório: confiança >= 70% e risco não alto)."
+}

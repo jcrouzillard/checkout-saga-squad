@@ -23,6 +23,7 @@ import re
 import sys
 import threading
 import time
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -31,6 +32,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import alerts as al  # noqa: E402  (D14, ADR-017: regras B1–B4/A1–A3 e estado dos agentes)
 from transcripts import TranscriptStore  # noqa: E402  (leitura incremental das transcrições)
 import testenv as te  # noqa: E402  (D15, ADR-018: ambiente de teste compartilhado)
+import bugs  # noqa: E402  (D16, ADR-019: demandas de bug — rascunho, links do produtivo, BugStore)
+import evidence_rules as er  # noqa: E402  (D16: regras únicas de evidência, máscara e limites)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -1015,7 +1018,172 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # ------------------------------------------------------------ D16 (ADR-019): demandas de bug
+    def _local_ok(self) -> bool:
+        """Anti-CSRF/DNS-rebinding nas rotas de bug: Host local e, se houver, Origin local e Sec-Fetch-Site não cross-site."""
+        host = (self.headers.get("Host") or "").strip().lower()
+        hostname = host[1:].split("]")[0] if host.startswith("[") else host.rsplit(":", 1)[0] if ":" in host else host
+        if hostname not in ("127.0.0.1", "localhost"):
+            return False
+        origin = self.headers.get("Origin")
+        if origin is not None:
+            try:
+                u = urllib.parse.urlsplit(origin)
+                if u.scheme not in ("http", "https") or u.hostname not in ("127.0.0.1", "localhost"):
+                    return False
+            except ValueError:
+                return False
+        return (self.headers.get("Sec-Fetch-Site") or "same-origin") in ("same-origin", "none")
+
+    def _forbidden(self):
+        return self._json({"error": "origem não permitida: use o Squad Control em http://localhost", "code": "origem_invalida"}, 403)
+
+    def _bug_err(self, e: "er.EvidenceError"):
+        return self._json(e.payload(), e.status)
+
+    def _send_evidence(self, path: pathlib.Path | None):
+        if path is None:
+            return self._json({"error": "arquivo não encontrado", "code": "arquivo_nao_encontrado"}, 404)
+        ext = er.extension(path.name)
+        mime = er.IMAGE_EXT.get(ext) or er.LOG_EXT.get(ext)
+        if not mime:
+            return self._json({"error": "tipo não permitido", "code": "tipo_nao_permitido"}, 415)
+        body = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Disposition", "inline")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _bug_get(self, path: str):
+        if not self._local_ok():
+            return self._forbidden()
+        parts = path.split("/")[3:]     # /api/bug/...
+        try:
+            if len(parts) == 3 and parts[0] == "draft":
+                return self._send_evidence(bugs.draft_file(DATA_ROOT, parts[1], parts[2]))
+            store = bugs.GitDirStore(DATA_ROOT)
+            if len(parts) == 1:
+                doc = store.get(parts[0])
+                return self._json(doc) if doc else self._json({"error": "bug não encontrado", "code": "bug_nao_encontrado"}, 404)
+            if len(parts) == 3 and parts[1] == "file":
+                return self._send_evidence(store.evidence_path(parts[0], parts[2]))
+        except er.EvidenceError as e:
+            return self._bug_err(e)
+        return self._json({"error": "not found"}, 404)
+
+    def _bug_task_meta(self, doc: dict) -> dict:
+        return {k: doc[k] for k in ("severity", "environment", "verifiedBy", "source", "dir", "evidences", "consent")}
+
+    def _create_bug(self, data: dict, title: str, when: str):
+        """POST /api/demand com nature=bug (§9): rascunho verificado + confirmação dupla → pasta no git + task."""
+        if not self._local_ok():
+            return self._forbidden()
+        found = er.find_secrets(f"{title}\n{data.get('detail') or ''}")
+        if found:
+            return self._json({"error": f"título/descrição contém segredo ({', '.join(found)}): remova antes de registrar",
+                               "code": "segredo_no_texto"}, 422)
+        bug = data.get("bug") if isinstance(data.get("bug"), dict) else {}
+        if not bug.get("draft"):
+            return self._json({"error": "bug exige ao menos uma evidência (log ou imagem): gere a prévia primeiro",
+                               "code": "evidencia_obrigatoria"}, 422)
+        severity = bug.get("severity") or "media"
+        if severity not in bugs.SEVERITIES:
+            return self._json({"error": "severidade inválida: critica | alta | media | baixa", "code": "severidade_invalida"}, 400)
+        if bug.get("environment") not in (None, "produtivo"):
+            return self._json({"error": "bug é só do ambiente produtivo", "code": "ambiente_de_teste"}, 422)
+        store = bugs.GitDirStore(DATA_ROOT)
+        try:
+            bugs.verify_draft(DATA_ROOT, bug["draft"])          # revarredura (cara) fora da trava — QA-D16-2
+            with bugs.LOCK:
+                d, meta, blobs = bugs.verify_draft(DATA_ROOT, bug["draft"], remask=False)   # só sha256
+                consent = bugs.check_consent(bug.get("consent"))
+                er.check_submission([len(b) for _, b in blobs], global_total=store.total_size())
+                demand = uuid.uuid4().hex[:12]
+                kind = meta["kind"]          # o tipo vem do rascunho (o que o humano revisou na prévia)
+                if data.get("kind") != kind:
+                    return self._json({"error": f"o tipo informado ({data.get('kind')}) diverge do rascunho ({kind}): "
+                                                "gere a prévia de novo com o tipo correto", "code": "tipo_divergente"}, 409)
+                created = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                doc = {"demand": demand, "title": title, "kind": kind, "createdAt": created,
+                       "severity": severity, "environment": "produtivo", "verifiedBy": meta["verifiedBy"],
+                       "source": meta.get("source"), "dir": f"docs/squad/{kind}/bugs/{demand}",
+                       "evidences": meta["evidences"], "consent": consent,
+                       "extracted": meta.get("extracted"), "warnings": meta.get("warnings") or []}
+                store.put_bug(kind, demand, doc, blobs)
+                entry = self._append_log({"id": demand, "agent": "humano", "type": "task", "to": "orquestrador",
+                                          "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
+                                          "priority": data.get("priority", "normal"), "kind": kind,
+                                          "backlog": True if when == "backlog" else None,
+                                          "nature": "bug", "bug": self._bug_task_meta(doc)})
+                import shutil
+                shutil.rmtree(d, ignore_errors=True)
+        except er.EvidenceError as e:
+            return self._bug_err(e)
+        return self._json(entry, 201)
+
+    def _bug_evidence(self, data: dict):
+        """POST /api/bug/evidence (§7.4): só acrescenta evidências a um bug em andamento."""
+        rows = read_jsonl(LOG)
+        task = next((e for e in rows if e.get("id") == data.get("demand") and e.get("type") == "task"
+                     and e.get("agent") == "humano"), None)
+        if not task:
+            return self._json({"error": "demanda não encontrada", "code": "demanda_nao_encontrada"}, 404)
+        if task.get("nature") != "bug":
+            return self._json({"error": "a demanda não é um bug", "code": "nao_e_bug"}, 409)
+        if is_canceled(rows, task["id"]):
+            return self._json({"error": "demanda cancelada", "code": "demanda_cancelada"}, 409)
+        if any(r.get("type") == "delivered" and r.get("demand") == task["id"] for r in rows):
+            return self._json({"error": "demanda já entregue", "code": "demanda_entregue"}, 409)
+        store = bugs.GitDirStore(DATA_ROOT)
+        try:
+            bugs.verify_draft(DATA_ROOT, data.get("draft"))     # revarredura (cara) fora da trava — QA-D16-2
+            with bugs.LOCK:
+                d, meta, blobs = bugs.verify_draft(DATA_ROOT, data.get("draft"), remask=False)   # só sha256
+                bugs.check_consent(data.get("consent"))
+                current = store.get(task["id"])
+                if current is None:
+                    return self._json({"error": "pasta do bug não encontrada", "code": "bug_nao_encontrado"}, 404)
+                er.check_submission([len(b) for _, b in blobs], bug_total=store.total_size(task["id"]),
+                                    global_total=store.total_size())
+                start = max([int(e["file"][:2]) for e in current.get("evidences") or []] + [0]) + 1
+                files, items = bugs.renumber(blobs, meta["evidences"], start)
+                store.add_evidence(task["id"], items, files)
+                entry = self._append_log({"agent": "humano", "type": "bug-evidence", "to": "orquestrador",
+                                          "demand": task["id"], "title": f"Evidência acrescentada ao bug ({len(items)})",
+                                          # name/status: compatível com os leitores atuais de `evidences` (UI, github_sync)
+                                          "evidences": [{**i, "name": i["file"], "status": "pass"} for i in items]})
+                import shutil
+                shutil.rmtree(d, ignore_errors=True)
+        except er.EvidenceError as e:
+            return self._bug_err(e)
+        return self._json(entry, 201)
+
+    def _bug_post(self, path: str, raw: bytes):
+        if not self._local_ok():
+            return self._forbidden()
+        try:
+            data = json.loads(raw or b"{}")
+        except json.JSONDecodeError:
+            return self._json({"error": "JSON inválido", "code": "json_invalido"}, 400)
+        if not isinstance(data, dict):
+            return self._json({"error": "JSON inválido", "code": "json_invalido"}, 400)
+        if path == "/api/bug/draft":
+            try:          # sem a trava global: build_draft só a toma para criar a pasta (QA-D16-2)
+                return self._json(bugs.build_draft(DATA_ROOT, data), 201)
+            except er.EvidenceError as e:
+                return self._bug_err(e)
+        if path == "/api/bug/evidence":
+            return self._bug_evidence(data)
+        return self._json({"error": "not found"}, 404)
+
     def do_GET(self):
+        if self.path.startswith("/api/bug/"):
+            return self._bug_get(urllib.parse.urlsplit(self.path).path)
         if self.path.startswith("/api/live"):
             # D14 (ADR-017, contrato §9.1): canal leve consultado a cada 1,5 s — sem enrich_log nem handoffs.
             body, version = live_payload()
@@ -1081,7 +1249,25 @@ class Handler(SimpleHTTPRequestHandler):
         return entry
 
     def do_POST(self):
-        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        # D16 (ressalva 4 do G1): o teto de 22 MB vale antes de ler qualquer byte do corpo (teto geral do servidor).
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > er.MAX_BODY:
+            self.close_connection = True
+            body = json.dumps({"error": "corpo da requisição acima de 22 MB" if length > 0 else "Content-Length inválido",
+                               "code": "corpo_grande" if length > 0 else "content_length_invalido"}, ensure_ascii=False).encode()
+            self.send_response(413 if length > 0 else 400)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Connection", "close")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        raw = self.rfile.read(length)
+        if self.path.startswith("/api/bug/"):
+            return self._bug_post(urllib.parse.urlsplit(self.path).path, raw)
         if self.path.startswith("/api/test-env/request"):
             # D15: só o humano pede; o servidor grava `test-env-request` e dispara o testenv.py em segundo plano.
             data = json.loads(raw or b"{}")
@@ -1216,12 +1402,18 @@ class Handler(SimpleHTTPRequestHandler):
                                       "route": data.get("route", "padrao"), "target": data.get("target", "auto")})
             inbox = DATA_ROOT / "docs/squad/inbox"
             inbox.mkdir(parents=True, exist_ok=True)
-            (inbox / f"{demand['id']}.json").write_text(json.dumps({
+            queued = {
                 "demand": demand["id"], "title": demand["title"].replace("Demanda: ", ""), "detail": demand.get("detail", ""),
                 "priority": entry["priority"], "route": entry["route"], "target": entry["target"],
                 "note": entry.get("detail", ""), "startedAt": entry["ts"], "kind": demand.get("kind"),
                 "clarifications": clarifications, "override": bool(data.get("override")),
-                "fromBacklog": from_backlog}, ensure_ascii=False, indent=2))
+                "fromBacklog": from_backlog}
+            if demand.get("nature") == "bug":   # D16 §7.6: campos novos só em bugs (consumidores atuais os ignoram)
+                b = demand.get("bug") or {}
+                queued.update(nature="bug", bug={"dir": b.get("dir"), "source": b.get("source"),
+                                                 "severity": b.get("severity"),
+                                                 "evidences": [{"file": e.get("file")} for e in b.get("evidences") or []]})
+            (inbox / f"{demand['id']}.json").write_text(json.dumps(queued, ensure_ascii=False, indent=2))
             return self._json(entry, 201)
         if self.path.startswith("/api/demand"):
             # Nova demanda para a squad: vira evento `task` para o Orquestrador (e issue no GitHub via github_sync).
@@ -1236,6 +1428,14 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"error": "quando iniciar: imediato | backlog"}, 400)
             if data.get("priority", "normal") not in ("alta", "normal", "baixa"):
                 return self._json({"error": "prioridade inválida: alta | normal | baixa"}, 400)
+            # D16 (ADR-019): natureza ortogonal ao tipo; sem `nature` (ou "demanda") o evento é o de sempre.
+            nature = data.get("nature")
+            if nature not in (None, "demanda", "bug"):
+                return self._json({"error": "natureza inválida: demanda | bug", "code": "natureza_invalida"}, 400)
+            if "bug" in data and nature != "bug":
+                return self._json({"error": "objeto bug exige nature: bug", "code": "bug_sem_natureza"}, 400)
+            if nature == "bug":
+                return self._create_bug(data, title, when)
             entry = self._append_log({"agent": "humano", "type": "task", "to": "orquestrador",
                                       "title": f"Demanda: {title}", "detail": data.get("detail", "").strip(),
                                       "priority": data.get("priority", "normal"), "kind": data.get("kind"),

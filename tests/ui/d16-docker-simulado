@@ -1,0 +1,3 @@
+#!/bin/sh
+# D16: executor docker SIMULADO para o fluxo de UI (SQUAD_DOCKER). Ver d16_simulados.py.
+exec python3 "$(dirname "$0")/d16_simulados.py" docker "$@"

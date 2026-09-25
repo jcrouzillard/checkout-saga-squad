@@ -1,0 +1,47 @@
+{
+  "gate": "G1",
+  "demand": "841f9a27e64a",
+  "title": "D16: demandas de bug (contrato + ADR-019)",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "handoff": "107bb8f5f4c8",
+  "branch": "feature/D16-demandas-de-bug",
+  "commit": "871b5f0",
+  "recommendation": "APPROVE",
+  "confidence": 0.81,
+  "risk": "moderado",
+  "human_required": false,
+  "evidences": [
+    {"name": "Aderência às 5 respostas do humano (B,3)", "status": "pass", "source": "docs/squad/inbox/done/841f9a27e64a.json x contrato §1-§7: link = trace Jaeger ou painel/alerta Grafana; só log/imagem em docs/squad/<kind>/bugs; só produtivo; evidência única obrigatória; QA escreve teste que falha; bug independente de produto/operação"},
+    {"name": "Compatibilidade verificada no código (B,3)", "status": "pass", "source": "server.py:1165 e :1232 (kind in produto|operacao), log.py:48-49 (--kind/--suggested-kind), triage.py:18/73 (DIMS, suggestedKind), github_sync.py:171/191 (tipo:* exclusivo só produto|operacao), pending.py:12 (filtro por kind), squad-control/index.html:1467 (KINDS); _append_log descarta None, logo sem nature o evento fica byte a byte igual (CA-1)"},
+    {"name": "Segurança para repositório público (B,3)", "status": "validate", "source": "gh repo view jcrouzillard/checkout-saga-squad = PUBLIC; contrato §8. Lacunas: shippingAddress/CEP/nome fora da máscara (api.md:20); pseudônimo customerId = sha256 sem sal; POST sem checagem de Origin/Host (server.py:1083); corpo lido antes de qualquer rota (server.py:1084) contraria o 413 antes de ler"},
+    {"name": "Só produtivo verificável (2)", "status": "validate", "source": "Jaeger :16686: /api/traces/<id> 200 e 404 {'errors':[{'code':404,'msg':'trace not found'}]}; traceID 32 hex; 0 spans com erro (5 serviços, tag error=true, 30d); atributos reais incluem client.address, network.peer.*, user_agent.original, server.address, messaging.kafka.message.key. Grafana 11.2.0 em :3001 (GRAFANA_PORT=3001), anônimo, rules groups: [], provisioning/alert-rules []; dashboard checkout-saga com 14 painéis. Ressalvas: OTLP 4317/4318 do produtivo publicado em 0.0.0.0 (presença no Jaeger é heurística forte, não prova); exprs com $__range; formato viewPanel=panel-<id> do Grafana 11"},
+    {"name": "Fluxo red->green, branch e checklist (2)", "status": "pass", "source": "contrato §7 e ADR-019 item 6: feature/<código>-bug-<slug>, hotfix só com versão publicada; evidence reproducao=FAIL; CA-16"},
+    {"name": "CAs verificáveis (2)", "status": "pass", "source": "contrato §13: 19 CAs com comando/observação objetiva"},
+    {"name": "gitflow STATE com as pastas de bugs (1)", "status": "validate", "source": "gitflow.py:57/61/69 usa git status --porcelain: pasta nova não rastreada aparece colapsada ('?? docs/squad/produto/'), que não casa com o prefixo 'docs/squad/produto/bugs/' -> snapshot_state não commita e clean_tree trava (CA-13 falharia); index.jsonl append-only sem merge=union em .gitattributes"},
+    {"name": "Relação com ADR-015 / evidence_rules.py (1)", "status": "validate", "source": "ADR-015 só existe na branch da D12 (PR #104, só proposta, sem código); tools/squad/evidence_rules.py não existe em lugar nenhum; §8.2 e §12 delegam a regra de título/descrição ao ADR-015"},
+    {"name": "Ownership e tamanho (1)", "status": "pass", "source": "AGENTS.md: tools/squad e docs/squad = Orquestrador; squad-control = Frontend; tests = QA; docs/architecture/bugs = Arquiteto"}
+  ],
+  "open_risks": [
+    "Máscara incompleta para dados do domínio: shippingAddress (rua, número, CEP, destinatário) e nomes não estão em §8.2; um log de erro com o payload do pedido iria ao git público. Incluir: objeto shippingAddress inteiro -> [MASCARADO:endereco], CEP \\d{5}-?\\d{3}, e testar em CA-6.",
+    "Pseudônimo cust-<sha256[:8]> sem sal é reversível por força bruta para ids curtos (ex.: c-123). Usar HMAC com chave local em .squad/ (fora do git), estável para manter a correlação.",
+    "gitflow STATE: git status --porcelain colapsa diretórios não rastreados; usar -uall (ou prefixo docs/squad/produto/ e docs/squad/operacao/) e adicionar index.jsonl merge=union no .gitattributes. CA-13 deve rodar com a pasta ainda inexistente no git.",
+    "server.py lê o corpo inteiro na linha 1084 antes do roteamento: o 413 por Content-Length > 22 MB tem de vir antes dessa leitura (vale como teto geral).",
+    "Sem proteção CSRF/DNS-rebinding: validar Host (127.0.0.1/localhost:porta) e Origin nas rotas de bug; id do rascunho com secrets.token_hex (>= 64 bits) — é o que impede uma página externa de forjar a confirmação.",
+    "Só produtivo é heurístico: OTLP 4317/4318 do produtivo exposto em 0.0.0.0 permite injetar spans; registrar isso em verifiedBy/aviso e manter o pedido ao DevOps (deployment.environment; opcionalmente publicar OTLP só em 127.0.0.1).",
+    "Grafana 11.2: aceitar viewPanel=<id> e viewPanel=panel-<id>; substituir $__range, $__rate_interval, $__interval antes do query_range (painéis 3 e 4 usam $__range).",
+    "Jaeger all-in-one guarda em memória: o link em bug.source morre num restart; a evidência válida é o snapshot gravado.",
+    "evidence_rules.py não existe e a D12 está só em proposta: a D16 cria o módulo e fica autossuficiente (inclusive a regra de bloqueio de segredo em título/descrição, sem depender do ADR-015 aceito); a D12 passa a reutilizá-lo. Sem isso há acoplamento com uma demanda não integrada.",
+    "Checagem red->green: dizer em qual arquivo entra o item novo (docs/squad/gates.md, G1 e G3) e que o Auditor roda o teste do commit antigo num git worktree temporário (não troca a branch).",
+    "Brief de handoff do Arquiteto não está em docs/squad/memory/handoffs/ (só o evento 107bb8f5f4c8) — desvio de protocolo menor.",
+    "Entrega grande (servidor, 4 integrações, UI, 19 CAs): recomenda-se fatiar em F1 (modelo, upload, máscara, BugStore, STATE, UI Registrar/selo — CA-1..3, 6, 8, 10..13, 17, 19), F2 (link Jaeger/Grafana — CA-4, 5, 7, 9) e F3 (GitHub, triagem, acréscimo — CA-14, 15, 18); CA-16 vale a partir do primeiro bug real."
+  ],
+  "communicate_to_human": [
+    "O repositório é PÚBLICO: logs e imagens de bug ficam públicos e no histórico permanente; apagar exige reescrita de histórico.",
+    "Imagens não são analisadas: só metadados (EXIF/GPS/textos) são removidos. O conteúdo visual (tela com e-mail, token, dado de cliente) é responsabilidade de quem confirma — recortar antes de anexar.",
+    "A máscara de logs é por padrão e pode falhar em formatos novos; a prévia mascarada deve ser lida antes de confirmar.",
+    "Bug de operação e bug só com arquivos não têm prova técnica de produtivo: vale a declaração do humano.",
+    "Hoje não há regras de alerta no Grafana e nenhum trace com erro no Jaeger: a criação a partir de alerta só será usada quando a Observabilidade criar regras."
+  ],
+  "rationale": "O contrato atende às 5 respostas, é aditivo (nature ortogonal a kind; conferido nos 6 pontos que validam kind) e define fluxo, limites e 19 CAs verificáveis; premissas do Jaeger e Grafana conferidas ao vivo (formato da API, 404, 0 spans de erro, groups: [], Grafana 11.2 anônimo em 3001). As lacunas encontradas são de implementação e de reforço de privacidade, corrigíveis sem novo desenho: máscara de endereço/CEP, HMAC no pseudônimo, STATE com -uall, 413 antes da leitura do corpo, Origin/Host, formato de viewPanel/variáveis do Grafana e autossuficiência do evidence_rules.py. Aprovado com essas ressalvas obrigatórias para a implementação; risco moderado por gravar evidências num repositório público."
+}

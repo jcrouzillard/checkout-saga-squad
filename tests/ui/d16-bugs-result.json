@@ -1,0 +1,543 @@
+{
+  "results": {
+    "botao-1440": {
+      "ok": true,
+      "dem": [
+        "Registrar bug",
+        "+ Nova demanda",
+        "Responder na D16",
+        "Revisar PR #104 (abre em nova aba)",
+        "Ver D12"
+      ],
+      "pai": [
+        "Registrar bug",
+        "+ Nova demanda",
+        "Responder 5 perguntas na D16",
+        "Responder 5 perguntas na D16",
+        "Revisar PR #104 (abre em nova aba)",
+        "Ver D12"
+      ]
+    },
+    "botao-390": {
+      "ok": true,
+      "dem": [
+        "Registrar bug",
+        "+ Nova demanda",
+        "Responder na D16",
+        "Revisar PR #104 (abre em nova aba)",
+        "Ver D12"
+      ],
+      "pai": [
+        "Registrar bug",
+        "+ Nova demanda",
+        "Responder 5 perguntas na D16",
+        "Responder 5 perguntas na D16",
+        "Revisar PR #104 (abre em nova aba)",
+        "Ver D12"
+      ]
+    },
+    "produto-1440": {
+      "ok": true,
+      "before": "Para registrar: gere a prévia mascarada.",
+      "s0": "Para registrar: marque as duas confirmações.",
+      "s1": "Para registrar: marque as duas confirmações.",
+      "s2": "",
+      "prev": {
+        "pres": 3,
+        "masked": true,
+        "leaked": [],
+        "imgs": [
+          {
+            "alt": "04-tela-erro.png",
+            "ok": true
+          }
+        ],
+        "imgInsidePre": 0,
+        "xss": null,
+        "red": [
+          "Mascarado: endereços 1",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: metadados da imagem 1"
+        ],
+        "extracted": "Origem\nTrace do Jaeger\nLink\nhttp://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\nVerificado por\nJaeger do produtivo (o trace existe em :16686)\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">",
+        "consent": "Confirmações obrigatórias\nO erro ocorreu no produtivo (não no ambiente de teste).\nRevisei a prévia mascarada. Entendo que estes arquivos vão para o git de um repositório público (jcrouzillard/checkout",
+        "warnings": [
+          "\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318) aceita spans de qualquer processo local.",
+          "O Jaeger produtivo guarda os traces em memória: o link deixa de funcionar num restart. A evidência válida é o snapshot gravado."
+        ]
+      },
+      "clarity": {
+        "porPadrao": true,
+        "leiaPrevia": true,
+        "revisei": true,
+        "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara."
+      },
+      "post": [
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 201
+        }
+      ],
+      "page": {
+        "hash": "#/demandas/D17",
+        "head": "BUG D17 · EM VALIDAÇÃO · ANALISANDO…",
+        "bugtag": true,
+        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/5c592485a143\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
+        "links": [
+          "/api/bug/5c592485a143/file/01-trace-4bf92f35.log",
+          "/api/bug/5c592485a143/file/02-logs-4bf92f35.log",
+          "/api/bug/5c592485a143/file/03-order-service.log",
+          "/api/bug/5c592485a143/file/04-tela-erro.png"
+        ],
+        "toc": [
+          "Bug",
+          "Execução",
+          "Gates",
+          "Validação",
+          "Registro"
+        ]
+      },
+      "served": [
+        {
+          "u": "/api/bug/5c592485a143/file/01-trace-4bf92f35.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 1292
+        },
+        {
+          "u": "/api/bug/5c592485a143/file/02-logs-4bf92f35.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 8135
+        },
+        {
+          "u": "/api/bug/5c592485a143/file/03-order-service.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 7934
+        },
+        {
+          "u": "/api/bug/5c592485a143/file/04-tela-erro.png",
+          "s": 200,
+          "ct": "image/png",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 74
+        }
+      ],
+      "files": [
+        "01-trace-4bf92f35.log",
+        "02-logs-4bf92f35.log",
+        "03-order-service.log",
+        "04-tela-erro.png"
+      ],
+      "storedEqualsPreviewDraft": true,
+      "previewIsFileHead": true,
+      "servedEqualsStored": true
+    },
+    "produto-390": {
+      "ok": true,
+      "before": "Para registrar: gere a prévia mascarada.",
+      "s0": "Para registrar: marque as duas confirmações.",
+      "s1": "Para registrar: marque as duas confirmações.",
+      "s2": "",
+      "prev": {
+        "pres": 3,
+        "masked": true,
+        "leaked": [],
+        "imgs": [
+          {
+            "alt": "04-tela-erro.png",
+            "ok": true
+          }
+        ],
+        "imgInsidePre": 0,
+        "xss": null,
+        "red": [
+          "Mascarado: endereços 1",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: segredos 9 · dados pessoais 4 · endereços 5 · pseudônimos 4",
+          "Mascarado: metadados da imagem 1"
+        ],
+        "extracted": "Origem\nTrace do Jaeger\nLink\nhttp://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\nVerificado por\nJaeger do produtivo (o trace existe em :16686)\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">",
+        "consent": "Confirmações obrigatórias\nO erro ocorreu no produtivo (não no ambiente de teste).\nRevisei a prévia mascarada. Entendo que estes arquivos vão para o git de um repositório público (jcrouzillard/checkout",
+        "warnings": [
+          "\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318) aceita spans de qualquer processo local.",
+          "O Jaeger produtivo guarda os traces em memória: o link deixa de funcionar num restart. A evidência válida é o snapshot gravado."
+        ]
+      },
+      "clarity": {
+        "porPadrao": true,
+        "leiaPrevia": true,
+        "revisei": true,
+        "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara."
+      },
+      "post": [
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 201
+        }
+      ],
+      "page": {
+        "hash": "#/demandas/D18",
+        "head": "BUG D18 · EM VALIDAÇÃO · ANALISANDO…",
+        "bugtag": true,
+        "sec": "Bug\nAmbiente\nprodutivo · verificado por Jaeger do produtivo (o trace existe em :16686)\nSeveridade\nMédia\nOrigem\nTrace do Jaeger · http://localhost:16686/trace/4bf92f3577b34da6a3ce929d0e0e4736\n(abre em nova aba)\n · trace 4bf92f3577b34da6a3ce929d0e0e4736\nPasta no git\ndocs/squad/produto/bugs/d7a4179fc0bf\nConfirmações\nprodutivo ✓ · repositório público ✓\nRESUMO EXTRAÍDO\nTrace\n4bf92f3577b34da6a3ce929d0e0e4736\nServiços\norder-service, shipping-service\nSpans\n2\nOperação raiz\norder-service POST /api/orders\nInício (UTC)\n2026-09-24T20:42:21.550+00:00\nDuração (ms)\n250\nSpans com erro\norder-service · POST /api/orders · HTTP 500\nshipping-service · shipping.commands process — endereço inválido\njava.lang.IllegalStateException: endereço inválido <img src=x onerror=\"window.__xss=2\">\n\"Só produtivo\" é heurístico: o trace/painel existir no produtivo é um indício forte, não prova — o OTLP do produtivo (4317/4318)",
+        "links": [
+          "/api/bug/d7a4179fc0bf/file/01-trace-4bf92f35.log",
+          "/api/bug/d7a4179fc0bf/file/02-logs-4bf92f35.log",
+          "/api/bug/d7a4179fc0bf/file/03-order-service.log",
+          "/api/bug/d7a4179fc0bf/file/04-tela-erro.png"
+        ],
+        "toc": [
+          "Bug",
+          "Execução",
+          "Gates",
+          "Validação",
+          "Registro"
+        ]
+      },
+      "served": [
+        {
+          "u": "/api/bug/d7a4179fc0bf/file/01-trace-4bf92f35.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 1292
+        },
+        {
+          "u": "/api/bug/d7a4179fc0bf/file/02-logs-4bf92f35.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 8135
+        },
+        {
+          "u": "/api/bug/d7a4179fc0bf/file/03-order-service.log",
+          "s": 200,
+          "ct": "text/plain; charset=utf-8",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 7934
+        },
+        {
+          "u": "/api/bug/d7a4179fc0bf/file/04-tela-erro.png",
+          "s": 200,
+          "ct": "image/png",
+          "nosniff": "nosniff",
+          "csp": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+          "n": 74
+        }
+      ],
+      "files": [
+        "01-trace-4bf92f35.log",
+        "02-logs-4bf92f35.log",
+        "03-order-service.log",
+        "04-tela-erro.png"
+      ],
+      "storedEqualsPreviewDraft": true,
+      "previewIsFileHead": true,
+      "servedEqualsStored": true
+    },
+    "operacao": {
+      "ok": true,
+      "pwdAuthEmClaro": false,
+      "red": "Mascarado: segredos 2",
+      "aviso": "A máscara é automática e reconhece apenas padrões conhecidos. Leia o conteúdo inteiro antes de confirmar: chaves ou formatos desconhecidos passam sem máscara.",
+      "pre": "{\"level\":\"ERROR\",\"message\":\"POST /api/demand 500\",\"pwd\":\"[MASCARADO:segredo]\",\"auth\":\"[MASCARADO:segredo]\"}",
+      "sec": "Bug\nAmbiente\nprodutivo · verificado por declaração humana (sem prova técnica)\nSeveridade\nMédia\nOrigem\nsó arquivos enviados (sem link)\nPasta no git\ndocs/squad/operacao/bugs/26f9348752f4\nConfirmações\nprodutivo ✓ · repositório público ✓\nEVIDÊNCIAS (2)\n01-squad-control.log\nlog\n108 B\nenviado por você\nAbrir o arquivo\n(abre em nova aba)\nMascarado: segredos 2\nVer o log (texto)\n02-tela-erro.png\nimagem\n74 B",
+      "hash": "#/demandas/D19"
+    },
+    "422-1440": {
+      "ok": true,
+      "msg": [
+        "Não foi possível registrar o bug (422): título/descrição contém segredo (chave_valor): remova antes de registrar."
+      ],
+      "hash": "#/demandas/bug"
+    },
+    "409-1440": {
+      "ok": true,
+      "verboAcrescentar": false,
+      "btnAntes": {
+        "dis": false,
+        "why": ""
+      },
+      "swapped": "produto",
+      "res": [
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 422
+        },
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 409
+        }
+      ],
+      "msg": [
+        "Não foi possível registrar o bug (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
+      ],
+      "prev": true,
+      "hash": "#/demandas/bug"
+    },
+    "422-390": {
+      "ok": true,
+      "msg": [
+        "Não foi possível registrar o bug (422): título/descrição contém segredo (chave_valor): remova antes de registrar."
+      ],
+      "hash": "#/demandas/bug"
+    },
+    "409-390": {
+      "ok": true,
+      "verboAcrescentar": false,
+      "btnAntes": {
+        "dis": false,
+        "why": ""
+      },
+      "swapped": "produto",
+      "res": [
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 422
+        },
+        {
+          "m": "POST",
+          "u": "/api/demand",
+          "s": 409
+        }
+      ],
+      "msg": [
+        "Não foi possível registrar o bug (409): o tipo informado (operacao) diverge do rascunho (produto): gere a prévia de novo com o tipo correto."
+      ],
+      "prev": true,
+      "hash": "#/demandas/bug"
+    },
+    "filtro-1440": {
+      "ok": true,
+      "seg": [
+        "Ativas 5",
+        "Com ação sua 2",
+        "Na fila 0",
+        "Backlog 0",
+        "Entregues 14",
+        "Canceladas 0",
+        "Bugs 3",
+        "Todas 19"
+      ],
+      "rows": 3,
+      "tags": [
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        },
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        },
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        }
+      ],
+      "noBug": 0,
+      "contrast": {
+        "color": "rgb(164, 38, 44)",
+        "bg": "rgb(251, 237, 237)"
+      }
+    },
+    "filtro-390": {
+      "ok": true,
+      "seg": [
+        "Ativas 5",
+        "Com ação sua 2",
+        "Na fila 0",
+        "Backlog 0",
+        "Entregues 14",
+        "Canceladas 0",
+        "Bugs 3",
+        "Todas 19"
+      ],
+      "rows": 3,
+      "tags": [
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        },
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        },
+        {
+          "t": "BUG",
+          "title": "Demanda de bug: falha observada no produtivo"
+        }
+      ],
+      "noBug": 0,
+      "contrast": {
+        "color": "rgb(164, 38, 44)",
+        "bg": "rgb(251, 237, 237)"
+      }
+    },
+    "acrescentar-1440": {
+      "ok": true,
+      "previaLonga": {
+        "linhas": 200,
+        "mostraLinha501": false,
+        "avisaTruncamento": true,
+        "abrirArquivo": true,
+        "mostrando": "Mostrando 200 de 501 linhas. O restante também vai para o git: leia o arquivo inteiro já mascarado antes de confirmar.",
+        "linkInteiro": [
+          {
+            "t": "Abrir o arquivo inteiro (mascarado) (abre em nova aba)",
+            "href": "/api/bug/draft/4894a09674694de2b2db09118d09b8a0/01-longo.log"
+          }
+        ],
+        "verInteiro": "Ver o arquivo inteiro (mascarado, 501 linhas)",
+        "exigeLeitura": {
+          "exige": "não",
+          "obs": "habilita com as 2 caixas sem abrir o arquivo inteiro"
+        },
+        "inteiro": {
+          "linhas": 501,
+          "linha501": "SEGREDO_NA_LINHA_501 senha=[MASCARADO:segredo]",
+          "segredoEmClaro": false,
+          "igualAoServidor": true
+        }
+      },
+      "after": {
+        "msg": "Evidência acrescentada (1 arquivo(s)).",
+        "files": [
+          "01-trace-4bf92f35.log",
+          "02-logs-4bf92f35.log",
+          "03-order-service.log",
+          "04-tela-erro.png",
+          "05-longo.log"
+        ]
+      },
+      "evidencesNoBugJson": [
+        "01-trace-4bf92f35.log",
+        "02-logs-4bf92f35.log",
+        "03-order-service.log",
+        "04-tela-erro.png",
+        "05-longo.log"
+      ]
+    },
+    "acrescentar-390": {
+      "ok": true,
+      "previaLonga": {
+        "linhas": 200,
+        "mostraLinha501": false,
+        "avisaTruncamento": true,
+        "abrirArquivo": true,
+        "mostrando": "Mostrando 200 de 501 linhas. O restante também vai para o git: leia o arquivo inteiro já mascarado antes de confirmar.",
+        "linkInteiro": [
+          {
+            "t": "Abrir o arquivo inteiro (mascarado) (abre em nova aba)",
+            "href": "/api/bug/draft/d6ea77e8a633a8042ddf621416f02acb/01-longo.log"
+          }
+        ],
+        "verInteiro": "Ver o arquivo inteiro (mascarado, 501 linhas)",
+        "exigeLeitura": {
+          "exige": "não",
+          "obs": "habilita com as 2 caixas sem abrir o arquivo inteiro"
+        },
+        "inteiro": {
+          "linhas": 501,
+          "linha501": "SEGREDO_NA_LINHA_501 senha=[MASCARADO:segredo]",
+          "segredoEmClaro": false,
+          "igualAoServidor": true
+        }
+      },
+      "after": {
+        "msg": "Evidência acrescentada (1 arquivo(s)).",
+        "files": [
+          "01-trace-4bf92f35.log",
+          "02-logs-4bf92f35.log",
+          "03-order-service.log",
+          "04-tela-erro.png",
+          "05-longo.log"
+        ]
+      },
+      "evidencesNoBugJson": [
+        "01-trace-4bf92f35.log",
+        "02-logs-4bf92f35.log",
+        "03-order-service.log",
+        "04-tela-erro.png",
+        "05-longo.log"
+      ]
+    },
+    "comum-409": {
+      "ok": true,
+      "s": 409,
+      "j": {
+        "error": "a demanda não é um bug",
+        "code": "nao_e_bug"
+      }
+    },
+    "produto-links-1440": {
+      "ok": true,
+      "jaeger": {
+        "btn": "Abrir bug a partir deste trace",
+        "href": "#/demandas/bug?kind=produto&fonte=jaeger",
+        "noTeste": 0,
+        "form": {
+          "hash": "#/demandas/bug?kind=produto&fonte=jaeger",
+          "kind": "produto",
+          "notice": "Copie o link do trace aberto em Produto › Jaeger e cole aqui. O quadro é de outra origem, então o Squad Control não consegue lê-lo sozinho.",
+          "focus": "dem-bug-link"
+        }
+      },
+      "grafana": {
+        "btn": "Abrir bug a partir deste painel ou alerta",
+        "href": "#/demandas/bug?kind=produto&fonte=grafana",
+        "noTeste": 0,
+        "form": {
+          "hash": "#/demandas/bug?kind=produto&fonte=grafana",
+          "kind": "produto",
+          "notice": "Copie o link do painel ou alerta aberto em Produto › Grafana e cole aqui. O quadro é de outra origem, então o Squad Control não consegue lê-lo sozinho.",
+          "focus": "dem-bug-link"
+        }
+      }
+    },
+    "produto-links-390": {
+      "ok": true,
+      "jaeger": {
+        "btn": "Abrir bug a partir deste trace",
+        "href": "#/demandas/bug?kind=produto&fonte=jaeger",
+        "noTeste": 0,
+        "form": {
+          "hash": "#/demandas/bug?kind=produto&fonte=jaeger",
+          "kind": "produto",
+          "notice": "Copie o link do trace aberto em Produto › Jaeger e cole aqui. O quadro é de outra origem, então o Squad Control não consegue lê-lo sozinho.",
+          "focus": "dem-bug-link"
+        }
+      },
+      "grafana": {
+        "btn": "Abrir bug a partir deste painel ou alerta",
+        "href": "#/demandas/bug?kind=produto&fonte=grafana",
+        "noTeste": 0,
+        "form": {
+          "hash": "#/demandas/bug?kind=produto&fonte=grafana",
+          "kind": "produto",
+          "notice": "Copie o link do painel ou alerta aberto em Produto › Grafana e cole aqui. O quadro é de outra origem, então o Squad Control não consegue lê-lo sozinho.",
+          "focus": "dem-bug-link"
+        }
+      }
+    },
+    "erros-js": []
+  },
+  "errors": []
+}
