@@ -681,7 +681,16 @@
   "3bd3f87f60e4",
   "b662b4d68ba5",
   "0c0eaf4ed927",
-  "8f5bfcee55ac"
+  "8f5bfcee55ac",
+  "8d09a767b3d1",
+  "db98fc20fcbc",
+  "a17aca3024b4",
+  "46d0e2ec4ba3",
+  "50366913d891",
+  "bef2a37b0bd1",
+  "521ebf55a817",
+  "d616f8102453",
+  "67782a123270"
  ],
  "issues": {
   "_diario": {
@@ -2724,10 +2733,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/211",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8zmb8",
    "agent": "arquiteto",
-   "status": "Gate (Auditor)",
+   "status": "Concluído",
    "phase": "F1",
    "handed": true,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "4ad036230cd8": {
@@ -2746,8 +2755,41 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/213",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8zn54",
    "agent": "frontend",
-   "status": "Gate (Auditor)",
+   "status": "Concluído",
    "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "db98fc20fcbc": {
+   "number": 214,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/214",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8zrZk",
+   "agent": "arquiteto",
+   "status": "Concluído",
+   "phase": null,
+   "handed": true,
+   "closed": true,
+   "kind": "task"
+  },
+  "50366913d891": {
+   "number": 215,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/215",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8zyPg",
+   "agent": "orquestrador",
+   "status": "Backlog",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "task"
+  },
+  "d616f8102453": {
+   "number": 216,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/216",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8z0EU",
+   "agent": "arquiteto",
+   "status": "Gate (Auditor)",
+   "phase": "F1",
    "handed": true,
    "closed": false,
    "kind": "task"
@@ -2795,9 +2837,9 @@
   }
  },
  "gates": {
-  "G1": "66e5d3bfc7ec",
-  "G2": "acd815be7b3d",
-  "G3": "4a2cc0a861b9",
+  "G1": "521ebf55a817",
+  "G2": "bef2a37b0bd1",
+  "G3": "67782a123270",
   "null": "636aba1f832a"
  }
 }
