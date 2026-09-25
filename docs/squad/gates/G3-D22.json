@@ -1,0 +1,34 @@
+{
+  "gate": "G3",
+  "cycle": 1,
+  "demand": "b26da7851764",
+  "code": "D22",
+  "phase": "F1 (entrega documental: ADR-024 + mapa; sem código nem QA)",
+  "from": "arquiteto",
+  "to": "Orquestrador (abrir PR feature/D22-plataforma-multiproduto → develop) → humano (aceite do ADR, respostas do §9, merge)",
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "10 ressalvas do G1-D22 aplicadas no commit be9f2f2", "status": "pass",
+     "source": "git diff 6dd827b HEAD -- docs/adr docs/contracts (+171/-57, 2 arquivos); ADR-024 §10 aponta cada uma e as seções existem: (1) §4.3 conversas e anexos em run: fora do git, ADR-020/023 sem mudança, nenhuma ocorrência restante de mem:conversas, mapa B7/B16; (2) ADR-015 em 'Afeta', §3 e mapa E2, §4.11 regra de branches em voo D12/D21 antes de F2a/F2b/F3/F4; (3) mapa F5 (github_sync.py:98-99,140,194 → cad:memory.link_base), §4.12, Q4/Q7; (4) §4.13 git filter-repo como pré-requisito do host só em F3/F4 + alternativa fast-export/fast-import; (5) §3 [env.prod] kind = compose|process|none, plataforma = process na 7070; (6) §4.9 negação gerada (claude), limitação declarada com opção explícita (codex), teste F6 nos dois runners; (7) §4.5 + mapa D2 bloco gerado no AGENTS.md; (8) mapa A10, C16 (CORRELATION_KEYS), C17 (TE_URLS/TE_APIS), C18, G7; (9) §6 F2a/F2b com critérios e rollback próprios; (10) brief de handoff"},
+    {"name": "Mapa: 74 pontos com classe, destino e fase em todas as linhas", "status": "pass",
+     "source": "parse das tabelas de docs/contracts/plataforma-multiproduto-mapa.md: 74 linhas A–G, ids únicos, todas com 6 colunas e nenhuma com classe/destino/fase vazia; classes PLAT 30 / CFG 22 / MEM 15 / PROD 7 e primeira fase F2a 4 / F2b 25 / F3 17 / F4 20 / F5 7 / sem mudança 1 conferem com a seção Contagem e com o brief"},
+    {"name": "Ordem da migração com dependências", "status": "pass",
+     "source": "ADR-024 §6 l.390-399: F2a ⇐ Q2; F2b ⇐ F2a; F3 ⇐ F2a + Q4 antes do G1 + filter-repo/alternativa; F4 ⇐ F2b e F3; regra de branches em voo antes de cada fase"},
+    {"name": "§9: Q2 bloqueia a F2 e Q4 antes do G1 da F3", "status": "pass",
+     "source": "ADR-024 l.423-425 e marcadores nas próprias perguntas 2 ('[bloqueia a F2]') e 4 ('[responder antes do G1 da F3]'); demais declaradas não bloqueantes com a fase em que pesam"},
+    {"name": "Brief de handoff", "status": "pass",
+     "source": "docs/squad/memory/handoffs/12-arquiteto-d22-adr024-para-auditor.md existe na cópia principal (não rastreado; não está no worktree da D22). Texto defasado: diz 'alterações não commitadas', mas o commit be9f2f2 já existe"},
+    {"name": "Build/testes/QA", "status": "validate",
+     "source": "não se aplica: fase só documental, nenhum arquivo fora de docs/adr, docs/contracts e docs/squad/gates alterado desde 6dd827b"}
+  ],
+  "open_risks": [
+    "Brief 12 só na cópia principal e com texto 'não commitadas' defasado — o Orquestrador deve incluí-lo na sincronização da memória.",
+    "Runner codex continua podendo ler outros produtos (limitação declarada, não resolvida) — aceitável agora, precisa do aceite explícito do humano.",
+    "Campos definitivos do product.toml só nos contratos da F2a/F2b; o ADR fixa só a forma.",
+    "Branches longas em voo (D12/PR #104, D21) seguem sujeitas à regra do §4.11 a cada fase."
+  ],
+  "human_required": false,
+  "rationale": "Todas as 10 ressalvas do G1 foram aplicadas e rastreadas no §10; o mapa mantém classe, destino e fase nas 74 linhas com contagens consistentes; o plano de fases tem dependências, critérios e rollback; o §9 marca Q2 como bloqueante da F2 e Q4 antes do G1 da F3. O critério de aceite da fase ('ADR aprovado no G1, listando cada ponto de acoplamento, o destino e a ordem da migração') está atendido do lado da squad; o aceite formal do ADR e as respostas do §9 são do humano na revisão do PR. APPROVE, confiança 0,90, risco baixo."
+}
