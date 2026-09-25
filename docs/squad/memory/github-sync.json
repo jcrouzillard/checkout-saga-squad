@@ -531,7 +531,32 @@
   "88d4ea73d67c",
   "35c473e0e2e2",
   "d6d30ac50a34",
-  "a5f7ae04bcbd"
+  "a5f7ae04bcbd",
+  "0823200eb2ab",
+  "604298b88447",
+  "2cbfb3f69ce9",
+  "402e76f187f9",
+  "8030022dd824",
+  "d12668852068",
+  "cc574032a7e9",
+  "7a4c6470da42",
+  "b96d4d0f6aa6",
+  "dc47147c109c",
+  "b9ed48d76e85",
+  "9fb50439c277",
+  "41bdb8b49835",
+  "fe9fdb1e356a",
+  "9460c27c2f4f",
+  "09818fee06c6",
+  "c0d227ae13f9",
+  "17cf45fd4ddb",
+  "39118ac34fa8",
+  "33e3ce02f7bd",
+  "710df73a4dc0",
+  "0e8ce35dc308",
+  "6b0b8018b5e1",
+  "0b1fb1a9cc3e",
+  "47c5b8b187f2"
  ],
  "issues": {
   "_diario": {
@@ -2101,10 +2126,10 @@
    "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/162",
    "item": "PVTI_lAHOAc6yfs4Bkbtezg8qEYI",
    "agent": "orquestrador",
-   "status": "Em andamento",
+   "status": "Concluído",
    "phase": null,
    "handed": true,
-   "closed": false,
+   "closed": true,
    "kind": "task"
   },
   "50aa4c539869": {
@@ -2271,6 +2296,39 @@
    "handed": true,
    "closed": true,
    "kind": "task"
+  },
+  "402e76f187f9": {
+   "number": 180,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/180",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8vieI",
+   "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "task"
+  },
+  "9fb50439c277": {
+   "number": 181,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/181",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8vmpM",
+   "agent": "arquiteto",
+   "status": "Gate (Auditor)",
+   "phase": null,
+   "handed": true,
+   "closed": false,
+   "kind": "task"
+  },
+  "41bdb8b49835": {
+   "number": 182,
+   "url": "https://github.com/jcrouzillard/checkout-saga-squad/issues/182",
+   "item": "PVTI_lAHOAc6yfs4Bkbtezg8vnwE",
+   "agent": "orquestrador",
+   "status": "Em andamento",
+   "phase": null,
+   "handed": false,
+   "closed": false,
+   "kind": "task"
   }
  },
  "project": {
@@ -2315,9 +2373,9 @@
   }
  },
  "gates": {
-  "G1": "a2e138988394",
+  "G1": "33e3ce02f7bd",
   "G2": "f558e6585895",
   "G3": "98475b11ef43",
-  "null": "4ea192921db4"
+  "null": "0e8ce35dc308"
  }
 }

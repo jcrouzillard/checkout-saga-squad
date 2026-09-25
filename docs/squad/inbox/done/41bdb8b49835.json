@@ -1,0 +1,41 @@
+{
+  "demand": "41bdb8b49835",
+  "title": "Melhorar e corrigir o visual do Chato",
+  "detail": "As coisas ficam desposicioandas e precisam ter uma formatacao melhor.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T12:09:19+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Na captura aparecem vários problemas possíveis no chat do Squad Control. Quais deles são o bug a corrigir? (a) nome, runner e “Respondendo…” do Orquestrador numa coluna à esquerda da bolha, enquanto “Você” e o horário ficam acima da bolha, à direita; (b) a resposta em andamento inteira em verde e negrito, e não com a formatação final; (c) “Respondendo…” repetido, no cabeçalho da mensagem e na barra acima do campo de pergunta; (d) horários em fusos diferentes (08:47:59 na sua mensagem e 11:47:11 no texto do Orquestrador); (e) outro item. Diga qual.",
+      "dimension": "objetivo",
+      "answer": "São esses mesmo."
+    },
+    {
+      "question": "Como deve ficar depois da correção, para o teste verificar? Por exemplo: autor e horário sempre acima da bolha, nos dois lados; a resposta com a mesma formatação durante e depois do streaming; um único indicador “Respondendo…”; todos os horários no fuso local. Confirme ou ajuste esses critérios.",
+      "dimension": "aceite",
+      "answer": "De maneira que fique mais uisuaral e entendivel possivel"
+    },
+    {
+      "question": "“Formatação melhor” se limita a corrigir os itens escolhidos acima ou inclui mudar o visual do chat, como largura das bolhas, espaçamento e a forma de mostrar listas e negrito nas respostas? Se inclui, existe uma referência visual a seguir?",
+      "dimension": "escopo",
+      "answer": "POde buscar as melhores referencias na internet para isso, de usabilidade e fluides de chat"
+    }
+  ],
+  "override": false,
+  "fromBacklog": false,
+  "nature": "bug",
+  "bug": {
+    "dir": "docs/squad/operacao/bugs/41bdb8b49835",
+    "source": null,
+    "severity": "media",
+    "evidences": [
+      {
+        "file": "01-colado-2026-09-25-a-s-8.48.17.png"
+      }
+    ]
+  }
+}
