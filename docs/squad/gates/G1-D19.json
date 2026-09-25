@@ -1,0 +1,40 @@
+{
+  "gate": "G1",
+  "demand": "402e76f187f9",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "recommendation": "RETURN",
+  "confidence": 0.72,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "fail", "weight": 3, "blocking": true,
+     "source": "inbox/done/402e76f187f9.json. Pass: q1 (só demanda existente, sem demanda nova → ajuste-pontual ancorado + §15), q2 (operação do teste com o humano → ambiente-teste só diagnóstico/correção na branch, CA-20, alternativa H), q3a (A6 novo), q3b (decision --change-request/--resolution, nunca o autor, Arquiteto se contrato/ADR). FAIL q3c: humano disse 'depois de uma nova tentativa, voltar para você'. A execução que parou É a original; a delegação é a nova tentativa. O contrato §2 'Tentativas' permite 2 delegations por (demanda,tipo,alvo) e CA-22 aceita uma 2ª proposta após 'falhou' → 2 novas tentativas. Pior: o alvo é agent-stalled:<runId> e run_agent.py:117 gera runId novo a cada execução, então a nova run que parar abre A2 com outro alvo e o contador zera (laço ilimitado)."},
+    {"name": "Premissas técnicas batem com o código", "status": "pass", "weight": 3, "blocking": true,
+     "source": "pending.py:47-58 (gh pr view por PR, cache .squad/pr-state.json 30 s → incluir mergeable na mesma chamada não custa requisição extra); gitflow.py:115-117 pr() reutiliza PR por --head; gitflow.py:153-170 align_memory faz merge --no-ff --no-commit e aborta em conflito de código; gitflow.py:173-183 open_review não duplica review; log.py:22 tem change-request sem evento de fechamento; alerts.py:410-431 A2 agent-stalled:<runId>; conversa.py:907-931 confirm revalida sob log_lock; server.py:1028/1047 record_human_decision/record_control."},
+    {"name": "Segurança", "status": "pass", "weight": 3, "blocking": true,
+     "source": "ADR-022 §6 e contrato §10: servidor sem gh/push e sem disparar processo (alternativa A recusada); confirmação humana obrigatória; revalidação na confirmação (CA-8) e no início (CA-15); agente e piso de risco pelo servidor (CA-7); log.py recusa --type delegation (CA-13); par 'confirmada' na conversa (CA-14); tarefa em <tarefa_confirmada_pelo_humano>, o resto em <dados> (CA-23); lista de proibidos §2 inclui merge, cancelar, pausar, repriorizar, testenv publish/reset/release, test-env-request, prod.py, push --force. Limitação declarada (sem criptografia, mesmo usuário) é aceitável."},
+    {"name": "Coerência com ADR-011/017/018/020", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Merge só humano (CA-1 'nenhum merge pela squad'); merge de origin/develop sem rebase/--force (§9.2, CA-17); review-update confere o mesmo número de PR e nunca cria (§9.4, CA-18); alerts.py continua sem rede (alternativa F); cópia principal e plankton-teste nunca usados (§9.1); B1/B2/B3 continuam pelo destravar (§2)."},
+    {"name": "Viabilidade da execução no worktree e memória", "status": "validate", "weight": 2, "blocking": true,
+     "source": "log.py:20 e gitflow.py:26-27 resolvem o log/ROOT a partir do próprio caminho do script. Um agente no plankton-d18 que rode 'python3 tools/squad/log.py' grava no decisions.jsonl do worktree: o evento com --delegation fica invisível para pending.py/alerts.py (cópia principal), os critérios de 'resolvido' do §2 nunca fecham, e o review-update empurraria mudança em docs/squad/memory/ para o PR (volta o defeito a66b91c8a0d6). O contrato não fixa que log.py/gitflow.py são sempre os da cópia principal (caminho absoluto) e que os comandos git novos recebem o worktree como cwd (os existentes fazem switch no ROOT)."},
+    {"name": "Critérios de aceite verificáveis", "status": "pass", "weight": 2, "blocking": false,
+     "source": "Contrato §12: 28 CAs, cada um com como verificar (SQUAD_LOG, gh simulado por PATH, repositório git temporário com origin local, runner fake da D17); CA-1 real uma vez num PR de teste. CA-22/CA-10 precisam ser ajustados junto com a correção das tentativas."},
+    {"name": "Donos por arquivo (single-writer)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "§0 correto para tools/squad/**, prompts, squad-control/**, tests/**. Falta docs/squad/gates.md (Orquestrador): o G3 precisa de critério para delegação (gate com --delegation, Auditor devolve escopo novo em ajuste-pontual, QA obrigatório se mudou código)."}
+  ],
+  "blocking_corrections": [
+    "1. Caso (c) = uma nova tentativa. Em pendencia-agente-parado: no máximo 1 delegation por (demanda, agente, passo). A falha dessa delegação volta ao humano (delegation-result falhou e o alvo deixa de ser delegável). Chave do contador independente do runId: usar (demanda, agente do run, passo/handoff de origem) ou encadear pelo campo delegation das runs filhas. A A2 de uma run iniciada por delegação (run com --delegation) não oferece delegar. Ajustar §2 'Tentativas', CA-10 e CA-22. Para os demais tipos, manter 2 (original + 1 nova) é decisão do Arquiteto e está coerente com o 'não repetir em loop'. Mas vale o mesmo cuidado de chave para conflito-develop: um pr-conflict novo depois de uma delegação falha no mesmo PR não pode zerar o contador; usar (demanda, tipo, PR).",
+    "2. Fixar no §8.2/§9/§10 (e no delacao.md): todo log.py e gitflow.py da delegação roda pelo caminho absoluto da cópia principal (ou SQUAD_LOG apontando para ela); os comandos novos do gitflow recebem --worktree/cwd explícito e nunca fazem switch na cópia principal; o worktree da demanda não commita docs/squad/memory/** (STATE) e o review-update recusa push se o diff da branch contra o merge-base tocar STATE. Acrescentar um CA para isso."
+  ],
+  "open_risks": [
+    "Perguntas do Arquiteto ao humano: nenhuma é bloqueante. Padrões recomendados: (1) manter ajuste-pontual com piso moderado e gate (é o que a resposta 1 pede: 'tarefas relacionadas à demanda existente'); (2) aceitar a latência de até um ciclo do plantão (≈3 min), com a UI mostrando 'aguardando o plantão'. Executar pelo servidor contraria o ADR-011 §2b e o ADR-020; (3) A6 de 30 min por SQUAD_HANDOFF_STALLED_S, ajustável; (4) o botão abre o chat pré-preenchido sem enviar, porque o critério de aceite do humano passa pelo chat e isso evita um 2º caminho de confirmação.",
+    "A2 some depois de STALLED_MAX_S (1 h, alerts.py:14): depois disso a pendência-agente-parado deixa de ser delegável. Documentar no cartão ou no §2.",
+    "Caso (a): o humano pediu que o handoff do próximo agente faça 'referência ao handoff pendente'. O vínculo hoje é transitivo (delegation.target). Recomendo gravar também --refs <id do handoff>.",
+    "Adicionar docs/squad/gates.md ao §0 (critério de G3 para delegação).",
+    "feature-sync sai com código 3 e deixa o merge em andamento no worktree. Se a delegação falhar no meio, o delegation-result falhou precisa de git merge --abort. Explicitar.",
+    "gh pr view --json mergeable devolve UNKNOWN na 1ª consulta com frequência. Está tratado (§8.1), mas o CA-1 real deve esperar pelo menos 2 consultas."
+  ],
+  "human_required": false,
+  "rationale": "O ADR-022 e o contrato são sólidos: segurança (servidor sem escrita, confirmação, dupla revalidação, log.py recusando delegation, dados versus instrução), coerência com os ADR-011/017/018/020, reuso real do código (conferido em pending.py, gitflow.py, alerts.py, conversa.py), custo zero do mergeable, 28 CAs verificáveis. Duas correções pequenas, mas bloqueantes. (1) O caso (c) diverge da resposta do humano: o contrato permite 2 delegations (= 2 novas tentativas), e o alvo por runId zera o contador a cada nova run, o que abre um laço. (2) Falta fixar que eventos e comandos da delegação usam o log e o gitflow da cópia principal com cwd no worktree. Sem isso os critérios de 'resolvido' não fecham e a memória vaza para o PR. Confiança = (0+3+3+2+1+2+0.5)/16 ≈ 0.72. Risco moderado: ferramental da squad com poder de push em branch de PR. Nada no produto muda. Das 4 perguntas ao humano, nenhuma é bloqueante; seguir os padrões do Arquiteto."
+}
