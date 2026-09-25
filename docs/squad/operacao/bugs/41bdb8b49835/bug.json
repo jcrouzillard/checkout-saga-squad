@@ -1,0 +1,30 @@
+{
+  "demand": "41bdb8b49835",
+  "title": "Melhorar e corrigir o visual do Chato",
+  "kind": "operacao",
+  "createdAt": "2026-09-25T11:50:00+00:00",
+  "severity": "media",
+  "environment": "produtivo",
+  "verifiedBy": "declaracao-humana",
+  "source": null,
+  "dir": "docs/squad/operacao/bugs/41bdb8b49835",
+  "evidences": [
+    {
+      "file": "01-colado-2026-09-25-a-s-8.48.17.png",
+      "type": "image",
+      "mime": "image/png",
+      "size": 195589,
+      "sha256": "acef512b520136ca85f542d2e0c37ad2b8e6cd37af39089d5d064a550d091fc2",
+      "origin": "upload",
+      "redactions": {
+        "metadata": 2
+      }
+    }
+  ],
+  "consent": {
+    "production": true,
+    "public": true
+  },
+  "extracted": null,
+  "warnings": []
+}
