@@ -147,6 +147,27 @@ def stop(p):
         os.killpg(p.pid, signal.SIGKILL)
 
 
+def fake_children(server_pid):
+    """(pid, pgid) dos conversa_fake_runner.py filhos DESTE servidor (defeito c2733217dc86: nada de pgrep global)."""
+    out = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,pgid=,command="], capture_output=True, text=True).stdout
+    res = []
+    for line in out.splitlines():
+        parts = line.split(None, 3)
+        if len(parts) == 4 and int(parts[1]) == server_pid and str(FAKE) in parts[3]:
+            res.append((int(parts[0]), int(parts[2])))
+    return res
+
+
+def group_alive(pgid):
+    try:
+        os.killpg(pgid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
 def req(method, path, body=None, headers=None, raw=None, port=None):
     port = port or SRV["port"]
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
@@ -278,7 +299,8 @@ class T01BuildCmd(unittest.TestCase):
         self.assertEqual(c1, ["codex", "exec", "--json", "-s", "read-only", "-C", self.root, "--skip-git-repo-check",
                               "SP\n\nP"])
         c2 = cv.build_cmd("codex", {"dataRoot": self.root, "sessionId": "th-1"}, {"prompt": "P", "resume": True})
-        self.assertEqual(c2, ["codex", "exec", "resume", "th-1", "--json", "-c", 'sandbox_mode="read-only"', "P"])
+        self.assertEqual(c2, ["codex", "exec", "resume", "th-1", "--json", "-c", 'sandbox_mode="read-only"',
+                              "--skip-git-repo-check", "P"])
 
     def test_ambiente_por_lista_de_permissao(self):
         env = cv.child_env({"PATH": "/bin", "HOME": "/h", "GH_TOKEN": "x", "GITHUB_TOKEN": "y", "SQUAD_RUN": "r",
@@ -506,6 +528,13 @@ class T05ConcorrenciaTimeoutCancelar(unittest.TestCase):
         a, b = new_conv(), new_conv()
         st, r = req("POST", f"/api/conversas/{a}/mensagens", {"text": "DORMIR"})
         self.assertEqual(st, 202)
+        filhos = []
+        for _ in range(50):
+            filhos = fake_children(SRV["p"].pid)
+            if filhos:
+                break
+            time.sleep(0.1)
+        self.assertEqual(len(filhos), 1, "um runner fake filho deste servidor durante o turno")
         st2, r2 = req("POST", f"/api/conversas/{b}/mensagens", {"text": "oi"})
         self.assertEqual((st2, r2["code"], r2.get("conversa")), (409, "turno_em_andamento", a))
         self.assertEqual(req("GET", "/api/conversas")[1]["busy"], {"conversa": a, "turn": r["turn"]})
@@ -515,14 +544,16 @@ class T05ConcorrenciaTimeoutCancelar(unittest.TestCase):
         fim = evs[-1]["data"]["message"]
         self.assertEqual((fim["status"], fim["text"]), ("tempo_esgotado", "parcial"))
         time.sleep(3.5)
-        ps = subprocess.run(["pgrep", "-f", str(FAKE)], capture_output=True, text=True).stdout.strip()
-        self.assertEqual(ps, "", "nenhum processo do grupo vivo")
+        self.assertEqual(fake_children(SRV["p"].pid), [], "nenhum runner fake filho deste servidor vivo")
+        self.assertFalse([g for _, g in filhos if group_alive(g)], "nenhum processo do grupo vivo")
 
     def test_02_cancelar(self):
         wait_idle()
         a = new_conv()
         st, r = req("POST", f"/api/conversas/{a}/mensagens", {"text": "DORMIR de novo"})
         time.sleep(1.0)
+        filhos = fake_children(SRV["p"].pid)
+        self.assertEqual(len(filhos), 1, "um runner fake filho deste servidor durante o turno")
         st_c, rc = req("POST", f"/api/conversas/{a}/turnos/{r['turn']}/cancelar", {})
         self.assertEqual((st_c, rc.get("status")), (202, "cancelando"))
         _, evs = sse(r["stream"])
@@ -531,7 +562,8 @@ class T05ConcorrenciaTimeoutCancelar(unittest.TestCase):
         st_c, rc = req("POST", f"/api/conversas/{a}/turnos/{r['turn']}/cancelar", {})
         self.assertEqual((st_c, rc["code"]), (409, "turno_encerrado"))
         time.sleep(3.5)
-        self.assertEqual(subprocess.run(["pgrep", "-f", str(FAKE)], capture_output=True, text=True).stdout.strip(), "")
+        self.assertEqual(fake_children(SRV["p"].pid), [], "nenhum runner fake filho deste servidor vivo")
+        self.assertFalse([g for _, g in filhos if group_alive(g)], "nenhum processo do grupo vivo")
 
     def test_03_reconexao_sse_last_event_id(self):
         wait_idle()

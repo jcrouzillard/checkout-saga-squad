@@ -252,9 +252,8 @@ class T01Comando(unittest.TestCase):
         self.assertEqual(c1[-1], "SP\n\n-começa com hífen")
         c2 = cv.build_cmd("codex", {"dataRoot": self.root, "sessionId": "th-1"},
                           {"prompt": "-hífen", "resume": True, "images": imgs[:1]})
-        self.assertEqual(c2[:4], ["codex", "exec", "resume", "th-1"])
-        self.assertIn('sandbox_mode="read-only"', c2)
-        self.assertEqual(c2[-3:], [f"--image={imgs[0]}", "--", "-hífen"])
+        self.assertEqual(c2, ["codex", "exec", "resume", "th-1", "--json", "-c", 'sandbox_mode="read-only"',
+                              "--skip-git-repo-check", f"--image={imgs[0]}", "--", "-hífen"])
         for p in [x.split("=", 1)[1] for x in c1 + c2 if x.startswith("--image=")]:
             self.assertTrue(pathlib.Path(p).is_absolute())
 

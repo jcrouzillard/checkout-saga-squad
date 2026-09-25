@@ -4,7 +4,8 @@
 Sobe o servidor DESTE repositório numa porta livre, com DATA_ROOT numa CÓPIA temporária (`--dir`, nunca o log real
 nem a 7070) e um PATH com um "calço" que grava o argv de cada chamada ao CLI real (`argv.jsonl`) antes de executá-lo.
 O DATA_ROOT vira um repositório git próprio (`git init` + commit vazio SÓ na cópia): no produtivo o cwd
-`.squad/conversas/.sessao` fica dentro do repositório e o `codex exec resume` (sem `--skip-git-repo-check`) exige isso.
+`.squad/conversas/.sessao` fica dentro do repositório; desde o fix de c1b28e123d53 o `codex exec resume` também leva
+`--skip-git-repo-check`.
 
   python3 tests/squad/real_conversa_anexos_d21.py codex  --dir <scratch>/real-codex    # 3 turnos
   python3 tests/squad/real_conversa_anexos_d21.py claude --dir <scratch>/real-claude   # 2 turnos
@@ -12,7 +13,7 @@ O DATA_ROOT vira um repositório git próprio (`git init` + commit vazio SÓ na 
 codex  (CA-I15): T1 print.png → texto do alerta; T2 sem imagem → "191" por `exec resume`; T3 COM imagem nova
         (segundo.png) na sessão retomada e pergunta começando por "-" → texto da imagem nova. Prova: sessionReset falso
         em T2/T3, o mesmo threadId nos três e argv de T3 = `codex exec resume <threadId> --json -c
-        sandbox_mode="read-only" --image=<abs> -- <prompt>`.
+        sandbox_mode="read-only" --skip-git-repo-check --image=<abs> -- <prompt>`.
 claude (CA-I14/ressalva 2): T1 print.png; T2 `--resume` COM duas imagens inline (segundo.png + quase5mb.png, sem
         SQUAD_CHAT_CLAUDE_B64_MAX) → texto das duas, `tools` vazio (sem plano B/Read), mesmo sessionId.
 Saída: <dir>/resultado.json (turnos, argv, verificações) e código 0 se todas as verificações passarem.
@@ -100,7 +101,7 @@ try:
         t2 = turn(cid, "Qual número de PR estava no print? Responda só o número.", [])
         t3 = turn(cid, "-leia a imagem que mandei agora e responda só o texto escrito nela.", ["segundo.png"])
         th = t1["sessionId"]
-        exp = ["exec", "resume", th, "--json", "-c", 'sandbox_mode="read-only"',
+        exp = ["exec", "resume", th, "--json", "-c", 'sandbox_mode="read-only"', "--skip-git-repo-check",
                f"--image={anexos.resolve() / (t3['ids'][0] + '.png')}", "--", None]
         argv3 = t3["calls"][-1]["argv"] if t3["calls"] else []
         c = out["checks"]
@@ -112,7 +113,7 @@ try:
         c["T3 sem sessionReset"] = t3["sessionReset"] is False
         c["mesmo threadId T1..T3"] = bool(th) and t2["sessionId"] == th and t3["sessionId"] == th
         c["T3 uma única chamada (sem nova sessão)"] = len(t3["calls"]) == 1
-        c["argv T3 = exec resume <th> --json -c sandbox --image=<abs> -- <prompt>"] = (
+        c["argv T3 = exec resume <th> --json -c sandbox --skip-git-repo-check --image=<abs> -- <prompt>"] = (
             len(argv3) == len(exp) and argv3[:-1] == exp[:-1] and argv3[-1].endswith(t3["q"]))
         c["T3 prompt começa por '-' (na última posição, depois de --)"] = argv3[-2:-1] == ["--"] and "Pergunta do humano:\n-leia" in argv3[-1]
         c["T3 resposta com o texto da imagem nova"] = "4271" in (t3["text"] or "") and "KAFKA" in (t3["text"] or "").upper()
