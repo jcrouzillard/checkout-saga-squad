@@ -1,0 +1,49 @@
+{
+  "gate": "G3",
+  "cycle": 1,
+  "demand": "6450aecde7f9",
+  "code": "D23",
+  "phase": "F2a (ADR-024 §6)",
+  "from": "qa+orquestrador",
+  "to": "Orquestrador (abrir PR feature/D23-f2a-resolvedor-de-produto → develop) → humano (conferência e merge)",
+  "commits": ["7b7cbfe (QA)", "ac4df23 (Orquestrador, QA-D23-1/2 + codes.json até D26)", "04b1431 (QA, CA-9 por ids sintéticos + testes de QA-D23-1/2)"],
+  "recommendation": "APPROVE",
+  "confidence": 0.9,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Regressão tests/squad uma a uma (SQUAD_CHAT_RUNNER=fake, PATH sem claude/codex/gh, docker trocado por shim que sai 127, Python 3.14)",
+     "status": "pass",
+     "source": "13/13 arquivos verdes: alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 38, conversa_anexos_d21 27, conversa_d17 44, conversa_tz_d20 7, delegacao_d19 27, e2e_compose_seguro_d15 11, entrega_por_pr (script, 'Todas as verificações passaram'), governanca_d14_qa 19, instancia_d18 18, produto_f2a 27. Na 1ª execução produto_f2a teve 1 ERROR em T03Gravacao.test_3_corrida_10_logpy_mais_10_post: URLError EINVAL em setsockopt(TCP_NODELAY) no CLIENTE com 10 POST simultâneos (backlog padrão 5 do ThreadingHTTPServer no macOS); 3 reexecuções seguidas: 27/27 OK. Intermitência do teste de carga, não do código de gravação"},
+    {"name": "(B,3) product.py codes --check contra cópia nova do log real",
+     "status": "pass",
+     "source": "cópia de docs/squad/memory/decisions.jsonl (703 linhas, sha256 14b8b605…) → rc 0, D1–D26 e 4 apelidos (D7↔D8, D9↔D10); também rc 0 lido direto do log real (só leitura)"},
+    {"name": "(B,3) codes.json: D1–D24 idênticos ao 33de93e",
+     "status": "pass",
+     "source": "comparação por id: 24/24 iguais; extras só 233278d0cfa9=D25 e 50366913d891=D26 (task do humano confirmados no log); aliases e rule iguais; mudam só generatedAt e source (lines 701, lastTaskId 50366913d891)"},
+    {"name": "(B,2) Diff de ac4df23 revisado",
+     "status": "pass",
+     "source": "gitflow.feature_start: demanda ausente → stderr 'demanda X não encontrada no log' e sys.exit(2) antes de qualquer git (QA-D23-1). server.py POST de bug: mark() antes de put_bug, _append_log em try/except BaseException → discard_bug (rmtree da pasta + truncate do index.jsonl no mark ou unlink se não existia) e re-raise → 503 trava_de_codigos; tudo dentro de bugs.LOCK, então o truncate não corta linha de outra gravação; discard_bug valida DEMAND_RE; rascunho só é apagado após o task (QA-D23-2). Coberto por test_ca7 (ausente sai 2, sem branch/commit) e test_qa_d23_2 (pasta, índice e log intactos no 503; reenvio 201)"},
+    {"name": "(2) CA-9 / nada no real",
+     "status": "pass",
+     "source": "ids sintéticos por uuid e marca F2A-QA-<run>; após as 5 execuções da suíte o log real segue com 703 linhas e bytes idênticos à cópia; git status do worktree limpo"},
+    {"name": "(2) Navegador (CA-13) e checklist",
+     "status": "validate",
+     "source": "tests/ui/d23-codigos-result.json ok=true (7/7, log reordenado, sem injeção) e checklist-f2a-d23.md conferidos; não reexecutado pelo Auditor neste gate (exige container do Chrome; restrição de não tocar containers) — o G2 já verificou o painel com Chrome headless"},
+    {"name": "(B,2) Memória fora do PR e integração",
+     "status": "pass",
+     "source": "git diff --name-only origin/develop...HEAD -- docs/squad/memory/ inbox/ produto/bugs/ operacao/bugs/ vazio; branch 10 commits atrás da origin/develop (D25/PR #217 e sincronizações) mas git merge-tree HEAD origin/develop sem conflito"}
+  ],
+  "open_risks": [
+    "codes.json foi gerado até D26 (log de 701 linhas). Se o humano abrir novas demandas antes do merge, o Orquestrador deve regenerar (product.py codes) de uma cópia nova do log e conferir D1–D24 inalterados + codes --check rc 0 antes do merge.",
+    "T03 test_3_corrida pode falhar intermitente no macOS (EINVAL no cliente com 10 conexões simultâneas; backlog 5). Sugestão ao QA: limitar a concorrência dos POST ou tentar de novo em URLError; não afeta o uso real do painel.",
+    "Branch atrás da develop: fazer merge (não rebase) da develop antes/no PR, conforme ADR-011."
+  ],
+  "pr_items": [
+    "Conferir no diff de codes.json que D1–D24 não mudaram e que D25/D26 são 233278d0cfa9/50366913d891; regenerar se surgirem novas demandas antes do merge.",
+    "Rodar python3 tools/squad/product.py codes --check (rc 0) na cópia principal logo antes do merge.",
+    "Abrir o painel após o merge: lista com D1–D24 como hoje e rotas #/demandas/D7, D8, D24 abrindo as demandas certas.",
+    "Opcional: rodar tests/squad/test_produto_f2a.py; se T03 corrida falhar com EINVAL, repetir (intermitência conhecida)."
+  ],
+  "human_required": false,
+  "rationale": "Todos os critérios bloqueantes cumpridos com evidência própria: 13 suítes verdes uma a uma, codes --check rc 0 contra cópia nova do log real, D1–D24 idênticos ao congelamento do 33de93e, correções QA-D23-1/2 corretas e cobertas por teste. Confiança 0,90 (navegador não reexecutado neste gate; um teste de concorrência intermitente). Risco moderado por mexer nas ferramentas de toda a squad e pela tabela que precisa estar atualizada no momento do merge."
+}
