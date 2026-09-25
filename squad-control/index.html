@@ -817,6 +817,44 @@
     .c-comp .row .btn, .c-prop .actions .btn { height: 44px; }
     .c-sugs button { min-height: 44px; }
   }
+  /* ================= D24 (ADR-025, contrato publicacao-do-squad-control §7): publicação do Squad Control ================= */
+  .pub-bar { position: sticky; top: calc(var(--hdr-stick, var(--hdr-h)) + var(--usage-h, 0px)); z-index: 6; display: grid; gap: 6px; margin: 0 0 16px; }
+  .pub-bar:empty { display: none; }
+  .pub-item { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 6px 12px; padding: 9px 12px 9px 14px; font-size: 13px; line-height: 1.4; color: var(--text); background: var(--accent-soft); border: 1px solid var(--line); border-left: 3px solid var(--accent); box-shadow: 0 2px 8px rgb(0 0 0 / .06); }
+  .pub-item.warn { background: var(--warn-soft); border-left-color: var(--warn); }
+  .pub-item.err { background: var(--danger-soft); border-left-color: var(--danger); }
+  .pub-item.ok { background: var(--ok-soft); border-left-color: var(--ok); }
+  .pub-item .pub-ic { flex: none; font-weight: 700; line-height: 32px; }
+  .pub-item .pub-ic { color: var(--accent); }
+  .pub-item.warn .pub-ic { color: var(--warn); } .pub-item.err .pub-ic { color: var(--danger); } .pub-item.ok .pub-ic { color: var(--ok); }
+  .pub-item .pub-t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; padding-block: 6px; }
+  .pub-item .pub-n { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pub-item a { color: inherit; }
+  .pub-item .pub-acts { flex: none; display: flex; gap: 8px; margin-left: auto; }
+  .pub-item button { font: inherit; font-size: 12.5px; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 2px; cursor: pointer; }
+  .pub-item button.pub-x { min-width: 32px; padding: 0 8px; }
+  .pub-item button:focus-visible, .pub-dlg button:focus-visible, .inst-panel .pub-sec button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .inst-panel .pub-sec { border-top: 1px solid var(--line); margin: 0 0 12px; padding-top: 10px; display: grid; gap: 6px; }
+  .inst-panel .pub-sec h3 { font-size: 12.5px; margin: 0; font-weight: 600; }
+  .inst-panel .pub-st { font-size: 12.5px; }
+  .inst-panel .pub-why { font-size: 12px; color: var(--muted); }
+  .inst-panel .pub-msg { font-size: 12px; } .inst-panel .pub-msg.err { color: var(--danger); } .inst-panel .pub-msg.ok { color: var(--ok); }
+  .inst-panel .pub-sec button[data-pub-btn] { justify-self: start; font: inherit; font-size: 12.5px; font-weight: 500; min-height: 36px; padding: 0 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); border-radius: 2px; cursor: pointer; }
+  .inst-panel .pub-sec button[data-pub-btn]:disabled { background: var(--raised); color: var(--muted); border-color: var(--line-strong); cursor: not-allowed; }
+  .pub-dlg { border: 1px solid var(--line); border-radius: 4px; padding: 18px 20px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); width: min(580px, calc(100vw - 32px)); }
+  .pub-dlg::backdrop { background: rgb(0 0 0 / .5); }
+  .pub-dlg h2 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+  .pub-dlg p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+  .pub-dlg .pub-dacts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .pub-dlg button { font: inherit; font-size: 13px; font-weight: 500; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); border-radius: 2px; cursor: pointer; }
+  .pub-dlg button.pri { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .pub-dlg button.dang { border-color: var(--danger); color: var(--danger); }
+  @media (max-width: 600px) {
+    .pub-item button, .inst-panel .pub-sec button[data-pub-btn] { min-height: 44px; }
+    .pub-item button.pub-x { min-width: 44px; }
+    .pub-item .pub-ic { line-height: 44px; } .pub-item .pub-t { padding-block: 12px; }
+    .pub-dlg .pub-dacts { flex-direction: column-reverse; align-items: stretch; } .pub-dlg button { min-height: 44px; }
+  }
 </style>
 </head>
 <body>
@@ -2814,6 +2852,7 @@ function classify(e) {
   if (e.type === "validation") return e.status === "perguntas"
     ? N({ title: `${pre}Arquiteto tem ${(e.questions || []).length} pergunta(s) sobre a demanda`, body: (e.questions || []).map(q => q.text).join(" "), href: dem("validacao") || "#/demandas" })
     : N({ title: `${pre}Demanda validada pelo Arquiteto`, body: "Pronta para iniciar.", href: dem() || "#/demandas" });
+  if (e.type.startsWith("squad-")) return pubClassify(e, N);   // D24: eventos do publicador
   return null;
 }
 const LEVEL_LABEL = { bloqueio: "Bloqueio", aviso: "Aviso", novidade: "Novidade" };
@@ -2969,14 +3008,14 @@ async function poll() {
       const r = await fetch("/api/live", { cache: "no-store" });
       if (r.status === 404) { liveSupported = false; live = null; }
       else if (!r.ok) throw new Error(r.status);
-      else { const j = await r.json(); live = j; liveSupported = true; syncClock(j.now); markOk(); if (j.version && j.version !== lastVersion) needState = true;
+      else { const j = await r.json(); live = j; liveSupported = true; syncClock(j.now); markOk(); pubOnLive(j);   /* D24 */ if (j.version && j.version !== lastVersion) needState = true;
         // D15: resumo do ambiente de teste no /api/live mudou → recarrega o estado completo (uma vez por mudança).
         const lt = j.testEnv && typeof j.testEnv === "object" ? teSum(j.testEnv) : null; if (lt && lt !== lastLiveTe) { lastLiveTe = lt; if (lt !== teSum(te())) needState = true; } }
     }
     needState = needState || Date.now() - lastStateAt >= (liveSupported ? 15000 : 3000);
     if (needState) { await fetchState(); markOk(); liveKey = liveSig(); await afterData(); }
     else { const k = liveSig(); if (k !== liveKey) { liveKey = k; await afterData(); } else { updateCounts(); renderGlobal(); } }
-  } catch (e) { everErr = true; renderGlobal(); }
+  } catch (e) { everErr = true; pubOnDown(); renderGlobal(); }   // D24: pubOnDown
   polling = false;
   pollTimer = setTimeout(poll, document.hidden ? 10000 : 1500);
 }
@@ -3008,6 +3047,7 @@ function renderGlobal() {
     sd.innerHTML = `Sem conexão${lastOkAt ? ` desde ${esc(hhmm(new Date(lastOkAt).toISOString()))}` : ""}: servidor indisponível. Rode <code>make squad</code>; o painel tenta de novo sozinho. ${state ? "Decisões, respostas, início e cancelamento ficam desabilitados até os dados voltarem." : ""}`;
   }
   applyStale();
+  pubAfterGlobal(band);   // D24: "Reiniciando…" no lugar do erro genérico
 }
 setInterval(() => {
   document.querySelectorAll("[data-age]").forEach(el => { const t = `${el.dataset.pre || ""}${fmtAge(ageS(el.dataset.age))}`; if (el.textContent !== t) el.textContent = t; });
@@ -3856,7 +3896,7 @@ function chatTurnEnded(fin, errText) {
   if (st === "ok") announce("Resposta do Orquestrador recebida");
   else {
     // D20 §3.5: erro/cancelada/tempo esgotado aparecem só no rodapé da mensagem; a barra só quando não há registro.
-    const lbl = { erro: "Erro na resposta", cancelada: "Resposta cancelada", tempo_esgotado: "Tempo esgotado", interrompida: "Resposta interrompida" }[st] || "Erro na resposta";
+    const lbl = pubInterrupted(fin) ? "Resposta interrompida pela publicação do Squad Control" : { erro: "Erro na resposta", cancelada: "Resposta cancelada", tempo_esgotado: "Tempo esgotado", interrompida: "Resposta interrompida" }[st] || "Erro na resposta";   // D24
     const detail = errText || fin?.error || "", text = `${lbl}${detail ? `: ${detail}` : "."}`;
     const recorded = chat.msgs.some(m => m.role === "orquestrador" && (a?.turn == null || m.turn === a.turn));
     if (!recorded) {
@@ -4000,19 +4040,19 @@ function chatMsgEl(m, isLastOrq) {
   if (txt) body.append(mdRender(txt));
   if (!txt || (m.status && m.status !== "ok")) {
     const n = mk(txt ? "p" : "span", txt ? "c-partial" : "c-note-empty");
-    n.textContent = m.status === "erro" ? `Sem resposta: ${m.error || "erro no runner"}.` : m.status === "interrompida" ? "O servidor reiniciou durante a resposta; nada foi aproveitado."
+    n.textContent = m.status === "erro" ? `Sem resposta: ${m.error || "erro no runner"}.` : m.status === "interrompida" ? (pubInterrupted(m) ? `Resposta interrompida pela publicação do Squad Control.${txt ? " O texto já recebido ficou salvo." : ""}` : "O servidor reiniciou durante a resposta; nada foi aproveitado.")
       : m.status === "cancelada" ? (txt ? "Texto parcial: você parou a resposta." : "Você parou a resposta antes do primeiro trecho.")
       : m.status === "tempo_esgotado" ? (txt ? "Texto parcial: a resposta passou do tempo limite." : "A resposta passou do tempo limite sem texto.") : "Sem texto.";
     body.append(n);
   }
   // Rodapé: estado final ≠ ok (ícone + texto), tempos (só na última resposta; nas anteriores vão no title do horário), ações.
-  const foot = mk("div", "c-foot"), fl = STATUS_FLAG[m.status];
+  const foot = mk("div", "c-foot"), fl = pubInterrupted(m) ? ["Interrompida pela publicação", "■", "warn"] : STATUS_FLAG[m.status];   // D24
   if (fl) foot.insertAdjacentHTML("beforeend", `<span class="c-flag flag${fl[2] ? ` c-flag--${fl[2]}` : ""}"><span aria-hidden="true">${fl[1]}</span>${fl[0]}</span>`);
   if (timings && isLastOrq) { const s = mk("span"); s.textContent = timings; foot.append(s); }
   if (m.sessionReset) { const s = mk("span"); s.textContent = "sessão reaberta com o histórico recente"; foot.append(s); }
   if (isLastOrq && ["erro", "tempo_esgotado", "interrompida"].includes(m.status) && !chat.active) {
     const human = [...chat.msgs].reverse().find(x => x.role === "humano" && x.turn === m.turn);
-    if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = "Tentar de novo"; foot.append(bt); }
+    if (human) { const bt = mk("button", "linkbtn"); bt.type = "button"; bt.dataset.chatRetry = String(m.turn); bt.textContent = pubInterrupted(m) ? "Reenviar" : "Tentar de novo"; foot.append(bt); }
   }
   if (foot.childNodes.length) li.append(foot);
   if (m.proposal && typeof m.proposal === "object" && CHAT_PID_RE.test(m.proposal.id || "")) li.append(m.proposal.kind === "delegar" ? delegPropEl(m.proposal) : chatPropEl(m.proposal));   // D19: kind ausente = destravar
@@ -4506,7 +4546,7 @@ function instView() {
   const stale = f.state === "desatualizado", unk = f.state === "indeterminado" || !f.state;
   const bad = stale ? "Desatualizado: o código mudou desde a subida. Reinicie (make squad)." : unk ? "Não foi possível verificar a versão." : "";
   const aria = `Ambiente: ${label}. Versão ${display}${stale ? ". Desatualizado, reinicie" : unk ? ". Não foi possível verificar a versão" : ""}${notes.length ? ". " + notes.join(", ").replace(/^./, c => c.toUpperCase()) : ""}`;
-  return { env, label, short: `${INST_ENV[env][1]} · ${b.commit || "commit ?"}`, display, notes, bad, warn: stale || unk, aria, prefix: env === "teste" ? "[TESTE] " : env === "desconhecido" ? "[?] " : "" };
+  return pubInstView({ env, label, short: `${INST_ENV[env][1]} · ${b.commit || "commit ?"}`, display, notes, bad, warn: stale || unk, aria, prefix: env === "teste" ? "[TESTE] " : env === "desconhecido" ? "[?] " : "" }, d);   // D24: publicando / revertido
 }
 function instFields() {
   const d = INST.data, v = instView(), T = x => x ? new Date(x).toLocaleString("pt-BR") : "—", S = x => (x === null || x === undefined || x === "") ? "—" : String(x);
@@ -4556,8 +4596,8 @@ function instPanelFill() {
   const p = $("#inst-panel"), v = instView();
   const html = `<h2 id="inst-panel-h" tabindex="-1">Ambiente e versão do Squad Control</h2>${v.bad ? `<p class="inst-bad">${v.warn ? "⚠ " : ""}${esc(v.bad)}</p>` : ""}${v.notes.length ? `<p class="inst-note" style="margin:6px 0 0">${esc(v.notes.join(" · "))}</p>` : ""}
     <dl>${instFields().map(([k, val, txt]) => `<dt>${esc(k)}</dt><dd${txt ? ` class="txt"` : ""}>${esc(val)}</dd>`).join("")}</dl>
-    <div class="inst-acts"><button type="button" data-inst-copy>Copiar</button><button type="button" data-inst-close>Fechar</button></div>`;
-  if (p.dataset.html !== html) { const f = document.activeElement, inP = p.contains(f), sel = f?.matches?.("[data-inst-copy]") ? "[data-inst-copy]" : f?.matches?.("[data-inst-close]") ? "[data-inst-close]" : null; p.innerHTML = html; p.dataset.html = html; if (inP) (sel ? p.querySelector(sel) : $("#inst-panel-h"))?.focus({ preventScroll: true }); }
+    ${pubPanelHtml()}<div class="inst-acts"><button type="button" data-inst-copy>Copiar</button><button type="button" data-inst-close>Fechar</button></div>`;
+  if (p.dataset.html !== html) { const f = document.activeElement, inP = p.contains(f), sel = f?.matches?.("[data-inst-copy]") ? "[data-inst-copy]" : f?.matches?.("[data-inst-close]") ? "[data-inst-close]" : f?.matches?.("[data-pub-btn]") ? "[data-pub-btn]" : null; p.innerHTML = html; p.dataset.html = html; if (inP) (sel && !p.querySelector(sel)?.disabled ? p.querySelector(sel) : $("#inst-panel-h"))?.focus({ preventScroll: true }); }
 }
 function instPlace() {
   const p = $("#inst-panel"), t = INST.trigger; if (!INST.open || !p || !t) return;
@@ -4613,7 +4653,7 @@ document.addEventListener("click", ev => {
   }
   if (INST.open && !ev.target.closest?.("#inst-panel")) instClose(false);
 });
-window.addEventListener("keydown", e => { if (e.key === "Escape" && INST.open) { e.stopPropagation(); instClose(true); } }, true);
+window.addEventListener("keydown", e => { if (e.key === "Escape" && INST.open && !C("pub-dlg")?.open) { e.stopPropagation(); instClose(true); } }, true);
 window.addEventListener("resize", instPlace);
 window.addEventListener("scroll", instPlace, { passive: true });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) instFetch(); });
@@ -4622,6 +4662,305 @@ setInterval(() => { if (!document.hidden) instFetch(); }, 60000);
 setTimeout(() => { if (INST.status === "loading") instFetch(); }, 5000);   // /api/state ainda não chegou
 { const tt = document.querySelector("title"); if (tt && window.MutationObserver) new MutationObserver(instTitle).observe(tt, { childList: true, characterData: true, subtree: true }); }
 instRender();
+// ================= D24 (ADR-025, contrato publicacao-do-squad-control §7): publicação do Squad Control =================
+// Fontes: live.publication (/api/live, 1,5 s; undefined = servidor sem o campo, null = sem supervisor) e
+// GET /api/squad-control/publication (canPublish/reason; ao abrir o detalhe do selo, a cada mudança e após o POST).
+// Tudo em funções pub*; os trechos existentes só chamam pubOnLive/pubOnDown/pubAfterGlobal/pubInstView/pubPanelHtml/
+// pubClassify/pubInterrupted. "var" porque instRender() (D18) roda antes deste bloco.
+var PUB = { pub: undefined, info: null, infoStatus: "none", infoAt: 0, infoBusy: false, sig: null, down: false, downSaid: false,
+  expect: false, expectAt: 0, openCommit: null, posting: false, msg: null, lastState: null, reloadBar: false, toast: null, key: null };
+const PUB_SS = {
+  get(k) { try { return sessionStorage.getItem("sc.d24." + k); } catch (e) { return null; } },
+  set(k, v) { try { if (v == null) sessionStorage.removeItem("sc.d24." + k); else sessionStorage.setItem("sc.d24." + k, v); } catch (e) {} },
+};
+const PUB_PHASE = { guard: "travas", sync: "sincronização da develop", preflight: "verificação prévia", health: "saúde após reinício",
+  "ponto-seguro": "resposta não terminou", supervisor: "publicador", stop: "parada do servidor", rollback: "reversão" };
+const PUB_REASON = { sem_supervisor: "Sem publicador: rode make squad", publicacao_em_andamento: "Publicação em andamento", nao_produtivo: "Disponível só no produtivo" };
+const PUB_STATE = { "no-ar": "no ar, nada pendente", verificando: "verificando a nova versão", "aguardando-ponto-seguro": "aguardando ponto seguro",
+  reiniciando: "reiniciando", revertendo: "revertendo para a versão anterior", revertido: "revertido: no ar a versão anterior", "fora-do-ar": "fora do ar" };
+const PUB_TRIGGER = { auto: "automático (merge)", botao: "botão", cli: "linha de comando", inicio: "subida" };
+const PUB_BUSY = ["verificando", "aguardando-ponto-seguro", "reiniciando", "revertendo"];
+const pubSha = x => x ? String(x).slice(0, 7) : "?";
+const pubRid = r => String(r?.eventId || `${r?.type}:${r?.commit}:${r?.at}`);
+const pubLeft = p => { const t = Date.parse(p?.deadline || ""); return isNaN(t) ? null : Math.max(0, Math.ceil((t - nowMs()) / 1000)); };
+// Botão "quando terminar": gatilho do humano (botão/CLI) esperando; o "agora" confirmado nunca espera (§5.4).
+const pubIsSafe = p => p?.state === "aguardando-ponto-seguro" && (p.trigger === "botao" || p.trigger === "cli");
+const pubRestarting = () => PUB.down && (PUB.expect || (!!PUB.lastState && PUB.lastState !== "no-ar"));
+function pubInterrupted(m) { return !!m && m.status === "interrompida" && (m.code === "reinicio_publicacao" || m.stop_reason === "reinicio" || m.stopReason === "reinicio"); }
+
+function pubOnLive(j) {
+  const wasDown = PUB.down; PUB.down = false; PUB.downSaid = false;
+  const p = Object.prototype.hasOwnProperty.call(j, "publication") ? (j.publication && typeof j.publication === "object" ? j.publication : null) : undefined;
+  const prev = PUB.pub; PUB.pub = p;
+  if (p) PUB.lastState = p.state || null; else PUB.lastState = null;
+  const sig = JSON.stringify(p === undefined ? "sem-campo" : p);
+  if (sig !== PUB.sig) {
+    const first = PUB.sig === null; PUB.sig = sig;
+    if (p !== undefined) pubInfoFetch(true);
+    pubTransition(prev, p, first); pubResult(p);
+    instRender();
+  }
+  if (wasDown) { PUB.expect = false; instFetch(); }   // §7.4: /api/instance assim que o /api/live volta depois de uma queda
+  pubRender();
+}
+function pubOnDown() {
+  PUB.down = true;
+  if (pubRestarting() && !PUB.downSaid) { PUB.downSaid = true; announce("Reiniciando o Squad Control…"); }
+  pubRender();
+}
+function pubAfterGlobal(band) {   // faixa "Reiniciando…" no lugar do erro genérico de conexão (§7.3)
+  const sd = $("#srv-down"); if (!sd) return;
+  const want = band === "off" && !pubRestarting();
+  if (sd.hidden === want) sd.hidden = !want;
+}
+function pubTransition(prev, p, first) {
+  if (first || !p || prev?.state === p.state) return;
+  const tgt = pubSha(p.target?.commit);
+  if (p.state === "verificando") announce(`Publicando ${tgt}…`);
+  else if (p.state === "aguardando-ponto-seguro") announce(pubIsSafe(p) ? "Publicação aguardando a resposta terminar." : `Squad Control será atualizado para ${tgt} em ${pubLeft(p) ?? "alguns"} s. A resposta em andamento será interrompida.`);
+}
+function pubResult(p) {
+  const r = p?.lastResult;
+  if (!r || typeof r !== "object" || !r.type) { if (p && PUB_SS.get("seen") === null) PUB_SS.set("seen", "nenhum"); return; }   // aba nova sem resultado: o próximo já é novidade
+  const id = pubRid(r), seen = PUB_SS.get("seen");
+  if (seen === id) return;
+  PUB_SS.set("seen", id);
+  if (seen === null) return;   // aba nova: resultado antigo não vira aviso (a faixa de falha ainda aparece, pela regra dela)
+  PUB.expect = false;
+  if (r.type === "squad-updated") {
+    const text = `Squad Control atualizado para ${r.display || pubSha(r.commit)}`;
+    PUB.toast = { text, until: Date.now() + 10000 };
+    PUB_SS.set("toast", JSON.stringify({ text, at: Date.now() }));   // sobrevive à recarga automática que vem logo depois
+    PUB_SS.set("dis", null);
+    announce(text + ".");
+  } else if (r.type === "squad-update-failed") { PUB.toast = null; PUB_SS.set("toast", null); announceErr(pubFailText(r, false)); }
+}
+// lastResult do /api/live não traz fase/rollback: completa pelo /api/squad-control/publication e pelo evento no log.
+function pubFailInfo(r) {
+  const ev = (state?.log || []).find(e => e && e.id && e.id === r.eventId) || {};
+  const inf = PUB.info?.lastResult && pubRid(PUB.info.lastResult) === pubRid(r) ? PUB.info.lastResult : {};
+  const pick = k => r[k] ?? inf[k] ?? ev[k];
+  const rb = pick("rolledBack");
+  return { phase: pick("phase"), detail: pick("detail"), runningCommit: pick("runningCommit"),
+    rolledBack: typeof rb === "boolean" ? rb : PUB.pub?.state === "revertido" || PUB.pub?.mode === "anterior" };
+}
+function pubRunning(x) {
+  const b = INST.data?.build;
+  return b?.display || PUB.info?.server?.display || (x?.runningCommit ? pubSha(x.runningCommit) : "atual");
+}
+function pubFailText(r, html) {
+  const x = pubFailInfo(r), ph = PUB_PHASE[x.phase] || x.phase || "fase não informada", run = pubRunning(x), sha = pubSha(r.commit);
+  const det = String(x.detail || "").split("\n")[0].trim(), short = det.length > 160 ? det.slice(0, 157) + "…" : det;
+  const E = html ? esc : (s => s);
+  if (x.rolledBack) { const t = `Publicação de ${E(sha)} falhou (${E(ph)}); mantida a versão anterior ${E(run)}.`; return html ? `<b>${t}</b>` : t; }
+  return `Publicação de ${E(sha)} não foi feita (${E(ph)})${short ? `: ${E(short)}` : ""}. A versão no ar continua ${E(run)}.`;
+}
+function pubFailure() {
+  const p = PUB.pub; if (!p) return null;
+  const r = p.lastResult, log = ` <a href="#/auditoria/eventos?tipo=squad-update-failed">Veja o log</a>.`;
+  if (r && r.type === "squad-update-failed") {
+    const id = pubRid(r); if (PUB_SS.get("dis") === id) return null;
+    return { k: `fail:${id}`, cls: "err", ic: "✕", html: pubFailText(r, true) + log, close: "fail", id };
+  }
+  if (p.state === "revertido") return { k: "rev", cls: "err", ic: "!", html: `<b>Squad Control revertido:</b> no ar a versão anterior ${esc(pubRunning(null))}.${log}` };
+  return null;
+}
+function pubItems() {
+  const items = [], p = PUB.pub;
+  if (pubRestarting()) items.push({ k: "down", cls: "warn", ic: "↻", html: "<b>Reiniciando o Squad Control…</b> O painel reconecta sozinho em alguns segundos." });
+  else if (p && p.state) {
+    const tgt = esc(pubSha(p.target?.commit));
+    if (p.state === "verificando") items.push({ k: "ver", cls: "", ic: "↻", html: `Publicando ${tgt}…` });
+    else if (p.state === "aguardando-ponto-seguro") items.push(pubIsSafe(p)
+      ? { k: "safe", cls: "", ic: "◷", html: `Publicação de ${tgt} aguardando a resposta da conversa terminar.` }
+      : { k: "cd", cls: "warn", ic: "◷", html: `<b>Squad Control será atualizado para ${tgt} em <span class="pub-n" data-pub-n></span> s.</b> A resposta em andamento será interrompida.` });
+    else if (p.state === "reiniciando" || p.state === "revertendo") items.push({ k: "rei", cls: "warn", ic: "↻", html: p.state === "revertendo" ? "Revertendo para a versão anterior…" : "Reiniciando o Squad Control…" });
+  }
+  const f = pubFailure(); if (f) items.push(f);
+  if (PUB.toast && PUB.toast.until > Date.now()) items.push({ k: "toast", cls: "ok", ic: "✓", html: `<b>${esc(PUB.toast.text)}</b>`, close: "toast" });
+  if (PUB.reloadBar) items.push({ k: "reload", cls: "", ic: "↻", html: "<b>Nova versão do Squad Control no ar.</b> Seu rascunho fica guardado ao recarregar.", act: "reload" });
+  return items;
+}
+function pubBar() {
+  let bar = $("#pub-bar");
+  if (!bar) {
+    const main = $("#conteudo"); if (!main) return null;
+    bar = document.createElement("div"); bar.id = "pub-bar"; bar.className = "pub-bar"; bar.hidden = true;
+    bar.setAttribute("role", "region"); bar.setAttribute("aria-label", "Publicação do Squad Control");
+    const au = $("#ai-usage"); if (au) au.after(bar); else main.prepend(bar);
+  }
+  return bar;
+}
+function pubRender() {
+  const bar = pubBar(); if (!bar) return;
+  if ($("#ai-usage")?.hidden) document.documentElement.style.setProperty("--usage-h", "0px");
+  const items = pubItems();
+  const html = items.map(i => `<div class="pub-item ${i.cls}" data-pub-k="${esc(i.k)}"><span class="pub-ic" aria-hidden="true">${i.ic}</span><span class="pub-t">${i.html}</span>${i.act || i.close ? `<span class="pub-acts">${i.act === "reload" ? `<button type="button" data-pub-act="reload">Recarregar</button>` : ""}${i.close ? `<button type="button" class="pub-x" data-pub-act="close-${i.close}" ${i.id ? `data-pub-id="${esc(i.id)}"` : ""} aria-label="Fechar aviso" title="Fechar aviso"><span aria-hidden="true">×</span></button>` : ""}</span>` : ""}</div>`).join("");
+  if (html !== PUB.key) {
+    const f = document.activeElement, act = bar.contains(f) ? f.dataset?.pubAct : null;
+    bar.innerHTML = html; PUB.key = html; bar.hidden = !items.length;
+    if (act) (bar.querySelector(`[data-pub-act="${act}"]`) || $("#main"))?.focus?.({ preventScroll: true });
+  }
+  pubTick();
+}
+function pubTick() {
+  const p = PUB.pub, n = p ? pubLeft(p) : null;
+  document.querySelectorAll("[data-pub-n]").forEach(el => { const t = n === null ? "alguns" : String(n); if (el.textContent !== t) el.textContent = t; });
+}
+// ---- §7.4 recarga automática: commit diferente do que a aba abriu → recarrega se não houver rascunho; senão, faixa.
+function pubHasDraft() {
+  const ta = C("chat-text"); if (ta && ta.value.trim()) return true;
+  if (chat.att.length || chat.sending) return true;
+  if (document.querySelector("dialog[open]")) return true;
+  if (editing()) return true;
+  for (const el of document.querySelectorAll("#main textarea, #main input, #drawer textarea, #drawer input")) {
+    if (el.type === "hidden" || el.type === "button" || el.type === "submit") continue;
+    if (el.type === "checkbox" || el.type === "radio") { if (el.checked !== el.defaultChecked) return true; }
+    else if (el.type === "file") { if (el.files?.length) return true; }
+    else if (el.value !== el.defaultValue) return true;
+  }
+  if (Object.values(keepStore).some(v => v !== "" && v !== false && v != null)) return true;
+  if (Object.values(bugComp).some(c => c && (c.busy || c.files?.length || c.draft))) return true;
+  return false;
+}
+function pubCheckReload() {
+  const b = INST.data?.build, cf = b?.commitFull || b?.commit; if (!cf || INST.status !== "ok") return;
+  if (!PUB.openCommit) { PUB.openCommit = cf; return; }
+  if (cf === PUB.openCommit) { if (PUB.reloadBar) { PUB.reloadBar = false; pubRender(); } return; }
+  if (!pubHasDraft()) { pubReload(); return; }
+  if (!PUB.reloadBar) { PUB.reloadBar = true; announce("Nova versão do Squad Control no ar. Use Recarregar quando terminar o rascunho."); pubRender(); }
+}
+function pubReload() {
+  const ta = C("chat-text");
+  if (ta && ta.value.trim()) PUB_SS.set("draft", JSON.stringify({ text: ta.value, conv: chat.id || null }));
+  PUB.openCommit = "__recarregando__";   // não repete
+  location.reload();   // mantém a rota (#/…)
+}
+// ---- §7.1/§7.2 detalhe do selo: linha "Publicação" e botão "Publicar Squad Control".
+async function pubInfoFetch(force) {
+  if (PUB.infoBusy || (!force && Date.now() - PUB.infoAt < 1000)) return;
+  PUB.infoBusy = true;
+  try {
+    const r = await fetch("/api/squad-control/publication", { cache: "no-store" });
+    if (r.status === 404) PUB.infoStatus = "old";
+    else if (!r.ok) PUB.infoStatus = "err";
+    else { let j = null; try { j = await r.json(); } catch (e) {}
+      if (j && typeof j === "object" && "canPublish" in j) { PUB.info = j; PUB.infoStatus = "ok"; } else PUB.infoStatus = "old"; }
+  } catch (e) { if (PUB.infoStatus !== "ok") PUB.infoStatus = "err"; }
+  PUB.infoBusy = false; PUB.infoAt = Date.now();
+  if (INST.open) instRender();
+}
+function pubStateText() {
+  const p = PUB.pub;
+  if (p === undefined) return PUB.infoStatus === "ok" && PUB.info?.supervised === false ? "sem publicador (Squad Control iniciado sem make squad)" : "servidor sem publicação (versão anterior à D24)";
+  if (p === null) return "sem publicador (Squad Control iniciado sem make squad)";
+  const tgt = p.target?.commit ? ` ${pubSha(p.target.commit)}` : "";
+  let t = `${PUB_STATE[p.state] || p.state || "—"}${PUB_BUSY.includes(p.state) ? tgt : ""}`;
+  if (p.state === "aguardando-ponto-seguro" && !pubIsSafe(p)) t += ` (reinicia em ${pubLeft(p) ?? "?"} s)`;
+  if (p.mode === "anterior") t += " · modo anterior";
+  const r = p.lastResult;
+  if (r && r.type) t += ` · último: ${r.type === "squad-updated" ? `atualizado para ${r.display || pubSha(r.commit)}` : r.type === "squad-update-failed" ? `falhou ${pubSha(r.commit)}` : r.type}${r.at ? ` em ${new Date(r.at).toLocaleString("pt-BR")}` : ""}`;
+  return t;
+}
+function pubPanelHtml() {
+  if (typeof PUB === "undefined" || !PUB || !INST.data?.environment) return "";
+  const prod = INST.data.environment.name === "produtivo";
+  let ctl = "";
+  if (!prod) ctl = `<p class="pub-why">${esc(PUB_REASON.nao_produtivo)}.</p>`;
+  else {
+    const ok = PUB.infoStatus === "ok", why = PUB.posting ? null
+      : ok ? (PUB.info.canPublish ? null : (PUB_REASON[PUB.info.reason] || `Indisponível (${PUB.info.reason || "motivo não informado"})`))
+      : PUB.infoStatus === "old" ? PUB_REASON.sem_supervisor : PUB.infoStatus === "err" ? "Não foi possível verificar o publicador" : "Verificando o publicador…";
+    const dis = PUB.posting || !!why;
+    ctl = `<button type="button" data-pub-btn ${dis ? "disabled" : ""} ${why ? `aria-describedby="pub-why"` : ""} title="Publica o código da develop. O Squad Control fica fora por ~5 s e a página recarrega sozinha.">${PUB.posting ? "Pedindo publicação…" : "Publicar Squad Control"}</button>`
+      + (why ? `<p class="pub-why" id="pub-why">${esc(why)}${why === PUB_REASON.sem_supervisor ? "" : "."}</p>` : `<p class="pub-why">O Squad Control fica fora por ~5 s e a página recarrega sozinha.</p>`);
+  }
+  const msg = PUB.msg ? `<p class="pub-msg ${PUB.msg.ok ? "ok" : "err"}">${esc(PUB.msg.text)}</p>` : "";
+  return `<div class="pub-sec"><dl style="margin:0"><dt>Publicação</dt><dd class="txt" id="pub-state">${esc(pubStateText())}</dd></dl>${ctl}${msg}</div>`;
+}
+function pubInstView(v, d) {
+  if (typeof PUB === "undefined" || !PUB || !d) return v;
+  const f = d.freshness || {}, p = PUB.pub;
+  if (f.state === "revertido") {
+    const t = `revertido (falhou ${pubSha(f.failedCommit)})`;
+    return { ...v, bad: `[!] ${t}`, warn: true, aria: `${v.aria.replace(/\. Não foi possível verificar a versão$/, "")}. Atenção: ${t}` };
+  }
+  // sem supervisor (p === null) o texto da D18 fica ("Reinicie (make squad)"): é a ação certa e o botão mostra o motivo.
+  if (f.state === "desatualizado" && p) {
+    const bad = p.state !== "no-ar" ? "Desatualizado, publicando…" : "Desatualizado: publique pelo detalhe do selo.";
+    return { ...v, bad, aria: v.aria.replace(". Desatualizado, reinicie", `. ${bad.replace(/[.…]$/, "")}`) };
+  }
+  return v;
+}
+function pubClassify(e, N) {
+  const href = t => `#/auditoria/eventos?tipo=${t}`;
+  if (e.type === "squad-updated") return N({ title: `${e.sameCommit ? "Squad Control reiniciado em" : "Squad Control atualizado para"} ${e.display || pubSha(e.commit)}`,
+    body: [`gatilho: ${PUB_TRIGGER[e.trigger] || e.trigger || "—"}`, e.interrupted ? "uma resposta da conversa foi interrompida" : ""].filter(Boolean).join(" · "), href: href("squad-updated") });
+  if (e.type === "squad-update-failed") { const ph = PUB_PHASE[e.phase] || e.phase || "—";
+    return N({ title: e.rolledBack ? `Squad Control: publicação de ${pubSha(e.commit)} falhou (${ph}), mantida a versão anterior` : `Squad Control: publicação de ${pubSha(e.commit)} não feita (${ph})`,
+      body: String(e.detail || "").slice(0, 140), href: href("squad-update-failed") }); }
+  if (e.type === "squad-server-crashed") return N({ title: `Squad Control caiu e foi reiniciado${e.restarts ? ` (${e.restarts})` : ""}`, body: e.exitCode != null ? `código de saída ${e.exitCode}` : "", href: href("squad-server-crashed") });
+  return null;   // squad-publish-requested: ação do próprio humano, fica só na Auditoria
+}
+async function pubPost(body) {
+  PUB.posting = true; PUB.msg = null; instRender();
+  let r = null, j = {};
+  try { r = await fetch("/api/squad-control/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); j = await r.json().catch(() => ({})); } catch (e) {}
+  PUB.posting = false;
+  if (r && r.status === 202) {
+    PUB.expect = true; PUB.expectAt = Date.now();
+    PUB.msg = { ok: true, text: body.when === "safe" ? "Publicação pedida: começa quando a resposta da conversa terminar." : "Publicação pedida. O Squad Control fica fora por alguns segundos e a página recarrega sozinha." };
+    announce(PUB.msg.text);
+  } else if (r && r.status === 409 && j.code === "resposta_em_andamento" && !body.confirm) { instRender(); pubDlgOpen(); return; }
+  else {
+    const c = j.code, text = c === "sem_supervisor" ? `${PUB_REASON.sem_supervisor}.` : c === "nao_produtivo" ? `${PUB_REASON.nao_produtivo}.` : c === "publicacao_em_andamento" ? "Já há uma publicação em andamento."
+      : c === "origem_invalida" ? "Pedido recusado: origem inválida." : c === "resposta_em_andamento" ? "Ainda há uma resposta em andamento; tente de novo." : r ? `Falha ao pedir a publicação (${r.status}${c ? ` ${c}` : ""}).` : "Sem conexão com o servidor.";
+    PUB.msg = { ok: false, text }; announceErr(text);
+  }
+  pubInfoFetch(true); instRender();
+}
+function pubDlg() {
+  let d = C("pub-dlg"); if (d) return d;
+  d = document.createElement("dialog"); d.className = "pub-dlg"; d.id = "pub-dlg";
+  d.setAttribute("aria-labelledby", "pub-dlg-h"); d.setAttribute("aria-describedby", "pub-dlg-d");
+  d.innerHTML = `<h2 id="pub-dlg-h">Há uma resposta da conversa em andamento.</h2>
+    <p id="pub-dlg-d">Publicar agora interrompe essa resposta (o texto já recebido fica salvo).</p>
+    <div class="pub-dacts"><button type="button" class="dang" data-pub-dlg="now">Publicar agora</button><button type="button" class="pri" data-pub-dlg="safe">Publicar quando a resposta terminar</button><button type="button" data-pub-dlg="cancel">Cancelar</button></div>`;
+  document.body.appendChild(d);
+  // cliques no diálogo não fecham o detalhe do selo (listener de documento da D18)
+  d.addEventListener("click", ev => {
+    ev.stopPropagation();
+    const b = ev.target.closest?.("[data-pub-dlg]"); if (!b) return;
+    const a = b.dataset.pubDlg; d.close(a);
+    if (a === "now") pubPost({ when: "now", confirm: true }); else if (a === "safe") pubPost({ when: "safe" });
+  });
+  d.addEventListener("close", () => { const t = $("#inst-panel [data-pub-btn]"); if (t && !t.disabled && INST.open) t.focus({ preventScroll: true }); else (INST.open ? $("#inst-panel-h") : INST.trigger || $("#inst-side"))?.focus?.({ preventScroll: true }); });
+  return d;
+}
+function pubDlgOpen() { const d = pubDlg(); if (!d.open) d.showModal(); d.querySelector('[data-pub-dlg="safe"]').focus(); }
+window.addEventListener("keydown", e => { if (e.key === "Escape" && C("pub-dlg")?.open) e.stopPropagation(); }, true);   // Esc fecha só o diálogo (não a conversa)
+document.addEventListener("click", ev => {
+  if (ev.target.closest?.("#inst-side, #inst-c")) { PUB.msg = null; setTimeout(() => { if (INST.open) pubInfoFetch(true); }, 0); return; }
+  const pb = ev.target.closest?.("[data-pub-btn]"); if (pb) { if (!pb.disabled && !PUB.posting) pubPost({ when: "now" }); return; }
+  const a = ev.target.closest?.("[data-pub-act]"); if (!a) return;
+  const act = a.dataset.pubAct;
+  if (act === "reload") pubReload();
+  else if (act === "close-toast") { PUB.toast = null; PUB_SS.set("toast", null); pubRender(); }
+  else if (act === "close-fail") { PUB_SS.set("dis", a.dataset.pubId || ""); pubRender(); }
+});
+setInterval(() => {
+  pubTick(); pubCheckReload();
+  if (PUB.toast && PUB.toast.until <= Date.now()) { PUB.toast = null; PUB_SS.set("toast", null); pubRender(); }
+  if (PUB.expect && Date.now() - PUB.expectAt > 90000) { PUB.expect = false; pubRender(); }
+  if (INST.open && Date.now() - PUB.infoAt > 15000) pubInfoFetch();
+}, 1000);
+// Depois de uma recarga: aviso "atualizado" pendente e rascunho da conversa (§7.4).
+(() => {
+  try { const t = JSON.parse(PUB_SS.get("toast") || "null"); if (t && t.text && Date.now() - t.at < 60000) PUB.toast = { text: t.text, until: Date.now() + 10000 }; else PUB_SS.set("toast", null); } catch (e) { PUB_SS.set("toast", null); }
+  const raw = PUB_SS.get("draft"); PUB_SS.set("draft", null);
+  try { const d = JSON.parse(raw || "null"), ta = C("chat-text"); if (d && d.text && ta && !ta.value) { ta.value = d.text; ta.dispatchEvent(new Event("input", { bubbles: true })); } } catch (e) {}
+  pubRender();
+})();
 </script>
 </body>
 </html>
