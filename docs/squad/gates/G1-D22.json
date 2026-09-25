@@ -1,0 +1,53 @@
+{
+  "gate": "G1",
+  "cycle": 1,
+  "demand": "b26da7851764",
+  "code": "D22",
+  "phase": "F1 (só o ADR)",
+  "from": "arquiteto",
+  "to": "humano (aprovação do ADR e respostas do §9) → Orquestrador (abrir F2)",
+  "recommendation": "APPROVE",
+  "confidence": 0.75,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Cada ponto de acoplamento com classe, destino e fase", "status": "pass",
+     "source": "parse das tabelas do mapa: 67 linhas, nenhuma sem destino/fase; classes 28 PLAT/18 CFG/14 MEM/7 PROD e primeira fase F2=25, F3=14, F4=20, F5=7, sem mudança=1 conferem com a contagem declarada (2 linhas com `\\|` escapado dentro da célula, D8 e D14, renderizam corretamente)"},
+    {"name": "(2) Completude do mapa por amostragem no código", "status": "validate",
+     "source": "grep -rn 'checkout|plankton|jcrouzillard|7070|docs/squad' em tools/squad, squad-control, Makefile, .github, tests/squad, docs/squad, .claude/agents: todos os valores fixos relevantes estão cobertos (REPO em gitflow/bugs/github_sync/index.html, checkout-saga/teste, portas, 7070, plankton-teste, OWNERS, STATE, mvn/pom). Omissões menores listadas em open_risks (ADR-015/D12 em voo, links blob/ das issues para a memória, CORRELATION_KEYS orderId/sagaId em bugs.py:185, textos de caminho/porta no index.html:1434,2023-2031,2413-2462, git-filter-repo ausente)"},
+    {"name": "(B,3) Ordem da migração com dependências explícitas", "status": "pass",
+     "source": "ADR-024 §6: F2 cadastro sem mover → F3 memória → F4 repositório → F5 painel → F6 prova; dependências F3⇐F2, F4⇐F3, F6⇐F5 justificadas; cada fase com critério de aceite verificável e rollback"},
+    {"name": "(B,2) Achados do Arquiteto procedem", "status": "pass",
+     "source": "(1) códigos D{n}: alerts.py:91-98/gitflow.py:415 contam tasks do humano; recalculado no log vivo (6af061f): 349e5b1bf818=D7, e31bdfb73679=D8, f2324e0f25de=D9, 174084ec85d0=D10, enquanto ui-cancelar-demanda.md:1 diz D7=e31bdfb73679, ADR-011 diz D8=349e5b1bf818, ADR-012 diz D9=174084ec85d0 — divergência confirmada; (2) gitflow.py:35, github_sync.py:29, triage.py:17 fixam LOG = ROOT/…decisions.jsonl sem SQUAD_LOG — confirmado; (3) pareceres no PR: 428e06c só adiciona docs/squad/gates/G1-D21.json na feature; git log origin/develop mostra G1/G2/G3-D19/D20 integrados — confirmado; (4) transcrições: server.py:65-70 slug de DATA_ROOT e run_agent.py:49-52 slug de ROOT — confirmado; números do log (622 eventos, 73 gates, 14 PRs, 173 issues) conferem"},
+    {"name": "(2) Coerência com ADRs existentes (011, 016–023)", "status": "validate",
+     "source": "ADR-011 (merge humano), 017 (orçamento por produto), 018 (mecanismo genérico + valores no cadastro), 019 (evidências no git da memória), 021 (versão da plataforma), 022 (SQUAD_LOG exportado, critério G3 substituído) coerentes. Conflito não declarado: ADR-020 §alternativa G rejeitou conversas no git ('histórico permanente de texto livre'); ADR-024 põe conversas em mem:conversas/ (git) com remoto opcional (Q4) e lista ADR-020 como 'sem mudança de regra'. ADR-015 (D12, fábrica, PR em aberto) ausente da lista de ADRs migrados (§3, E2)"},
+    {"name": "(2) Fases pequenas, verificáveis e reversíveis", "status": "validate",
+     "source": "F3–F6 bem delimitadas, flags de retorno (SQUAD_MEMORY_MODE, SQUAD_MULTI), corte ≤ 15 min com verificação por ids/sha256. F2 concentra 25 pontos em quase todas as ferramentas (não é 'pequena'); F3/F4 dependem de git-filter-repo, que não está instalado no host (`git filter-repo` → comando inexistente) e não é stdlib"},
+    {"name": "(1) Perguntas ao humano objetivas", "status": "pass",
+     "source": "ADR-024 §9: 8 perguntas fechadas, cada uma com proposta"},
+    {"name": "(1) Protocolo de handoff (brief em docs/squad/memory/handoffs)", "status": "fail",
+     "source": "evento handoff 2f60b5301319 existe no log, mas não há brief .md de D22 em docs/squad/memory/handoffs/ (nem na cópia principal nem no worktree); o detail diz 'não commitados' mas o commit 11ae26e já existe"}
+  ],
+  "blocking_questions_for_F2": {
+    "blocks": ["Q2 — numeração (prefixo por produto vs global; D22 continua D22): a F2 grava `code` no task, cria code_prefix e congela codes.json/aliases — sem a resposta a F2 não tem especificação"],
+    "do_not_block": ["Q1 (repo/visibilidade: F4)", "Q3 (histórico inteiro: F3; os códigos são congelados por id de qualquer forma)", "Q4 (remoto da memória: F3 — mas decide para onde apontam os links de parecer/evidência em PRs e issues)", "Q5 (janela de corte: F3)", "Q6 (calços/apelidos: F4/F5)", "Q7 (apagar arquivos antigos: pós-F3)", "Q8 (produto de prova: F6)"],
+    "note": "Recomendo responder Q3 junto com Q2 (a forma de exibir o legado no squad-platform depende do esquema de códigos) e Q4 antes do G1 da F3."
+  },
+  "open_risks": [
+    "Conflito com ADR-020: conversas em git (mem:conversas/) com remoto opcional contraria a alternativa G rejeitada; ou conversas vão para run: (fora do git, como hoje), ou o ADR-024 declara que emenda o ADR-020 e exige máscara antes de qualquer remoto. Inclui os anexos de imagem da D21/ADR-023 (não mapeados).",
+    "ADR-015 (D12, feature/D12-evidencias-na-demanda, PR #104 aberto desde 23/09) não aparece em E2/§3; demandas em voo com vida longa (D12, D21) vão conflitar com F2–F4 — falta regra de rebase/merge das branches em voo entre fases.",
+    "Links para a memória fora do mapa: github_sync.py:98-99,140,194 grava nas issues links blob/<branch>/docs/squad/… (log, handoffs, evidências de bug); com memória só local (Q4) o 'PR passa a citar o parecer por link' não tem alvo acessível ao revisor, e os links das 173 issues antigas quebram se Q7 = apagar.",
+    "Isolamento da conversa entre produtos: com runner codex a leitura não é restrita (CODEX_WARNING em conversa.py) e claude_deny_paths não nega $SQUAD_HOME/products/<outro>; o teste de negação da F6 precisa cobrir os dois runners ou declarar a limitação.",
+    "Regras em duas camadas: Codex/Copilot/Devin leem só o AGENTS.md do cwd e não seguem link; fora do run_agent a constituição não chega a eles — prever cópia gerada ou include explícito.",
+    "Plataforma como produto de si mesma: o 'produtivo' do squad-platform é um processo Python (porta 7070), não um projeto Compose; o esquema [env.prod] do cadastro precisa de um tipo não-Compose (ou prod.py não se aplica) — definir no contrato da F2/F5.",
+    "git-filter-repo não instalado no host e não é stdlib: declarar como pré-requisito de F3/F4 ou usar alternativa (git fast-export/subtree).",
+    "F2 grande (25 pontos): sugerido dividir em F2a (resolvedor, code congelado, SQUAD_LOG nos 3 scripts, slug das transcrições) e F2b (valores para o cadastro).",
+    "Omissões menores de CFG: CORRELATION_KEYS orderId/sagaId (bugs.py:185) → cad:evidence.correlation_keys; TE_APIS/TE_URLS e textos de caminho docs/squad/… e :16686 no index.html (1433-1434, 2023-2031, 2174-2176, 2413-2462) → derivar do cadastro/API; tests/squad com constantes do checkout em 10 arquivos (ajustar junto com o critério (b) da F2)."
+  ],
+  "corrections": [
+    "Antes do aceite humano (sem novo ciclo de gate): no ADR-024, resolver o destino de conversas vs ADR-020 e incluir ADR-015 na lista de ADRs da fábrica; acrescentar ao mapa as linhas de links blob/ (github_sync) e CORRELATION_KEYS.",
+    "No contrato da F2: tipo de produtivo não-Compose; regra para branches em voo; pré-requisito git-filter-repo para F3/F4.",
+    "Arquiteto: registrar o brief de handoff em docs/squad/memory/handoffs/."
+  ],
+  "human_required": false,
+  "rationale": "O mapa é sólido, verificado linha a linha por amostragem: 67 pontos, todos com classe, destino e fase, contagens consistentes, e os quatro achados centrais (códigos D{n} já divergentes, três ferramentas ignorando SQUAD_LOG, pareceres entrando nos PRs, slug das transcrições por ROOT/DATA_ROOT) procedem no código e no log vivo. As decisões (repo squad-platform, product.toml na plataforma, memória git local por produto, histórico D1–D21 inteiro, duas camadas de regras, plataforma como produto, corte curto com flag de retorno) são coerentes entre si e com ADR-011/017/018/019/021/022, com exceção do destino das conversas (conflito com ADR-020) e da omissão do ADR-015. O plano é ordenado, verificável e reversível; F2 é grande e F3/F4 têm uma dependência de ferramenta não declarada. Nenhuma falha em critério bloqueante: APPROVE com ressalvas (confiança 0,75, risco moderado). Só a Q2 bloqueia o início da F2. A aprovação do ADR e as respostas do §9 continuam sendo do humano (critério de aceite da fase)."
+}
