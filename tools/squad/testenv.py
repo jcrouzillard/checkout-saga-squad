@@ -134,6 +134,13 @@ def main_root() -> pathlib.Path:
     return find_main_root() or ROOT
 
 
+PUBLISHER_WORKTREE = "plankton-squad-prev"   # D24 (ADR-025 §5.5.7): rollback do publicador — nunca é ambiente de teste
+
+
+def is_publisher_worktree(p: pathlib.Path) -> bool:
+    return pathlib.Path(p).name == PUBLISHER_WORKTREE
+
+
 def worktree() -> pathlib.Path:
     env = os.environ.get("SQUAD_TEST_WORKTREE")
     return pathlib.Path(env).resolve() if env else main_root().parent / "plankton-teste"
@@ -622,6 +629,9 @@ def publish(demand: str, require_request: bool = True, commit: str | None = None
     pr = info.get("number") or rv.get("pr")
     t0 = time.time()
     wt = worktree()
+    if is_publisher_worktree(wt):   # D24: o worktree do publicador nunca é oferecido ao teste
+        _fail({}, demand, "guard", f"worktree {wt.name} pertence ao publicador do Squad Control (rollback)")
+        return False
     append("test-env-publishing", f"Publicando no teste: PR #{pr} @ {sha[:12]}", demand=demand, pr=pr,
            url=rv.get("url"), commit=sha, detail=reason or None)
     ctx = {"pr": pr}

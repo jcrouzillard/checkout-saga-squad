@@ -30,7 +30,9 @@ TYPES = {"task", "decision", "handoff", "gate", "defect", "change-request", "hum
          # D16 (ADR-019): evidência acrescentada a uma demanda de bug — gravado pelo servidor (POST /api/bug/evidence)
          "bug-evidence",
          # D19 (ADR-022): delegação pela conversa — o tipo `delegation` NÃO entra aqui (só o servidor o grava)
-         "delegation-start", "delegation-result", "review-updated", "pr-conflict", "pr-conflict-cleared"}
+         "delegation-start", "delegation-result", "review-updated", "pr-conflict", "pr-conflict-cleared",
+         # D24 (ADR-025): publicação do Squad Control — gravados pelo servidor e por tools/squad/publisher.py
+         "squad-publish-requested", "squad-updated", "squad-update-failed", "squad-server-crashed"}
 DELEGATION_STATUS = {"ok", "falhou", "obsoleta", "recusada", "cancelada"}
 # campos obrigatórios por tipo novo (contrato delegacao-pela-conversa §3.2)
 REQUIRED = {"delegation-start": ("demand", "delegation", "branch", "to"),

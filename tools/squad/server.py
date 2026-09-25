@@ -36,6 +36,7 @@ import bugs  # noqa: E402  (D16, ADR-019: demandas de bug — rascunho, links do
 import evidence_rules as er  # noqa: E402  (D16: regras únicas de evidência, máscara e limites)
 import instance as inst  # noqa: E402  (D18, ADR-021: ambiente e versão do próprio Squad Control)
 import conversa as cv  # noqa: E402  (D17, ADR-020: conversa direta com o Orquestrador)
+import publication as pub  # noqa: E402  (D24, ADR-025: publicação do Squad Control pelo supervisor)
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -751,6 +752,7 @@ def annotate_delegations(alerts: list[dict], rows: list[dict], rules, now: float
 
 def live_payload() -> tuple[bytes, str]:
     data = compute(full=False)
+    data["publication"] = pub.live_view(pub.state_dir(DATA_ROOT))   # D24 §4.3: ≤ 1 KB, null sem supervisor
     body = json.dumps(data, ensure_ascii=False).encode()
     if len(body) > LIVE_MAX_BYTES:   # nunca passa de 64 KB: corta o menos essencial primeiro
         for a in data["agents"]:
@@ -1608,7 +1610,14 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:  # nunca derruba /api/state
             return None
 
+    def _chat_busy(self):
+        return _CHAT.busy() if _CHAT is not None else None
+
     def do_GET(self):
+        if self.path.startswith("/api/squad-control/publication"):   # D24 (ADR-025, contrato §4.1)
+            if not self._local_ok():
+                return self._forbidden()
+            return self._json(pub.api_view(pub.state_dir(DATA_ROOT), self._instance(), self._chat_busy()))
         if self.path == "/api/conversas" or self.path.startswith(("/api/conversas/", "/api/conversas?")):
             return self._chat_get()
         if self.path.startswith("/api/bug/"):
@@ -1686,6 +1695,15 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
+        if urllib.parse.urlsplit(self.path).path == "/api/squad-control/publish":   # D24 (contrato §4.2)
+            if not self._local_ok():
+                self.close_connection = True
+                return self._forbidden()
+            if length < 0 or length > pub.MAX_BODY:
+                return self._json({"code": "pedido_invalido", "error": "corpo inválido"}, 400, close=True)
+            code, out = pub.handle_publish(pub.state_dir(DATA_ROOT), self._instance(), self._chat_busy(),
+                                           self.headers.get("Content-Type"), self.rfile.read(length), append_log)
+            return self._json(out, code)
         m = cv.UPLOAD_ROUTE_RE.match(urllib.parse.urlsplit(self.path).path)
         if m:   # D21 §4: rota de anexo casada ANTES do teto de 32 KB; teto próprio de 5 MB antes de ler o corpo
             return self._chat_upload(m.group(1), length)
@@ -1913,7 +1931,13 @@ def main():
     # Aquecimento: a 1ª leitura das transcrições é completa (dezenas de MB); as seguintes só leem o que foi acrescentado.
     threading.Thread(target=lambda: compute(full=False), daemon=True).start()
     chat()   # D17: fecha como `interrompida` turnos que ficaram abertos numa execução anterior
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    # D24 §6: SIGTERM gracioso (turno → interrompida com o texto parcial) no servidor supervisionado; em primeiro
+    # plano (make squad-primeiro-plano, testes) o comportamento antigo continua (recover() na próxima subida).
+    wait = pub.install_signals(httpd, lambda: _CHAT) if os.environ.get("SQUAD_SUPERVISED") else (lambda: None)
+    httpd.serve_forever()
+    wait()
+    httpd.server_close()
 
 
 if __name__ == "__main__":

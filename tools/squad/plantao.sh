@@ -9,6 +9,8 @@ echo "plantão do Orquestrador · runner=${SQUAD_RUNNER:-claude} · a cada ${INT
 while true; do
   # D15 (contrato §4.6): pedidos do humano ao ambiente de teste parados pelo lock são retomados a cada ciclo.
   [ -f infra/teste/teste.env ] && python3 tools/squad/testenv.py reconcile >/dev/null 2>&1 || true
+  # D24 (ADR-025): sobe o publicador do Squad Control se a 7070 estiver livre (nunca adota um servidor no ar).
+  python3 tools/squad/publisher.py ensure >/dev/null 2>&1 || true
   if python3 tools/squad/pending.py; then
     python3 tools/squad/run_agent.py orquestrador @docs/squad/prompts/plantao.md || echo "execução do Orquestrador terminou com erro"
   fi
