@@ -1,0 +1,50 @@
+{
+  "gate": "G1",
+  "demand": "b72a6bd8caf3",
+  "from": "arquiteto",
+  "to": "orquestrador",
+  "cycle": 1,
+  "handoff": "fe8c677dfe74",
+  "commit": "94d97c2",
+  "recommendation": "APPROVE",
+  "confidence": 0.82,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Respostas do humano refletidas", "status": "pass", "weight": 3, "blocking": true,
+     "source": "decisions.jsonl e7df6310d4b6: q1 'somente a Opção A' + Squad Control com teste apartado → ADR-021 §Decisão 1 e contrato §1 (só a instância do próprio Squad Control; checkout fora, §8); q2 'uma combinação' → §2 display '<tag> · <pom> · <sha7>'; q3 'sempre visível, rodapé do menu à esquerda' → §5 bloco .instance sticky bottom:0 no fim de .side"},
+    {"name": "Regra determinística do ambiente", "status": "validate", "weight": 3, "blocking": true,
+     "source": "contrato §1: tabela ordenada 1-5, primeira que decide vence, avaliada na subida, comparação por Path.resolve(), reason explicativo. Ressalva R1: testenv.main_root() (tools/squad/testenv.py:109-126) devolve ROOT quando nenhum worktree está em develop ou o git falha — reusá-lo como está faria um worktree de feature na 7070 virar 'produtivo'; o reuso precisa distinguir 'encontrado' de 'fallback' (e respeitar o timeout de 2 s, hoje 10 s)"},
+    {"name": "Fatos do ADR conferidos no repositório", "status": "pass", "weight": 2, "blocking": true,
+     "source": "git describe --tags develop → 'fatal: No tags can describe 91e3a64…'; git merge-base --is-ancestor v1.0.0 develop → não; git tag --list 'v[0-9]*' --sort=-v:refname → v1.0.0; pom.xml:10 parent 3.4.5, :16 projeto 1.1.0-SNAPSHOT; server.py:41 DATA_ROOT=SQUAD_ROOT_DATA, :701 'version': data_version() (versão dos dados), :1471 porta padrão 7070, :1476 bind 127.0.0.1; ADR 020 ausente (reservado à D17), sem colisão"},
+    {"name": "Custo: nada de git no /api/live", "status": "pass", "weight": 2, "blocking": true,
+     "source": "§2 cálculo único na subida com timeout 2 s; §3 headNow com cache de 30 s só em /api/state e /api/instance; §4 e CA13 (contador de subprocess = 0 no /api/live, payload/headers inalterados). Ressalva R2: §3 prevê rev-parse + diff --quiet + diff --name-only (até 3 comandos), mas o texto e o CA13 dizem '1 por 30 s' — alinhar"},
+    {"name": "Compatibilidade da API (só acréscimos, version intocado)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "§4: chave nova 'instance' em /api/state e rota nova GET /api/instance (no-store); 'version' preservado (ADR-017) e /api/live inalterado; CA14 teste de contrato; CA19 servidor antigo 404 → selo 'desconhecido' com texto de reinício"},
+    {"name": "Estados desatualizado / sujo / desconhecido", "status": "validate", "weight": 2, "blocking": false,
+     "source": "§3 atual/desatualizado/indeterminado por diff restrito a tools/squad e squad-control (commits de memória não desatualizam, CA10/CA11); §2 dirty restrito às mesmas pastas (CA12); §1 desconhecido para SQUAD_ENV inválida ou sem git (CA4/CA5). Ressalvas R3 (dirty só na subida, mas squad-control/ é servido do disco — recalcular junto com freshness no cache de 30 s) e R4 (SQUAD_LOG, server.py:42, também pode apontar para o log real; dataIsMain deve considerar o caminho efetivo do LOG)"},
+    {"name": "UI 1440/390 e acessibilidade", "status": "validate", "weight": 2, "blocking": false,
+     "source": "§5: ≥900 px sticky no rodapé de .side (a .layout estica a coluna até a altura do main, então o sticky bottom funciona em página longa — CA15); <900 px selo compacto no cabeçalho; button aria-expanded, Esc/clique fora, aria-label, texto além de cor, AA nos dois temas, prefixo [TESTE] no document.title (CA16-CA18). Ressalva R5 = pergunta (a): abaixo de 600 px o header é position: relative (index.html:296, D14-QA-4), então a 390 px o selo sai da tela ao rolar — não cumpre literalmente 'sempre visível'"},
+    {"name": "Critérios de aceite verificáveis", "status": "pass", "weight": 2, "blocking": false,
+     "source": "CA1-CA20 com forma de verificação (unitário com ROOT/porta/DATA_ROOT simulados, repo temporário com tag fora da história, contador de subprocess, Playwright 1440/390, axe, rota interceptada, git que dorme)"},
+    {"name": "Ownership, escopo e riscos", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Orquestrador tools/squad/** (server.py, instance.py), Frontend squad-control/**, DevOps só se houver alvo make, QA tests/** — bate com AGENTS.md; §7 riscos e §8 fora de escopo explícitos"}
+  ],
+  "open_risks": [
+    "R1 (corrigir na implementação, Orquestrador) — main_root() com fallback silencioso para ROOT: expor uma variante que retorne None quando nenhum worktree está em develop ou o git falha (rodar a regra 3 antes, sem depender dela) e usar timeout de 2 s. Acrescentar ao CA2/CA3 o caso 'nenhum worktree em develop' → teste.",
+    "R2 — contagem de git no freshness: fazer diff --quiet/--name-only só quando headNow muda (memorizar por par commitFull→headNow); reescrever CA13 como 'no máximo 1 rev-parse por 30 s e diff só em HEAD novo'.",
+    "R3 — dirty calculado só na subida: como squad-control/ é servido do disco, recalcular dirty junto com freshness (mesmo cache de 30 s) para '+alterações' refletir o que está na tela.",
+    "R4 — dataIsMain deve olhar também LOG (SQUAD_LOG) além de DATA_ROOT; uma instância de teste com SQUAD_LOG apontando para o log da cópia principal grava no log real sem aviso.",
+    "R5 — pergunta (a), 390 px: o critério do humano é 'sempre visível'; não bloqueia porque o pedido explícito é o rodapé do menu (desktop) e o prefixo [TESTE]/[?] no título da aba é sempre visível, mas o padrão recomendado é, abaixo de 600 px, fixar o selo compacto (position: fixed; bottom/left com safe-area, sem cobrir os toasts à direita) — custo baixo e cumpre o critério literalmente. Humano confirma na revisão.",
+    "R6 — tags de pré-release (v1.1.0-rc1) ordenam acima da final com -v:refname sem versionsort.suffix; hoje só há v1.0.0 — registrar ou filtrar para vX.Y.Z."
+  ],
+  "questions_to_human": [
+    {"id": "a", "blocking": false, "default": "Abaixo de 600 px o selo compacto fica fixo (position: fixed no canto inferior esquerdo), cumprindo 'sempre visível'; entre 600 e 900 px segue no cabeçalho, que já é sticky.",
+     "note": "Como está no contrato, a 390 px o selo some ao rolar — fere a letra do critério 3; o padrão acima corrige sem mudar o cabeçalho (D14-QA-4)."},
+    {"id": "b", "blocking": false, "default": "Só aviso ('dados do produtivo') nesta demanda; bloquear escrita vira demanda própria se o humano quiser.",
+     "note": "Somar R4 (SQUAD_LOG) para o aviso não ter furo."},
+    {"id": "c", "blocking": false, "default": "Fora de escopo; a regra de inferência (worktree ≠ develop ou porta ≠ 7070 → teste) já dá o selo certo sem convenção. Sugestão para demanda futura: 'make squad-teste' em porta fixa (ex.: 7170).",
+     "note": "Nenhum CA depende disso."}
+  ],
+  "human_required": false,
+  "rationale": "ADR-021 e o contrato traduzem as três respostas do humano e estão ancorados em fatos conferidos no repositório (git describe falha em develop, v1.0.0 fora da história, pom do projeto ≠ parent, 'version' já é a versão dos dados, bind em 127.0.0.1). A regra de ambiente é ordenada e determinística, a API é só acréscimo com nome novo ('instance'), o /api/live fica sem git e há fallback para servidor antigo. Nenhuma das 3 perguntas é bloqueante: (a) fere a letra de 'sempre visível' a 390 px, mas há padrão barato (selo fixo abaixo de 600 px) que o humano confirma na revisão; (b) e (c) seguem o padrão do contrato. Ressalvas para a implementação: fallback de main_root() (R1, a mais importante — pode rotular um worktree como produtivo), contagem de git (R2), dirty recalculado (R3), SQUAD_LOG em dataIsMain (R4). Confiança 0.82 = 15.5/19 (critérios 'validar' em regra do ambiente, estados e UI); risco baixo: recurso somente leitura, local, sem tocar o checkout."
+}

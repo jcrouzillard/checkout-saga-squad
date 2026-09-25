@@ -1,0 +1,741 @@
+{
+  "results": {
+    "CA15-1440x900-dark": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "docH": 48934,
+      "scrollY": 48034,
+      "sideTop": {
+        "x": 16,
+        "y": 797,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideEnd": {
+        "x": 16,
+        "y": 668,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideText": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "compactoOculto": true
+    },
+    "CA15-1440x900-light": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "docH": 48934,
+      "scrollY": 48034,
+      "sideTop": {
+        "x": 16,
+        "y": 797,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideEnd": {
+        "x": 16,
+        "y": 668,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideText": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "compactoOculto": true
+    },
+    "CA15-1280x720-dark": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "docH": 48962,
+      "scrollY": 48242,
+      "sideTop": {
+        "x": 16,
+        "y": 617,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideEnd": {
+        "x": 16,
+        "y": 488,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideText": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "compactoOculto": true
+    },
+    "CA15-1280x720-light": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "docH": 48962,
+      "scrollY": 48242,
+      "sideTop": {
+        "x": 16,
+        "y": 617,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideEnd": {
+        "x": 16,
+        "y": 488,
+        "w": 175,
+        "h": 91,
+        "shown": true,
+        "inView": true
+      },
+      "sideText": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "compactoOculto": true
+    },
+    "largura-800": {
+      "ok": true,
+      "c": {
+        "x": 179,
+        "y": 10,
+        "w": 137,
+        "h": 36,
+        "shown": true,
+        "inView": true
+      },
+      "commitVisivel": true,
+      "text": "●TESTE 97495c5",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "scrollW": 800,
+      "bell": {
+        "x": 750,
+        "y": 0,
+        "w": 26,
+        "h": 56,
+        "shown": true,
+        "inView": true
+      }
+    },
+    "largura-700": {
+      "ok": true,
+      "c": {
+        "x": 171,
+        "y": 10,
+        "w": 81,
+        "h": 36,
+        "shown": true,
+        "inView": true
+      },
+      "commitVisivel": false,
+      "text": "●TESTE",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "scrollW": 700,
+      "bell": {
+        "x": 650,
+        "y": 0,
+        "w": 26,
+        "h": 56,
+        "shown": true,
+        "inView": true
+      }
+    },
+    "CA16-390-dark": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "scrollW": 390,
+      "bell": {
+        "x": 352,
+        "y": 0,
+        "w": 26,
+        "h": 48,
+        "shown": true,
+        "inView": true
+      },
+      "selo": {
+        "x": 12,
+        "y": 792,
+        "w": 137,
+        "h": 40,
+        "shown": true,
+        "inView": true
+      },
+      "text": "●TESTE 97495c5",
+      "toasts": [
+        {
+          "x": 12,
+          "y": 501.625,
+          "w": 358,
+          "h": 86.125
+        },
+        {
+          "x": 12,
+          "y": 597.75,
+          "w": 358,
+          "h": 86.125
+        },
+        {
+          "x": 12,
+          "y": 693.875,
+          "w": 358,
+          "h": 86.125
+        }
+      ],
+      "toastsCobertos": 0,
+      "ultimoBotao": [
+        {
+          "route": "#/demandas",
+          "label": "Como funciona o ciclo da demanda",
+          "x": 16,
+          "y": 659.5,
+          "w": 358,
+          "h": 21,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/painel",
+          "label": "Ver todas as entregues",
+          "x": 16,
+          "y": 659.625,
+          "w": 133.109375,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/demandas/D18/execucao",
+          "label": "Ver na Auditoria",
+          "x": 16,
+          "y": 659.75,
+          "w": 93.171875,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/squad",
+          "label": "Legenda de estados e limites",
+          "x": 16,
+          "y": 659.25,
+          "w": 168.796875,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        }
+      ],
+      "semRolagemH": {
+        "#/painel": true,
+        "#/squad": true,
+        "#/auditoria": true,
+        "#/execucoes": true
+      },
+      "noCabecalho": true
+    },
+    "CA16-390-light": {
+      "ok": true,
+      "rota": "#/auditoria",
+      "scrollW": 390,
+      "bell": {
+        "x": 352,
+        "y": 0,
+        "w": 26,
+        "h": 48,
+        "shown": true,
+        "inView": true
+      },
+      "selo": {
+        "x": 12,
+        "y": 792,
+        "w": 137,
+        "h": 40,
+        "shown": true,
+        "inView": true
+      },
+      "text": "●TESTE 97495c5",
+      "toasts": [
+        {
+          "x": 12,
+          "y": 501.625,
+          "w": 358,
+          "h": 86.125
+        },
+        {
+          "x": 12,
+          "y": 597.75,
+          "w": 358,
+          "h": 86.125
+        },
+        {
+          "x": 12,
+          "y": 693.875,
+          "w": 358,
+          "h": 86.125
+        }
+      ],
+      "toastsCobertos": 0,
+      "ultimoBotao": [
+        {
+          "route": "#/demandas",
+          "label": "Como funciona o ciclo da demanda",
+          "x": 16,
+          "y": 659.5,
+          "w": 358,
+          "h": 21,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/painel",
+          "label": "Ver todas as entregues",
+          "x": 16,
+          "y": 659.625,
+          "w": 133.109375,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/demandas/D18/execucao",
+          "label": "Ver na Auditoria",
+          "x": 16,
+          "y": 659.75,
+          "w": 93.171875,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        },
+        {
+          "route": "#/squad",
+          "label": "Legenda de estados e limites",
+          "x": 16,
+          "y": 659.25,
+          "w": 168.796875,
+          "h": 17,
+          "H": 844,
+          "sobOSelo": false
+        }
+      ],
+      "semRolagemH": {
+        "#/painel": true,
+        "#/squad": true,
+        "#/auditoria": true,
+        "#/execucoes": true
+      },
+      "noCabecalho": true
+    },
+    "CA17-1440-dark": {
+      "ok": true,
+      "opened": {
+        "hidden": false,
+        "exp": "true",
+        "role": "dialog",
+        "focusIn": true,
+        "dts": [
+          "Ambiente",
+          "Motivo",
+          "Versão",
+          "Tag de release",
+          "Versão do pom",
+          "Commit",
+          "Branch",
+          "Alterações locais",
+          "Worktree",
+          "Porta",
+          "Raiz do código",
+          "Origem dos dados",
+          "Log",
+          "Subiu em",
+          "HEAD atual",
+          "Atualidade",
+          "Verificado em"
+        ],
+        "btns": [
+          "Copiar",
+          "Fechar"
+        ],
+        "inView": true
+      },
+      "closed": {
+        "hidden": true,
+        "exp": "false",
+        "focusBack": true
+      },
+      "cliqueFora": true,
+      "fechar": {
+        "hidden": true,
+        "focusBack": true
+      },
+      "faltam": [],
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "esperado": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "titleAttr": "Teste · v1.0.0 · 1.1.0-SNAPSHOT · 97495c5"
+    },
+    "CA17-1440-light": {
+      "ok": true,
+      "opened": {
+        "hidden": false,
+        "exp": "true",
+        "role": "dialog",
+        "focusIn": true,
+        "dts": [
+          "Ambiente",
+          "Motivo",
+          "Versão",
+          "Tag de release",
+          "Versão do pom",
+          "Commit",
+          "Branch",
+          "Alterações locais",
+          "Worktree",
+          "Porta",
+          "Raiz do código",
+          "Origem dos dados",
+          "Log",
+          "Subiu em",
+          "HEAD atual",
+          "Atualidade",
+          "Verificado em"
+        ],
+        "btns": [
+          "Copiar",
+          "Fechar"
+        ],
+        "inView": true
+      },
+      "closed": {
+        "hidden": true,
+        "exp": "false",
+        "focusBack": true
+      },
+      "cliqueFora": true,
+      "fechar": {
+        "hidden": true,
+        "focusBack": true
+      },
+      "faltam": [],
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "esperado": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "titleAttr": "Teste · v1.0.0 · 1.1.0-SNAPSHOT · 97495c5"
+    },
+    "CA17-390-dark": {
+      "ok": true,
+      "opened": {
+        "hidden": false,
+        "exp": "true",
+        "role": "dialog",
+        "focusIn": true,
+        "dts": [
+          "Ambiente",
+          "Motivo",
+          "Versão",
+          "Tag de release",
+          "Versão do pom",
+          "Commit",
+          "Branch",
+          "Alterações locais",
+          "Worktree",
+          "Porta",
+          "Raiz do código",
+          "Origem dos dados",
+          "Log",
+          "Subiu em",
+          "HEAD atual",
+          "Atualidade",
+          "Verificado em"
+        ],
+        "btns": [
+          "Copiar",
+          "Fechar"
+        ],
+        "inView": true
+      },
+      "closed": {
+        "hidden": true,
+        "exp": "false",
+        "focusBack": true
+      },
+      "cliqueFora": true,
+      "fechar": {
+        "hidden": true,
+        "focusBack": true
+      },
+      "faltam": [],
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "esperado": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "titleAttr": "Teste · v1.0.0 · 1.1.0-SNAPSHOT · 97495c5"
+    },
+    "CA17-390-light": {
+      "ok": true,
+      "opened": {
+        "hidden": false,
+        "exp": "true",
+        "role": "dialog",
+        "focusIn": true,
+        "dts": [
+          "Ambiente",
+          "Motivo",
+          "Versão",
+          "Tag de release",
+          "Versão do pom",
+          "Commit",
+          "Branch",
+          "Alterações locais",
+          "Worktree",
+          "Porta",
+          "Raiz do código",
+          "Origem dos dados",
+          "Log",
+          "Subiu em",
+          "HEAD atual",
+          "Atualidade",
+          "Verificado em"
+        ],
+        "btns": [
+          "Copiar",
+          "Fechar"
+        ],
+        "inView": true
+      },
+      "closed": {
+        "hidden": true,
+        "exp": "false",
+        "focusBack": true
+      },
+      "cliqueFora": true,
+      "fechar": {
+        "hidden": true,
+        "focusBack": true
+      },
+      "faltam": [],
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "esperado": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "titleAttr": "Teste · v1.0.0 · 1.1.0-SNAPSHOT · 97495c5"
+    },
+    "estado-produtivo-1440": {
+      "env": "produtivo",
+      "text": "●PRODUTIVO v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "aria": "Ambiente: Produtivo. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "title": "(31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control Ambiente Produtivo (inferido) Motivo cópia principal (develop), porta 7070 Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton Porta 7070 Raiz do código /Users/juliencrouzillard/orca/",
+      "errs": [],
+      "ok": true
+    },
+    "estado-produtivo-390": {
+      "env": "produtivo",
+      "text": "●PRODUTIVO 97495c5",
+      "aria": "Ambiente: Produtivo. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "title": "(31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control Ambiente Produtivo (inferido) Motivo cópia principal (develop), porta 7070 Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton Porta 7070 Raiz do código /Users/juliencrouzillard/orca/",
+      "errs": [],
+      "ok": true
+    },
+    "estado-dadosprod-1440": {
+      "env": "teste",
+      "text": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 dados do produtivo",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5. Dados do produtivo",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control dados do produtivo Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton-d18 Porta 7288 Raiz do código ",
+      "errs": [],
+      "ok": true
+    },
+    "estado-dadosprod-390": {
+      "env": "teste",
+      "text": "●TESTE 97495c5",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5. Dados do produtivo",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control dados do produtivo Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton-d18 Porta 7288 Raiz do código ",
+      "errs": [],
+      "ok": true
+    },
+    "estado-stale-1440": {
+      "env": "teste",
+      "text": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 ⚠ Desatualizado: o código mudou desde a subida. Reinicie (make squad).",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5. Desatualizado, reinicie",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control ⚠ Desatualizado: o código mudou desde a subida. Reinicie (make squad). Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais ",
+      "errs": [],
+      "ok": true
+    },
+    "estado-stale-390": {
+      "env": "teste",
+      "text": "●TESTE 97495c5 ⚠",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5. Desatualizado, reinicie",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control ⚠ Desatualizado: o código mudou desde a subida. Reinicie (make squad). Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais ",
+      "errs": [],
+      "ok": true
+    },
+    "estado-indet-1440": {
+      "env": "teste",
+      "text": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Não foi possível verificar a versão.",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control Não foi possível verificar a versão. Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton-d18 Porta 72",
+      "errs": [],
+      "ok": true,
+      "ariaDizIndeterminado": false
+    },
+    "estado-indet-390": {
+      "env": "teste",
+      "text": "●TESTE 97495c5",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control Não foi possível verificar a versão. Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais não Worktree plankton-d18 Porta 72",
+      "errs": [],
+      "ok": true,
+      "ariaDizIndeterminado": false
+    },
+    "estado-dirty-1440": {
+      "env": "teste",
+      "text": "●TESTE v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 +alterações alterações locais não commitadas",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 +alterações. Alterações locais não commitadas",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control alterações locais não commitadas Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 +alterações Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais sim (tools/squad ou squad-",
+      "errs": [],
+      "ok": true
+    },
+    "estado-dirty-390": {
+      "env": "teste",
+      "text": "●TESTE 97495c5",
+      "aria": "Ambiente: Teste. Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 +alterações. Alterações locais não commitadas",
+      "title": "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+      "painel": "Ambiente e versão do Squad Control alterações locais não commitadas Ambiente Teste (inferido) Motivo worktree plankton-d18, porta 7288, dados de data Versão v1.0.0 · 1.1.0-SNAPSHOT · 97495c5 +alterações Tag de release v1.0.0 Versão do pom 1.1.0-SNAPSHOT Commit 97495c5af848f180197de14f1ca18bef9b9b643f Branch feature/D18-ambiente-e-versao-no-squad-control Alterações locais sim (tools/squad ou squad-",
+      "errs": [],
+      "ok": true
+    },
+    "CA19-1440-dark": {
+      "ok": true,
+      "env": "desconhecido",
+      "text": "●AMBIENTE DESCONHECIDO versão indisponível ⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "sideText": "●AMBIENTE DESCONHECIDO versão indisponível ⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "aria": "Ambiente: Ambiente desconhecido. Servidor sem suporte à versão, reinicie",
+      "title": "[?] (31) Painel · Squad Control · Checkout Saga",
+      "pageErrors": [],
+      "consoleErros": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "chamadasInstance": 1
+    },
+    "CA19-1440-light": {
+      "ok": true,
+      "env": "desconhecido",
+      "text": "●AMBIENTE DESCONHECIDO versão indisponível ⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "sideText": "●AMBIENTE DESCONHECIDO versão indisponível ⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "aria": "Ambiente: Ambiente desconhecido. Servidor sem suporte à versão, reinicie",
+      "title": "[?] (31) Painel · Squad Control · Checkout Saga",
+      "pageErrors": [],
+      "consoleErros": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "chamadasInstance": 1
+    },
+    "CA19-390-dark": {
+      "ok": true,
+      "env": "desconhecido",
+      "text": "●DESCONHECIDO ⚠",
+      "sideText": "●Ambiente desconhecidoversão indisponível⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "aria": "Ambiente: Ambiente desconhecido. Servidor sem suporte à versão, reinicie",
+      "title": "[?] (31) Painel · Squad Control · Checkout Saga",
+      "pageErrors": [],
+      "consoleErros": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "chamadasInstance": 1
+    },
+    "CA19-390-light": {
+      "ok": true,
+      "env": "desconhecido",
+      "text": "●DESCONHECIDO ⚠",
+      "sideText": "●Ambiente desconhecidoversão indisponível⚠ Servidor sem suporte à versão — reinicie (make squad).",
+      "aria": "Ambiente: Ambiente desconhecido. Servidor sem suporte à versão, reinicie",
+      "title": "[?] (31) Painel · Squad Control · Checkout Saga",
+      "pageErrors": [],
+      "consoleErros": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "chamadasInstance": 1
+    },
+    "titulo-TESTE": {
+      "ok": true,
+      "titles": [
+        "[TESTE] (31) Painel · Squad Control · Checkout Saga",
+        "[TESTE] (31) Demandas · Squad Control · Checkout Saga",
+        "[TESTE] (31) Squad · Squad Control · Checkout Saga",
+        "[TESTE] (31) Auditoria · Eventos · Squad Control · Checkout Saga"
+      ],
+      "chamadasInstanceEm6s": 0
+    },
+    "carga-sem-instance-no-ciclo": {
+      "ok": true,
+      "chamadasInstanceEm6s": 0
+    }
+  },
+  "errors": [],
+  "axe": [
+    {
+      "label": "1440-dark-fechado",
+      "violations": []
+    },
+    {
+      "label": "1440-light-fechado",
+      "violations": []
+    },
+    {
+      "label": "1280-dark-fechado",
+      "violations": []
+    },
+    {
+      "label": "1280-light-fechado",
+      "violations": []
+    },
+    {
+      "label": "390-dark-fechado",
+      "violations": []
+    },
+    {
+      "label": "390-light-fechado",
+      "violations": []
+    },
+    {
+      "label": "1440-dark-detalhe-aberto",
+      "violations": []
+    },
+    {
+      "label": "1440-light-detalhe-aberto",
+      "violations": []
+    },
+    {
+      "label": "390-dark-detalhe-aberto",
+      "violations": []
+    },
+    {
+      "label": "390-light-detalhe-aberto",
+      "violations": []
+    },
+    {
+      "label": "antigo-1440-dark",
+      "violations": []
+    },
+    {
+      "label": "antigo-1440-light",
+      "violations": []
+    },
+    {
+      "label": "antigo-390-dark",
+      "violations": []
+    },
+    {
+      "label": "antigo-390-light",
+      "violations": []
+    }
+  ],
+  "axeViolacoes": [],
+  "falhas": []
+}

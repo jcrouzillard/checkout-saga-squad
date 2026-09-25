@@ -106,15 +106,18 @@ def http_ok(url: str, timeout: float = 3.0) -> bool:
 
 
 # ================================================================ caminhos
-def main_root() -> pathlib.Path:
+def find_main_root(root: pathlib.Path | None = None, timeout: float = 10) -> pathlib.Path | None:
     """Cópia principal = o worktree em `develop` (hoje `plankton/`; ele próprio pode ser um worktree ligado a outro
-    repositório, então NÃO é o diretório do .git comum). `$SQUAD_MAIN_ROOT` sobrepõe (testes)."""
+    repositório, então NÃO é o diretório do .git comum). `$SQUAD_MAIN_ROOT` sobrepõe (testes).
+    Sem fallback: None quando o git falha ou nenhum worktree está em `develop` (D18, ressalva R1 do G1)."""
     env = os.environ.get("SQUAD_MAIN_ROOT")
     if env:
         return pathlib.Path(env).resolve()
     try:
-        p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=ROOT, capture_output=True, text=True,
-                           timeout=10)
+        p = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=root or ROOT, capture_output=True,
+                           text=True, timeout=timeout)
+        if p.returncode != 0:
+            return None
         path = None
         for line in p.stdout.splitlines():
             if line.startswith("worktree "):
@@ -123,7 +126,12 @@ def main_root() -> pathlib.Path:
                 return pathlib.Path(path).resolve()
     except (OSError, subprocess.TimeoutExpired):
         pass
-    return ROOT
+    return None
+
+
+def main_root() -> pathlib.Path:
+    """Cópia principal (ver `find_main_root`); na falta dela, a raiz deste repositório (comportamento da D15)."""
+    return find_main_root() or ROOT
 
 
 def worktree() -> pathlib.Path:
