@@ -1,0 +1,51 @@
+{
+  "gate": "G3",
+  "demand": "b72a6bd8caf3",
+  "from": "qa",
+  "to": "release",
+  "cycle": 1,
+  "handoffs": ["fe8c677dfe74", "f61cd842c1ff", "25425042af36", "e029eb6233cc", "e5907a461fc7"],
+  "evidence_events": ["687a54f19756", "a2e138988394", "4ea192921db4", "f33f1b3d52e3"],
+  "commits": ["94d97c2", "c20a602", "22616bd", "26ad4ff", "b3e5299"],
+  "recommendation": "APPROVE",
+  "confidence": 0.84,
+  "risk": "baixo",
+  "evidences": [
+    {"name": "Suítes da squad (uma a uma, no worktree plankton-d18)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "Rodadas pelo Auditor em b3e5299: test_alertas_d14 20 OK (3 repetições extras, todas 20 OK: corrida QA-1 do G2 estabilizada), test_ambiente_teste_d15 41 OK, test_bugs_d16 38 OK, test_bugs_d16_qa 18 OK, test_e2e_compose_seguro_d15 11 OK, test_entrega_por_pr 'Todas as verificações passaram', test_governanca_d14_qa 19 OK, test_instancia_d18 18 OK. Total 165 testes + entrega por PR. Log real intacto (515 linhas antes e depois) e log do worktree intacto (488); git status limpo após as suítes."},
+    {"name": "Correção QA-D18-1 (b3e5299) conferida", "status": "pass", "weight": 3, "blocking": true,
+     "source": "git show b3e5299: 2 linhas em squad-control/index.html, instView(). aria-label ganha '. Não foi possível verificar a versão' quando freshness indeterminado/ausente e warn = stale || unk (⚠ no compacto e no rodapé). Verificação própria: instView() extraída do index.html e executada em JavaScriptCore (osascript -l JavaScript) com state indeterminado/ausente → warn=true e aria '…Não foi possível verificar a versão'; desatualizado → '…Desatualizado, reinicie'; atual → warn=false e aria sem sufixo; servidor antigo inalterado. O ⚠ do compacto é aria-hidden (sem rótulo duplicado)."},
+    {"name": "Critérios de aceite do contrato (CA1–CA20)", "status": "pass", "weight": 3, "blocking": true,
+     "source": "tests/ui/checklist-ambiente-versao-d18.md: CA1–CA20 PASSA com teste nomeado (tests/squad/test_instancia_d18.py) ou roteiro de navegador (tests/ui/d18-ambiente-versao.js → d18-ambiente-versao-result.json: 5 chaves, 0 'ok': false, axe em 14 execuções) e capturas 1440/1280/800/700/390, claro/escuro. CA1–CA14 e CA20 reexecutados aqui via test_instancia_d18 (18 OK), incluindo CA13 (0 subprocessos no /api/live) e CA14 (/api/state só com acréscimo 'instance')."},
+    {"name": "Ressalvas do G1 (R1–R6) e do G2 (QA-1..QA-3)", "status": "pass", "weight": 2, "blocking": true,
+     "source": "R1/R2/R3/R4/R6 conferidas no G2 e cobertas por teste em test_instancia_d18 (test_r1_sem_develop, test_ca13_r2_*, test_ca6_r4_*, test_r6_so_prerelease). R5 (selo fixo a 390) aceito no G2 e medido no CA16. QA-1 estabilizado (d14 verde 4/4 rodadas); QA-2 portado para tests/squad/test_instancia_d18.py com CA13/CA14 por HTTP; QA-3 roteiro Playwright/axe executado pelo QA (26ad4ff)."},
+    {"name": "Contrato alinhado ao código (environment.log e §3)", "status": "validate", "weight": 1, "blocking": false,
+     "source": "docs/contracts/ui-ambiente-e-versao.md §4 (exemplo linha ~64) ainda não lista environment.log nem cita, na §3, 'rev-parse + status por janela' e 'diff --name-only só em HEAD novo'. Pendência do Arquiteto registrada no G2. Decisão: NÃO bloqueia — é campo aditivo (a API é 'só acréscimo', §4), aceito no G2, sem consumidor externo e coberto por teste (R4). Recomendado commit doc do Arquiteto no mesmo PR antes do merge; se não couber, 1º item do backlog."},
+    {"name": "axe após b3e5299", "status": "validate", "weight": 1, "blocking": false,
+     "source": "axe 0 violações em 14 execuções no commit 26ad4ff; a última rodada do Frontend (b3e5299) não rodou axe e o d18-ambiente-versao-result.json commitado ainda é o de 26ad4ff (ariaDizIndeterminado=false). Risco de regressão de acessibilidade mínimo: a mudança só altera o texto do aria-label e acrescenta um span '⚠' aria-hidden com classe já existente (.inst-bad, contraste já medido no estado desatualizado)."},
+    {"name": "Critério padrão G3: e2e 7 cenários", "status": "validate", "weight": 2, "blocking": false,
+     "source": "git diff origin/develop...HEAD (42 arquivos) só toca docs/**, tools/squad/{instance,server,testenv}.py, squad-control/index.html e tests/**; nada em services/**, Dockerfile, docker-compose.yml ou tests/e2e. Não rodado (sem containers, por restrição). O CI do PR roda o e2e."},
+    {"name": "Trace ponta a ponta no Jaeger", "status": "validate", "weight": 2, "blocking": false,
+     "source": "Não é entrega da D18 (ferramenta da squad, recurso somente leitura e local)."},
+    {"name": "Critério G3 de demanda de bug (teste falha antes da correção)", "status": "pass", "weight": 0, "blocking": false,
+     "source": "Não se aplica: D18 é demanda comum (nature ≠ bug)."},
+    {"name": "Escopo e ownership", "status": "pass", "weight": 1, "blocking": false,
+     "source": "Por commit: 94d97c2 Arquiteto docs/adr+contracts; c20a602 Orquestrador tools/squad; 22616bd e b3e5299 Frontend squad-control/index.html; 26ad4ff QA tests/squad e tests/ui; 7aaf1c5/97495c5 Auditor docs/squad/gates. Sem escrita cruzada."},
+    {"name": "Rastreabilidade", "status": "pass", "weight": 1, "blocking": false,
+     "source": "decisions.jsonl demand=b72a6bd8caf3: validação a52441a9248e → respostas humanas e7df6310d4b6 → start e517361e9222 → ADR-021 687a54f19756 → G1 a2e138988394 → handoffs f61cd842c1ff/25425042af36 → G2 4ea192921db4 → defeito QA-D18-1 f33f1b3d52e3 → handoff QA e029eb6233cc → correção e5907a461fc7; todos os commits com prefixo 'D18'."}
+  ],
+  "open_risks": [
+    "Arquiteto (não bloqueia; preferível no mesmo PR): registrar environment.log no §4 do contrato e, na §3, a contagem de git (rev-parse + status por janela de 30 s; diff --name-only só em HEAD novo). Se o humano aceitar os desvios de UI de 600–900 px (rótulos curtos, commit oculto em 600–780 px) e o selo fixo a 390 px, registrá-los também no §5/CA16.",
+    "QA (backlog): regravar tests/ui/d18-ambiente-versao-result.json em b3e5299 com axe (o commitado ainda mostra ariaDizIndeterminado=false, do commit anterior à correção).",
+    "Harness: 'unittest discover' num só processo continua inadequado (contaminação de env entre módulos, já em backlog da D16); rodar por módulo.",
+    "Conflito provável com a D17 em tools/squad/server.py (import, _instance, rota, main) — pequeno; resolver no merge da segunda que entrar.",
+    "ADR-021 segue 'Proposto' (padrão das D14–D16); aceitação formal junto do merge.",
+    "R10: o servidor da 7070 não recarrega tools/squad/** nem squad-control/**; após o merge o selo mostrará 'Servidor sem suporte à versão — reinicie' até o humano reiniciar o Squad Control (comportamento esperado, CA19)."
+  ],
+  "post_merge_steps": [
+    "1. (Humano) Reiniciar o Squad Control da 7070 e conferir o selo 'PRODUTIVO · <tag> · 1.1.0-SNAPSHOT · <sha7>' no rodapé do menu e o título da aba sem prefixo.",
+    "2. (Orquestrador) Abrir no backlog: alinhamento do contrato (se não entrou no PR), regravação do resultado do roteiro de navegador com axe, e o isolamento do harness de tests/squad."
+  ],
+  "human_required": false,
+  "rationale": "Todas as suítes da squad passam isoladas por módulo no head b3e5299 (165 testes + entrega por PR), inclusive a de alertas D14 que falhava no G2 por corrida e agora passa de forma estável, e o log real não foi tocado. A correção do QA-D18-1 é mínima e correta: verifiquei a função instView() executando-a fora do navegador nos quatro estados de freshness e no servidor antigo. Os 20 critérios do contrato têm teste ou roteiro de navegador com evidência, e as ressalvas do G1/G2 estão cobertas por testes nomeados. A pendência do Arquiteto (environment.log no contrato) não bloqueia: é campo aditivo, previsto pelo princípio 'só acréscimo' da API, aprovado no G2 e testado; mas pela hierarquia de verdade o contrato deve alcançar o código, então recomendo o commit doc no mesmo PR. Confiança 0,84 = 16/19 (e2e e Jaeger 'validar' por não se aplicarem; contrato e axe pós-correção 'validar'). Risco baixo: recurso somente leitura, local, sem tocar o checkout."
+}
