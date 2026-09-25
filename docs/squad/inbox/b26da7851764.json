@@ -1,0 +1,14 @@
+{
+  "demand": "b26da7851764",
+  "title": "Separar a squad e o Squad Control do produto (plataforma multiproduto)",
+  "detail": "> Problema: A squad, o painel e a memória vivem no repositório do checkout e as ferramentas têm o produto embutido. Assim a squad não consegue atender outros produtos, e o histórico do produto se mistura com o da squad.\n>\n> O que eu quero:\n> 1. O Squad Control e as ferramentas da squad num sistema à parte, independente de qualquer produto.\n> 2. Cadastrar um produto por configuração: repositório, branches, donos de diretório, build e testes, ambiente de teste, produtivo e onde ficam os ADRs e contratos.\n> 3. A memória da squad (log, gates, handoffs e conversas) fora do repositório do produto, separada por produto.\n> 4. O painel mostrando vários produtos, com demandas, alertas e ambientes separados por produto.\n> 5. O checkout migrado como primeiro produto, sem perder o histórico D1–D21 e sem parar a squad.\n>\n> Entrega em fases: primeiro o ADR, com o mapa do acoplamento atual e o plano de fases, para eu aprovar. Depois cada fase vira uma demanda própria.\n>\n> Critério de aceite da fase 1: o ADR aprovado no G1, listando cada ponto de acoplamento, o destino dele e a ordem da migração.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T14:41:04+00:00",
+  "kind": "operacao",
+  "clarifications": [],
+  "override": false,
+  "fromBacklog": false
+}
