@@ -1,0 +1,30 @@
+{
+  "demand": "402e76f187f9",
+  "title": "Delegar tarefas à squad pela conversa com o Orquestrador",
+  "detail": "> Problema: Quando surge um impedimento fora do fluxo, a única saída é fechar o PR ou abrir uma demanda nova. Um exemplo é um PR em revisão que passa a ter conflito com a develop, como aconteceu no PR #171 da D18. Não há como pedir a um agente que resolva algo pontual numa demanda que já existe.\n>\n> O que eu quero:\n> 1. Na conversa com o Orquestrador, poder pedir uma tarefa para uma demanda existente. Exemplo: \"resolva o conflito do PR da D18 com a develop\".\n> 2. O Orquestrador propõe a delegação num cartão, informando a demanda, o agente responsável, a tarefa e o risco. Nada é executado sem eu confirmar, igual ao \"destravar\" de hoje.\n> 3. Depois de confirmada, a tarefa entra no fluxo normal da squad: branch da própria demanda, dono do diretório (single-writer), avaliação do Auditor e, se mudar código, QA. O PR existente é atualizado, sem abrir outro.\n> 4. Poder delegar tarefas de impedimento: conflito com a develop, gate travado, teste quebrado, ambiente de teste com erro e pendência de outro agente.\n> 5. O plantão detecta sozinho quando um PR em revisão fica com conflito e mostra um alerta no Painel com a ação \"Delegar correção\".\n> 6. Tudo fica registrado no log (quem pediu, o que foi delegado e o resultado) e aparece na tela da demanda.\n>\n> Limites: merge, cancelar e repriorizar continuam só comigo. O conteúdo de log e evidências nunca vira instrução.\n>\n> Critério de aceite: com um PR em conflito, eu peço a correção pelo chat, confirmo o cartão, a squad resolve na branch da demanda, o Auditor aprova e o mesmo PR fica pronto para eu revisar sem conflito.\n\nEnquanto essa demanda não sai, o conflito da D18 continua precisando de um caminho. Hoje o caminho é fechar o PR #171 no GitHub com um comentário explicando o motivo.",
+  "priority": "alta",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T11:47:28+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "Os cinco tipos de impedimento do item 4 formam uma lista fechada, com o servidor recusando qualquer outra tarefa mesmo que o Orquestrador a proponha, como já acontece com os estados destraváveis do ADR-020? Ou o chat deve aceitar outras tarefas pontuais em texto livre para uma demanda existente, como o exemplo do item 1 sugere?",
+      "dimension": "escopo",
+      "answer": "SOmente tarefas relacioandas sobre a demanda existente. sem gerar nova demanda."
+    },
+    {
+      "question": "No caso 'ambiente de teste com erro', o ADR-018 hoje diz que o ambiente de teste só é mexido por pedido do humano (test-env-request) via testenv.py e que agentes nunca gravam esse pedido. A confirmação do cartão vale como esse pedido, autorizando a squad a recriar ou reiniciar o checkout-teste? Ou a delegação fica restrita a diagnosticar e corrigir código ou configuração na branch da demanda, deixando a operação do ambiente com você?",
+      "dimension": "restricoes",
+      "answer": "Deixa a operação do ambiente comigo."
+    },
+    {
+      "question": "O que é exatamente 'pendência de outro agente'? Pode ser (a) um handoff sem continuidade, com o próximo agente sem ter começado; (b) uma solicitação de mudança aberta no log para o dono de outro diretório; ou (c) um agente parado no meio do turno. Qual delas, ou quais, deve ser delegável e o que conta como resolvido em cada caso?",
+      "dimension": "objetivo",
+      "answer": "(a) Handoff sem continuidade\n\nO que é: um agente registrou um handoff numa demanda e o próximo da cadeia não registrou nenhum progress, handoff ou gate depois disso.\nAção delegável: iniciar o próximo agente para aquela demanda, no passo seguinte ao handoff.\nResolvido quando: o próximo agente registra o próprio handoff (ou o gate, se for o Auditor), fazendo referência ao handoff pendente.\nHoje: nenhum alerta detecta esse caso. Seria preciso criar um.\n(b) Solicitação de mudança aberta\n\nO que é: um change-request no log dirigido ao dono de outro diretório (regra single-writer do AGENTS.md).\nAção delegável: acionar o dono do diretório para tratar a solicitação. Nunca quem pediu, para não quebrar o single-writer.\nResolvido quando: o dono registra um decision ligado ao id da solicitação, aceitando (com a mudança feita e handoff) ou recusando com justificativa. Se a mudança tocar contrato ou ADR, quem decide é o Arquiteto.\nHoje: o log tem o tipo change-request (tools/squad/log.py:22), mas não tem um evento que o feche. A D19 precisa definir esse vínculo.\n(c) Agente parado no meio do turno\n\nO que é: a execução morreu sem \"Finalizado\". Isso já é detectado pelo alerta A2 (tools/squad/alerts.py:424, \"retomar a tarefa\").\nAção delegável: retomar a mesma tarefa, com o mesmo agente, a mesma demanda e o mesmo passo.\nResolvido quando: a execução termina com código 0 e registra o handoff ou gate esperado daquele passo. Se falhar de novo, não repetir em loop: depois de uma nova tentativa, voltar para você decidir.\nRegras comuns aos três casos:\n\nSó para demanda existente.\nSempre com o cartão de confirmação seu.\nO resultado passa pelo gate normal do passo.\nMerge, cancelamento e repriorização ficam fora."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
