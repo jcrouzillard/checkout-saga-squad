@@ -1,0 +1,41 @@
+{
+  "gate": "G3",
+  "cycle": 1,
+  "demand": "cf7a120591b0",
+  "code": "D24",
+  "from": "qa",
+  "to": "release (PR para develop, merge do humano)",
+  "commits": ["2dfb206", "03b40ca", "048b9db"],
+  "handoffs": ["2f0e0c5cd7e5"],
+  "decisions": ["84b1d532e0da"],
+  "recommendation": "APPROVE",
+  "confidence": 0.88,
+  "risk": "moderado",
+  "evidences": [
+    {"name": "(B,3) Suíte do publicador sobre o código com a D23", "status": "pass",
+     "source": "QA_D24_BASE=scratchpad/g3-d24/pub SQUAD_CHAT_RUNNER=fake python3 tests/squad/test_publicador_d24.py → Ran 29 tests in 390 s, OK (Guardas 3, ParadaGraciosa 1, PublicadorFalso 17, PublicadorReal 8, incluindo CA-1 ≤ 45/60 s, CA-2 preflight, R1, R2 e R2 com 5 paralelos). Saída: scratchpad g3-d24/pub.out"},
+    {"name": "(B,3) Demais suítes tests/squad uma a uma", "status": "pass",
+     "source": "13 suítes, todas rc=0: alertas_d14 20, ambiente_teste_d15 41, bugs_d16_qa 18, bugs_d16 38, conversa_anexos_d21 27, conversa_d17 44 (test_03 falhava no G2, agora verde), conversa_tz_d20 7, delegacao_d19 27, e2e_compose_seguro_d15 11 (docker falso), entrega_por_pr, governanca_d14_qa 19, instancia_d18 18, produto_f2a 27. Saída: scratchpad g3-d24/suites.out"},
+    {"name": "(B,2) Merge da develop com a D23 (048b9db)", "status": "pass",
+     "source": "merge (não rebase), origin/develop 1ba49fa ancestral do HEAD. server.py: import publication e import product lado a lado; caminhos via product.resolve() (precedência SQUAD_LOG > SQUAD_ROOT_DATA > repositório, que é o que o preflight do publicador usa: SQUAD_ROOT_DATA sintético, SQUAD_LOG removido); /api/state com codes, /api/live com publication. log.py: tipos squad-* da D24 e append_task/codes.lock da D23. test_instancia_d18 (STATE_KEYS + codes, LIVE_KEYS + publication) e test_produto_f2a (LIVE_KEYS + publication) coerentes e verdes"},
+    {"name": "(B,2) R1 — log sujo reanexado sem perder nem duplicar", "status": "pass",
+     "source": "publisher.memory_block/ff_with_memory/reattach (2dfb206): só age se o único bloqueio for memória viva (STATE do gitflow) sem alteração no índice; decisions.jsonl por link duro + troca atômica pelo HEAD + ff-only (até 5 tentativas) + reanexação O_APPEND deduplicada por id, cópias só apagadas após conferência; outros arquivos só se o conteúdo local == commit novo, senão volta ao comportamento antigo (espera o review-sync). test_07_r1 com escritor contínuo: ≤ 60 s, 0 perdidos locais/remotos, 0 duplicados"},
+    {"name": "(B,2) R2 — segundo pedido 409", "status": "pass",
+     "source": "publication.handle_publish: conferência de requests/ e gravação sob flock (requests.lock) → 409 publicacao_em_andamento com pendingRequestId; api_view marca canPublish=false com pedido pendente. test_04 e test_05 (5 POST paralelos → 1×202)"},
+    {"name": "(B,2) Memória fora do PR e isolamento", "status": "pass",
+     "source": "git diff --name-only origin/develop...HEAD -- docs/squad/memory/ docs/squad/inbox/ docs/squad/produto/bugs/ docs/squad/operacao/bugs/ vazio. 7070 real e pid 7606 iguais antes/depois (started 08:26:56); nenhum processo de teste remanescente; nenhum worktree plankton-squad-prev na cópia principal; nada gravado no log real"},
+    {"name": "(1) Roteiro do aceite humano", "status": "pass",
+     "source": "tests/ui/checklist-publicacao-d24.md (77 linhas) e tests/ui/d24-publicacao.js + evidências PNG"},
+    {"name": "(2) Aceite CA-1/CA-2 na 7070 real", "status": "validate",
+     "source": "impossível antes do merge por construção (só a cópia principal em develop publica); fica para o humano após o merge, pelo checklist"}
+  ],
+  "open_risks": [
+    "Aceite humano após o merge: `make squad` UMA vez com confirmação no terminal (adota o servidor da 7070; sem TTY recusa) e depois um PR de teste que muda o painel → publicação ≤ 60 s (CA-1); CA-2 opcional com um PR de import quebrado em branch descartável.",
+    "R4 continua: tools/squad/plantao.sh roda `publisher.py ensure` a cada ciclo — `make squad-parar` é desfeito em ≤ 3 min enquanto o plantão roda. Para parar de verdade, parar o plantão antes (ou follow-up para o ensure respeitar o estado parado).",
+    "github-sync.json sujo na cópia principal (hoje está M): se um PR integrado mudar esse arquivo e o conteúdo local diferir, o R1 não se aplica (só o decisions.jsonl é juntado por id) e a publicação espera o review-sync (≥ 180 s) — CA-1 estoura nesse caso, sem perda de dados.",
+    "Janela residual do R1: um escritor que abra o log entre a troca atômica e o merge e grave só depois do merge escreve num inode descartado (evento perdido). Janela de milissegundos; log.py abre e grava de imediato. Baixo.",
+    "TOCTOU entre travas e merge com o sync do plantão (herdado do G2; git recusa por index.lock)."
+  ],
+  "human_required": false,
+  "rationale": "Todas as 14 suítes de tests/squad verdes sobre o HEAD com a D23 integrada (29/29 no publicador, 27/27 na F2a), o que mostra que o publicador e o resolvedor de produto convivem: o preflight usa exatamente as variáveis que product.resolve() respeita. R1 e R2 corrigidos no código e cobertos por testes com asserção de 0 perdidos/0 duplicados e de 1×202 sob concorrência. Merge por merge, sem memória no diff do PR. Confiança 0,88 (aceite na 7070 real só após o merge, conta 50%); risco moderado porque a D24 reinicia o produtivo do Squad Control sozinha. Aprovado para PR; o merge e o aceite ficam com o humano."
+}

@@ -1,4 +1,5 @@
 .PHONY: up down ps logs build test e2e restart-orchestrator kill-orchestrator squad \
+	squad-primeiro-plano squad-parar squad-status squad-logs squad-publicar \
 	teste-publicar teste-status teste-liberar teste-derrubar teste-apagar-dados teste-config e2e-teste prod-atualizar
 
 ## Sobe toda a stack (infra + observabilidade + serviços), (re)construindo as imagens.
@@ -37,9 +38,23 @@ restart-orchestrator:
 kill-orchestrator:
 	docker compose kill saga-orchestrator && docker compose up -d saga-orchestrator
 
-## Gera o dashboard da squad (propriedade do Orquestrador).
-squad:
-	python3 tools/squad/server.py # painel em http://localhost:7070
+squad: ## Squad Control em segundo plano com publicação automática (http://localhost:7070)
+	python3 tools/squad/publisher.py start
+
+squad-primeiro-plano: ## Modo antigo, no terminal, sem publicação automática
+	python3 tools/squad/server.py
+
+squad-parar: ## Para o supervisor e o Squad Control graciosamente
+	python3 tools/squad/publisher.py stop
+
+squad-status: ## Estado do supervisor/publicação do Squad Control
+	python3 tools/squad/publisher.py status
+
+squad-logs: ## Segue o log do Squad Control supervisionado
+	tail -n 100 -f .squad/squad-control/server.log
+
+squad-publicar: ## Pede a publicação da develop no Squad Control (opcional WHEN=now|safe)
+	python3 tools/squad/publisher.py publish$(if $(WHEN), --when $(WHEN))
 
 github-sync: ## Espelha o log da squad em Issues + GitHub Project (kanban)
 	python3 tools/squad/github_sync.py --watch 20

@@ -25,6 +25,8 @@ ENVS = ("produtivo", "teste")
 LABELS = {"produtivo": "Produtivo", "teste": "Teste", "desconhecido": "Ambiente desconhecido"}
 FINAL_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 SEP = " · "
+PUBLISHER_WORKTREE = "plankton-squad-prev"   # D24 (ADR-025 §5): worktree de rollback do publicador
+PUBLISH_MODES = ("principal", "anterior")
 
 
 def _now() -> str:
@@ -75,7 +77,8 @@ def environment(root: pathlib.Path, port: int, data_root: pathlib.Path, log: pat
         name, source, reason = "desconhecido", "indeterminado", "git indisponível ou fora de repositório"
     else:
         source = "inferido"
-        where = "cópia principal" if main and root == main else f"worktree {root.name}"
+        where = "cópia principal" if main and root == main else (
+            "publicador (rollback)" if root.name == PUBLISHER_WORKTREE else f"worktree {root.name}")
         parts = [where, f"porta {port}"]
         if main is None:
             parts.append("nenhum worktree em develop")
@@ -151,6 +154,12 @@ class Instance:
             "release": None, "pom": pom_version(self.root), "commit": None, "commitFull": None, "branch": None,
             "dirty": None, "startedAt": _now()}
         self.build.setdefault("display", display(self.build))
+        # D24 (contrato §4.4): só acréscimos dentro de `build`/`freshness`
+        e = os.environ if env is None else env
+        mode = (e.get("SQUAD_PUBLISH_MODE") or "").strip()
+        self.build["mode"] = mode if mode in PUBLISH_MODES else "principal"
+        self.build["pid"] = os.getpid()
+        self.reverted = (e.get("SQUAD_PUBLISH_REVERTED") or "").strip() or None
         self._lock = threading.Lock()
         self._at = 0.0
         self._fresh: dict | None = None
@@ -181,5 +190,7 @@ class Instance:
         with self._lock:
             if self._fresh is None or time.monotonic() - self._at >= self.cache_s:
                 self._fresh = self._refresh()
+                if self.reverted:   # D24: no ar o commit anterior depois de uma publicação que falhou
+                    self._fresh.update(state="revertido", failedCommit=self.reverted[:7])
                 self._at = time.monotonic()
             return {"environment": dict(self.env), "build": dict(self.build), "freshness": dict(self._fresh)}

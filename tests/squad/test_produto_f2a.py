@@ -57,7 +57,7 @@ FROZEN = ["13e55010e3f5", "48b6ace91207", "62f458c8038b", "1cc732c62a2d", "d91b7
           "efe387a35d71", "1e3d3c894630", "518f89f27ae8", "841f9a27e64a", "e1d6eae16073", "b72a6bd8caf3",
           "402e76f187f9", "41bdb8b49835", "71b7d9bc3313", "b26da7851764", "6450aecde7f9", "cf7a120591b0"]
 TABLE = {i: f"D{n}" for n, i in enumerate(FROZEN, 1)}
-LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv"}   # test_instancia_d18
+LIVE_KEYS = {"now", "version", "serverMs", "thresholds", "summary", "alerts", "agents", "testEnv", "publication"}   # test_instancia_d18 (+ D24 publication)
 
 ENV0 = {k: v for k, v in os.environ.items() if not k.startswith("SQUAD_")}
 ENV0["SQUAD_CHAT_RUNNER"] = "fake"

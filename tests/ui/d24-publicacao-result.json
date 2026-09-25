@@ -1,0 +1,167 @@
+{
+  "results": {
+    "CA12-botao-produtivo": {
+      "ok": true,
+      "btn": "Publicar Squad Control",
+      "dis": false,
+      "st": "no ar, nada pendente",
+      "title": "Publica o código da develop. O Squad Control fica fora por ~5 s e a página recarrega sozinha."
+    },
+    "CA8-dialogo-confirmacao": {
+      "ok": true,
+      "open": true,
+      "h": "Há uma resposta da conversa em andamento.",
+      "btns": [
+        "Publicar agora",
+        "Publicar quando a resposta terminar",
+        "Cancelar"
+      ],
+      "focus": "Publicar quando a resposta terminar",
+      "modal": true
+    },
+    "esc-fecha-so-dialogo": {
+      "ok": true,
+      "open": false,
+      "panel": true,
+      "chat": false,
+      "posts": [
+        {
+          "when": "now"
+        }
+      ]
+    },
+    "CA8-publicar-agora-confirm": {
+      "ok": true,
+      "posts": [
+        {
+          "when": "now"
+        },
+        {
+          "when": "now"
+        },
+        {
+          "when": "now",
+          "confirm": true
+        }
+      ],
+      "msg": "Publicação pedida. O Squad Control fica fora por alguns segundos e a página recarrega sozinha."
+    },
+    "CA8-quando-terminar": {
+      "ok": true,
+      "posts": [
+        {
+          "when": "now"
+        },
+        {
+          "when": "now"
+        },
+        {
+          "when": "now",
+          "confirm": true
+        },
+        {
+          "when": "now"
+        },
+        {
+          "when": "safe"
+        }
+      ],
+      "msg": "Publicação pedida: começa quando a resposta da conversa terminar."
+    },
+    "CA12-sem-supervisor": {
+      "ok": true,
+      "dis": true,
+      "why": "Sem publicador: rode make squad",
+      "selo": "●PRODUTIVO\nv1.0.0 · 1.1.0-SNAPSHOT · aaaaaaa\n⚠ Desatualizado: o código mudou desde a subida. Reinicie (make squad)."
+    },
+    "CA12-so-produtivo": {
+      "ok": true,
+      "btn": false,
+      "sec": "Publicação\nsem publicador (Squad Control iniciado sem make squad)\n\nDisponível só no produtivo."
+    },
+    "CA11-contagem": {
+      "ok": true,
+      "t1": "◷\nSquad Control será atualizado para bbbbbbb em 19 s. A resposta em andamento será interrompida.",
+      "t2": "◷\nSquad Control será atualizado para bbbbbbb em 17 s. A resposta em andamento será interrompida.",
+      "selo": "●PRODUTIVO\nv1.0.0 · 1.1.0-SNAPSHOT · aaaaaaa\n⚠ Desatualizado, publicando…"
+    },
+    "CA11-aguardando-safe": {
+      "ok": true,
+      "v": "◷\nPublicação de bbbbbbb aguardando a resposta da conversa terminar."
+    },
+    "CA11-verificando": {
+      "ok": true,
+      "v": "↻\nPublicando bbbbbbb…"
+    },
+    "queda-reiniciando": {
+      "ok": true,
+      "d1": "↻\nReiniciando o Squad Control… O painel reconecta sozinho em alguns segundos.",
+      "d2": "↻\nReiniciando o Squad Control… O painel reconecta sozinho em alguns segundos.",
+      "srv": true,
+      "live": "✕\nSem conexão desde 19:15:23"
+    },
+    "CA13-recarga-automatica": {
+      "ok": true,
+      "hash": "#/demandas",
+      "bar": "✓\nSquad Control atualizado para v1.0.0 · 1.1.0-SNAPSHOT · bbbbbbb\n×",
+      "open": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "CA11-aviso-10s": {
+      "ok": true,
+      "v": ""
+    },
+    "CA13-rascunho-sem-recarga": {
+      "ok": true,
+      "marker": 2,
+      "bar": "✓\nSquad Control atualizado para v1.0.0 · ccccccc\n×\n↻\nNova versão do Squad Control no ar. Seu rascunho fica guardado ao recarregar.\nRecarregar",
+      "btn": true
+    },
+    "CA13-rascunho-preservado": {
+      "ok": true,
+      "draft": "rascunho importante D24"
+    },
+    "CA2-faixa-rollback": {
+      "ok": true,
+      "bar": "✕\nPublicação de ddddddd falhou (saúde após reinício); mantida a versão anterior v1.0.0 · 1.1.0-SNAPSHOT · ccccccc. Veja o log.\n×",
+      "selo": "●PRODUTIVO\nv1.0.0 · 1.1.0-SNAPSHOT · ccccccc\n⚠ [!] revertido (falhou ddddddd)",
+      "aria": "Ambiente: Produtivo. Versão v1.0.0 · 1.1.0-SNAPSHOT · ccccccc. Atenção: revertido (falhou ddddddd)"
+    },
+    "CA12-selo-revertido": {
+      "ok": true,
+      "bar": "✕\nPublicação de ddddddd falhou (saúde após reinício); mantida a versão anterior v1.0.0 · 1.1.0-SNAPSHOT · ccccccc. Veja o log.\n×",
+      "selo": "●PRODUTIVO\nv1.0.0 · 1.1.0-SNAPSHOT · ccccccc\n⚠ [!] revertido (falhou ddddddd)",
+      "aria": "Ambiente: Produtivo. Versão v1.0.0 · 1.1.0-SNAPSHOT · ccccccc. Atenção: revertido (falhou ddddddd)"
+    },
+    "faixa-falha-fechavel": {
+      "ok": true,
+      "v": ""
+    },
+    "CA2-faixa-preflight": {
+      "ok": true,
+      "v": "✕\nPublicação de ddddddd não foi feita (verificação prévia): SyntaxError em tools/squad/server.py, linha 12. A versão no ar continua v1.0.0 · 1.1.0-SNAPSHOT · ccccccc. Veja o log.\n×"
+    },
+    "CA14-interrompida": {
+      "ok": true,
+      "body": "Recebido. O registro confirma:\n\n08:47 – suas respostas à triagem da D19 fo\n\nResposta interrompida pela publicação do Squad Control. O texto já recebido ficou salvo.",
+      "foot": "■\nInterrompida pela publicação\ntotal 1,6 s\nReenviar",
+      "btn": "Reenviar"
+    },
+    "CA14-reenviar": {
+      "ok": true,
+      "humans": [
+        "FXD20 pergunta de teste da publicação",
+        "FXD20 pergunta de teste da publicação"
+      ]
+    },
+    "CA1-real-recarga-sozinha": {
+      "ok": true,
+      "marker": "recarregada",
+      "open": "9c1506ebbe4c4f42489819a4a76f5ebfd7abb137",
+      "hash": "#/demandas",
+      "bar": "✓\nSquad Control atualizado para sem tag · 1.1.0-SNAPSHOT · 9c1506e\n×",
+      "secs": 27.2,
+      "htmlTemTitulo": true
+    }
+  },
+  "errors": []
+}
