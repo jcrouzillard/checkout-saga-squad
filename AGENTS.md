@@ -86,6 +86,10 @@ Ao terminar sua tarefa, todo agente:
   portas = produtivo + 10 000) só por `tools/squad/testenv.py`, e só por pedido do humano (`test-env-request`).
   Agentes nunca gravam `test-env-request` nem apagam dados do teste; para verificar isolamento usam
   `testenv.py prod-fingerprint` (só leitura).
+- **Publicação do Squad Control** (ADR-025): o supervisor `tools/squad/publisher.py` é o único processo autorizado a
+  avançar a `develop` da cópia principal fora do `gitflow.py`, e só por avanço simples (fast-forward), com HEAD em
+  `develop` e nenhuma operação git em andamento. O botão "Publicar Squad Control" e o evento `squad-publish-requested`
+  são só do humano: nenhum agente os usa.
 
 ## Convenções de código
 - Mensagens de commit e documentação em português; identificadores em inglês.
