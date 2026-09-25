@@ -1,0 +1,20 @@
+{
+  "demand": "6450aecde7f9",
+  "title": "D22 · F2a: resolvedor de produto e códigos de demanda congelados (ADR-024)",
+  "detail": "Contexto: fase F2a do plano do ADR-024 (docs/adr/024-plataforma-multiproduto.md, §6), que continua a D22.\n\nEntrega (ADR-024 §6, linha F2a):\n\nleitor do cadastro de produto, com o checkout-saga como produto padrão implícito. Sem informar produto, tudo continua igual a hoje;\ncadastro mínimo product.toml do checkout-saga, ainda dentro deste repositório;\ncódigos de demanda congelados: o registro de cada demanda passa a gravar o código, e as demandas antigas ficam fixadas pelo id, com apelidos para os códigos que os contratos citam de forma diferente;\ngitflow, github_sync e triage passam a respeitar o log configurado;\nas transcrições das execuções continuam aparecendo no painel quando a execução roda num worktree ou com a memória em outro lugar.\nMinhas respostas às perguntas do ADR-024 §9:\n\nQ2 (numeração): [preencher]\nQ3 (histórico legado): [preencher]\nCritério de aceite: os critérios (a) a (d) da F2a no §6 do ADR-024. Os códigos D1–D22 do painel ficam iguais aos de hoje.\n\nFora do escopo: mover arquivos, a memória ou o repositório (isso é da F2b em diante). Mudar o comportamento de quem não informa produto.\n\n5. As duas respostas, que são suas. Minha sugestão, se quiser aproveitar:\n\nQ2: \"A numeração continua D global (D23, D24…) até a F5. A partir da F5, as demandas da plataforma usam o prefixo P (P1, P2…). A D22 continua D22, e D1–D22 ficam congeladas como estão hoje no painel.\"\nQ3: \"Aceito: D1–D21 inteiras na memória do checkout, sem dividir por tipo, visíveis como somente leitura na plataforma.\"\n6. Depois de registrar: o Arquiteto faz a triagem em cerca de 1 minuto. Se vierem perguntas, responda no cartão da demanda e clique em Iniciar.\n\nSobre a D12: a F2a pode correr com o PR #104 da D12 aberto. Pela regra do ADR-024 (§4.11), o Orquestrador vai registrar essa branch em andamento e pedir que você escolha: integrar antes ou deixar a D12 absorver a F2a depois.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-25T17:26:48+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "A resposta à Q2 do ADR-024 §9 ainda está como \"[preencher]\", e o §6 diz que a F2a só começa com essa resposta, porque ela define o `code` e o `code_prefix` gravados em cada demanda. Você adota a sugestão da descrição? Ela diz: numeração D global (D23, D24…) até a F5, prefixo P para a plataforma a partir da F5, a D22 continua D22 e D1–D22 ficam congeladas. Se não adotar, qual numeração vale?",
+      "dimension": "restricoes",
+      "answer": "Adoto a sugestão. Q2: a numeração continua D global (D23, D24…) até a F5; a partir da F5, as demandas do produto squad-platform usam o prefixo P (P1, P2…); o checkout continua em D. D1–D23 ficam congeladas como aparecem hoje no painel (a D22 continua D22 e esta demanda continua D23). Q3: aceito manter D1–D21 inteiras na memória do checkout, sem dividir por tipo, visíveis como somente leitura na plataforma."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
