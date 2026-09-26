@@ -1,0 +1,25 @@
+{
+  "demand": "e3759bc0526a",
+  "title": "Painel mais vivo: movimento com propósito no tema Grafite",
+  "detail": "O que eu quero: deixar o Squad Control mais animado sem perder a sobriedade do tema Grafite (D14):\n\nfluxo da demanda ao vivo, com o passo atual em andamento e o resultado de cada gate aparecendo (✓ aprovado, ↩ devolvido);\nanimação curta de passagem de bastão entre os cartões dos agentes a cada handoff;\ncartões de agente com anel de atividade, troca suave do passo atual e selo do executor (D26);\neventos novos entrando com leve deslizar e realce temporário, na linha do tempo e no sino;\ncontadores animando até o valor novo;\nesqueletos de carregamento;\nconfirmação breve e elegante ao entregar uma demanda;\nmodo apresentação em tela cheia com a squad ao vivo.\nRegras:\n\ntokens de movimento únicos (durações e curvas) documentados no contrato do tema;\nprefers-reduced-motion: reduce desliga todas as animações;\nsem bibliotecas novas;\nsem aumentar o custo do /api/live (ADR-017);\nacessibilidade WCAG 2.2 AA mantida, com estado nunca só por cor ou movimento;\nclaro e escuro.\nCritério de aceite:\n\nnuma demanda em andamento, vejo o fluxo avançar, a passagem de bastão a cada handoff e o gate aparecer ao sair o parecer;\ncom \"reduzir movimento\" ligado no sistema, nada anima e toda a informação continua visível;\ntestes de interface em 390 px e 1440 px, claro e escuro, como nas D13–D20.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-26T17:30:45+00:00",
+  "kind": "operacao",
+  "clarifications": [
+    {
+      "question": "O modo apresentação em tela cheia é o único item sem equivalente no painel atual. O que ele deve mostrar quando houver mais de uma demanda ativa: a demanda selecionada, a mais recente em execução (como o painel já escolhe em squad-control/index.html:1464) ou todas as ativas? E ele fica restrito à leitura, sem botões de ação (pausar, aprovar, publicar), saindo com Esc?",
+      "dimension": "escopo",
+      "answer": "Pense em algo onde não vire uma bagunça, mas tenha informacões sobre todas as demandas ativas e como elas esta progrendido.\nNo modo tela chei, fica restrito a leitura mesmo."
+    },
+    {
+      "question": "O critério de aceite não cobre o modo apresentação, os contadores, os esqueletos nem a confirmação de entrega. Esses itens têm prioridade igual e entram todos nesta demanda, com testes em 390/1440 px e nos temas claro e escuro? Ou o aceite mínimo é só o fluxo, a passagem de bastão, o gate e o reduzir movimento, e o resto pode sair numa demanda seguinte, se o G3 apertar?",
+      "dimension": "aceite",
+      "answer": "Ebtra cmo criterio de aceite sim."
+    }
+  ],
+  "override": false,
+  "fromBacklog": false
+}
