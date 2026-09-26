@@ -1,0 +1,14 @@
+{
+  "demand": "44aa6232e662",
+  "title": "Instalar o coletor de consumo do Claude Code pelo painel (statusline)",
+  "detail": "Autorização: autorizo a squad a alterar o meu ~/.claude/settings.json para instalar o coletor tools/squad/statusline_usage.py, conforme docs/contracts/ui-consumo-da-ia.md §2, com backup da statusline atual.\n\nO que eu quero:\n\nNo cartão de consumo, quando aparecer \"Statusline não instalada\", um botão Instalar coletor. Antes de instalar, ele mostra uma confirmação explicando que vai mexer no ~/.claude/settings.json.\nA instalação preserva a minha statusline atual (o coletor chama a anterior depois), faz backup e não instala duas vezes.\nUm botão Desinstalar, que restaura o backup.\nO coletor grava na mesma pasta que o painel lê, mesmo quando o painel é publicado pelo supervisor (D24) ou roda a partir de outra cópia.\nCada instalação e desinstalação é registrada no log.\nDepois de instalar, o cartão avisa: \"Abra uma sessão interativa do Claude Code para gerar o primeiro dado\", porque as execuções dos agentes (claude -p) não alimentam o coletor.\nCritério de aceite: clico em Instalar, confirmo, abro o Claude Code e mando uma mensagem. O cartão passa a mostrar as janelas de 5 h e de 7 dias com números reais. Desinstalar volta a minha statusline exatamente como era.",
+  "priority": "normal",
+  "route": "padrao",
+  "target": "auto",
+  "note": "",
+  "startedAt": "2026-09-26T17:20:01+00:00",
+  "kind": "operacao",
+  "clarifications": [],
+  "override": false,
+  "fromBacklog": false
+}
